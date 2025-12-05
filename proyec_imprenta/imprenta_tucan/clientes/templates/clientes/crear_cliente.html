@@ -1,0 +1,38 @@
+{% extends 'base.html' %}
+{% block title %}Nuevo Cliente{% endblock %}
+{% block content %}
+<div class="max-w-4xl mx-auto">
+  <h1 class="text-4xl font-black mb-8">Registrar Nuevo Cliente</h1>
+  <form method="post" class="space-y-8">
+    {% csrf_token %}
+
+    <section>
+      <h2 class="text-2xl font-bold mb-4 border-b pb-2">Datos Personales</h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {{ form.nombre }}
+        {{ form.apellido }}
+      </div>
+    </section>
+
+    <section>
+      <h2 class="text-2xl font-bold mb-4 border-b pb-2">Razón Social</h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {{ form.razon_social }}
+      </div>
+    </section>
+
+    <section>
+      <h2 class="text-2xl font-bold mb-4 border-b pb-2">Contacto</h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {{ form.telefono }}
+        {{ form.email }}
+      </div>
+    </section>
+
+    <div class="flex justify-end gap-4 pt-4">
+      <a href="{% url 'lista_clientes' %}" class="px-6 py-3 rounded-lg bg-gray-light hover:bg-gray-dark font-bold">Cancelar</a>
+      <button type="submit" class="px-6 py-3 rounded-lg bg-primary text-white font-bold hover:bg-primary-dark">Guardar</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

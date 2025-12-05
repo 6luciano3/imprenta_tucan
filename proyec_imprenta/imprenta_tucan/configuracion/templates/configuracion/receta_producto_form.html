@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="max-w-xl mx-auto bg-white shadow rounded-xl p-8">
+  <h2 class="text-xl font-bold mb-6">{{ form.instance.pk|yesno:"Editar Receta,Nueva Receta" }}</h2>
+  <form method="post" class="space-y-5">
+    {% csrf_token %}
+    <div>
+      <label for="id_producto" class="block font-semibold mb-1">Producto</label>
+      {{ form.producto }}
+    </div>
+    <div>
+      <label for="id_formula" class="block font-semibold mb-1">Fórmula</label>
+      {{ form.formula }}
+    </div>
+    <div>
+      <label for="id_insumos" class="block font-semibold mb-1">Insumos</label>
+      {{ form.insumos }}
+    </div>
+    <div>
+      <label for="id_descripcion" class="block font-semibold mb-1">Descripción</label>
+      {{ form.descripcion }}
+    </div>
+    <div>
+      <label for="id_activo" class="block font-semibold mb-1">Activo</label>
+      {{ form.activo }}
+    </div>
+    <div class="flex gap-3 mt-6">
+      <button type="submit" class="px-4 py-2 bg-primary text-white rounded hover:bg-primary-dark transition">Guardar</button>
+      <a href="{% url 'receta_producto_list' %}" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition">Volver</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

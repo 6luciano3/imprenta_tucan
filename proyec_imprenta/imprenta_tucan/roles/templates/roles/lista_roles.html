@@ -1,0 +1,111 @@
+{% extends 'layouts/list_base.html' %}
+{% block title %}Roles{% endblock %}
+
+{% block list_icon %}<span class="material-symbols-outlined text-3xl">verified_user</span>{% endblock %}
+{% block list_title_text %}Lista de Roles{% endblock %}
+{% block new_button_href %}{% url 'alta_rol' %}{% endblock %}
+{% block new_button_label %}Nuevo Rol{% endblock %}
+{% block search_placeholder %}Nombre, descripción, estado...{% endblock %}
+{% block clear_url %}{% url 'lista_roles' %}{% endblock %}
+{% block order_fields_options %}
+  <option value="idRol" {% if order_by == 'idRol' %}selected{% endif %}>ID</option>
+  <option value="nombreRol" {% if order_by == 'nombreRol' %}selected{% endif %}>Nombre</option>
+  <option value="descripcion" {% if order_by == 'descripcion' %}selected{% endif %}>Descripción</option>
+  <option value="estado" {% if order_by == 'estado' %}selected{% endif %}>Estado</option>
+{% endblock %}
+
+{% block list_content %}
+
+  <!-- Tabla -->
+  <div class="bg-white shadow rounded-xl overflow-hidden table-responsive">
+    <table class="w-full min-w-[980px] text-left text-sm">
+      <thead class="bg-gray-100 text-left text-xs uppercase text-gray-600">
+        <tr>
+          <th class="px-4 py-3">Nombre</th>
+          <th class="px-4 py-3">Descripción</th>
+          <th class="px-4 py-3">Estado</th>
+          <th class="px-4 py-3">Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for rol in roles %}
+          <tr class="border-t">
+            <td class="px-4 py-2 font-medium">{{ rol.nombreRol }}</td>
+            <td class="px-4 py-2 text-gray-600">{{ rol.descripcion }}</td>
+            <td class="px-4 py-2">
+              {% if rol.estado == 'Activo' %}
+                <span class="text-green-600 font-semibold">{{ rol.estado }}</span>
+              {% else %}
+                <span class="text-red-600 font-semibold">{{ rol.estado }}</span>
+              {% endif %}
+            </td>
+            <td class="px-4 py-2">
+              <div class="flex gap-2">
+                <a href="{% url 'modificar_rol' rol.idRol %}"
+                   class="inline-flex items-center px-3 py-1 rounded bg-blue-100 text-blue-700 hover:bg-blue-200"
+                   title="Editar rol" aria-label="Editar rol">
+                  <span class="material-symbols-outlined text-base">edit</span>
+                </a>
+                {% if rol.estado == 'Activo' %}
+                  <form method="post" action="{% url 'desactivar_rol' rol.idRol %}">
+                    {% csrf_token %}
+                    <button type="submit"
+                            class="inline-flex items-center px-3 py-1 rounded bg-yellow-100 text-yellow-700 hover:bg-yellow-200"
+                            title="Desactivar rol" aria-label="Desactivar rol">
+                      <span class="material-symbols-outlined text-base">block</span>
+                    </button>
+                  </form>
+                {% else %}
+                  <form method="post" action="{% url 'reactivar_rol' rol.idRol %}">
+                    {% csrf_token %}
+                    <button type="submit"
+                            class="inline-flex items-center px-3 py-1 rounded bg-green-100 text-green-700 hover:bg-green-200"
+                            title="Activar rol" aria-label="Activar rol">
+                      <span class="material-symbols-outlined text-base">check_circle</span>
+                    </button>
+                  </form>
+                {% endif %}
+                <form method="post" action="{% url 'eliminar_rol' rol.idRol %}" onsubmit="return confirm('¿Eliminar este rol? Esta acción no se puede deshacer.');">
+                  {% csrf_token %}
+                  <button type="submit"
+                          class="inline-flex items-center px-3 py-1 rounded bg-red-100 text-red-700 hover:bg-red-200"
+                          title="Eliminar rol" aria-label="Eliminar rol">
+                    <span class="material-symbols-outlined text-base">delete</span>
+                  </button>
+                </form>
+              </div>
+            </td>
+          </tr>
+        {% empty %}
+          <tr>
+            <td colspan="4" class="px-4 py-4 text-center text-gray-500">No se encontraron roles.</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <!-- Paginación -->
+  <div class="px-5 py-4 border-t border-gray-200">
+      <div class="flex justify-end items-center gap-2">
+        {% if roles.has_previous %}
+          <a href="?q={{ query }}&order_by={{ order_by }}&direction={{ direction }}&page=1" class="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm">
+            <span class="material-symbols-outlined text-sm">first_page</span>
+          </a>
+          <a href="?q={{ query }}&order_by={{ order_by }}&direction={{ direction }}&page={{ roles.previous_page_number }}" class="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm">
+            <span class="material-symbols-outlined text-sm">chevron_left</span>
+          </a>
+        {% endif %}
+        <span class="text-sm text-gray-700">Página {{ roles.number }} de {{ roles.paginator.num_pages }}</span>
+        {% if roles.has_next %}
+          <a href="?q={{ query }}&order_by={{ order_by }}&direction={{ direction }}&page={{ roles.next_page_number }}" class="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm">
+            <span class="material-symbols-outlined text-sm">chevron_right</span>
+          </a>
+          <a href="?q={{ query }}&order_by={{ order_by }}&direction={{ direction }}&page={{ roles.paginator.num_pages }}" class="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm">
+            <span class="material-symbols-outlined text-sm">last_page</span>
+          </a>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+{% endblock %}

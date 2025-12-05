@@ -1,0 +1,30 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1 class="text-2xl font-bold mb-6">Panel de Configuración</h1>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+  <div class="bg-white rounded-xl shadow p-6 flex flex-col items-start">
+    <div class="flex items-center gap-3 mb-2">
+      <span class="material-symbols-outlined text-primary text-3xl">straighten</span>
+      <span class="text-lg font-semibold">Unidades de Medida</span>
+    </div>
+    <p class="text-gray-600 mb-4">Gestiona las unidades de medida utilizadas en el sistema.</p>
+    <a href="{% url 'unidad_list' %}" class="px-4 py-2 bg-primary text-white rounded hover:bg-primary-dark transition">Ir a Unidades</a>
+  </div>
+  <div class="bg-white rounded-xl shadow p-6 flex flex-col items-start">
+    <div class="flex items-center gap-3 mb-2">
+      <span class="material-symbols-outlined text-primary text-3xl">settings</span>
+      <span class="text-lg font-semibold">Fórmulas</span>
+    </div>
+    <p class="text-gray-600 mb-4">Administra las fórmulas configurables del sistema.</p>
+    <a href="{% url 'lista_formulas' %}" class="px-4 py-2 bg-primary text-white rounded hover:bg-primary-dark transition">Ir a Fórmulas</a>
+  </div>
+</div>
+  <div class="bg-white rounded-xl shadow p-6 flex flex-col items-start">
+    <div class="flex items-center gap-3 mb-2">
+      <span class="material-symbols-outlined text-primary text-3xl">receipt_long</span>
+      <span class="text-lg font-semibold">Recetas de Productos</span>
+    </div>
+    <p class="text-gray-600 mb-4">Gestiona las recetas que vinculan productos, fórmulas e insumos.</p>
+    <a href="{% url 'receta_producto_list' %}" class="px-4 py-2 bg-primary text-white rounded hover:bg-primary-dark transition">Ir a Recetas</a>
+  </div>
+{% endblock %}

@@ -1,0 +1,141 @@
+{% extends 'base.html' %}
+{% block title %}Modificar Pedido{% endblock %}
+
+{% block extra_head %}
+<!-- Bootstrap 5 CDN (solo para esta pantalla) -->
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3 fw-bold mb-0">✏️ Modificar pedido</h1>
+    <a href="{% url 'lista_pedidos' %}" class="btn btn-secondary">Volver</a>
+  </div>
+
+  {% if messages %}
+    <div class="mb-3">
+      {% for message in messages %}
+        <div class="alert alert-{{ message.tags }} mb-2">{{ message }}</div>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <div id="stockAlert" class="alert alert-danger d-none" role="alert"></div>
+      <form method="post" novalidate>
+        {% csrf_token %}
+
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label">Cliente</label>
+            <input type="text" class="form-control" value="{{ pedido.cliente }}" disabled>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Producto</label>
+            {{ form.producto }}
+          </div>
+
+        <div class="col-md-4">
+            <label class="form-label">Fecha de Pedido</label>
+            <input type="date" class="form-control" value="{{ pedido.fecha_pedido|date:'Y-m-d' }}" disabled>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Fecha de Entrega</label>
+            {{ form.fecha_entrega }}
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Cantidad</label>
+            {{ form.cantidad }}
+          </div>
+
+          <div class="col-md-4">
+            <label class="form-label">Estado</label>
+            {{ form.estado }}
+          </div>
+
+          <div class="col-12">
+            <label class="form-label">Especificaciones</label>
+            {{ form.especificaciones }}
+          </div>
+
+          <div class="col-md-4">
+            <label class="form-label">Monto Total</label>
+            <input id="montoTotal" class="form-control" type="text" value="{{ pedido.monto_total }}" readonly>
+            <div class="form-text">Se calcula automáticamente: precio del producto x cantidad.</div>
+          </div>
+        </div>
+
+        <div class="d-flex justify-content-end gap-2 mt-4">
+          <a href="{% url 'lista_pedidos' %}" class="btn btn-outline-secondary">Cancelar</a>
+          <button type="submit" class="btn btn-primary" id="btnSubmit">Guardar Cambios</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Cálculo de monto total en el cliente usando mapa de precios inyectado
+  (function() {
+  const precios = {{ precios|default:'{}'|safe }};
+    const cantidadInput = document.querySelector('input[name="cantidad"]');
+    const productoSelect = document.querySelector('select[name="producto"]');
+    const monto = document.getElementById('montoTotal');
+    const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
+    const stockAlert = document.getElementById('stockAlert');
+    const btnSubmit = document.getElementById('btnSubmit');
+
+    function recalc() {
+      const cant = parseInt(cantidadInput?.value || '0', 10) || 0;
+      const productoId = parseInt(productoSelect?.value || '0', 10);
+      const precio = precios[productoId] || 0;
+      const total = (precio * cant).toFixed(2);
+      monto.value = isFinite(total) ? total : '0.00';
+    }
+
+    function clearStockAlert() {
+      stockAlert.classList.add('d-none');
+      stockAlert.textContent = '';
+      btnSubmit.disabled = false;
+    }
+
+    let debounceTimer;
+    function scheduleCheckStock() {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(checkStock, 400);
+    }
+
+    async function checkStock() {
+      const cant = parseInt(cantidadInput?.value || '0', 10) || 0;
+      const productoId = parseInt(productoSelect?.value || '0', 10);
+      if (!productoId || cant <= 0) { clearStockAlert(); return; }
+      try {
+        const resp = await fetch('{% url "verificar_stock_modificar" pedido.id %}', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+          body: JSON.stringify({ producto: productoId, cantidad: cant })
+        });
+        if (!resp.ok) throw new Error('Error en verificación');
+        const data = await resp.json();
+        if (data.ok) { clearStockAlert(); return; }
+        const detalle = (data.faltantes || []).map(f => `${f.codigo} - ${f.nombre}: faltan ${Number(f.faltan).toFixed(2)}`).join(', ');
+        stockAlert.textContent = detalle || 'No hay insumos suficientes para la modificación.';
+        stockAlert.classList.remove('d-none');
+        btnSubmit.disabled = true;
+      } catch (e) {
+        stockAlert.textContent = 'No se pudo verificar el stock en este momento.';
+        stockAlert.classList.remove('d-none');
+        btnSubmit.disabled = false;
+      }
+    }
+
+    cantidadInput?.addEventListener('input', () => { recalc(); scheduleCheckStock(); });
+    productoSelect?.addEventListener('change', () => { recalc(); scheduleCheckStock(); });
+    recalc();
+    scheduleCheckStock();
+  })();
+</script>
+{% endblock %}

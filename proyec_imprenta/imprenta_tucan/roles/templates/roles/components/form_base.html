@@ -1,0 +1,18 @@
+<form method="POST" class="space-y-6">
+  {% csrf_token %}
+  {% for field in form %}
+    <div>
+      <label for="{{ field.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">
+        {{ field.label }}
+      </label>
+      {{ field }}
+      {% if field.errors %}
+        <p class="text-sm text-red-600 mt-1">{{ field.errors.as_text|slice:"2:" }}</p>
+      {% endif %}
+    </div>
+  {% endfor %}
+  <div class="flex justify-end gap-4 pt-4">
+    <a href="{% url return_url %}" class="px-4 py-2 rounded-lg bg-gray-300 text-sm">Cancelar</a>
+    <button type="submit" class="px-4 py-2 rounded-lg bg-primary text-white text-sm">Guardar</button>
+  </div>
+</form>

@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block content %}
+  <div class="container mt-5">
+    <h2>Dar de baja un rol</h2>
+    <p>¿Estás seguro de que deseas dar de baja el rol "{{ rol.nombreRol }}"?</p>
+    <form method="post">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-danger">Confirmar</button>
+      <a href="{% url 'roles_list' %}" class="btn btn-secondary">Cancelar</a>
+    </form>
+  </div>
+{% endblock %}

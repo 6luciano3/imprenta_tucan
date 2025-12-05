@@ -1,0 +1,105 @@
+{% extends 'layouts/list_base.html' %}
+{% block title %}Usuarios{% endblock %}
+
+{% block list_icon %}<span class="material-symbols-outlined text-3xl">groups</span>{% endblock %}
+{% block list_title_text %}Lista de Usuarios{% endblock %}
+{% block new_button_href %}{% url 'alta_usuario' %}{% endblock %}
+{% block new_button_label %}Nuevo Usuario{% endblock %}
+{% block search_placeholder %}Nombre, apellido, email, teléfono, rol...{% endblock %}
+{% block clear_url %}{% url 'lista_usuarios' %}{% endblock %}
+{% block order_fields_options %}
+  <option value="id" {% if order_by == 'id' %}selected{% endif %}>ID</option>
+  <option value="nombre" {% if order_by == 'nombre' %}selected{% endif %}>Nombre</option>
+  <option value="apellido" {% if order_by == 'apellido' %}selected{% endif %}>Apellido</option>
+  <option value="email" {% if order_by == 'email' %}selected{% endif %}>Email</option>
+  <option value="telefono" {% if order_by == 'telefono' %}selected{% endif %}>Teléfono</option>
+  <option value="rol__nombreRol" {% if order_by == 'rol__nombreRol' %}selected{% endif %}>Rol</option>
+  <option value="estado" {% if order_by == 'estado' %}selected{% endif %}>Estado</option>
+{% endblock %}
+
+{% block list_content %}
+
+    <!-- Tabla de usuarios -->
+    <div class="bg-white shadow rounded-xl overflow-hidden table-responsive">
+      <table class="w-full min-w-[980px] text-left text-sm">
+        <thead class="bg-gray-100 dark:bg-gray-800 text-left text-xs uppercase text-gray-600 dark:text-gray-400">
+          <tr>
+            <th class="px-6 py-3">ID</th>
+            <th class="px-6 py-3">Nombre</th>
+            <th class="px-6 py-3">Email</th>
+            <th class="px-6 py-3">Teléfono</th>
+            <th class="px-6 py-3">Rol</th>
+            <th class="px-6 py-3">Estado</th>
+            <th class="px-6 py-3">Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for usuario in usuarios %}
+          <tr class="border-t border-[#dbe0e6] dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition">
+            <td class="px-6 py-4 text-[#617589] dark:text-gray-400">{{ usuario.id }}</td>
+            <td class="px-6 py-4 text-[#111418] dark:text-white">{{ usuario.nombre }} {{ usuario.apellido }}</td>
+            <td class="px-6 py-4 text-[#111418] dark:text-white">{{ usuario.email }}</td>
+            <td class="px-6 py-4 text-[#111418] dark:text-white">{{ usuario.telefono }}</td>
+            <td class="px-6 py-4 text-[#111418] dark:text-white">{{ usuario.rol.nombreRol }}</td>
+            <td class="px-6 py-4 text-[#111418] dark:text-white">{{ usuario.estado }}</td>
+            <td class="px-6 py-4 text-[#617589] dark:text-gray-400 font-bold">
+              <div class="flex gap-2 flex-wrap">
+                <a href="{% url 'detalle_usuario' usuario.id %}"
+                   class="text-primary hover:text-primary/80 flex items-center gap-1"
+                   title="Ver detalles" aria-label="Ver detalles">
+                  <span class="material-symbols-outlined text-base">visibility</span>
+                </a>
+                <a href="{% url 'modificar_usuario' usuario.id %}"
+                   class="text-yellow-600 hover:text-yellow-800 flex items-center gap-1"
+                   title="Editar usuario" aria-label="Editar usuario">
+                  <span class="material-symbols-outlined text-base">edit</span>
+                </a>
+                {% if usuario.estado == 'Activo' %}
+                  <a href="{% url 'baja_usuario' usuario.id %}"
+                     class="text-red-600 hover:text-red-800 flex items-center gap-1"
+                     title="Desactivar usuario" aria-label="Desactivar usuario">
+                    <span class="material-symbols-outlined text-base">block</span>
+                  </a>
+                {% else %}
+                  <a href="{% url 'reactivar_usuario' usuario.id %}"
+                     class="text-green-600 hover:text-green-800 flex items-center gap-1"
+                     title="Activar usuario" aria-label="Activar usuario">
+                    <span class="material-symbols-outlined text-base">check_circle</span>
+                  </a>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="7" class="px-6 py-6 text-center text-gray-500 dark:text-gray-400">No se encontraron usuarios.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+  <!-- Paginación (estilo unificado) -->
+    <div class="px-5 py-4">
+      <div class="flex justify-end items-center gap-2">
+        {% if usuarios.has_previous %}
+          <a href="?q={{ query }}&order_by={{ order_by }}&direction={{ direction }}&page=1" class="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm">
+            <span class="material-symbols-outlined text-sm">first_page</span>
+          </a>
+          <a href="?q={{ query }}&order_by={{ order_by }}&direction={{ direction }}&page={{ usuarios.previous_page_number }}" class="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm">
+            <span class="material-symbols-outlined text-sm">chevron_left</span>
+          </a>
+        {% endif %}
+        <span class="text-sm text-gray-700">Página {{ usuarios.number }} de {{ usuarios.paginator.num_pages }}</span>
+        {% if usuarios.has_next %}
+          <a href="?q={{ query }}&order_by={{ order_by }}&direction={{ direction }}&page={{ usuarios.next_page_number }}" class="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm">
+            <span class="material-symbols-outlined text-sm">chevron_right</span>
+          </a>
+          <a href="?q={{ query }}&order_by={{ order_by }}&direction={{ direction }}&page={{ usuarios.paginator.num_pages }}" class="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm">
+            <span class="material-symbols-outlined text-sm">last_page</span>
+          </a>
+        {% endif %}
+      </div>
+  </div>
+ 
+{% endblock %}

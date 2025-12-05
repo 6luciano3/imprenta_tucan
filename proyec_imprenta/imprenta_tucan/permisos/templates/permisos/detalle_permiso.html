@@ -1,0 +1,38 @@
+{% extends 'base.html' %}
+{% block title %}Detalle de Permiso{% endblock %}
+{% block content %}
+<div class="max-w-3xl mx-auto">
+  <h1 class="text-3xl font-black mb-6 flex items-center gap-2">
+    <span class="material-symbols-outlined text-4xl">visibility</span>
+    Detalle del Permiso
+  </h1>
+
+  <div class="bg-white rounded-xl shadow p-6">
+    <dl class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <dt class="text-sm font-medium text-gray-500">Nombre del Permiso:</dt>
+      <dd class="sm:col-span-2 font-medium">{{ permiso.nombre }}</dd>
+
+      <dt class="text-sm font-medium text-gray-500">Descripción:</dt>
+      <dd class="sm:col-span-2">{{ permiso.descripcion }}</dd>
+
+      <dt class="text-sm font-medium text-gray-500">Módulo:</dt>
+      <dd class="sm:col-span-2">{{ permiso.modulo }}</dd>
+
+      <dt class="text-sm font-medium text-gray-500">Acciones:</dt>
+      <dd class="sm:col-span-2">
+        Crear, Listar, Ver, Editar, Actualizar, Eliminar, Activar, Desactivar, Aprobar, Rechazar, Exportar, Importar, Imprimir, Descargar
+      </dd>
+
+      <dt class="text-sm font-medium text-gray-500">Estado:</dt>
+      <dd class="sm:col-span-2">
+        <span class="px-2 py-1 rounded text-xs {% if permiso.estado == 'Activo' %}bg-green-100 text-green-700{% else %}bg-gray-200 text-gray-700{% endif %}">{{ permiso.estado }}</span>
+      </dd>
+    </dl>
+
+    <div class="mt-6 flex justify-end gap-3">
+      <a href="{% url 'buscar_permiso' %}" class="px-4 py-2 rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300">Volver a búsqueda</a>
+      <a href="{% url 'lista_permisos' %}" class="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700">Ir a lista</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

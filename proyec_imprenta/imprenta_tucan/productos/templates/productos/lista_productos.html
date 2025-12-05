@@ -1,0 +1,117 @@
+{% extends 'layouts/list_base.html' %}
+{% block title %}Lista de Productos{% endblock %}
+
+{% block list_icon %}<span class="material-symbols-outlined text-3xl">inventory_2</span>{% endblock %}
+{% block list_title_text %}Lista de Productos{% endblock %}
+{% block new_button %}
+  {% if can_productos_crear %}
+    <a href="{% url 'alta_producto' %}"
+       class="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg shadow hover:bg-green-700">
+      <span class="material-symbols-outlined">add</span>
+      Nuevo Producto
+    </a>
+  {% endif %}
+{% endblock %}
+{% block search_placeholder %}Nombre, descripción, categoría, tipo, unidad...{% endblock %}
+{% block clear_url %}{% url 'lista_productos' %}{% endblock %}
+{% block order_fields_options %}
+  <option value="idProducto" {% if order_by == 'idProducto' %}selected{% endif %}>ID</option>
+  <option value="nombreProducto" {% if order_by == 'nombreProducto' %}selected{% endif %}>Nombre</option>
+  <option value="precioUnitario" {% if order_by == 'precioUnitario' %}selected{% endif %}>Precio</option>
+  <option value="categoriaProducto__nombreCategoria" {% if order_by == 'categoriaProducto__nombreCategoria' %}selected{% endif %}>Categoría</option>
+  <option value="tipoProducto__nombreTipoProducto" {% if order_by == 'tipoProducto__nombreTipoProducto' %}selected{% endif %}>Tipo</option>
+  <option value="unidadMedida__nombreUnidad" {% if order_by == 'unidadMedida__nombreUnidad' %}selected{% endif %}>Unidad</option>
+{% endblock %}
+
+{% block list_content %}
+
+<div class="bg-white shadow rounded-xl overflow-hidden table-responsive">
+  <table class="w-full min-w-[980px] text-left text-sm">
+    <thead class="bg-gray-100 text-gray-700">
+      <tr>
+        <th class="py-3 px-5">ID</th>
+        <th class="py-3 px-5">Nombre del Producto</th>
+        <th class="py-3 px-5 hidden lg:table-cell">Descripción</th>
+        <th class="py-3 px-5">Precio Unitario</th>
+        <th class="py-3 px-5 hidden md:table-cell">Categoría</th>
+        <th class="py-3 px-5 hidden md:table-cell">Tipo</th>
+        <th class="py-3 px-5 hidden md:table-cell">Unidad de Medida</th>
+        <th class="py-3 px-5 text-center">Acciones</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for producto in productos %}
+      <tr class="border-b hover:bg-gray-50">
+        <td class="py-3 px-5 font-medium">{{ producto.idProducto }}</td>
+        <td class="py-3 px-5">{{ producto.nombreProducto }}</td>
+        <td class="py-3 px-5 hidden lg:table-cell">{{ producto.descripcion|default:'-' }}</td>
+        <td class="py-3 px-5">${{ producto.precioUnitario }}</td>
+        <td class="py-3 px-5 hidden md:table-cell">{{ producto.categoriaProducto }}</td>
+        <td class="py-3 px-5 hidden md:table-cell">{{ producto.tipoProducto }}</td>
+        <td class="py-3 px-5 hidden md:table-cell">{{ producto.unidadMedida }}</td>
+        <td class="py-3 px-5 flex justify-center gap-3">
+          <a href="{% url 'detalle_producto' producto.idProducto %}"
+             class="text-blue-600 hover:text-blue-800 flex items-center gap-1" title="Ver detalles">
+            <span class="material-symbols-outlined text-sm">visibility</span>
+          </a>
+          {% if can_productos_editar %}
+          <a href="{% url 'modificar_producto' producto.idProducto %}"
+             class="text-amber-600 hover:text-amber-800 flex items-center gap-1" title="Modificar">
+            <span class="material-symbols-outlined text-sm">edit</span>
+          </a>
+          {% endif %}
+          {% if can_productos_activar %}
+          <form method="POST" action="{% url 'activar_producto' producto.idProducto %}" class="inline">
+            {% csrf_token %}
+            <button type="submit" 
+                    class="{% if producto.activo %}text-orange-600 hover:text-orange-800{% else %}text-green-600 hover:text-green-800{% endif %} flex items-center gap-1"
+                    title="{% if producto.activo %}Desactivar{% else %}Activar{% endif %}">
+              <span class="material-symbols-outlined text-sm">
+                {% if producto.activo %}toggle_on{% else %}toggle_off{% endif %}
+              </span>
+            </button>
+          </form>
+          {% endif %}
+          {% if can_productos_eliminar %}
+          <a href="{% url 'eliminar_producto' producto.idProducto %}"
+             class="text-red-600 hover:text-red-800 flex items-center gap-1" title="Eliminar">
+            <span class="material-symbols-outlined text-sm">delete</span>
+          </a>
+          {% endif %}
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="8" class="text-center py-6 text-gray-500">No hay productos registrados.</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <!-- Controles de paginación (alineado con Clientes/Proveedores/Insumos) -->
+  <div class="px-5 py-4 border-t border-gray-200">
+    <div class="flex justify-end items-center gap-2">
+      {% if productos.has_previous %}
+        <a href="?q={{ query }}&order_by={{ order_by }}&direction={{ direction }}&page=1" class="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm">
+          <span class="material-symbols-outlined text-sm">first_page</span>
+        </a>
+        <a href="?q={{ query }}&order_by={{ order_by }}&direction={{ direction }}&page={{ productos.previous_page_number }}" class="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm">
+          <span class="material-symbols-outlined text-sm">chevron_left</span>
+        </a>
+      {% endif %}
+
+      <span class="text-sm text-gray-700">
+        Página {{ productos.number }} de {{ productos.paginator.num_pages }}
+      </span>
+
+      {% if productos.has_next %}
+        <a href="?q={{ query }}&order_by={{ order_by }}&direction={{ direction }}&page={{ productos.next_page_number }}" class="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm">
+          <span class="material-symbols-outlined text-sm">chevron_right</span>
+        </a>
+        <a href="?q={{ query }}&order_by={{ order_by }}&direction={{ direction }}&page={{ productos.paginator.num_pages }}" class="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm">
+          <span class="material-symbols-outlined text-sm">last_page</span>
+        </a>
+      {% endif %}
+    </div>
+  </div>
+ </div>
+{% endblock %}

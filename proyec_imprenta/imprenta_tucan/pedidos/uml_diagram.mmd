@@ -1,0 +1,11 @@
+classDiagram
+    Cliente <|-- Pedido
+    Pedido "1" o-- "1" Producto
+    Pedido --> OrdenProduccion
+    Producto o-- Insumo : receta
+
+    class Cliente{ +int id\n+nombre\n+email }
+    class Pedido{ +int id\n+tiraje\n+estado }
+    class Producto{ +int id\n+tipo\n+receta }
+    class Insumo{ +int id\n+nombre\n+stock }
+    class OrdenProduccion{ +int id\n+estado }

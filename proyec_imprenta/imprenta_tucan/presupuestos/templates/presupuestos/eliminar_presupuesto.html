@@ -1,0 +1,15 @@
+{% extends 'base.html' %}
+{% block title %}Eliminar Presupuesto{% endblock %}
+{% block content %}
+<div class="container mx-auto max-w-lg py-8">
+  <h1 class="text-2xl font-bold mb-6 text-red-700">Eliminar presupuesto</h1>
+  <div class="bg-white p-6 rounded shadow">
+    <p class="mb-4">¿Estás seguro que deseas eliminar el presupuesto <strong>{{ presupuesto.numero }}</strong> del cliente <strong>{{ presupuesto.cliente }}</strong>?</p>
+    <form method="post">
+      {% csrf_token %}
+      <button type="submit" class="bg-red-600 text-white px-4 py-2 rounded">Eliminar</button>
+      <a href="{% url 'presupuestos:lista' %}" class="ml-2 text-blue-600">Cancelar</a>
+    </form>
+  </div>
+</div>
+{% endblock %}

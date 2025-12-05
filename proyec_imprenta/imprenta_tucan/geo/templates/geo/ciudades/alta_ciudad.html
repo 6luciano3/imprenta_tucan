@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+{% block title %}Nueva Ciudad{% endblock %}
+{% block extra_head %}
+  {% if request.GET.popup %}
+  <style>
+    nav, aside { display: none !important; }
+    main { padding: 0 !important; }
+    body { background: #fff !important; }
+  </style>
+  {% endif %}
+{% endblock %}
+{% block content %}
+<div class="max-w-xl mx-auto bg-white shadow rounded-xl p-6">
+  <h1 class="text-2xl font-semibold mb-4">Crear Ciudad</h1>
+  <form method="POST">
+    {% csrf_token %}
+    {% if request.GET.next %}<input type="hidden" name="next" value="{{ request.GET.next }}">{% endif %}
+    {% if request.GET.popup %}<input type="hidden" name="popup" value="1">{% endif %}
+    {{ form.non_field_errors }}
+    <div class="space-y-4">
+      <div>
+        <label for="id_nombre" class="block text-sm font-medium text-gray-700 mb-1">Nombre</label>
+        {{ form.nombre }}
+        {% for error in form.nombre.errors %}<p class="text-red-600 text-sm">{{ error }}</p>{% endfor %}
+      </div>
+      <div>
+        <label for="id_provincia" class="block text-sm font-medium text-gray-700 mb-1">Provincia</label>
+        {{ form.provincia }}
+        {% for error in form.provincia.errors %}<p class="text-red-600 text-sm">{{ error }}</p>{% endfor %}
+      </div>
+      <div class="flex items-center gap-2">
+        {{ form.activo }} <label for="id_activo" class="text-sm font-medium text-gray-700">Activo</label>
+      </div>
+    </div>
+    <div class="mt-6 flex gap-3">
+      <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Guardar</button>
+      <a href="{% url 'lista_ciudades' %}{% if request.GET.next or request.GET.popup %}?{% endif %}{% if request.GET.next %}next={{ request.GET.next|urlencode }}{% endif %}{% if request.GET.next and request.GET.popup %}&{% endif %}{% if request.GET.popup %}popup=1{% endif %}"
+         class="px-4 py-2 rounded border border-gray-300 text-gray-700 hover:bg-gray-50">Cancelar</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

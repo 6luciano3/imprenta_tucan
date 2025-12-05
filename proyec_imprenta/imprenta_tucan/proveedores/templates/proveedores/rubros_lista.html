@@ -1,0 +1,73 @@
+{% extends 'layouts/list_base.html' %}
+{% block title %}Rubros{% endblock %}
+{% block list_icon %}<span class="material-symbols-outlined text-3xl">category</span>{% endblock %}
+{% block list_title_text %}Rubros de la Industria Gráfica{% endblock %}
+{% block new_button_href %}{% url 'crear_rubro' %}{% if request.GET.popup %}?popup=1{% endif %}{% endblock %}
+{% block new_button_label %}Nuevo Rubro{% endblock %}
+{% block search_placeholder %}Buscar por nombre o descripción...{% endblock %}
+{% block clear_url %}{% url 'lista_rubros' %}{% if request.GET.popup %}?popup=1{% endif %}{% endblock %}
+{% block order_fields_options %}
+  <option value="nombre" {% if order_by == 'nombre' %}selected{% endif %}>Nombre</option>
+  <option value="activo" {% if order_by == 'activo' %}selected{% endif %}>Estado</option>
+  <option value="created_at" {% if order_by == 'created_at' %}selected{% endif %}>Creación</option>
+{% endblock %}
+{% block list_content %}
+<div class="bg-white shadow rounded-xl overflow-hidden table-responsive">
+  <table class="w-full min-w-[640px] text-left text-sm">
+    <thead class="bg-gray-100 text-gray-700">
+      <tr>
+        <th class="py-3 px-5">Nombre</th>
+        <th class="py-3 px-5 hidden md:table-cell">Descripción</th>
+        <th class="py-3 px-5 text-center">Estado</th>
+        <th class="py-3 px-5 text-center">Acciones</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in rubros %}
+      <tr class="border-b hover:bg-gray-50">
+        <td class="py-3 px-5 font-medium">{{ r.nombre }}</td>
+        <td class="py-3 px-5 hidden md:table-cell">{{ r.descripcion|default:'-' }}</td>
+        <td class="py-3 px-5 text-center">
+          <span class="text-xs px-2 py-1 rounded {% if r.activo %}bg-green-100 text-green-700{% else %}bg-gray-200 text-gray-700{% endif %}">
+            {% if r.activo %}Activo{% else %}Inactivo{% endif %}
+          </span>
+        </td>
+        <td class="py-3 px-5 flex justify-center gap-3">
+          <a href="{% url 'editar_rubro' r.id %}{% if request.GET.popup %}?popup=1{% endif %}" class="text-amber-600 hover:text-amber-800 flex items-center gap-1" title="Editar">
+            <span class="material-symbols-outlined text-sm">edit</span>
+          </a>
+          <a href="{% url 'eliminar_rubro' r.id %}{% if request.GET.popup %}?popup=1{% endif %}" class="text-red-600 hover:text-red-800 flex items-center gap-1" title="Eliminar">
+            <span class="material-symbols-outlined text-sm">delete</span>
+          </a>
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="4" class="text-center py-6 text-gray-500">No hay rubros registrados.</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <div class="px-5 py-4 border-t border-gray-200">
+    <div class="flex justify-end items-center gap-2">
+      {% if rubros.has_previous %}
+        <a href="?q={{ query }}&order_by={{ order_by }}&direction={{ direction }}&page=1" class="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm">
+          <span class="material-symbols-outlined text-sm">first_page</span>
+        </a>
+        <a href="?q={{ query }}&order_by={{ order_by }}&direction={{ direction }}&page={{ rubros.previous_page_number }}" class="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm">
+          <span class="material-symbols-outlined text-sm">chevron_left</span>
+        </a>
+      {% endif %}
+      <span class="text-sm text-gray-700">Página {{ rubros.number }} de {{ rubros.paginator.num_pages }}</span>
+      {% if rubros.has_next %}
+        <a href="?q={{ query }}&order_by={{ order_by }}&direction={{ direction }}&page={{ rubros.next_page_number }}" class="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm">
+          <span class="material-symbols-outlined text-sm">chevron_right</span>
+        </a>
+        <a href="?q={{ query }}&order_by={{ order_by }}&direction={{ direction }}&page={{ rubros.paginator.num_pages }}" class="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm">
+          <span class="material-symbols-outlined text-sm">last_page</span>
+        </a>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

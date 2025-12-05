@@ -1,0 +1,40 @@
+{% extends 'base.html' %}
+{% block title %}Detalle del Presupuesto{% endblock %}
+
+{% block content %}
+<div class="px-4 md:px-10 lg:px-20 xl:px-40 py-5">
+  <div class="max-w-3xl mx-auto">
+    <div class="flex justify-between items-center mb-6">
+      <h1 class="text-3xl font-black text-[#111418] dark:text-white">Detalle del Presupuesto</h1>
+      <a href="{% url 'dashboard' %}" class="flex items-center gap-2 bg-gray-500 text-white px-4 py-2 rounded-lg shadow hover:bg-gray-600">
+        <span class="material-symbols-outlined">arrow_back</span>
+        Volver
+      </a>
+    </div>
+    <div class="bg-white rounded-xl shadow p-6">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-gray-700">
+        <div>
+          <p class="font-semibold">Número/ID:</p>
+          <p class="mb-4">{{ presupuesto.id|default:presupuesto.numero|default:"-" }}</p>
+        </div>
+        <div>
+          <p class="font-semibold">Cliente:</p>
+          <p class="mb-4">{{ presupuesto.cliente|default:"-" }}</p>
+        </div>
+        <div>
+          <p class="font-semibold">Fecha:</p>
+          <p class="mb-4">{{ presupuesto.fecha|date:"d/m/Y" }}</p>
+        </div>
+        <div>
+          <p class="font-semibold">Validez:</p>
+          <p class="mb-4">{{ presupuesto.validez|default:"-" }}</p>
+        </div>
+        <div>
+          <p class="font-semibold">Total:</p>
+          <p class="mb-4">{{ presupuesto.total|default:"-" }}</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,112 @@
+{% extends 'layouts/list_base.html' %}
+{% block title %}Ciudades{% endblock %}
+
+{% block list_icon %}<span class="material-symbols-outlined text-3xl">location_city</span>{% endblock %}
+{% block list_title_text %}Lista de Ciudades{% endblock %}
+{% block new_button_href %}{% url 'crear_ciudad' %}{% if request.GET.next or request.GET.popup %}?{% endif %}{% if request.GET.next %}next={{ request.GET.next|urlencode }}{% endif %}{% if request.GET.next and request.GET.popup %}&{% endif %}{% if request.GET.popup %}popup=1{% endif %}{% endblock %}
+{% block extra_head %}
+  {% if request.GET.popup %}
+  <style>
+    nav, aside { display: none !important; }
+    main { padding: 0 !important; }
+    body { background: #fff !important; }
+  </style>
+  {% endif %}
+{% endblock %}
+{% block new_button_label %}Nueva Ciudad{% endblock %}
+{% block search_placeholder %}Buscar por nombre...{% endblock %}
+{% block clear_url %}{% url 'lista_ciudades' %}{% endblock %}
+{% block order_fields_options %}
+  <option value="id" {% if order_by == 'id' %}selected{% endif %}>ID</option>
+  <option value="nombre" {% if order_by == 'nombre' %}selected{% endif %}>Nombre</option>
+  <option value="provincia" {% if order_by == 'provincia' %}selected{% endif %}>Provincia</option>
+  <option value="activo" {% if order_by == 'activo' %}selected{% endif %}>Estado</option>
+{% endblock %}
+
+{% block list_content %}
+{% if request.GET.popup %}
+<div class="mb-2 text-xs text-gray-500">[DEBUG] Vista lista_ciudades en modo popup cargada correctamente.</div>
+{% endif %}
+<div class="bg-white shadow rounded-xl overflow-hidden table-responsive">
+  <table class="w-full min-w-[760px] text-left text-sm">
+    <thead class="bg-gray-100 text-gray-700">
+      <tr>
+        <th class="py-3 px-5">Nombre</th>
+        <th class="py-3 px-5 hidden sm:table-cell">Provincia</th>
+        <th class="py-3 px-5 text-center">Estado</th>
+        <th class="py-3 px-5 text-center">Acciones</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for c in ciudades %}
+      <tr class="border-b hover:bg-gray-50">
+        <td class="py-3 px-5 font-medium">{{ c.nombre }}</td>
+        <td class="py-3 px-5 hidden sm:table-cell">{{ c.provincia|default:'-' }}</td>
+        <td class="py-3 px-5 text-center">
+          <span class="text-xs px-2 py-1 rounded {% if c.activo %}bg-green-100 text-green-700{% else %}bg-gray-200 text-gray-700{% endif %}">
+            {% if c.activo %}Activo{% else %}Inactivo{% endif %}
+          </span>
+        </td>
+        <td class="py-3 px-5 flex justify-center gap-3">
+          <a href="{% url 'editar_ciudad' c.id %}{% if request.GET.next or request.GET.popup %}?{% endif %}{% if request.GET.next %}next={{ request.GET.next|urlencode }}{% endif %}{% if request.GET.next and request.GET.popup %}&{% endif %}{% if request.GET.popup %}popup=1{% endif %}"
+             class="text-yellow-600 hover:text-yellow-800 flex items-center gap-1"
+             title="Editar">
+            <span class="material-symbols-outlined text-sm">edit</span>
+          </a>
+          <form method="POST" action="{% url 'activar_ciudad' c.id %}{% if request.GET.next or request.GET.popup %}?{% endif %}{% if request.GET.next %}next={{ request.GET.next|urlencode }}{% endif %}{% if request.GET.next and request.GET.popup %}&{% endif %}{% if request.GET.popup %}popup=1{% endif %}" class="inline">
+            {% csrf_token %}
+            {% if request.GET.next %}<input type="hidden" name="next" value="{{ request.GET.next }}">{% endif %}
+            {% if request.GET.popup %}<input type="hidden" name="popup" value="1">{% endif %}
+            <button type="submit" 
+                    class="{% if c.activo %}text-orange-600 hover:text-orange-800{% else %}text-green-600 hover:text-green-800{% endif %} flex items-center gap-1"
+                    title="{% if c.activo %}Desactivar{% else %}Activar{% endif %}">
+              <span class="material-symbols-outlined text-sm">
+                {% if c.activo %}toggle_on{% else %}toggle_off{% endif %}
+              </span>
+            </button>
+          </form>
+          <form method="POST" action="{% url 'eliminar_ciudad' c.id %}{% if request.GET.next or request.GET.popup %}?{% endif %}{% if request.GET.next %}next={{ request.GET.next|urlencode }}{% endif %}{% if request.GET.next and request.GET.popup %}&{% endif %}{% if request.GET.popup %}popup=1{% endif %}" class="inline" onsubmit="return confirm('¿Eliminar {{ c.nombre }}?');">
+            {% csrf_token %}
+            {% if request.GET.next %}<input type="hidden" name="next" value="{{ request.GET.next }}">{% endif %}
+            {% if request.GET.popup %}<input type="hidden" name="popup" value="1">{% endif %}
+            <button type="submit" class="text-red-600 hover:text-red-800 flex items-center gap-1" title="Eliminar">
+              <span class="material-symbols-outlined text-sm">delete</span>
+            </button>
+          </form>
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="4" class="text-center py-6 text-gray-500">No hay ciudades registradas.</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <div class="px-5 py-4 border-t border-gray-200">
+    <div class="flex justify-end items-center gap-2">
+      {% if ciudades.has_previous %}
+        <a href="?q={{ query }}&order_by={{ order_by }}&direction={{ direction }}&page=1" class="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm">
+          <span class="material-symbols-outlined text-sm">first_page</span>
+        </a>
+        <a href="?q={{ query }}&order_by={{ order_by }}&direction={{ direction }}&page={{ ciudades.previous_page_number }}" class="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm">
+          <span class="material-symbols-outlined text-sm">chevron_left</span>
+        </a>
+      {% endif %}
+
+      <span class="text-sm text-gray-700">
+        Página {{ ciudades.number }} de {{ ciudades.paginator.num_pages }}
+      </span>
+
+      {% if ciudades.has_next %}
+        <a href="?q={{ query }}&order_by={{ order_by }}&direction={{ direction }}&page={{ ciudades.next_page_number }}" class="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm">
+          <span class="material-symbols-outlined text-sm">chevron_right</span>
+        </a>
+        <a href="?q={{ query }}&order_by={{ order_by }}&direction={{ direction }}&page={{ ciudades.paginator.num_pages }}" class="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm">
+          <span class="material-symbols-outlined text-sm">last_page</span>
+        </a>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

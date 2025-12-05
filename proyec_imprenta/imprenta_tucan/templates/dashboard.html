@@ -1,0 +1,165 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Panel de Control | Imprenta Tucán{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 py-8">
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
+        <div>
+            <h1 class="text-4xl font-extrabold mb-2 text-gray-900">Panel de Control</h1>
+            <p class="text-gray-500 text-lg">Bienvenido <span class="font-semibold">{{ user.nombre }} {{ user.apellido }}</span> — administra los módulos principales del sistema.</p>
+        </div>
+        <form method="post" action="{% url 'logout' %}" class="flex items-center" title="Cerrar sesión">
+            {% csrf_token %}
+            <button type="submit" class="inline-flex items-center gap-2 px-5 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-base font-semibold shadow">
+                <span class="material-symbols-outlined text-xl">logout</span>
+                Salir
+            </button>
+        </form>
+    </div>
+
+    <!-- Tarjetas de módulos eliminadas -->
+
+    <!-- Tabla de registros eliminada -->
+</div>
+    <!-- Tarjetas verticales restauradas -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-6 mb-10">
+        {% if show_presupuestos %}
+        <div class="bg-orange-500 text-white rounded-2xl p-6 shadow-lg hover:scale-105 transition-transform">
+            <div class="flex flex-col items-center">
+                <span class="material-symbols-outlined text-6xl mb-2">request_quote</span>
+                <h3 class="text-lg font-semibold">Presupuestos</h3>
+                <p class="text-3xl font-bold mt-1">{{ total_presupuestos }}</p>
+                <a href="{% url 'presupuestos:lista' %}" class="text-sm mt-3 underline">Ver más</a>
+            </div>
+        </div>
+        {% endif %}
+        {% if show_auditoria %}
+        <div class="bg-red-500 text-white rounded-2xl p-6 shadow-lg hover:scale-105 transition-transform">
+            <div class="flex flex-col items-center">
+                <span class="material-symbols-outlined text-6xl mb-2">fact_check</span>
+                <h3 class="text-lg font-semibold">Auditoría</h3>
+                <p class="text-3xl font-bold mt-1">{{ total_auditoria }}</p>
+                <a href="{% url 'lista_auditoria' %}" class="text-sm mt-3 underline">Ver más</a>
+            </div>
+        </div>
+        {% endif %}
+        {% if show_configuracion %}
+        <div class="bg-gray-300 text-gray-900 rounded-2xl p-6 shadow-lg hover:scale-105 transition-transform">
+            <div class="flex flex-col items-center">
+                <span class="material-symbols-outlined text-6xl mb-2">settings</span>
+                <h3 class="text-lg font-semibold">Configuración</h3>
+                <p class="text-3xl font-bold mt-1">{{ total_configuracion }}</p>
+                <a href="{% url 'configuracion_home' %}" class="text-sm mt-3 underline">Ver más</a>
+            </div>
+        </div>
+        {% endif %}
+        {% if show_usuarios %}
+        <div class="bg-blue-600 text-white rounded-2xl p-6 shadow-lg hover:scale-105 transition-transform">
+            <div class="flex flex-col items-center">
+                <span class="material-symbols-outlined text-6xl mb-2">badge</span>
+                <h3 class="text-lg font-semibold">Usuarios</h3>
+                <p class="text-3xl font-bold mt-1">{{ total_usuarios }}</p>
+                <a href="{% url 'lista_usuarios' %}" class="text-sm mt-3 underline">Ver más</a>
+            </div>
+        </div>
+        {% endif %}
+        {% if show_clientes %}
+        <div class="bg-green-600 text-white rounded-2xl p-6 shadow-lg hover:scale-105 transition-transform">
+            <div class="flex flex-col items-center">
+                <span class="material-symbols-outlined text-6xl mb-2">group</span>
+                <h3 class="text-lg font-semibold">Clientes</h3>
+                <p class="text-3xl font-bold mt-1">{{ total_clientes }}</p>
+                <a href="{% url 'lista_clientes' %}" class="text-sm mt-3 underline">Ver más</a>
+            </div>
+        </div>
+        {% endif %}
+        {% if show_productos %}
+        <div class="bg-yellow-500 text-white rounded-2xl p-6 shadow-lg hover:scale-105 transition-transform">
+            <div class="flex flex-col items-center">
+                <span class="material-symbols-outlined text-6xl mb-2">inventory_2</span>
+                <h3 class="text-lg font-semibold">Productos</h3>
+                <p class="text-3xl font-bold mt-1">{{ total_productos }}</p>
+                <a href="{% url 'lista_productos' %}" class="text-sm mt-3 underline">Ver más</a>
+            </div>
+        </div>
+        {% endif %}
+        {% if show_roles %}
+        <div class="bg-gray-700 text-white rounded-2xl p-6 shadow-lg hover:scale-105 transition-transform">
+            <div class="flex flex-col items-center">
+                <span class="material-symbols-outlined text-6xl mb-2">shield_person</span>
+                <h3 class="text-lg font-semibold">Roles</h3>
+                <p class="text-3xl font-bold mt-1">{{ total_roles }}</p>
+                <a href="{% url 'lista_roles' %}" class="text-sm mt-3 underline">Ver más</a>
+            </div>
+        </div>
+        {% endif %}
+        {% if show_proveedores %}
+        <div class="bg-indigo-600 text-white rounded-2xl p-6 shadow-lg hover:scale-105 transition-transform">
+            <div class="flex flex-col items-center">
+                <span class="material-symbols-outlined text-6xl mb-2">local_shipping</span>
+                <h3 class="text-lg font-semibold">Proveedores</h3>
+                <p class="text-3xl font-bold mt-1">{{ total_proveedores }}</p>
+                <a href="{% url 'lista_proveedores' %}" class="text-sm mt-3 underline">Ver más</a>
+            </div>
+        </div>
+        {% endif %}
+        {% if show_insumos %}
+        <div class="bg-purple-600 text-white rounded-2xl p-6 shadow-lg hover:scale-105 transition-transform">
+            <div class="flex flex-col items-center">
+                <span class="material-symbols-outlined text-6xl mb-2">construction</span>
+                <h3 class="text-lg font-semibold">Insumos</h3>
+                <p class="text-3xl font-bold mt-1">{{ total_insumos }}</p>
+                <a href="{% url 'lista_insumos' %}" class="text-sm mt-3 underline">Ver más</a>
+            </div>
+        </div>
+        {% endif %}
+        {% if show_pedidos %}
+        <div class="bg-teal-600 text-white rounded-2xl p-6 shadow-lg hover:scale-105 transition-transform">
+            <div class="flex flex-col items-center">
+                <span class="material-symbols-outlined text-6xl mb-2">receipt_long</span>
+                <h3 class="text-lg font-semibold">Pedidos</h3>
+                <p class="text-3xl font-bold mt-1">{{ total_pedidos }}</p>
+                <a href="{% url 'lista_pedidos' %}" class="text-sm mt-3 underline">Ver más</a>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- TABLA DE REGISTROS -->
+    <!-- TABLA DE REGISTROS -->
+    <section class="mt-10 bg-white rounded-xl shadow p-6">
+        <h2 class="text-xl font-bold mb-4 flex items-center gap-2">
+            <span class="material-symbols-outlined text-blue-600">bar_chart</span>
+            Últimos registros
+        </h2>
+        <div class="overflow-x-auto">
+            <table class="min-w-full border-t text-sm">
+                <thead class="bg-gray-100 text-gray-600 uppercase text-xs">
+                    <tr>
+                        <th class="py-3 px-4 text-left">Módulo</th>
+                        <th class="py-3 px-4 text-left">Descripción</th>
+                        <th class="py-3 px-4 text-left">Fecha</th>
+                        <th class="py-3 px-4 text-left">Faltan</th>
+                    </tr>
+                </thead>
+                <tbody id="ultimos-registros-tbody"></tbody>
+            </table>
+        </div>
+        <script>
+        // ...existing code...
+        // Ejemplo de cómo debería generarse la fila en JS:
+        // let tr = document.createElement('tr');
+        // tr.innerHTML = `
+        //   <td class="py-3 px-4">${item.modulo}</td>
+        //   <td class="py-3 px-4">${item.descripcion}</td>
+        //   <td class="py-3 px-4">${item.fecha}</td>
+        //   <td class="py-3 px-4 ${item.faltan > 0 ? 'text-red-600 font-semibold' : 'text-gray-700'}">${Number(item.faltan).toLocaleString()}</td>
+        // `;
+        // document.getElementById('ultimos-registros-tbody').appendChild(tr);
+        // ...existing code...
+        </script>
+
+</script>
+{% endblock %}

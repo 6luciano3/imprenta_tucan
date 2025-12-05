@@ -1,0 +1,132 @@
+{% extends 'base.html' %}
+{% block title %}Alta de Producto{% endblock %}
+
+{% block content %}
+<h1 class="text-3xl font-black mb-8 flex items-center gap-2">
+  <span class="material-symbols-outlined text-3xl">add</span>
+  Agregar Producto
+</h1>
+
+<form method="post" class="bg-white p-8 rounded-xl shadow max-w-3xl mx-auto space-y-6">
+  {% csrf_token %}
+
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <label class="flex flex-col">
+      <span class="font-semibold mb-1">Nombre *</span>
+      {{ form.nombreProducto }}
+    </label>
+  </div>
+
+  <label class="flex flex-col">
+    <span class="font-semibold mb-1">Descripción</span>
+    {{ form.descripcion }}
+  </label>
+
+  <div class="grid grid-cols-2 gap-6">
+    <label class="flex flex-col">
+      <span class="font-semibold mb-1">Precio Unitario *</span>
+      {{ form.precioUnitario }}
+    </label>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+    <label class="flex flex-col">
+      <span class="font-semibold mb-1">Categoría *</span>
+      {{ form.categoriaProducto }}
+      <a href="{% url 'lista_categorias' %}" class="text-sm text-blue-600 hover:underline mt-1 gestionar-link">Gestionar categorías</a>
+    </label>
+    <label class="flex flex-col">
+      <span class="font-semibold mb-1">Tipo *</span>
+      {{ form.tipoProducto }}
+      <a href="{% url 'lista_tipos' %}" class="text-sm text-blue-600 hover:underline mt-1 gestionar-link">Gestionar tipos</a>
+    </label>
+    <label class="flex flex-col">
+      <span class="font-semibold mb-1">Unidad de Medida *</span>
+      {{ form.unidadMedida }}
+      <a href="{% url 'lista_unidades' %}" class="text-sm text-blue-600 hover:underline mt-1 gestionar-link">Gestionar unidades</a>
+    </label>
+  </div>
+
+  <div class="flex justify-end gap-4 pt-4">
+    <a href="{% url 'lista_productos' %}"
+       class="px-6 py-2 bg-gray-300 rounded-lg hover:bg-gray-400 transition">Cancelar</a>
+    <button type="submit"
+            class="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition">Guardar</button>
+  </div>
+</form>
+ 
+<!-- Modal de gestión de catálogos -->
+<div id="catalogModal" class="hidden fixed inset-0 z-50">
+  <!-- Fondo -->
+  <div id="catalogModalBackdrop" class="absolute inset-0 bg-black bg-opacity-50"></div>
+  <!-- Contenedor -->
+  <div class="absolute inset-0 flex items-center justify-center p-4">
+    <div class="bg-white w-full max-w-5xl h-[80vh] rounded-xl shadow-2xl overflow-hidden flex flex-col">
+      <div class="flex items-center justify-between px-4 py-2 border-b">
+        <div class="flex items-center gap-2">
+          <span class="material-symbols-outlined">open_in_new</span>
+          <h2 class="font-semibold">Gestión</h2>
+        </div>
+        <div class="flex items-center gap-2">
+          <button id="catalogModalRefresh" class="px-3 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300" title="Recargar contenido">Recargar</button>
+          <button id="catalogModalClose" class="px-3 py-1 bg-gray-700 text-white rounded hover:bg-gray-800">Cerrar</button>
+        </div>
+      </div>
+      <div class="flex-1">
+        <iframe id="catalogModalFrame" src="about:blank" class="w-full h-full"></iframe>
+      </div>
+    </div>
+  </div>
+  
+  <script>
+    (function(){
+      const modal = document.getElementById('catalogModal');
+      const backdrop = document.getElementById('catalogModalBackdrop');
+      const frame = document.getElementById('catalogModalFrame');
+      const btnClose = document.getElementById('catalogModalClose');
+      const btnRefresh = document.getElementById('catalogModalRefresh');
+
+      function withPopupParam(url){
+        try {
+          const u = new URL(url, window.location.origin);
+          if(!u.searchParams.has('popup')) u.searchParams.set('popup','1');
+          return u.toString();
+        } catch(e) {
+          // Fallback simple si URL relativa sin base
+          return url + (url.includes('?') ? '&' : '?') + 'popup=1';
+        }
+      }
+
+      function openModal(url){
+        frame.src = withPopupParam(url);
+        modal.classList.remove('hidden');
+      }
+      function closeModal(){
+        modal.classList.add('hidden');
+        frame.src = 'about:blank';
+        // Recargar la página para actualizar los selects con nuevas opciones
+        window.location.reload();
+      }
+      function refreshContent(){
+        if(frame && frame.contentWindow){ frame.contentWindow.location.reload(); }
+      }
+
+      document.querySelectorAll('.gestionar-link').forEach(a => {
+        a.addEventListener('click', function(ev){
+          ev.preventDefault();
+          openModal(this.href);
+        });
+      });
+
+      backdrop.addEventListener('click', closeModal);
+      btnClose.addEventListener('click', closeModal);
+      btnRefresh.addEventListener('click', refreshContent);
+
+      // Cerrar con ESC
+      document.addEventListener('keydown', (e)=>{
+        if(!modal.classList.contains('hidden') && e.key === 'Escape') closeModal();
+      });
+    })();
+  </script>
+</div>
+{% endblock %}

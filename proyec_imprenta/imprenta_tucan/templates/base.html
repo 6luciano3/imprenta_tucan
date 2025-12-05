@@ -1,0 +1,170 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es" class="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Panel Administrativo{% endblock %}</title>
+
+  <!-- Tailwind + Plugins -->
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+
+  <!-- Tipografía e íconos -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
+
+  <!-- Configuración Tailwind -->
+  <script>
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "primary": "#3498db",
+            "primary-dark": "#2980b9",
+            "background-light": "#f6f7f8",
+            "gray-light": "#ecf0f1",
+            "gray-dark": "#bdc3c7",
+            "text-light": "#2c3e50",
+          },
+          fontFamily: {
+            display: ["Inter", "sans-serif"]
+          },
+          fontSize: {
+            base: "12px",
+            sm: "11px",
+            lg: "14px",
+            xl: "16px",
+            "2xl": "18px"
+          }
+        },
+      },
+    }
+  </script>
+
+  {% block extra_head %}{% endblock %}
+  <!-- Estilos adicionales responsivos -->
+  <link rel="stylesheet" href="{% static 'css/styles.css' %}?v=20251112-01">
+</head>
+<body class="bg-background-light font-display text-text-light text-base">
+{% if not request.GET.popup %}
+<!-- Header/Navigation (solo 'Imprenta Tucán') -->
+<nav class="bg-blue-600 text-white p-4">
+  <div class="container mx-auto text-center">
+    <h1 class="text-lg md:text-xl font-bold">
+      <a href="{% url 'dashboard' %}" class="hover:text-blue-200">Imprenta Tucán</a>
+    </h1>
+  </div>
+</nav>
+{% endif %}
+
+<div class="flex min-h-screen">
+  {% if not request.GET.popup %}
+
+  <!-- Sidebar responsive -->
+  <aside class="hidden lg:flex flex-col justify-between w-64 bg-white shadow-lg p-4">
+    <div class="flex flex-col gap-8">
+      <div class="flex items-center gap-3">
+        <div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-9"
+             style="background-image: url('https://cdn-icons-png.flaticon.com/512/3135/3135715.png');"></div>
+        <div>
+          {% if user.is_authenticated %}
+            <h1 class="text-lg font-bold">{{ user.nombre }} {{ user.apellido }}</h1>
+            <p class="text-sm text-gray-500">
+              {% if user.rol %}{{ user.rol.nombreRol }} · {% endif %}{{ user.email|truncatechars:20 }}
+            </p>
+          {% else %}
+            <h1 class="text-lg font-bold">Invitado</h1>
+            <p class="text-sm text-gray-500">&nbsp;</p>
+          {% endif %}
+        </div>
+      </div>
+
+      <nav class="flex flex-col gap-2">
+        <a href="{% url 'lista_auditoria' %}" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-light {% if request.resolver_match.url_name == 'lista_auditoria' %}bg-primary text-white{% endif %}">
+          <span class="material-symbols-outlined">fact_check</span> Auditoría
+        </a>
+        <a href="{% url 'configuracion_home' %}" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-light {% if request.resolver_match.url_name == 'configuracion_home' %}bg-primary text-white{% endif %}">
+          <span class="material-symbols-outlined">settings</span> Configuración
+        </a>
+        <a href="{% url 'presupuestos:lista' %}" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-light {% if request.resolver_match.url_name == 'lista' %}bg-primary text-white{% endif %}">
+          <span class="material-symbols-outlined">request_quote</span> Presupuestos
+        </a>
+        <a href="{% url 'dashboard' %}" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-light {% if request.resolver_match.url_name == 'dashboard' %}bg-primary text-white{% endif %}">
+          <span class="material-symbols-outlined">dashboard</span> Dashboard
+        </a>
+        {% if show_clientes %}
+        <a href="{% url 'lista_clientes' %}" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-light {% if request.resolver_match.url_name == 'lista_clientes' %}bg-primary text-white{% endif %}">
+          <span class="material-symbols-outlined">group</span> Clientes
+        </a>
+        {% endif %}
+        {% if show_proveedores %}
+        <a href="{% url 'lista_proveedores' %}" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-light {% if request.resolver_match.url_name == 'lista_proveedores' %}bg-primary text-white{% endif %}">
+          <span class="material-symbols-outlined">business</span> Proveedores
+        </a>
+        {% endif %}
+        {% if show_usuarios %}
+        <a href="{% url 'lista_usuarios' %}" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-light {% if request.resolver_match.url_name == 'lista_usuarios' %}bg-primary text-white{% endif %}">
+          <span class="material-symbols-outlined">badge</span> Usuarios
+        </a>
+        {% endif %}
+        {% if show_productos %}
+        <a href="{% url 'lista_productos' %}" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-light {% if request.resolver_match.url_name == 'lista_productos' %}bg-primary text-white{% endif %}">
+          <span class="material-symbols-outlined">inventory_2</span> Productos
+        </a>
+        {% endif %}
+        {% if show_insumos %}
+        <a href="{% url 'lista_insumos' %}" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-light {% if request.resolver_match.url_name == 'lista_insumos' %}bg-primary text-white{% endif %}">
+          <span class="material-symbols-outlined">construction</span> Insumos
+        </a>
+        {% endif %}
+        {% if show_pedidos %}
+        <a href="{% url 'lista_pedidos' %}" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-light {% if request.resolver_match.url_name == 'lista_pedidos' %}bg-primary text-white{% endif %}">
+          <span class="material-symbols-outlined">receipt_long</span> Pedidos
+        </a>
+        {% endif %}
+        {% if show_roles %}
+        <a href="{% url 'lista_roles' %}" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-light {% if request.resolver_match.url_name == 'lista_roles' %}bg-primary text-white{% endif %}">
+          <span class="material-symbols-outlined">admin_panel_settings</span> Roles
+        </a>
+        {% endif %}
+        {% if show_permisos %}
+        <a href="{% url 'lista_permisos' %}" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-light {% if request.resolver_match.url_name == 'lista_permisos' %}bg-primary text-white{% endif %}">
+          <span class="material-symbols-outlined">lock</span> Permisos
+        </a>
+        {% endif %}
+        {% if show_reportes %}
+        <a href="{% url 'estadisticas:dashboard' %}" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-light {% if request.resolver_match.namespace == 'estadisticas' %}bg-primary text-white{% endif %}">
+          <span class="material-symbols-outlined">monitoring</span> Estadísticas
+        </a>
+        {% endif %}
+      </nav>
+    </div>
+  </aside>
+  {% endif %}
+
+  <!-- Contenido principal responsive -->
+  <main class="flex-1 p-4 md:p-6 lg:p-8">
+
+    <!-- Mensajes responsive -->
+    {% if messages %}
+      <div class="max-w-full mx-auto mb-4 md:mb-6">
+        {% for message in messages %}
+          <div class="mb-4 px-3 md:px-4 py-2 md:py-3 rounded-lg shadow text-white text-sm md:text-base
+                      {% if message.tags == 'success' %}bg-green-600
+                      {% elif message.tags == 'error' %}bg-red-600
+                      {% elif message.tags == 'warning' %}bg-yellow-500
+                      {% else %}bg-gray-600{% endif %}">
+            {{ message }}
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    {% block content %}{% endblock %}
+  </main>
+
+<!-- Sin JS de menú móvil: el encabezado solo muestra "Imprenta Tucán" -->
+{% block extra_js %}{% endblock %}
+</body>
+</html>

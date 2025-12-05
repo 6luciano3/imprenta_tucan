@@ -1,0 +1,63 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container mx-auto px-4 py-8 max-w-2xl">
+  <h2 class="text-2xl font-bold mb-6 text-blue-700">Alta / Edición de Fórmula</h2>
+  <form method="post" id="formula-form" class="bg-white rounded shadow p-6 space-y-4">
+    {% csrf_token %}
+    <div>
+      <label class="block text-sm font-semibold mb-1 text-gray-700">Código</label>
+      <input name="codigo" value="{{ form.codigo.value }}" class="w-full border rounded px-3 py-2 focus:outline-none focus:ring focus:border-blue-400" required>
+    </div>
+    <div>
+      <label class="block text-sm font-semibold mb-1 text-gray-700">Nombre</label>
+      <input name="nombre" value="{{ form.nombre.value }}" class="w-full border rounded px-3 py-2 focus:outline-none focus:ring focus:border-blue-400" required>
+    </div>
+    <div>
+      <label class="block text-sm font-semibold mb-1 text-gray-700">Descripción</label>
+      <textarea name="descripcion" class="w-full border rounded px-3 py-2 focus:outline-none focus:ring focus:border-blue-400">{{ form.descripcion.value }}</textarea>
+    </div>
+    <div>
+      <label class="block text-sm font-semibold mb-1 text-gray-700">Expresión</label>
+      <textarea name="expresion" id="expresion" class="w-full border rounded px-3 py-2 font-mono focus:outline-none focus:ring focus:border-blue-400" required>{{ form.expresion.value }}</textarea>
+      <div class="text-xs text-gray-500 mt-1">Ejemplo: (tiraje * area) / rendimiento</div>
+    </div>
+    <div>
+      <label class="block text-sm font-semibold mb-1 text-gray-700">Variables (JSON)</label>
+      <input name="variables_json" value="{{ form.variables_json.value }}" class="w-full border rounded px-3 py-2 font-mono focus:outline-none focus:ring focus:border-blue-400" placeholder='["tiraje","area","rendimiento"]'>
+      <div class="text-xs text-gray-500 mt-1">Ejemplo: ["tiraje","area","rendimiento"]</div>
+    </div>
+    <div class="flex gap-2 mt-4">
+      <button id="btn-validar" type="button" class="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded shadow">Validar</button>
+      <button type="submit" class="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded shadow">Guardar</button>
+      <a href="{% url 'lista_formulas' %}" class="bg-gray-400 hover:bg-gray-500 text-white font-semibold py-2 px-4 rounded shadow">Volver</a>
+    </div>
+    <div id="validacion-resultado" class="mt-4 text-sm"></div>
+  </form>
+  <div class="mt-6 text-xs text-gray-600">
+    <strong>Funciones permitidas:</strong> min, max, round, ceil, floor, abs<br>
+    <strong>Variables típicas:</strong> tiraje, area, rendimiento, perdida_percent<br>
+    <strong>Ayuda:</strong> Ejemplo de expresión: <span class="font-mono">(tiraje * area) / rendimiento</span>
+  </div>
+</div>
+<script>
+document.getElementById('btn-validar').addEventListener('click', function(e){
+  let expr = document.getElementById('expresion').value;
+  let vars = prompt('Ingrese variables en formato JSON (ej: {"tiraje":100,"area":0.21,"rendimiento":5})');
+  if (!vars) return;
+  fetch('/api/configuracion/formula/validate/', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({expresion: expr, variables: JSON.parse(vars)})
+  }).then(r => r.json()).then(data => {
+    let div = document.getElementById('validacion-resultado');
+    if (data.ok) {
+      div.innerHTML = '<span class="text-green-700 font-semibold">Resultado: ' + data.resultado + '</span>';
+    } else {
+      div.innerHTML = '<span class="text-red-700 font-semibold">Error: ' + data.error + '</span>';
+    }
+  }).catch(err => {
+    document.getElementById('validacion-resultado').innerHTML = '<span class="text-red-700">Error de red o sintaxis.</span>';
+  });
+});
+</script>
+{% endblock %}

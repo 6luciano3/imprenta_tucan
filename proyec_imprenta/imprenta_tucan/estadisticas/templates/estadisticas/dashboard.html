@@ -1,0 +1,176 @@
+{% extends 'base.html' %}
+{% block title %}Estadísticas{% endblock %}
+
+{% block content %}
+<h1 class="text-3xl font-black mb-6 flex items-center gap-2">
+  <span class="material-symbols-outlined text-3xl">monitoring</span>
+  Estadísticas
+</h1>
+
+<!-- Filtros por fecha -->
+<div class="bg-white p-4 rounded-xl shadow mb-6 flex flex-col md:flex-row gap-3 md:items-end">
+  <div class="flex gap-2 items-end">
+    <div>
+      <label for="filtroDesde" class="block text-sm font-medium">Desde</label>
+      <input type="date" id="filtroDesde" class="border rounded px-2 py-1" />
+    </div>
+    <div>
+      <label for="filtroHasta" class="block text-sm font-medium">Hasta</label>
+      <input type="date" id="filtroHasta" class="border rounded px-2 py-1" />
+    </div>
+    <button id="btnAplicar" class="bg-blue-600 text-white px-4 py-2 rounded">Aplicar</button>
+    <button id="btnLimpiar" class="bg-gray-300 px-4 py-2 rounded">Limpiar</button>
+  </div>
+</div>
+
+<!-- KPIs -->
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+  <div class="bg-white p-4 rounded-xl shadow flex flex-col items-center">
+    <div class="text-lg font-bold" id="kpiClientes">0</div>
+    <div class="text-xs text-gray-500">Clientes</div>
+  </div>
+  <div class="bg-white p-4 rounded-xl shadow flex flex-col items-center">
+    <div class="text-lg font-bold" id="kpiProductos">0</div>
+    <div class="text-xs text-gray-500">Productos</div>
+  </div>
+  <div class="bg-white p-4 rounded-xl shadow flex flex-col items-center">
+    <div class="text-lg font-bold" id="kpiPedidos">0</div>
+    <div class="text-xs text-gray-500">Pedidos</div>
+  </div>
+  <div class="bg-white p-4 rounded-xl shadow flex flex-col items-center">
+    <div class="text-lg font-bold" id="kpiIngresos">$0.00</div>
+    <div class="text-xs text-gray-500">Ingresos totales</div>
+  </div>
+</div>
+
+<!-- KPIs adicionales -->
+<div class="grid grid-cols-3 gap-4 mb-6">
+  <div class="bg-white p-4 rounded-xl shadow flex flex-col items-center">
+    <div class="text-lg font-bold" id="kpiHoy">0</div>
+    <div class="text-xs text-gray-500">Pedidos hoy</div>
+  </div>
+  <div class="bg-white p-4 rounded-xl shadow flex flex-col items-center">
+    <div class="text-lg font-bold" id="kpiSemana">0</div>
+    <div class="text-xs text-gray-500">Pedidos semana</div>
+  </div>
+  <div class="bg-white p-4 rounded-xl shadow flex flex-col items-center">
+    <div class="text-lg font-bold" id="kpiMes">0</div>
+    <div class="text-xs text-gray-500">Pedidos mes</div>
+  </div>
+</div>
+
+<!-- Gráficos -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+  <div class="bg-white p-4 rounded-xl shadow flex flex-col items-center">
+    <h2 class="font-bold mb-2">Pedidos por estado</h2>
+    <canvas id="chartEstados" width="300" height="300"></canvas>
+  </div>
+  <div class="bg-white p-4 rounded-xl shadow flex flex-col items-center">
+    <h2 class="font-bold mb-2">Ingresos por mes</h2>
+    <canvas id="chartIngresos" width="300" height="300"></canvas>
+  </div>
+  <div class="bg-white p-4 rounded-xl shadow flex flex-col items-center">
+    <h2 class="font-bold mb-2">Top 5 productos por ingresos</h2>
+    <canvas id="chartTopProductos" width="300" height="300"></canvas>
+  </div>
+</div>
+        <!-- ...existing code... -->
+
+  <!-- ...existing code... -->
+<!-- script block eliminado -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+let chartEstados, chartIngresos, chartTopProductos;
+
+function buildParams(){
+  const d = document.getElementById('filtroDesde').value;
+  const h = document.getElementById('filtroHasta').value;
+  const p = new URLSearchParams();
+  if (d) p.set('desde', d);
+  if (h) p.set('hasta', h);
+  const s = p.toString();
+  return s ? `?${s}` : '';
+}
+
+async function drawPie(id, url){
+  const r = await fetch(url + buildParams());
+  const {labels, values} = await r.json();
+  const ctx = document.getElementById(id);
+  if (chartEstados) chartEstados.destroy();
+  chartEstados = new Chart(ctx, {
+    type: 'pie',
+    data: { labels, datasets: [{ data: values, backgroundColor: ['#3498db','#2ecc71','#e74c3c','#9b59b6','#f1c40f','#1abc9c'] }] },
+  });
+}
+async function drawLine(id, url, label){
+  const r = await fetch(url + buildParams());
+  const {labels, values} = await r.json();
+  const ctx = document.getElementById(id);
+  if (chartIngresos) chartIngresos.destroy();
+  chartIngresos = new Chart(ctx, {
+    type: 'line',
+    data: { labels, datasets: [{ label, data: values, borderColor: '#3498db', fill: false }] },
+    options: { scales: { y: { beginAtZero: true } } }
+  });
+}
+async function drawBar(id, url, label){
+  const r = await fetch(url + buildParams());
+  const {labels, values} = await r.json();
+  const ctx = document.getElementById(id);
+  if (chartTopProductos) chartTopProductos.destroy();
+  chartTopProductos = new Chart(ctx, {
+    type: 'bar',
+    data: { labels, datasets: [{ label, data: values, backgroundColor: '#2ecc71' }] },
+    options: { scales: { y: { beginAtZero: true } } }
+  });
+}
+
+async function refreshKPIs(){
+  const r = await fetch('{% url 'estadisticas:api_kpis' %}' + buildParams());
+  const k = await r.json();
+  document.getElementById('kpiClientes').textContent = k.clientes;
+  document.getElementById('kpiProductos').textContent = k.productos;
+  document.getElementById('kpiPedidos').textContent = k.pedidos;
+  document.getElementById('kpiIngresos').textContent = `$${parseFloat(k.ingresos_totales).toFixed(2)}`;
+  document.getElementById('kpiHoy').textContent = k.pedidos_hoy;
+  document.getElementById('kpiSemana').textContent = k.pedidos_semana;
+  document.getElementById('kpiMes').textContent = k.pedidos_mes;
+}
+
+function refreshAll(){
+  drawPie('chartEstados', '/estadisticas/api/pedidos-por-estado/' + buildParams());
+  drawLine('chartIngresos', '/estadisticas/api/ingresos-por-mes/' + buildParams(), 'Ingresos');
+  drawBar('chartTopProductos', '/estadisticas/api/top-productos/' + buildParams(), 'Ingresos');
+  refreshKPIs();
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  const desdeInput = document.getElementById('filtroDesde');
+  const hastaInput = document.getElementById('filtroHasta');
+  if (!desdeInput.value || !hastaInput.value){
+    const hoy = new Date();
+    const hasta = hoy.toISOString().slice(0,10);
+    const hace6 = new Date(hoy);
+    hace6.setMonth(hace6.getMonth() - 6);
+    const desde = hace6.toISOString().slice(0,10);
+    if (!desdeInput.value) desdeInput.value = desde;
+    if (!hastaInput.value) hastaInput.value = hasta;
+  }
+
+  document.getElementById('btnAplicar').addEventListener('click', function(e) {
+    e.preventDefault();
+    console.log('Botón Aplicar presionado');
+    refreshAll();
+  });
+  document.getElementById('btnLimpiar').addEventListener('click', function(e) {
+    e.preventDefault();
+    document.getElementById('filtroDesde').value = '';
+    document.getElementById('filtroHasta').value = '';
+    refreshAll();
+  });
+
+  refreshAll();
+});
+</script>
+    <!-- ...existing code... -->
+{% endblock %}

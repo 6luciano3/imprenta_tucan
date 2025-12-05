@@ -1,0 +1,149 @@
+{% extends 'base.html' %}
+{% block title %}Alta de Permiso{% endblock %}
+{% block content %}
+<div class="max-w-3xl mx-auto">
+  <h1 class="text-3xl font-black mb-4 flex items-center gap-2">
+    <span class="material-symbols-outlined text-4xl">lock</span>
+    Alta de Permiso
+  </h1>
+  <p class="text-gray-600 mb-8">Registra nuevos permisos para gestionar acciones y módulos del sistema.</p>
+
+  <form method="POST" class="bg-white rounded-xl shadow p-6 space-y-6" id="form-alta-permiso">
+    {% csrf_token %}
+    {{ form.non_field_errors }}
+    <div class="grid grid-cols-1 gap-6">
+      <div>
+        <label for="id_nombre" class="block text-sm font-medium text-gray-700 mb-2">Nombre del Permiso *</label>
+        {{ form.nombre }}
+        {% for e in form.nombre.errors %}<p class="mt-1 text-sm text-red-600 flex items-center gap-1"><span class="material-symbols-outlined text-sm">error</span>{{ e }}</p>{% endfor %}
+      </div>
+      <div>
+        <label for="id_descripcion" class="block text-sm font-medium text-gray-700 mb-2">Descripción *</label>
+        {{ form.descripcion }}
+        {% for e in form.descripcion.errors %}<p class="mt-1 text-sm text-red-600 flex items-center gap-1"><span class="material-symbols-outlined text-sm">error</span>{{ e }}</p>{% endfor %}
+      </div>
+      <div>
+        <label for="id_modulo" class="block text-sm font-medium text-gray-700 mb-2">Módulo *</label>
+        {{ form.modulo }}
+      </div>
+      <div>
+        <label for="id_acciones" class="block text-sm font-medium text-gray-700 mb-2">Acciones *</label>
+        {{ form.acciones }}
+        <p class="text-xs text-gray-500 mt-1">Indica qué puede hacer este permiso. Ejemplo: Crear, Listar, Editar, Eliminar</p>
+        <p class="text-xs font-semibold text-gray-600 mb-2 flex items-center gap-1">
+          <span class="material-symbols-outlined text-sm">tips_and_updates</span>
+          Acciones sugeridas (clic para añadir):
+        </p>
+        <div class="flex flex-wrap gap-2 mb-2" id="acciones-sugeridas">
+          <button type="button" data-accion="Crear" class="acciones-chip inline-flex items-center gap-1 px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-medium hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-400">
+            <span class="material-symbols-outlined text-xs">add</span>Crear
+          </button>
+          <button type="button" data-accion="Listar" class="acciones-chip inline-flex items-center gap-1 px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-medium hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-400">
+            <span class="material-symbols-outlined text-xs">add</span>Listar
+          </button>
+          <button type="button" data-accion="Ver" class="acciones-chip inline-flex items-center gap-1 px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-medium hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-400">
+            <span class="material-symbols-outlined text-xs">add</span>Ver
+          </button>
+          <button type="button" data-accion="Editar" class="acciones-chip inline-flex items-center gap-1 px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-medium hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-400">
+            <span class="material-symbols-outlined text-xs">add</span>Editar
+          </button>
+          <button type="button" data-accion="Actualizar" class="acciones-chip inline-flex items-center gap-1 px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-medium hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-400">
+            <span class="material-symbols-outlined text-xs">add</span>Actualizar
+          </button>
+          <button type="button" data-accion="Eliminar" class="acciones-chip inline-flex items-center gap-1 px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-medium hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-400">
+            <span class="material-symbols-outlined text-xs">add</span>Eliminar
+          </button>
+          <button type="button" data-accion="Activar" class="acciones-chip inline-flex items-center gap-1 px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-medium hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-400">
+            <span class="material-symbols-outlined text-xs">add</span>Activar
+          </button>
+          <button type="button" data-accion="Desactivar" class="acciones-chip inline-flex items-center gap-1 px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-medium hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-400">
+            <span class="material-symbols-outlined text-xs">add</span>Desactivar
+          </button>
+          <button type="button" data-accion="Aprobar" class="acciones-chip inline-flex items-center gap-1 px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-medium hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-400">
+            <span class="material-symbols-outlined text-xs">add</span>Aprobar
+          </button>
+          <button type="button" data-accion="Rechazar" class="acciones-chip inline-flex items-center gap-1 px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-medium hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-400">
+            <span class="material-symbols-outlined text-xs">add</span>Rechazar
+          </button>
+          <button type="button" data-accion="Exportar" class="acciones-chip inline-flex items-center gap-1 px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-medium hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-400">
+            <span class="material-symbols-outlined text-xs">add</span>Exportar
+          </button>
+          <button type="button" data-accion="Importar" class="acciones-chip inline-flex items-center gap-1 px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-medium hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-400">
+            <span class="material-symbols-outlined text-xs">add</span>Importar
+          </button>
+          <button type="button" data-accion="Imprimir" class="acciones-chip inline-flex items-center gap-1 px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-medium hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-400">
+            <span class="material-symbols-outlined text-xs">add</span>Imprimir
+          </button>
+          <button type="button" data-accion="Descargar" class="acciones-chip inline-flex items-center gap-1 px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-medium hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-400">
+            <span class="material-symbols-outlined text-xs">add</span>Descargar
+          </button>
+        </div>
+        {% for e in form.acciones.errors %}<p class="mt-1 text-sm text-red-600 flex items-center gap-1"><span class="material-symbols-outlined text-sm">error</span>{{ e }}</p>{% endfor %}
+      </div>
+    </div>
+    <div class="flex justify-end gap-3 pt-2">
+      <a href="{% url 'lista_permisos' %}" class="px-5 py-2 rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300 flex items-center gap-2">
+        <span class="material-symbols-outlined text-sm">close</span>Cancelar
+      </a>
+      <button type="submit" class="px-5 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 flex items-center gap-2">
+        <span class="material-symbols-outlined text-sm">save</span>Registrar Permiso
+      </button>
+    </div>
+  </form>
+  <div class="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-800">
+    <h2 class="font-semibold mb-2 flex items-center gap-1"><span class="material-symbols-outlined text-base">info</span>Ayuda</h2>
+    <ul class="list-disc pl-5 space-y-1">
+      <li>Todos los campos marcados con (*) son obligatorios.</li>
+      <li>El nombre del permiso debe ser único (no se permiten duplicados).</li>
+      <li>Use acciones separadas por comas para definir capacidades del permiso.</li>
+      <li>Ejemplo válido: Nombre: Gestión de Productos | Módulo: Productos | Acciones: Crear, Listar, Editar, Eliminar</li>
+    </ul>
+  </div>
+</div>
+      </div>
+    </div>
+    <div class="flex justify-end gap-3 pt-2">
+      <a href="{% url 'lista_permisos' %}" class="px-5 py-2 rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300 flex items-center gap-2">
+        <span class="material-symbols-outlined text-sm">close</span>Cancelar
+      </a>
+      <button type="submit" class="px-5 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 flex items-center gap-2">
+        <span class="material-symbols-outlined text-sm">save</span>Registrar Permiso
+      </button>
+    </div>
+  </form>
+
+  <div class="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-800">
+    <h2 class="font-semibold mb-2 flex items-center gap-1"><span class="material-symbols-outlined text-base">info</span>Ayuda</h2>
+    <ul class="list-disc pl-5 space-y-1">
+      <li>Todos los campos marcados con (*) son obligatorios.</li>
+      <li>El nombre del permiso debe ser único (no se permiten duplicados).</li>
+      <li>Use acciones separadas por comas para definir capacidades del permiso.</li>
+      <li>Ejemplo válido: Nombre: Gestión de Productos | Módulo: Productos | Acciones: Crear, Listar, Editar, Eliminar</li>
+    </ul>
+  </div>
+</div>
+<script>
+  (function(){
+    const textarea = document.getElementById('id_acciones');
+    const chips = document.querySelectorAll('.acciones-chip');
+    function normalizarListado(text){
+      return text.split(',')
+        .map(t => t.trim())
+        .filter(t => t.length > 0);
+    }
+    function agregarAccion(accion){
+      let existentes = normalizarListado(textarea.value);
+      if(!existentes.includes(accion)){
+        existentes.push(accion);
+        textarea.value = existentes.join(', ');
+      }
+      textarea.focus();
+    }
+    chips.forEach(chip => {
+      chip.addEventListener('click', () => {
+        agregarAccion(chip.getAttribute('data-accion'));
+      });
+    });
+  })();
+</script>
+{% endblock %}

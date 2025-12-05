@@ -1,0 +1,55 @@
+{% extends 'layouts/list_base.html' %}
+{% block extra_head %}
+  {% if request.GET.popup %}
+  <style>
+    nav, aside { display: none !important; }
+    main { padding: 0 !important; }
+    body { background: #fff !important; }
+  </style>
+  {% endif %}
+{% endblock %}
+{% block title %}Unidades de Medida{% endblock %}
+
+{% block list_icon %}<span class="material-symbols-outlined text-3xl">straighten</span>{% endblock %}
+{% block list_title_text %}Unidades de Medida{% endblock %}
+{% block new_button_href %}{% url 'crear_unidad' %}{% if request.GET.popup %}?popup=1{% endif %}{% endblock %}
+{% block new_button_label %}Nueva Unidad{% endblock %}
+{% block search_placeholder %}Nombre o abreviatura...{% endblock %}
+{% block clear_url %}{% url 'lista_unidades' %}{% if request.GET.popup %}?popup=1{% endif %}{% endblock %}
+{% block order_fields_options %}
+  <option value="nombre" selected>Nombre</option>
+{% endblock %}
+
+{% block list_content %}
+<div class="bg-white shadow rounded-xl overflow-hidden table-responsive">
+  <table class="w-full min-w-[600px] text-left text-sm">
+    <thead class="bg-gray-100 text-gray-700">
+      <tr>
+        <th class="py-3 px-5">Nombre</th>
+        <th class="py-3 px-5">Abreviatura</th>
+        <th class="py-3 px-5 text-center">Acciones</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for u in unidades %}
+      <tr class="border-b hover:bg-gray-50">
+        <td class="py-3 px-5 font-medium">{{ u.nombreUnidad }}</td>
+        <td class="py-3 px-5">{{ u.abreviatura }}</td>
+        <td class="py-3 px-5 flex justify-center gap-3">
+          <a href="{% url 'editar_unidad' u.id %}{% if request.GET.popup %}?popup=1{% endif %}" class="text-amber-600 hover:text-amber-800 flex items-center gap-1" title="Editar">
+            <span class="material-symbols-outlined text-sm">edit</span>
+          </a>
+          <a href="{% url 'eliminar_unidad' u.id %}{% if request.GET.popup %}?popup=1{% endif %}" class="text-red-600 hover:text-red-800 flex items-center gap-1" title="Eliminar">
+            <span class="material-symbols-outlined text-sm">delete</span>
+          </a>
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="3" class="text-center py-6 text-gray-500">No hay unidades.</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

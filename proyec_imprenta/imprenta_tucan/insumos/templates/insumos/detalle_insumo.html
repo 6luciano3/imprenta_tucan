@@ -1,0 +1,91 @@
+{% extends 'base.html' %}
+{% block title %}Detalle de Insumo{% endblock %}
+
+{% block content %}
+<div class="px-4 md:px-10 lg:px-20 xl:px-40 py-5">
+  <div class="max-w-3xl mx-auto">
+    <div class="flex justify-between items-center mb-6">
+      <h1 class="text-3xl font-black text-[#111418] dark:text-white">🧰 Detalle de Insumo</h1>
+      <a href="{% url 'lista_insumos' %}" class="flex items-center gap-2 bg-gray-500 text-white px-4 py-2 rounded-lg shadow hover:bg-gray-600">
+        <span class="material-symbols-outlined">arrow_back</span>
+        Volver
+      </a>
+    </div>
+
+  <div class="bg-white p-6 rounded-xl shadow">
+      <h2 class="text-xl font-semibold mb-4 text-gray-800">Información</h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-gray-700">
+        <div>
+          <p class="font-semibold">Código:</p>
+          <p class="mb-4">{{ insumo.codigo }}</p>
+        </div>
+        <div>
+          <p class="font-semibold">Nombre:</p>
+          <p class="mb-4">{{ insumo.nombre }}</p>
+        </div>
+        <div>
+          <p class="font-semibold">Categoría:</p>
+          <p class="mb-4">{{ insumo.categoria|default:"-" }}</p>
+        </div>
+        <div>
+          <p class="font-semibold">Stock:</p>
+          <p class="mb-4">{{ insumo.stock }}</p>
+        </div>
+        <div>
+          <p class="font-semibold">Precio:</p>
+          <p class="mb-4">{{ insumo.precio }}</p>
+        </div>
+        <div>
+          <p class="font-semibold">Estado:</p>
+          <p class="mb-4">{% if insumo.activo %}Activo{% else %}Inactivo{% endif %}</p>
+        </div>
+      </div>
+
+      <div class="mt-6 flex justify-between items-center">
+        <a href="{% url 'lista_insumos' %}" class="inline-flex items-center gap-2 bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700">
+          <span class="material-symbols-outlined">arrow_back</span>
+          Volver
+        </a>
+        {% if can_insumos_eliminar %}
+          <button onclick="return confirmarEliminarInsumoDetalle({{ insumo.pk }}, '{{ insumo.nombre|escapejs }}')"
+                  class="inline-flex items-center gap-2 bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700">
+            <span class="material-symbols-outlined">delete</span>
+            Eliminar
+          </button>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+<!-- Modal de confirmación de eliminación (Detalle) -->
+<div id="modalEliminarInsumoDetalle" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full">
+  <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+    <div class="mt-3 text-center">
+      <h3 class="text-lg leading-6 font-medium text-gray-900">Confirmar eliminación</h3>
+      <div class="mt-2 px-7 py-3">
+        <p class="text-sm text-gray-500">
+          ¿Estás seguro que deseas eliminar el insumo <span id="insumoNombreDetalle" class="font-medium"></span>?
+        </p>
+      </div>
+      <div class="flex justify-center gap-4 mt-4">
+        <form id="formEliminarInsumoDetalle" method="POST">
+          {% csrf_token %}
+          <button type="submit" class="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700">Eliminar</button>
+        </form>
+        <button onclick="cerrarModalEliminarInsumoDetalle()" class="bg-gray-200 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-300">Cancelar</button>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+function confirmarEliminarInsumoDetalle(id, nombre) {
+  document.getElementById('modalEliminarInsumoDetalle').classList.remove('hidden');
+  document.getElementById('insumoNombreDetalle').textContent = nombre;
+  document.getElementById('formEliminarInsumoDetalle').action = "{% url 'eliminar_insumo' 0 %}".replace('0', id);
+  return false;
+}
+function cerrarModalEliminarInsumoDetalle() {
+  document.getElementById('modalEliminarInsumoDetalle').classList.add('hidden');
+}
+</script>
+{% endblock %}

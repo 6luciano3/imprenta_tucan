@@ -1,0 +1,51 @@
+{% extends 'base.html' %}
+{% block title %}Detalle de Producto{% endblock %}
+
+{% block content %}
+<h1 class="text-3xl font-black mb-6 flex items-center gap-2">
+  <span class="material-symbols-outlined text-3xl">info</span>
+  Detalles del Producto
+</h1>
+
+<div class="bg-white p-6 rounded-xl shadow max-w-3xl">
+  <dl class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div>
+      <dt class="font-semibold text-gray-700">ID</dt>
+      <dd>{{ producto.idProducto }}</dd>
+    </div>
+    <div>
+      <dt class="font-semibold text-gray-700">Nombre</dt>
+      <dd>{{ producto.nombreProducto }}</dd>
+    </div>
+    <div class="md:col-span-2">
+      <dt class="font-semibold text-gray-700">Descripción</dt>
+      <dd>{{ producto.descripcion|default:'-' }}</dd>
+    </div>
+    <div>
+      <dt class="font-semibold text-gray-700">Precio Unitario</dt>
+      <dd>${{ producto.precioUnitario }}</dd>
+    </div>
+    <div>
+      <dt class="font-semibold text-gray-700">Categoría</dt>
+      <dd>{{ producto.categoriaProducto }}</dd>
+    </div>
+    <div>
+      <dt class="font-semibold text-gray-700">Tipo</dt>
+      <dd>{{ producto.tipoProducto }}</dd>
+    </div>
+    <div>
+      <dt class="font-semibold text-gray-700">Unidad de Medida</dt>
+      <dd>{{ producto.unidadMedida }}</dd>
+    </div>
+  </dl>
+
+  <div class="flex justify-end gap-4 mt-6">
+    <a href="{% url 'lista_productos' %}"
+       class="px-6 py-2 bg-gray-300 rounded-lg hover:bg-gray-400 transition">Volver</a>
+   {% if can_productos_editar %}
+   <a href="{% url 'modificar_producto' producto.idProducto %}"
+     class="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition">Modificar</a>
+   {% endif %}
+  </div>
+</div>
+{% endblock %}

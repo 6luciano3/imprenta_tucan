@@ -1,0 +1,83 @@
+{% extends 'base.html' %}
+{% block title %}Modificar Rol{% endblock %}
+{% block content %}
+<div class="max-w-4xl mx-auto">
+	<h1 class="text-3xl font-black mb-6 flex items-center gap-2">
+		<span class="material-symbols-outlined text-4xl">edit</span>
+		Modificar Rol{% if rol %}: {{ rol.nombreRol }}{% endif %}
+	</h1>
+
+	<form method="POST" class="bg-white rounded-xl shadow p-6 space-y-8">
+		{% csrf_token %}
+		{{ form.non_field_errors }}
+		<div class="grid md:grid-cols-2 gap-8">
+			<div class="space-y-6">
+				<div>
+					<label for="id_nombreRol" class="block text-sm font-medium text-gray-700 mb-2">Nombre del Rol *</label>
+					{{ form.nombreRol }}
+					{% for e in form.nombreRol.errors %}<p class="mt-1 text-sm text-red-600 flex items-center gap-1"><span class="material-symbols-outlined text-sm">error</span>{{ e }}</p>{% endfor %}
+				</div>
+				<div>
+					<label for="id_descripcion" class="block text-sm font-medium text-gray-700 mb-2">Descripción *</label>
+					{{ form.descripcion }}
+					{% for e in form.descripcion.errors %}<p class="mt-1 text-sm text-red-600 flex items-center gap-1"><span class="material-symbols-outlined text-sm">error</span>{{ e }}</p>{% endfor %}
+				</div>
+			</div>
+			<div class="space-y-4">
+				<div class="flex items-center justify-between">
+					<label class="block text-sm font-medium text-gray-700 mb-2">Permisos (todos los activos) *</label>
+					<div class="flex items-center gap-2">
+						<button type="button" id="btn-select-all" class="text-xs px-2 py-1 bg-gray-100 rounded hover:bg-gray-200">Seleccionar todo</button>
+						<button type="button" id="btn-unselect-all" class="text-xs px-2 py-1 bg-gray-100 rounded hover:bg-gray-200">Quitar selección</button>
+					</div>
+				</div>
+								<div class="border border-gray-200 rounded-lg p-4 max-h-80 overflow-auto space-y-2 bg-gray-50" id="permisos-container">
+									{% for permiso in form.permisos.field.queryset %}
+										<label class="flex items-start gap-2 text-sm cursor-pointer bg-white border border-gray-200 rounded-md p-2 hover:bg-blue-50">
+											<input type="checkbox" name="permisos" value="{{ permiso.id }}" class="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+														 {% if permiso.id in selected_perm_ids %}checked{% endif %}>
+											<span>
+												<span class="font-medium text-gray-800">{{ permiso.nombre }}</span>
+								<span class="block text-gray-500 text-xs">Módulo: {{ permiso.modulo }} | Acciones: {% if permiso.acciones_list %}{% for acc in permiso.acciones_list %}{{ acc }}{% if not forloop.last %}, {% endif %}{% endfor %}{% else %}<span class="text-gray-400">Sin acciones</span>{% endif %}</span>
+											</span>
+										</label>
+									{% empty %}
+										<p class="text-sm text-gray-500">No hay permisos activos.</p>
+									{% endfor %}
+								</div>
+				{% for e in form.permisos.errors %}<p class="mt-1 text-sm text-red-600 flex items-center gap-1"><span class="material-symbols-outlined text-sm">error</span>{{ e }}</p>{% endfor %}
+			</div>
+		</div>
+		<div class="flex justify-end gap-3 pt-4">
+			<a href="{% url 'lista_roles' %}" class="px-5 py-2 rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300 flex items-center gap-2">
+				<span class="material-symbols-outlined text-sm">close</span>Cancelar
+			</a>
+			<button type="submit" class="px-5 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 flex items-center gap-2">
+				<span class="material-symbols-outlined text-sm">save</span>Guardar Cambios
+			</button>
+		</div>
+	</form>
+
+	<div class="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-800">
+		<h2 class="font-semibold mb-2 flex items-center gap-1"><span class="material-symbols-outlined text-base">info</span>Ayuda</h2>
+		<ul class="list-disc pl-5 space-y-1">
+			<li>Podés asignar cualquier permiso activo del sistema a este rol.</li>
+			<li>Usá “Seleccionar todo” o “Quitar selección” para agilizar la edición.</li>
+			<li>Los cambios se aplican al guardar; verás un mensaje de confirmación.</li>
+		</ul>
+	</div>
+</div>
+
+<script>
+	(function(){
+		const cont = document.getElementById('permisos-container');
+		const selectAll = document.getElementById('btn-select-all');
+		const unselectAll = document.getElementById('btn-unselect-all');
+		function setAll(val){
+			cont.querySelectorAll('input[type="checkbox"][name="permisos"]').forEach(cb => cb.checked = val);
+		}
+		selectAll?.addEventListener('click', ()=> setAll(true));
+		unselectAll?.addEventListener('click', ()=> setAll(false));
+	})();
+	</script>
+{% endblock %}

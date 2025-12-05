@@ -1,0 +1,217 @@
+{% extends 'layouts/list_base.html' %}
+{% block title %}Lista de Proveedores{% endblock %}
+
+{% block list_icon %}<span class="material-symbols-outlined text-3xl">business</span>{% endblock %}
+{% block list_title_text %}Lista de Proveedores{% endblock %}
+{% block new_button_href %}{% url 'crear_proveedor' %}{% endblock %}
+{% block new_button_label %}Nuevo Proveedor{% endblock %}
+{% block search_placeholder %}Nombre, CUIT, email, rubro, dirección...{% endblock %}
+{% block clear_url %}{% url 'lista_proveedores' %}{% endblock %}
+{% block order_fields_options %}
+  <option value="id" {% if order_by == 'id' %}selected{% endif %}>ID</option>
+  <option value="nombre" {% if order_by == 'nombre' %}selected{% endif %}>Nombre</option>
+  <option value="cuit" {% if order_by == 'cuit' %}selected{% endif %}>CUIT</option>
+  <option value="email" {% if order_by == 'email' %}selected{% endif %}>Email</option>
+  <option value="telefono" {% if order_by == 'telefono' %}selected{% endif %}>Teléfono</option>
+  <option value="rubro" {% if order_by == 'rubro' %}selected{% endif %}>Rubro</option>
+  <option value="direccion" {% if order_by == 'direccion' %}selected{% endif %}>Dirección</option>
+{% endblock %}
+
+{% block list_actions_right %}{% endblock %}
+
+
+{% block list_content %}
+
+<!-- Botón para mostrar el ranking de scores de proveedores -->
+<div class="flex justify-end mb-4">
+  <button id="btnRankingProveedores" type="button" class="bg-yellow-400 hover:bg-yellow-500 text-gray-900 font-semibold px-4 py-2 rounded shadow flex items-center gap-2">
+    <span class="material-symbols-outlined">star</span>
+    Mostrar Ranking de Proveedores
+  </button>
+</div>
+
+<!-- Tabla de ranking de scores (se muestra dinámicamente) -->
+<div id="rankingProveedoresContainer" class="mb-6 hidden">
+  <div class="bg-white shadow rounded-xl overflow-hidden table-responsive">
+    <table class="w-full min-w-[600px] text-left text-sm">
+      <thead class="bg-yellow-100 text-gray-700">
+        <tr>
+          <th class="py-3 px-5">Proveedor</th>
+          <th class="py-3 px-5">Score</th>
+          <th class="py-3 px-5">Actualizado</th>
+        </tr>
+      </thead>
+      <tbody id="rankingProveedoresBody">
+        <!-- JS insertará filas aquí -->
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Tabla de proveedores -->
+<div class="bg-white shadow rounded-xl overflow-hidden table-responsive">
+  <table class="w-full min-w-[980px] text-left text-sm">
+    <thead class="bg-gray-100 text-gray-700">
+      <tr>
+        <th class="py-3 px-5">Nombre</th>
+        <th class="py-3 px-5">CUIT</th>
+        <th class="py-3 px-5 hidden sm:table-cell">Email</th>
+        <th class="py-3 px-5 hidden md:table-cell">Rubro</th>
+        <th class="py-3 px-5 hidden md:table-cell">Teléfono</th>
+        <th class="py-3 px-5 text-center">Acciones</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for proveedor in proveedores %}
+      <tr class="border-b hover:bg-gray-50">
+        <td class="py-3 px-5 font-medium">{{ proveedor.nombre }}</td>
+        <td class="py-3 px-5">{{ proveedor.cuit|default:"-" }}</td>
+        <td class="py-3 px-5 hidden sm:table-cell">{{ proveedor.email }}</td>
+        <td class="py-3 px-5 hidden md:table-cell">{{ proveedor.rubro|default:"-" }}</td>
+        <td class="py-3 px-5 hidden md:table-cell">{{ proveedor.telefono }}</td>
+        <td class="py-3 px-5 flex justify-center gap-3">
+          <a href="{% url 'detalle_proveedor' proveedor.id %}" 
+             class="text-blue-600 hover:text-blue-800 flex items-center gap-1" 
+             title="Ver detalles">
+            <span class="material-symbols-outlined text-sm">visibility</span>
+          </a>
+          <a href="{% url 'editar_proveedor' proveedor.id %}" 
+             class="text-yellow-600 hover:text-yellow-800 flex items-center gap-1"
+             title="Editar">
+            <span class="material-symbols-outlined text-sm">edit</span>
+          </a>
+          <form method="POST" action="{% url 'activar_proveedor' proveedor.id %}" class="inline">
+            {% csrf_token %}
+            <button type="submit" 
+                    class="{% if proveedor.activo %}text-orange-600 hover:text-orange-800{% else %}text-green-600 hover:text-green-800{% endif %} flex items-center gap-1"
+                    title="{% if proveedor.activo %}Desactivar{% else %}Activar{% endif %}">
+              <span class="material-symbols-outlined text-sm">
+                {% if proveedor.activo %}toggle_on{% else %}toggle_off{% endif %}
+              </span>
+            </button>
+          </form>
+       <a href="#" 
+         onclick="return confirmarEliminacion({{ proveedor.id }}, '{{ proveedor.nombre }}')" 
+             class="text-red-600 hover:text-red-800 flex items-center gap-1"
+             title="Eliminar">
+            <span class="material-symbols-outlined text-sm">delete</span>
+          </a>
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="6" class="text-center py-6 text-gray-500">No hay proveedores registrados.</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <!-- Controles de paginación -->
+  <div class="px-5 py-4 border-t border-gray-200">
+    <div class="flex justify-end items-center gap-2">
+      {% if proveedores.has_previous %}
+        <a href="?q={{ query }}&order_by={{ order_by }}&direction={{ direction }}&page=1" class="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm">
+          <span class="material-symbols-outlined text-sm">first_page</span>
+        </a>
+        <a href="?q={{ query }}&order_by={{ order_by }}&direction={{ direction }}&page={{ proveedores.previous_page_number }}" class="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm">
+          <span class="material-symbols-outlined text-sm">chevron_left</span>
+        </a>
+      {% endif %}
+
+      <span class="text-sm text-gray-700">
+        Página {{ proveedores.number }} de {{ proveedores.paginator.num_pages }}
+      </span>
+
+      {% if proveedores.has_next %}
+        <a href="?q={{ query }}&order_by={{ order_by }}&direction={{ direction }}&page={{ proveedores.next_page_number }}" class="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm">
+          <span class="material-symbols-outlined text-sm">chevron_right</span>
+        </a>
+        <a href="?q={{ query }}&order_by={{ order_by }}&direction={{ direction }}&page={{ proveedores.paginator.num_pages }}" class="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm">
+          <span class="material-symbols-outlined text-sm">last_page</span>
+        </a>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Modal de confirmación de eliminación -->
+<div id="modalConfirmacion" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full">
+  <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+    <div class="mt-3 text-center">
+      <h3 class="text-lg leading-6 font-medium text-gray-900">Confirmar eliminación</h3>
+      <div class="mt-2 px-7 py-3">
+        <p class="text-sm text-gray-500">
+          ¿Estás seguro que deseas eliminar al proveedor <span id="proveedorNombre" class="font-medium"></span>?
+        </p>
+      </div>
+      <div class="flex justify-center gap-4 mt-4">
+        <form id="formEliminar" method="POST">
+          {% csrf_token %}
+          <button type="submit" 
+                  class="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700">
+            Eliminar
+          </button>
+        </form>
+        <button onclick="cerrarModal()"
+                class="bg-gray-200 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-300">
+          Cancelar
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function confirmarEliminacion(id, nombre) {
+  document.getElementById('modalConfirmacion').classList.remove('hidden');
+  document.getElementById('proveedorNombre').textContent = nombre;
+  document.getElementById('formEliminar').action = "{% url 'eliminar_proveedor' 0 %}".replace('0', id);
+  return false;
+}
+
+function cerrarModal() {
+  document.getElementById('modalConfirmacion').classList.add('hidden');
+}
+// Mostrar ranking de proveedores desde la API inteligente
+document.addEventListener('DOMContentLoaded', function() {
+  const btnRanking = document.getElementById('btnRankingProveedores');
+  const container = document.getElementById('rankingProveedoresContainer');
+  const tbody = document.getElementById('rankingProveedoresBody');
+  if (btnRanking && container && tbody) {
+    btnRanking.addEventListener('click', function() {
+      fetch('/api/score-proveedores/')
+        .then(response => response.json())
+        .then(data => {
+          // Soporta respuesta paginada (data.results) o array directa
+          const scores = Array.isArray(data) ? data : (Array.isArray(data.results) ? data.results : []);
+          tbody.innerHTML = '';
+          if (scores.length === 0) {
+            let row = document.createElement('tr');
+            row.innerHTML = `<td colspan="3" class="text-center py-6 text-gray-500">No hay scores registrados.</td>`;
+            tbody.appendChild(row);
+          } else {
+            // Ordenar por score descendente y mostrar top 10
+            scores.sort((a, b) => (b.score || 0) - (a.score || 0));
+            scores.slice(0, 10).forEach(item => {
+              let row = document.createElement('tr');
+              row.innerHTML = `
+                <td class="py-3 px-5 font-medium">${item.proveedor_nombre || item.proveedor || ''}</td>
+                <td class="py-3 px-5">${item.score != null ? item.score : '-'}</td>
+                <td class="py-3 px-5">${item.actualizado ? item.actualizado.split('T')[0] : '-'}</td>
+              `;
+              tbody.appendChild(row);
+            });
+          }
+          container.classList.remove('hidden');
+          btnRanking.disabled = true;
+          btnRanking.textContent = 'Ranking cargado';
+        })
+        .catch(error => {
+          alert('Error al obtener ranking de proveedores.');
+          console.error('Error al obtener ranking de proveedores:', error);
+        });
+    });
+  }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,117 @@
+{% extends 'layouts/list_base.html' %}
+
+{% block list_icon %}<span class="material-symbols-outlined text-3xl">functions</span>{% endblock %}
+{% block list_title_text %}Fórmulas configurables{% endblock %}
+{% block list_title_actions %}
+  <div class="flex justify-end items-center mt-2">
+    <a href="/configuracion/" class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold py-2 px-4 rounded shadow flex items-center gap-2">
+      <span class="material-symbols-outlined text-base">arrow_back</span>
+      Volver
+    </a>
+  </div>
+{% endblock %}
+{% block extra_head %}
+{{ block.super }}
+<style>
+  .volver-btn {
+    position: absolute;
+    left: 2rem;
+    top: 2rem;
+    z-index: 10;
+  }
+</style>
+{% endblock %}
+{% block new_button_href %}{% url 'crear_formula' %}{% endblock %}
+{% block new_button_label %}Nueva fórmula{% endblock %}
+{% block search_placeholder %}Código, insumo, expresión...{% endblock %}
+{% block clear_url %}{% url 'lista_formulas' %}{% endblock %}
+{% block order_fields_options %}
+  <option value="codigo" {% if order_by == 'codigo' %}selected{% endif %}>Código</option>
+  <option value="insumo" {% if order_by == 'insumo' %}selected{% endif %}>Insumo</option>
+  <option value="version" {% if order_by == 'version' %}selected{% endif %}>Versión</option>
+  <option value="activo" {% if order_by == 'activo' %}selected{% endif %}>Activo</option>
+{% endblock %}
+{% block list_content %}
+  <div class="bg-white shadow rounded-xl overflow-hidden table-responsive">
+    <table class="w-full min-w-[980px] text-left text-sm">
+      <thead class="bg-gray-100 text-gray-700">
+        <tr>
+          <th class="py-3 px-5">Código</th>
+          <th class="py-3 px-5">Insumo</th>
+          <th class="py-3 px-5">Expresión</th>
+          <th class="py-3 px-5">Versión</th>
+          <th class="py-3 px-5">Activo</th>
+          <th class="py-3 px-5 text-center">Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for f in formulas %}
+        <tr class="border-b hover:bg-gray-50">
+          <td class="py-3 px-5 font-medium">{{ f.codigo }}</td>
+          <td class="py-3 px-5">{{ f.insumo.nombre }}</td>
+          <td class="py-3 px-5 whitespace-pre-line text-xs text-gray-700">{{ f.expresion }}</td>
+          <td class="py-3 px-5">{{ f.version }}</td>
+          <td class="py-3 px-5">{{ f.activo|yesno:"Sí,No" }}</td>
+          <td class="py-3 px-5 flex justify-center gap-3">
+            <a href="{% url 'editar_formula' f.pk %}"
+               class="text-yellow-600 hover:text-yellow-800 flex items-center gap-1"
+               title="Editar">
+              <span class="material-symbols-outlined text-sm">edit</span>
+            </a>
+            {% if f.activo %}
+              <form method="post" action="{% url 'desactivar_formula' f.pk %}" class="inline">
+                {% csrf_token %}
+                <button type="submit"
+                        class="text-orange-600 hover:text-orange-800 flex items-center gap-1"
+                        title="Desactivar">
+                  <span class="material-symbols-outlined text-sm">toggle_on</span>
+                </button>
+              </form>
+            {% else %}
+              <form method="post" action="{% url 'activar_formula' f.pk %}" class="inline">
+                {% csrf_token %}
+                <button type="submit"
+                        class="text-green-600 hover:text-green-800 flex items-center gap-1"
+                        title="Activar">
+                  <span class="material-symbols-outlined text-sm">toggle_off</span>
+                </button>
+              </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="6" class="text-center py-6 text-gray-500">No hay fórmulas configuradas.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <!-- Controles de paginación -->
+    <div class="px-5 py-4 border-t border-gray-200">
+      <div class="flex justify-end items-center gap-2">
+        {% if page_obj.has_previous %}
+          <a href="?q={{ query }}&order_by={{ order_by }}&direction={{ direction }}&page=1" class="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm">
+            <span class="material-symbols-outlined text-sm">first_page</span>
+          </a>
+          <a href="?q={{ query }}&order_by={{ order_by }}&direction={{ direction }}&page={{ page_obj.previous_page_number }}" class="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm">
+            <span class="material-symbols-outlined text-sm">chevron_left</span>
+          </a>
+        {% endif %}
+
+        <span class="text-sm text-gray-700">
+          Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}
+        </span>
+
+        {% if page_obj.has_next %}
+          <a href="?q={{ query }}&order_by={{ order_by }}&direction={{ direction }}&page={{ page_obj.next_page_number }}" class="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm">
+            <span class="material-symbols-outlined text-sm">chevron_right</span>
+          </a>
+          <a href="?q={{ query }}&order_by={{ order_by }}&direction={{ direction }}&page={{ page_obj.paginator.num_pages }}" class="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm">
+            <span class="material-symbols-outlined text-sm">last_page</span>
+          </a>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+{% endblock %}

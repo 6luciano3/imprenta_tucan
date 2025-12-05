@@ -1,0 +1,11 @@
+{% extends 'base.html' %}
+
+
+{% block content %}
+<h1 class="text-3xl font-black mb-6">❌ Baja de Permiso</h1>
+<p class="mb-4">¿Estás seguro de que deseas dar de baja el permiso "{{ permiso.nombrePermiso }}"?</p>
+<form method="post">
+    {% csrf_token %}
+    <button type="submit">Confirmar Baja</button>
+</form>
+{% endblock %}

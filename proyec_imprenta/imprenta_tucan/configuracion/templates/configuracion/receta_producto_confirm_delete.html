@@ -1,0 +1,14 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="max-w-xl mx-auto bg-white shadow rounded-xl p-8">
+  <h2 class="text-xl font-bold mb-6">Eliminar Receta</h2>
+  <form method="post" class="space-y-5">
+    {% csrf_token %}
+    <p>¿Estás seguro que deseas eliminar la receta de <strong>{{ receta.producto }}</strong> con fórmula <strong>{{ receta.producto.formula }}</strong>?</p>
+    <div class="flex gap-3 mt-6">
+      <button type="submit" class="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition">Eliminar</button>
+      <a href="{% url 'receta_producto_list' %}" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition">Cancelar</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

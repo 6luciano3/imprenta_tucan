@@ -1,0 +1,25 @@
+{% extends 'base.html' %}
+{% block title %}{% if modo == 'editar' %}Editar Rubro{% else %}Nuevo Rubro{% endif %}{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-bold mb-4">{% if modo == 'editar' %}Editar Rubro{% else %}Crear Rubro{% endif %}</h1>
+<form method="post" class="bg-white p-6 rounded-xl shadow max-w-xl">
+  {% csrf_token %}
+  <div class="mb-4">
+    <label class="block text-sm font-medium mb-1">Nombre</label>
+    {{ form.nombre }}
+  </div>
+  <div class="mb-4">
+    <label class="block text-sm font-medium mb-1">Descripción</label>
+    {{ form.descripcion }}
+  </div>
+  <div class="mb-6">
+    <label class="inline-flex items-center gap-2">
+      {{ form.activo }} <span>Activo</span>
+    </label>
+  </div>
+  <div class="flex gap-2 justify-end">
+    <a href="{% url 'lista_rubros' %}{% if request.GET.popup %}?popup=1{% endif %}" class="px-4 py-2 bg-gray-200 rounded">Cancelar</a>
+    <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded">Guardar</button>
+  </div>
+</form>
+{% endblock %}

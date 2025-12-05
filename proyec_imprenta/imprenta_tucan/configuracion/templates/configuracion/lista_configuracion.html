@@ -1,0 +1,74 @@
+{% extends 'base.html' %}
+{% block title %}Configuración{% endblock %}
+{% block content %}
+<div class="container mx-auto px-4 py-6">
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div class="bg-white shadow rounded-xl p-4 flex flex-col items-center">
+            <span class="material-symbols-outlined text-4xl text-blue-600 mb-2">functions</span>
+            <div class="text-lg font-bold">{{ total_formulas }}</div>
+            <div class="text-xs text-gray-500">Fórmulas totales</div>
+        </div>
+        <div class="bg-white shadow rounded-xl p-4 flex flex-col items-center">
+            <span class="material-symbols-outlined text-4xl text-green-600 mb-2">toggle_on</span>
+            <div class="text-lg font-bold">{{ formulas_activas }}</div>
+            <div class="text-xs text-gray-500">Activas</div>
+        </div>
+        <div class="bg-white shadow rounded-xl p-4 flex flex-col items-center">
+            <span class="material-symbols-outlined text-4xl text-red-600 mb-2">toggle_off</span>
+            <div class="text-lg font-bold">{{ formulas_inactivas }}</div>
+            <div class="text-xs text-gray-500">Inactivas</div>
+        </div>
+        <div class="bg-white shadow rounded-xl p-4 flex flex-col items-center">
+            <span class="material-symbols-outlined text-4xl text-gray-600 mb-2">update</span>
+            <div class="text-lg font-bold">{% if ultima_actualizacion %}{{ ultima_actualizacion|date:'d/m/Y H:i' }}{% else %}-{% endif %}</div>
+            <div class="text-xs text-gray-500">Última actualización</div>
+        </div>
+    </div>
+    <div class="mb-6 flex justify-end">
+        <a href="/configuracion/formulas/" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded shadow">Gestionar fórmulas</a>
+    </div>
+    <h2 class="text-xl font-semibold mb-4 text-blue-700">Fórmulas configurables</h2>
+    <div class="overflow-x-auto rounded shadow mb-8">
+        <table class="min-w-full bg-white border border-gray-200 text-sm">
+            <thead class="bg-blue-100">
+                <tr>
+                    <th class="px-4 py-2 text-left">Código</th>
+                    <th class="px-4 py-2 text-left">Nombre</th>
+                    <th class="px-4 py-2 text-left">Expresión</th>
+                    <th class="px-4 py-2 text-left">Versión</th>
+                    <th class="px-4 py-2 text-left">Activo</th>
+                    <th class="px-4 py-2 text-left">Modificar</th>
+                    <th class="px-4 py-2 text-left">Desactivar</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for f in formulas %}
+                <tr class="border-b hover:bg-blue-50">
+                    <td class="px-4 py-2 font-semibold">{{ f.codigo }}</td>
+                    <td class="px-4 py-2">{{ f.nombre }}</td>
+                    <td class="px-4 py-2 whitespace-pre-line text-xs text-gray-700">{{ f.expresion }}</td>
+                    <td class="px-4 py-2">{{ f.version }}</td>
+                    <td class="px-4 py-2">{{ f.activo|yesno:"Sí,No" }}</td>
+                    <td class="px-4 py-2">
+                        <a href="{% url 'editar_formula' f.pk %}" class="bg-yellow-500 hover:bg-yellow-600 text-white py-1 px-3 rounded text-xs font-semibold">Modificar</a>
+                    </td>
+                    <td class="px-4 py-2">
+                        {% if f.activo %}
+                        <form method="post" action="{% url 'desactivar_formula' f.pk %}" style="display:inline;">
+                            {% csrf_token %}
+                            <button type="submit" class="bg-red-500 hover:bg-red-600 text-white py-1 px-3 rounded text-xs font-semibold">Desactivar</button>
+                        </form>
+                        {% else %}
+                        <span class="text-gray-400 text-xs">Inactiva</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="5" class="text-center py-4">No hay fórmulas configuradas.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <!-- Sección 'Grupos de Parámetros' eliminada -->
+</div>
+{% endblock %}

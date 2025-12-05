@@ -1,0 +1,78 @@
+{% extends 'base.html' %}
+{% block title %}Detalles del Cliente{% endblock %}
+
+{% block content %}
+<div class="px-4 md:px-10 lg:px-20 xl:px-40 py-5">
+  <div class="max-w-3xl mx-auto">
+    <div class="flex justify-between items-center mb-6">
+      <h1 class="text-3xl font-black text-gray-900">Detalles del Cliente</h1>
+      <a href="{% url 'lista_clientes' %}" class="flex items-center gap-2 bg-gray-500 text-white px-4 py-2 rounded-lg shadow hover:bg-gray-600">
+        <span class="material-symbols-outlined">arrow_back</span>
+        Volver
+      </a>
+    </div>
+
+    <div class="bg-white p-6 rounded-xl shadow">
+      <h2 class="text-xl font-semibold mb-4 text-gray-800">Información</h2>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-gray-700">
+        <div>
+          <p class="font-semibold">ID de Cliente:</p>
+          <p class="mb-4">{{ cliente.id }}</p>
+        </div>
+        <div>
+          <p class="font-semibold">Estado:</p>
+          <p class="mb-4">{{ cliente.estado }}</p>
+        </div>
+        <div>
+          <p class="font-semibold">Nombre:</p>
+          <p class="mb-4">{{ cliente.nombre }}</p>
+        </div>
+        <div>
+          <p class="font-semibold">Apellido:</p>
+          <p class="mb-4">{{ cliente.apellido }}</p>
+        </div>
+        <div>
+          <p class="font-semibold">Razón Social:</p>
+          <p class="mb-4">{{ cliente.razon_social|default:"Sin razón social" }}</p>
+        </div>
+        <div>
+          <p class="font-semibold">Correo Electrónico:</p>
+          <p class="mb-4">{{ cliente.email }}</p>
+        </div>
+        <div>
+          <p class="font-semibold">Teléfono:</p>
+          <p class="mb-4">{{ cliente.telefono }}</p>
+        </div>
+        <div>
+          <p class="font-semibold">Celular:</p>
+          <p class="mb-4">{{ cliente.celular|default:"No informado" }}</p>
+        </div>
+        <div>
+          <p class="font-semibold">Dirección:</p>
+          <p class="mb-4">{{ cliente.direccion }}</p>
+        </div>
+        <div>
+          <p class="font-semibold">Ciudad:</p>
+          <p class="mb-4">{{ cliente.ciudad }}</p>
+        </div>
+        <div>
+          <p class="font-semibold">Provincia:</p>
+          <p class="mb-4">{{ cliente.provincia }}</p>
+        </div>
+        <div>
+          <p class="font-semibold">País:</p>
+          <p class="mb-4">{{ cliente.pais }}</p>
+        </div>
+      </div>
+
+      <div class="mt-6 text-right">
+        <a href="{% url 'lista_clientes' %}" class="flex inline-flex items-center gap-2 bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700">
+          <span class="material-symbols-outlined">arrow_back</span>
+          Volver
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

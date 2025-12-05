@@ -1,0 +1,44 @@
+{% extends 'base.html' %}
+{% block extra_head %}
+  {% if request.GET.popup %}
+  <style>
+    nav, aside { display: none !important; }
+    main { padding: 0 !important; }
+    body { background: #fff !important; }
+  </style>
+  {% endif %}
+{% endblock %}
+{% block title %}{% if modo == 'editar' %}Editar Categoría{% else %}Nueva Categoría{% endif %}{% endblock %}
+
+{% block content %}
+<div class="px-4 md:px-10 lg:px-20 xl:px-40 py-5">
+  <div class="max-w-3xl mx-auto">
+    <div class="flex justify-between items-center mb-6">
+      <h1 class="text-3xl font-black text-gray-900">{% if modo == 'editar' %}Editar Categoría{% else %}Nueva Categoría{% endif %}</h1>
+      <a href="{% url 'lista_categorias' %}{% if request.GET.popup %}?popup=1{% endif %}" class="flex items-center gap-2 bg-gray-600 text-white px-4 py-2 rounded-lg shadow hover:bg-gray-700">
+        <span class="material-symbols-outlined">arrow_back</span>
+        Volver
+      </a>
+    </div>
+
+    <div class="bg-white p-6 rounded-xl shadow">
+      <form method="POST" class="space-y-4">
+        {% csrf_token %}
+        {% if request.GET.popup %}<input type="hidden" name="popup" value="1" />{% endif %}
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Nombre *</label>
+          {{ form.nombreCategoria }}
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
+          {{ form.descripcion }}
+        </div>
+        <div class="flex justify-end gap-2 pt-4">
+          <a href="{% url 'lista_categorias' %}{% if request.GET.popup %}?popup=1{% endif %}" class="px-5 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">Cancelar</a>
+          <button type="submit" class="px-5 py-2 bg-primary text-white rounded hover:bg-primary-dark">Guardar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

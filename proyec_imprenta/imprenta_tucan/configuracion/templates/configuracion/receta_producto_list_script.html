@@ -1,0 +1,52 @@
+<script>
+// Modal y AJAX para edición rápida de fórmula
+let recetaId = null;
+let currentProductoId = null;
+function openFormulaModal(id, currentFormula) {
+    recetaId = id;
+    // Selecciona la fórmula actual en el combo
+    const select = document.getElementById('formula-select');
+    if (select) {
+        // Si currentFormula está vacío, selecciona la primera opción
+        if (currentFormula) {
+            select.value = currentFormula;
+        } else {
+            select.selectedIndex = 0;
+        }
+    }
+    document.getElementById('formula-modal').classList.remove('hidden');
+}
+function closeFormulaModal() {
+    recetaId = null;
+    document.getElementById('formula-modal').classList.add('hidden');
+}
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.btn-edit-formula').forEach(btn => {
+        btn.addEventListener('click', function() {
+            openFormulaModal(this.dataset.id, this.dataset.formula);
+        });
+    });
+    document.getElementById('formula-save-btn').addEventListener('click', function() {
+        const formulaId = document.getElementById('formula-select').value;
+        if (!recetaId || !formulaId) return;
+        fetch(`/configuracion/recetas/${recetaId}/editar_formula/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: `formula_id=${formulaId}`
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.ok) {
+                document.getElementById(`formula-label-${recetaId}`).innerText = data.formula;
+                closeFormulaModal();
+            } else {
+                alert(data.error || 'Error al actualizar fórmula');
+            }
+        });
+    });
+    document.getElementById('formula-cancel-btn').addEventListener('click', closeFormulaModal);
+});
+</script>

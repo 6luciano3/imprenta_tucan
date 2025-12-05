@@ -1,0 +1,245 @@
+body {
+    background-color: #f8f9fa;
+    overflow-x: hidden;
+}
+
+#wrapper {
+    display: flex;
+    width: 100%;
+}
+
+#sidebar-wrapper {
+    min-height: 100vh;
+    width: 250px;
+    transition: all 0.3s;
+}
+
+#sidebar-wrapper .list-group-item:hover {
+    background-color: #495057;
+}
+
+#wrapper.toggled #sidebar-wrapper {
+    margin-left: -250px;
+}
+
+#page-content-wrapper {
+    flex: 1;
+}
+
+.list-group-item.active {
+    background-color: #0d6efd !important;
+    border-color: #0d6efd !important;
+}
+
+/* ========== Helpers Responsivos Globales ========== */
+/* Asegurar que imágenes y medios no desborden */
+img, video, canvas {
+    max-width: 100%;
+    height: auto;
+}
+
+/* Hacer que las tablas se puedan desplazar horizontalmente en pantallas chicas */
+.table-responsive {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* Espaciado seguro para contenedores principales en móviles */
+.container-safe {
+    padding-left: 1rem;
+    padding-right: 1rem;
+}
+
+/* Utilidades de visibilidad para columnas en tablas (si no se usa Tailwind) */
+@media (max-width: 640px) { /* hasta sm */
+    .hide-sm { display: none !important; }
+}
+
+@media (max-width: 768px) { /* hasta md */
+    .hide-md { display: none !important; }
+}
+
+/* Botoneras que se adaptan en móvil */
+.btn-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem;
+}
+
+/* Modales: ancho fluido en móvil si se usa un ancho fijo en el template */
+.modal-fluid {
+    width: 92vw;
+    max-width: 28rem; /* ~ w-112 */
+}
+
+/* ========== List Controls (Search + Sort) Compact Styling ========== */
+/* Reduce overall container padding by ~50% while preserving width and styles */
+.list-controls {
+    padding: 0.5rem 0.75rem !important; /* reduce top/bottom aún más */
+}
+
+/* Compact variant: scale down inner controls proportionally */
+.list-controls--compact label {
+    font-size: 10pt;              /* optional smaller typography */
+    margin-bottom: 0.25rem;       /* reduce label spacing */
+}
+
+.list-controls--compact form input[type="text"],
+.list-controls--compact form select {
+    font-size: 10pt !important;   /* tamaño objetivo */
+    line-height: 1 !important;    /* altura del texto */
+    padding-top: 0 !important;    
+    padding-bottom: 0 !important; 
+    height: 1.2em !important;     /* cercano a la altura de tipografía + bordes */
+    min-height: 0 !important;     /* evitar mínimos del navegador/plugin */
+    box-sizing: border-box;
+    border-radius: 0 !important;  /* quitar bordes redondeados */
+}
+
+/* Normalización específica para SELECT (caret compacto y sin apariencia nativa) */
+.list-controls--compact form select {
+        -webkit-appearance: none;
+        -moz-appearance: none;
+        appearance: none;
+        background-image: url("data:image/svg+xml;utf8,\
+            <svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23666'>\
+                <path d='M7 10l5 5 5-5z'/>\
+            </svg>");
+        background-repeat: no-repeat;
+        background-position: right 0.35rem center;
+        background-size: 0.8em auto;
+        padding-right: 1.5rem !important; /* espacio para el caret */
+}
+
+/* Ocultar flecha por defecto en IE/Edge antiguos */
+.list-controls--compact form select::-ms-expand {
+        display: none;
+}
+
+/* Ocultar flecha por defecto en IE/Edge antiguos */
+.list-controls--compact form select::-ms-expand {
+        display: none;
+}
+
+.list-controls--compact form button {
+    font-size: 10pt;
+    line-height: 1 !important;    /* alinear al texto */
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+    padding-left: 0.5rem !important;  /* reducir ancho horizontal */
+    padding-right: 0.5rem !important; /* reducir ancho horizontal */
+    height: 1.2em !important;     /* consistente con inputs/selects */
+    min-height: 0 !important;
+    display: inline-flex;
+    align-items: center;
+    border-radius: 0 !important;  /* quitar bordes redondeados de botones */
+}
+
+/* Make Material Symbols match the reduced control size */
+.list-controls--compact .material-symbols-outlined {
+    font-size: 1em;   /* follow text size */
+    line-height: 1;   /* tight to center vertically */
+}
+
+/* Enlaces tipo botón (p.ej., "Limpiar") dentro de la barra compacta */
+.list-controls--compact a {
+    font-size: 10pt;
+    line-height: 1 !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+    padding-left: 0.5rem !important;
+    padding-right: 0.5rem !important;
+    height: 1.2em !important;
+    min-height: 0 !important;
+    display: inline-flex;
+    align-items: center;
+}
+
+/* Mobile safety: keep full width and wrapping without changing layout */
+@media (max-width: 640px) {
+    .list-controls {
+        padding-left: 0.75rem;
+        padding-right: 0.75rem;
+    }
+}
+
+/* ========== Tabla: encabezado con gris corporativo ========== */
+/* Aplica a tablas envueltas en .table-responsive y a cualquier <table> por las dudas */
+.table-responsive thead,
+table thead,
+thead.bg-gray-100 {
+    background-color: #34495E !important; /* gris solicitado */
+    color: #ffffff !important;            /* contraste para legibilidad */
+}
+.table-responsive thead tr,
+table thead tr,
+.table-responsive thead th,
+table thead th {
+    background-color: #34495E !important;
+    color: #ffffff !important;
+}
+
+/* ========== Fondo general de las tablas: azul clarito 10% ========== */
+/* Usamos el color primario #3498db con 10% de opacidad para dar un tinte suave. */
+.table-responsive table,
+table {
+    background-color: rgba(52, 152, 219, 0.10) !important; /* 10% de #3498db */
+}
+
+/* Asegurar que el thead mantenga su fondo gris por encima del fondo azul */
+.table-responsive thead,
+table thead,
+.table-responsive thead tr,
+table thead tr,
+.table-responsive thead th,
+table thead th {
+    background-color: #34495E !important;
+}
+
+/* ========== Mejor distribución de la barra (Clientes) ========== */
+/* Fila principal: 2 grupos (izq: búsqueda | der: orden) */
+.list-controls--compact .list-controls__row {
+    display: grid;
+    grid-template-columns: 1fr auto; /* el grupo de orden queda a la derecha */
+    column-gap: 1rem;  /* separar grupos */
+    row-gap: 0.5rem;
+    align-items: center;
+}
+
+/* Grupo izquierdo (buscador + botón Buscar) */
+.list-controls--compact .list-controls__row > form:first-of-type {
+    display: grid !important;           /* sobreescribe .flex */
+    grid-template-columns: 1fr auto;    /* input crece | botón fijo */
+    column-gap: 0.75rem;                /* espaciado entre input y botón */
+    align-items: center;
+}
+
+/* Grupo derecho (Ordenar por + Dirección + botón Ordenar) */
+.list-controls--compact .list-controls__row > form:last-of-type {
+    display: grid !important;           /* sobreescribe .flex */
+    grid-template-columns: auto auto auto;
+    column-gap: 0.75rem;                /* espaciado entre selects y botón */
+    align-items: center;
+    justify-self: end;                   /* anclar el grupo a la derecha */
+    margin-right: 0.25rem;               /* evitar que quede pegado al borde */
+}
+
+/* Anchos de campos: buscador flexible, selects auto */
+.list-controls--compact .field-search { min-width: 14rem; }
+.list-controls--compact .field-order-by select,
+.list-controls--compact .field-direction select {
+    width: auto !important;      /* sobreescribe w-full */
+    min-width: 8rem;
+}
+
+/* En pantallas medianas y chicas, apilar grupos y contenidos */
+@media (max-width: 1024px) {
+    .list-controls--compact .list-controls__row {
+        grid-template-columns: 1fr; /* apilar grupos */
+    }
+    .list-controls--compact .list-controls__row > form:first-of-type,
+    .list-controls--compact .list-controls__row > form:last-of-type {
+        grid-template-columns: 1fr; /* apilar elementos dentro de cada grupo */
+    }
+}

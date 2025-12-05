@@ -1,0 +1,40 @@
+{% extends 'base.html' %}
+{% block title %}Validar Proyección de Insumo{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-bold mb-4">Validar Proyección de Insumo</h1>
+<div class="mb-6">
+    <p><strong>Insumo:</strong> {{ proyeccion.insumo.nombre }}</p>
+    <p><strong>Periodo:</strong> {{ proyeccion.periodo }}</p>
+    <p><strong>Cantidad proyectada:</strong> {{ proyeccion.cantidad_proyectada }}</p>
+    <p><strong>Proveedor sugerido:</strong> {% if proyeccion.proveedor_sugerido %}{{ proyeccion.proveedor_sugerido.nombre }}{% else %}-{% endif %}</p>
+</div>
+<form method="post">
+    {% csrf_token %}
+    <div class="mb-4">
+        <label for="cantidad_validada" class="block font-semibold mb-1">Cantidad validada</label>
+        <input type="number" name="cantidad_validada" id="cantidad_validada" value="{{ proyeccion.cantidad_validada|default:proyeccion.cantidad_proyectada }}" class="border rounded px-2 py-1 w-32">
+    </div>
+    <div class="mb-4">
+        <label for="proveedor_validado" class="block font-semibold mb-1">Proveedor validado</label>
+        <select name="proveedor_validado" id="proveedor_validado" class="border rounded px-2 py-1 w-64">
+            {% for proveedor in proveedores %}
+            <option value="{{ proveedor.id }}" {% if proyeccion.proveedor_validado and proyeccion.proveedor_validado.id == proveedor.id %}selected{% elif proyeccion.proveedor_sugerido and proyeccion.proveedor_sugerido.id == proveedor.id %}selected{% endif %}>{{ proveedor.nombre }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="mb-4">
+        <label for="estado" class="block font-semibold mb-1">Estado</label>
+        <select name="estado" id="estado" class="border rounded px-2 py-1 w-64">
+            <option value="aceptada" {% if proyeccion.estado == 'aceptada' %}selected{% endif %}>Aceptar</option>
+            <option value="modificada" {% if proyeccion.estado == 'modificada' %}selected{% endif %}>Modificar</option>
+            <option value="rechazada" {% if proyeccion.estado == 'rechazada' %}selected{% endif %}>Rechazar</option>
+        </select>
+    </div>
+    <div class="mb-4">
+        <label for="comentario_admin" class="block font-semibold mb-1">Comentario</label>
+        <textarea name="comentario_admin" id="comentario_admin" rows="3" class="border rounded px-2 py-1 w-full">{{ proyeccion.comentario_admin }}</textarea>
+    </div>
+    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 rounded">Guardar validación</button>
+    <a href="{% url 'lista_proyecciones' %}" class="ml-4 text-gray-600 hover:underline">Volver a la lista</a>
+</form>
+{% endblock %}

@@ -1,0 +1,65 @@
+{% extends 'base.html' %}
+{% block title %}Detalles del Proveedor{% endblock %}
+
+{% block content %}
+<div class="px-4 md:px-10 lg:px-20 xl:px-40 py-5">
+  <div class="max-w-3xl mx-auto">
+    <div class="flex justify-between items-center mb-6">
+      <h1 class="text-3xl font-black text-gray-900">Detalles del Proveedor</h1>
+      <a href="{% url 'lista_proveedores' %}" class="flex items-center gap-2 bg-gray-700 text-white px-4 py-2 rounded-lg shadow hover:bg-gray-800">
+        <span class="material-symbols-outlined">arrow_back</span>
+        Volver
+      </a>
+    </div>
+
+    <div class="bg-white p-6 rounded-xl shadow">
+      <h2 class="text-xl font-semibold mb-4 text-gray-800">Información</h2>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-gray-700">
+        <div>
+          <p class="font-semibold">ID de Proveedor:</p>
+          <p class="mb-4">{{ proveedor.id }}</p>
+        </div>
+        <div>
+          <p class="font-semibold">Estado:</p>
+          <p class="mb-4">{% if proveedor.activo %}Activo{% else %}Inactivo{% endif %}</p>
+        </div>
+        <div>
+          <p class="font-semibold">Nombre:</p>
+          <p class="mb-4">{{ proveedor.nombre }}</p>
+        </div>
+        <div>
+          <p class="font-semibold">CUIT:</p>
+          <p class="mb-4">{{ proveedor.cuit|default:"-" }}</p>
+        </div>
+        <div>
+          <p class="font-semibold">Correo Electrónico:</p>
+          <p class="mb-4">{{ proveedor.email }}</p>
+        </div>
+        <div>
+          <p class="font-semibold">Teléfono:</p>
+          <p class="mb-4">{{ proveedor.telefono }}</p>
+        </div>
+        <div class="md:col-span-2">
+          <p class="font-semibold">Dirección:</p>
+          <p class="mb-4">{{ proveedor.direccion|default:"-" }}</p>
+        </div>
+        <div class="md:col-span-2">
+          <p class="font-semibold">Rubro:</p>
+          <p class="mb-4">{{ proveedor.rubro|default:"-" }}</p>
+        </div>
+      </div>
+
+      <div class="mt-6 flex justify-end gap-2">
+        <a href="{% url 'editar_proveedor' proveedor.id %}" class="bg-gray-700 text-white px-4 py-2 rounded hover:bg-gray-800">Editar</a>
+        <form method="POST" action="{% url 'activar_proveedor' proveedor.id %}">
+          {% csrf_token %}
+          <button type="submit" class="px-4 py-2 rounded text-white bg-gray-700 hover:bg-gray-800">
+            {% if proveedor.activo %}Desactivar{% else %}Activar{% endif %}
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

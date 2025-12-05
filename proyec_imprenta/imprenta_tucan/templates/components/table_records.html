@@ -1,0 +1,28 @@
+<section class="mt-10 bg-white rounded-xl shadow p-6">
+  <h2 class="text-xl font-bold mb-4 flex items-center gap-2">
+    <span class="material-symbols-outlined text-blue-600">bar_chart</span>
+    Últimos registros
+  </h2>
+  <div class="overflow-x-auto">
+    <table class="min-w-full border-t text-sm">
+      <thead class="bg-gray-100 text-gray-600 uppercase text-xs">
+        <tr>
+          <th class="py-3 px-4 text-left">Módulo</th>
+          <th class="py-3 px-4 text-left">Descripción</th>
+          <th class="py-3 px-4 text-left">Fecha</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for registro in registros %}
+          <tr class="border-t">
+            <td class="py-3 px-4">{{ registro.modulo }}</td>
+            <td class="py-3 px-4 text-gray-600">{{ registro.descripcion }}</td>
+            <td class="py-3 px-4">{{ registro.fecha|default:"-" }}</td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="3" class="py-4 px-4 text-center text-gray-400">No hay registros recientes.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>

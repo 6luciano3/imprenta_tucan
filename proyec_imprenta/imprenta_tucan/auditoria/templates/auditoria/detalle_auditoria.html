@@ -1,0 +1,21 @@
+{% extends 'base.html' %}
+{% block title %}Detalle Auditoría{% endblock %}
+{% block content %}
+<div class="max-w-lg mx-auto mt-10 bg-white p-8 rounded shadow">
+    <h2 class="text-xl font-bold mb-4">Detalle de Auditoría</h2>
+    <table class="min-w-full border text-sm mb-6">
+        <tr><th class="text-left pr-4">ID</th><td>{{ auditoria.id }}</td></tr>
+        <tr><th class="text-left pr-4">Modelo</th><td>{{ auditoria.model }}</td></tr>
+        <tr><th class="text-left pr-4">Registro</th><td>{{ auditoria.object_repr }}</td></tr>
+        <tr><th class="text-left pr-4">Evento</th><td>{{ auditoria.get_action_display }}</td></tr>
+        <tr><th class="text-left pr-4">Usuario</th><td>{{ auditoria.user }}</td></tr>
+        <tr><th class="text-left pr-4">Fecha</th><td>{{ auditoria.timestamp|date:'d/m/Y H:i' }}</td></tr>
+        <tr><th class="text-left pr-4">IP</th><td>{{ auditoria.ip_address }}</td></tr>
+        <tr><th class="text-left pr-4">Ruta</th><td>{{ auditoria.path }}</td></tr>
+        <tr><th class="text-left pr-4">Método</th><td>{{ auditoria.method }}</td></tr>
+        <tr><th class="text-left pr-4">Cambios</th><td><pre class="whitespace-pre-wrap">{{ auditoria.changes }}</pre></td></tr>
+        <tr><th class="text-left pr-4">Extra</th><td><pre class="whitespace-pre-wrap">{{ auditoria.extra }}</pre></td></tr>
+    </table>
+    <a href="{% url 'lista_auditoria' %}" class="text-blue-600 hover:underline">&larr; Volver a la lista</a>
+</div>
+{% endblock %}

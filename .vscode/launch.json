@@ -1,0 +1,26 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "🚀 Ejecutar Servidor Django",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/run.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/proyec_imprenta/imprenta_tucan"
+            }
+        },
+        {
+            "name": "🐍 Django Server Direct",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/proyec_imprenta/imprenta_tucan/manage.py",
+            "args": ["runserver"],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/proyec_imprenta/imprenta_tucan",
+            "python": "${workspaceFolder}/imprenta_tuc/Scripts/python.exe"
+        }
+    ]
+}

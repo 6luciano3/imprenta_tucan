@@ -1,0 +1,21 @@
+{% extends 'base.html' %}
+
+
+{% block content %}
+<h1>Buscar Rol</h1>
+<form method="get">
+    <input type="text" name="criterio" placeholder="Buscar por nombre" value="{{ criterio }}">
+    <button type="submit">Buscar</button>
+</form>
+<ul>
+    {% for rol in roles %}
+    <li>
+        {{ rol.nombreRol }} - {{ rol.descripcion }}
+        <a href="{% url 'modificar_rol' rol.idRol %}">Modificar</a>
+        {% if rol.estado == 'Activo' %}
+        <a href="{% url 'baja_rol' rol.idRol %}">Dar de Baja</a>
+        {% endif %}
+    </li>
+    {% endfor %}
+</ul>
+{% endblock %}

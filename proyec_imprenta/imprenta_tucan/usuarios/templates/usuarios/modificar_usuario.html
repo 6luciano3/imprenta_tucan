@@ -1,0 +1,57 @@
+{% extends 'base.html' %}
+{% block title %}{{ labels.edit_user|default:'Modificar Usuario' }}{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+  <div class="flex justify-between items-center mb-8 border-b pb-4 border-slate-200 dark:border-slate-800">
+    <h1 class="text-4xl font-black text-slate-900 dark:text-white tracking-tight">{{ labels.edit_user|default:'Editar Usuario' }}</h1>
+  </div>
+
+  <div class="bg-white dark:bg-background-dark p-8 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800">
+    <form method="POST" class="space-y-6">
+      {% csrf_token %}
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {% for field in form %}
+          {% if field.name not in 'password confirm_password' %}
+            <label class="flex flex-col">
+              <p class="text-base font-medium text-slate-900 dark:text-white pb-2">{{ field.label }}</p>
+              {{ field }}
+              {% if field.errors %}
+                <p class="text-sm text-red-600 mt-1">{{ field.errors.as_text|slice:"2:" }}</p>
+              {% endif %}
+            </label>
+          {% endif %}
+        {% endfor %}
+      </div>
+
+      <div class="border-t border-slate-200 dark:border-slate-800 pt-6">
+        <p class="text-lg font-semibold text-slate-900 dark:text-white mb-1">{{ labels.change_password|default:'Cambiar Contraseña' }}</p>
+        <p class="text-sm text-slate-500 dark:text-slate-400">{{ labels.password_help|default:'Deje los campos en blanco para mantener la contraseña actual.' }}</p>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <label class="flex flex-col">
+          <p class="text-base font-medium text-slate-900 dark:text-white pb-2">{{ labels.new_password|default:'Nueva Contraseña' }}</p>
+          {{ form.password }}
+          {% if form.password.errors %}
+            <p class="text-sm text-red-600 mt-1">{{ form.password.errors.as_text|slice:"2:" }}</p>
+          {% endif %}
+        </label>
+        <label class="flex flex-col">
+          <p class="text-base font-medium text-slate-900 dark:text-white pb-2">Confirmar Contraseña</p>
+          {{ form.confirm_password }}
+          {% if form.confirm_password.errors %}
+            <p class="text-sm text-red-600 mt-1">{{ form.confirm_password.errors.as_text|slice:"2:" }}</p>
+          {% endif %}
+        </label>
+      </div>
+
+      <div class="flex justify-end gap-4 pt-6">
+        <a href="{% url 'lista_usuarios' %}" class="px-6 py-3 rounded-lg bg-slate-200 dark:bg-slate-800 text-slate-800 dark:text-slate-200 hover:bg-slate-300 dark:hover:bg-slate-700 text-base font-bold">Cancelar</a>
+        <button type="submit" class="px-6 py-3 rounded-lg bg-primary text-white hover:bg-primary/90 text-base font-bold">Guardar Cambios</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,41 @@
+{% extends 'base.html' %}
+{% block title %}Editar Usuario{% endblock %}
+
+{% block content %}
+<h1 class="text-3xl font-black mb-8">✏️ Editar Usuario: {{ usuario.nombre }} {{ usuario.apellido }}</h1>
+
+<form method="post" class="bg-white p-8 rounded-xl shadow max-w-3xl mx-auto space-y-6">
+  {% csrf_token %}
+
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <label class="flex flex-col">
+      <span class="font-semibold mb-1">Nombre *</span>
+      {{ form.nombre }}
+    </label>
+    <label class="flex flex-col">
+      <span class="font-semibold mb-1">Apellido *</span>
+      {{ form.apellido }}
+    </label>
+  </div>
+
+  <label class="flex flex-col">
+    <span class="font-semibold mb-1">Correo Electrónico *</span>
+    {{ form.email }}
+  </label>
+
+  <label class="flex flex-col">
+    <span class="font-semibold mb-1">Teléfono</span>
+    {{ form.telefono }}
+  </label>
+
+  <label class="flex flex-col">
+    <span class="font-semibold mb-1">Rol</span>
+    {{ form.rol }}
+  </label>
+
+  <div class="flex justify-end gap-4 pt-4">
+    <a href="{% url 'lista_usuarios' %}" class="px-6 py-2 bg-gray-300 rounded-lg hover:bg-gray-400">Cancelar</a>
+    <button type="submit" class="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark">Actualizar</button>
+  </div>
+</form>
+{% endblock %}

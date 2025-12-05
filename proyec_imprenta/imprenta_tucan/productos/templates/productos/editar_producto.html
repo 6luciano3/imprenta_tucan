@@ -1,0 +1,53 @@
+{% extends 'base.html' %}
+{% block title %}Modificar Producto{% endblock %}
+{% block content %}
+<h1 class="text-3xl font-black mb-8 flex items-center gap-2">
+    <span class="material-symbols-outlined text-3xl">edit</span>
+    Modificar Producto
+</h1>
+
+<form method="post" class="bg-white p-8 rounded-xl shadow max-w-3xl mx-auto space-y-6">
+    {% csrf_token %}
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <label class="flex flex-col">
+            <span class="font-semibold mb-1">Nombre *</span>
+            {{ form.nombreProducto }}
+        </label>
+    </div>
+
+    <label class="flex flex-col">
+        <span class="font-semibold mb-1">Descripción</span>
+        {{ form.descripcion }}
+    </label>
+
+    <div class="grid grid-cols-2 gap-6">
+        <label class="flex flex-col">
+            <span class="font-semibold mb-1">Precio Unitario *</span>
+            {{ form.precioUnitario }}
+        </label>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <label class="flex flex-col">
+            <span class="font-semibold mb-1">Categoría *</span>
+            {{ form.categoriaProducto }}
+        </label>
+        <label class="flex flex-col">
+            <span class="font-semibold mb-1">Tipo *</span>
+            {{ form.tipoProducto }}
+        </label>
+        <label class="flex flex-col">
+            <span class="font-semibold mb-1">Unidad de Medida *</span>
+            {{ form.unidadMedida }}
+        </label>
+    </div>
+
+    <div class="flex justify-end gap-4 pt-4">
+        <a href="{% url 'lista_productos' %}"
+             class="px-6 py-2 bg-gray-300 rounded-lg hover:bg-gray-400 transition">Cancelar</a>
+        <button type="submit"
+                        class="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition">Guardar</button>
+    </div>
+</form>
+{% endblock %}

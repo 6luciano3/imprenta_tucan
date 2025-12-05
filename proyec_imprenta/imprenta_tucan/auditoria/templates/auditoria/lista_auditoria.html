@@ -1,0 +1,61 @@
+{% extends 'base.html' %}
+{% block title %}Auditoría{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-bold mb-4">Registros de Auditoría</h1>
+
+<form method="get" class="mb-6 flex flex-wrap gap-4 items-end bg-gray-50 p-4 rounded-lg shadow">
+    <div>
+        <label for="modelo" class="block text-xs font-semibold mb-1">Modelo</label>
+        <input type="text" name="modelo" id="modelo" value="{{ request.GET.modelo }}" class="border rounded px-2 py-1 text-sm" placeholder="Modelo">
+    </div>
+    <div>
+        <label for="evento" class="block text-xs font-semibold mb-1">Evento</label>
+        <select name="evento" id="evento" class="border rounded px-2 py-1 text-sm">
+            <option value="">Todos</option>
+            <option value="create" {% if request.GET.evento == 'create' %}selected{% endif %}>Crear</option>
+            <option value="update" {% if request.GET.evento == 'update' %}selected{% endif %}>Actualizar</option>
+            <option value="delete" {% if request.GET.evento == 'delete' %}selected{% endif %}>Eliminar</option>
+        </select>
+    </div>
+    <div>
+        <label for="usuario" class="block text-xs font-semibold mb-1">Usuario</label>
+        <input type="text" name="usuario" id="usuario" value="{{ request.GET.usuario }}" class="border rounded px-2 py-1 text-sm" placeholder="Usuario">
+    </div>
+    <div>
+        <label for="fecha" class="block text-xs font-semibold mb-1">Fecha</label>
+        <input type="date" name="fecha" id="fecha" value="{{ request.GET.fecha }}" class="border rounded px-2 py-1 text-sm">
+    </div>
+    <div class="flex gap-2 items-end">
+        <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 rounded">Buscar</button>
+        <a href="{% url 'lista_auditoria' %}" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold px-4 py-2 rounded inline-block">Limpiar</a>
+    </div>
+</form>
+<table class="min-w-full border text-sm">
+    <thead class="bg-gray-100">
+        <tr>
+            <th class="px-2 py-1">ID</th>
+            <th class="px-2 py-1">Modelo/Registro</th>
+            <th class="px-2 py-1">Evento</th>
+            <th class="px-2 py-1">Usuario</th>
+            <th class="px-2 py-1">Fecha</th>
+            <th class="px-2 py-1">Acciones</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for a in auditorias %}
+        <tr>
+            <td class="px-2 py-1">{{ a.id }}</td>
+            <td class="px-2 py-1">{{ a.model }} / {{ a.object_repr|truncatechars:30 }}</td>
+            <td class="px-2 py-1">{{ a.get_action_display }}</td>
+            <td class="px-2 py-1">{{ a.user|default_if_none:"" }}</td>
+            <td class="px-2 py-1">{{ a.timestamp|date:'d/m/Y H:i' }}</td>
+            <td class="px-2 py-1 flex gap-2">
+                <a href="{% url 'ver_auditoria' a.id %}" class="text-blue-600 hover:underline">Ver</a>
+            </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6" class="text-center py-4">No hay registros de auditoría.</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

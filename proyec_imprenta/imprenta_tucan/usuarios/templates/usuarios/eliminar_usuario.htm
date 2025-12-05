@@ -1,0 +1,13 @@
+{% extends 'base.html' %}
+
+
+{% block content %}
+<h1>Baja de Usuario</h1>
+<p>¿Estás seguro de que deseas dar de baja al usuario "{{ usuario.nombre }} {{ usuario.apellido }}"?</p>
+<form method="post">
+    {% csrf_token %}
+    <button type="submit">Confirmar Baja</button>
+</form>
+{% endblock %}
+
+

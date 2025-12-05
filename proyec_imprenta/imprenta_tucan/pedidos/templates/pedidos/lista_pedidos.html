@@ -1,0 +1,131 @@
+{% extends 'layouts/list_base.html' %}
+{% block title %}Lista de Pedidos{% endblock %}
+
+{% block list_icon %}<span class="material-symbols-outlined text-3xl">receipt_long</span>{% endblock %}
+{% block list_title_text %}Lista de Pedidos{% endblock %}
+{% block new_button_href %}{% url 'alta_pedido' %}{% endblock %}
+{% block new_button_label %}Nuevo Pedido{% endblock %}
+{% block search_placeholder %}Cliente, producto, estado...{% endblock %}
+{% block clear_url %}{% url 'lista_pedidos' %}{% endblock %}
+{% block order_fields_options %}
+  <option value="id" {% if order_by == 'id' %}selected{% endif %}>ID</option>
+  <option value="cliente__nombre" {% if order_by == 'cliente__nombre' %}selected{% endif %}>Cliente</option>
+  <option value="producto__nombreProducto" {% if order_by == 'producto__nombreProducto' %}selected{% endif %}>Producto</option>
+  <option value="fecha_pedido" {% if order_by == 'fecha_pedido' %}selected{% endif %}>Fecha Pedido</option>
+  <option value="fecha_entrega" {% if order_by == 'fecha_entrega' %}selected{% endif %}>Fecha Entrega</option>
+  <option value="estado__nombre" {% if order_by == 'estado__nombre' %}selected{% endif %}>Estado</option>
+  <option value="monto_total" {% if order_by == 'monto_total' %}selected{% endif %}>Monto Total</option>
+{% endblock %}
+
+{% block list_content %}
+  <!-- Tabla -->
+    <div class="bg-white shadow rounded-xl overflow-hidden table-responsive">
+      {% if pedidos %}
+      <table class="w-full min-w-[980px] text-left text-sm">
+        <thead class="bg-gray-100 text-gray-700">
+          <tr>
+            <th class="py-3 px-5">#</th>
+            <th class="py-3 px-5">Cliente</th>
+            <th class="py-3 px-5 hidden md:table-cell">Producto</th>
+            <th class="py-3 px-5 hidden sm:table-cell">Fecha Pedido</th>
+            <th class="py-3 px-5 hidden md:table-cell">Fecha Entrega</th>
+            <th class="py-3 px-5 hidden md:table-cell">Estado</th>
+            <th class="py-3 px-5 hidden md:table-cell">Total</th>
+            <th class="py-3 px-5 text-center">Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for pedido in pedidos %}
+          <tr class="border-b hover:bg-gray-50">
+            <td class="py-3 px-5 font-medium">{{ pedido.id }}</td>
+            <td class="py-3 px-5">{{ pedido.cliente }}</td>
+            <td class="py-3 px-5 hidden md:table-cell">{{ pedido.producto.nombreProducto }}</td>
+            <td class="py-3 px-5 hidden sm:table-cell">{{ pedido.fecha_pedido|date:"d/m/Y" }}</td>
+            <td class="py-3 px-5 hidden md:table-cell">{{ pedido.fecha_entrega|date:"d/m/Y" }}</td>
+            <td class="py-3 px-5 hidden md:table-cell">{{ pedido.estado.nombre|default:"-" }}</td>
+            <td class="py-3 px-5 hidden md:table-cell">{{ pedido.monto_total|default:"-" }}</td>
+            <td class="py-3 px-5 flex justify-center gap-3">
+              <a href="{% url 'detalle_pedido' pedido.id %}" class="inline-flex items-center text-blue-600 hover:text-blue-800" title="Ver detalle">
+                <span class="material-symbols-outlined text-base">visibility</span>
+              </a>
+              <a href="{% url 'modificar_pedido' pedido.id %}" class="inline-flex items-center text-amber-600 hover:text-amber-800" title="Modificar">
+                <span class="material-symbols-outlined text-base">edit</span>
+              </a>
+              <a href="#" onclick="return confirmarEliminacion({{ pedido.id }}, '{{ pedido.cliente|escapejs }}')" class="inline-flex items-center text-red-600 hover:text-red-800" title="Eliminar">
+                <span class="material-symbols-outlined text-base">delete</span>
+              </a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <!-- Controles de paginación (alineado con Clientes/Proveedores/Insumos) -->
+      <div class="px-5 py-4 border-t border-gray-200">
+        <div class="flex justify-end items-center gap-2">
+          {% if pedidos.has_previous %}
+            <a href="?q={{ query }}&order_by={{ order_by }}&direction={{ direction }}&page=1" class="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm">
+              <span class="material-symbols-outlined text-sm">first_page</span>
+            </a>
+            <a href="?q={{ query }}&order_by={{ order_by }}&direction={{ direction }}&page={{ pedidos.previous_page_number }}" class="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm">
+              <span class="material-symbols-outlined text-sm">chevron_left</span>
+            </a>
+          {% endif %}
+
+          <span class="text-sm text-gray-700">
+            Página {{ pedidos.number }} de {{ pedidos.paginator.num_pages }}
+          </span>
+
+          {% if pedidos.has_next %}
+            <a href="?q={{ query }}&order_by={{ order_by }}&direction={{ direction }}&page={{ pedidos.next_page_number }}" class="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm">
+              <span class="material-symbols-outlined text-sm">chevron_right</span>
+            </a>
+            <a href="?q={{ query }}&order_by={{ order_by }}&direction={{ direction }}&page={{ pedidos.paginator.num_pages }}" class="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm">
+              <span class="material-symbols-outlined text-sm">last_page</span>
+            </a>
+          {% endif %}
+        </div>
+      </div>
+      {% else %}
+      <div class="p-8 text-center text-gray-500">No hay pedidos para mostrar.</div>
+      {% endif %}
+  </div>
+
+  <!-- Modal de confirmación de eliminación -->
+    <div id="modalConfirmacion" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full">
+      <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+        <div class="mt-3 text-center">
+          <h3 class="text-lg leading-6 font-medium text-gray-900">Confirmar eliminación</h3>
+          <div class="mt-2 px-7 py-3">
+            <p class="text-sm text-gray-500">
+              ¿Estás seguro que deseas eliminar <span id="pedidoNombre" class="font-medium"></span>?
+            </p>
+          </div>
+          <div class="flex justify-center gap-4 mt-4">
+            <form id="formEliminar" method="POST">
+              {% csrf_token %}
+              <button type="submit" class="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700">
+                Eliminar
+              </button>
+            </form>
+            <button onclick="cerrarModal()" class="bg-gray-200 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-300">
+              Cancelar
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      function confirmarEliminacion(id, nombre) {
+        document.getElementById('modalConfirmacion').classList.remove('hidden');
+        document.getElementById('pedidoNombre').textContent = nombre;
+        document.getElementById('formEliminar').action = "{% url 'eliminar_pedido' 0 %}".replace('0', id);
+        return false;
+      }
+      function cerrarModal() {
+        document.getElementById('modalConfirmacion').classList.add('hidden');
+      }
+    </script>
+    </div>
+  </div>
+{% endblock %}

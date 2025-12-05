@@ -1,0 +1,27 @@
+{% extends 'base.html' %}
+{% block extra_head %}
+  {% if request.GET.popup %}
+  <style>
+    nav, aside { display: none !important; }
+    main { padding: 0 !important; }
+    body { background: #fff !important; }
+  </style>
+  {% endif %}
+{% endblock %}
+{% block title %}Eliminar {{ tipo }}{% endblock %}
+
+{% block content %}
+<div class="px-4 md:px-10 lg:px-20 xl:px-40 py-5">
+  <div class="max-w-xl mx-auto bg-white p-6 rounded-xl shadow">
+    <h1 class="text-2xl font-bold mb-4">Eliminar {{ tipo }}</h1>
+    <p class="mb-6">¿Seguro que deseas eliminar "<strong>{{ obj }}</strong>"? Esta acción no se puede deshacer.</p>
+
+    <form method="POST" class="flex gap-3 justify-end">
+      {% csrf_token %}
+      {% if request.GET.popup %}<input type="hidden" name="popup" value="1" />{% endif %}
+      <a href="{% url volver %}{% if request.GET.popup %}?popup=1{% endif %}" class="px-5 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">Cancelar</a>
+      <button type="submit" class="px-5 py-2 bg-red-600 text-white rounded hover:bg-red-700">Eliminar</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

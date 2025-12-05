@@ -1,0 +1,29 @@
+{% extends 'base.html' %}
+{% block title %}Editar Presupuesto{% endblock %}
+
+{% block content %}
+<div class="px-4 md:px-10 lg:px-20 xl:px-40 py-5">
+  <div class="max-w-3xl mx-auto bg-white rounded-xl shadow p-6">
+    <div class="flex justify-between items-center mb-6">
+      <h1 class="text-3xl font-black text-[#111418] dark:text-white">✏️ Editar Presupuesto</h1>
+      {% if return_url %}
+        <a href="{% url return_url %}" class="flex items-center gap-2 bg-gray-500 text-white px-4 py-2 rounded-lg shadow hover:bg-gray-600">
+          <span class="material-symbols-outlined">arrow_back</span>
+          Volver
+        </a>
+      {% else %}
+        <a href="{% url 'dashboard' %}" class="flex items-center gap-2 bg-gray-500 text-white px-4 py-2 rounded-lg shadow hover:bg-gray-600">
+          <span class="material-symbols-outlined">arrow_back</span>
+          Volver
+        </a>
+      {% endif %}
+    </div>
+
+    {% if form %}
+      {% include 'components/form_base.html' with return_url=return_url|default:'dashboard' %}
+    {% else %}
+      <p class="text-gray-600">Formulario no disponible. Cree la vista y el formulario para continuar.</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

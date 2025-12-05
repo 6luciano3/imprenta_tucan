@@ -1,0 +1,68 @@
+{% extends 'base.html' %}
+{% block title %}Alta de Rol{% endblock %}
+{% block content %}
+<div class="max-w-4xl mx-auto">
+	<h1 class="text-3xl font-black mb-6 flex items-center gap-2">
+		<span class="material-symbols-outlined text-4xl">supervisor_account</span>
+		Alta de Rol:
+	</h1>
+	<p class="text-gray-600 mb-8">Registra un rol asignándole los permisos correspondientes.</p>
+
+	<form method="POST" class="bg-white rounded-xl shadow p-6 space-y-8">
+		{% csrf_token %}
+		{{ form.non_field_errors }}
+		<div class="grid md:grid-cols-2 gap-8">
+			<div class="space-y-6">
+				<div>
+					<label for="id_nombreRol" class="block text-sm font-medium text-gray-700 mb-2">Nombre del Rol *</label>
+					{{ form.nombreRol }}
+					{% for e in form.nombreRol.errors %}<p class="mt-1 text-sm text-red-600 flex items-center gap-1"><span class="material-symbols-outlined text-sm">error</span>{{ e }}</p>{% endfor %}
+				</div>
+				<div>
+					<label for="id_descripcion" class="block text-sm font-medium text-gray-700 mb-2">Descripción *</label>
+					{{ form.descripcion }}
+					{% for e in form.descripcion.errors %}<p class="mt-1 text-sm text-red-600 flex items-center gap-1"><span class="material-symbols-outlined text-sm">error</span>{{ e }}</p>{% endfor %}
+				</div>
+			</div>
+			<div class="space-y-4">
+				<label class="block text-sm font-medium text-gray-700 mb-2">Permisos *</label>
+				<div class="border border-gray-200 rounded-lg p-4 max-h-72 overflow-auto space-y-2 bg-gray-50">
+					{% if form.permisos.field.queryset.exists %}
+						{% for permiso in form.permisos.field.queryset %}
+							<label class="flex items-start gap-2 text-sm cursor-pointer bg-white border border-gray-200 rounded-md p-2 hover:bg-blue-50">
+								<input type="checkbox" name="permisos" value="{{ permiso.id }}" class="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+										 {% if permiso.id in selected_perm_ids %}checked{% endif %}>
+								<span>
+									<span class="font-medium text-gray-800">{{ permiso.nombre }}</span>
+									<span class="block text-gray-500 text-xs">Módulo: {{ permiso.modulo }} | Acciones: {{ permiso.acciones|join:', ' }}</span>
+								</span>
+							</label>
+						{% endfor %}
+					{% else %}
+						<p class="text-sm text-gray-500">No hay permisos activos para Pedidos/Insumos.</p>
+					{% endif %}
+				</div>
+				{% for e in form.permisos.errors %}<p class="mt-1 text-sm text-red-600 flex items-center gap-1"><span class="material-symbols-outlined text-sm">error</span>{{ e }}</p>{% endfor %}
+			</div>
+		</div>
+		<div class="flex justify-end gap-3 pt-4">
+			<a href="{% url 'lista_roles' %}" class="px-5 py-2 rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300 flex items-center gap-2">
+				<span class="material-symbols-outlined text-sm">close</span>Cancelar
+			</a>
+			<button type="submit" class="px-5 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 flex items-center gap-2">
+				<span class="material-symbols-outlined text-sm">save</span>Registrar Rol
+			</button>
+		</div>
+	</form>
+
+	<div class="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-800">
+		<h2 class="font-semibold mb-2 flex items-center gap-1"><span class="material-symbols-outlined text-base">info</span>Ayuda</h2>
+		<ul class="list-disc pl-5 space-y-1">
+			<li>El nombre del rol debe ser único y no puede quedar vacío.</li>
+			<li>Debe seleccionar al menos un permiso entre los disponibles.</li>
+			<li>Los permisos mostrados corresponden a los módulos permitidos y solo los activos.</li>
+			<li>Ejemplo: El rol puede tener Crear, Listar y Aprobar en los módulos pertinentes.</li>
+		</ul>
+	</div>
+</div>
+{% endblock %}

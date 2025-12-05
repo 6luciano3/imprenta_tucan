@@ -1,0 +1,272 @@
+{% extends 'base.html' %}
+{% load widget_tweaks %}
+{% block title %}Crear Cliente{% endblock %}
+
+{% block content %}
+<div class="px-4 md:px-10 lg:px-20 xl:px-40 py-5">
+  <div class="max-w-4xl mx-auto">
+
+    <div class="flex justify-between items-center mb-6">
+      <h1 class="text-3xl md:text-4xl font-black text-gray-900">Crear Nuevo Cliente</h1>
+      <a href="{% url 'lista_clientes' %}" 
+         class="flex items-center gap-2 bg-gray-500 text-white px-4 py-2 rounded-lg shadow hover:bg-gray-600">
+        <span class="material-symbols-outlined">arrow_back</span>
+        Volver
+      </a>
+    </div>
+
+    <!-- Formulario con diseño organizado -->
+    <div class="bg-white shadow-lg rounded-xl overflow-hidden">
+      <div class="p-6 border-b border-gray-200">
+        <h2 class="text-xl font-semibold text-gray-800">Información del Cliente</h2>
+        <p class="text-sm text-gray-600 mt-1">Complete los datos requeridos (*)</p>
+      </div>
+
+      <form method="POST" novalidate class="p-6">
+        {% csrf_token %}
+        
+        <!-- Sección: Datos Personales -->
+        <div class="mb-8">
+          <h3 class="text-lg font-medium text-gray-800 mb-4 border-b border-gray-200 pb-2">
+            👤 Datos Personales
+          </h3>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Nombre -->
+            <div>
+              <label for="{{ form.nombre.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
+                Nombre *
+              </label>
+              {{ form.nombre|add_class:"w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" }}
+              {% if form.nombre.errors %}
+                {% for error in form.nombre.errors %}
+                  <p class="mt-1 text-sm text-red-600 flex items-center gap-1">
+                    <span class="material-symbols-outlined text-sm">error</span>{{ error }}
+                  </p>
+                {% endfor %}
+              {% endif %}
+            </div>
+
+            <!-- Apellido -->
+            <div>
+              <label for="{{ form.apellido.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
+                Apellido *
+              </label>
+              {{ form.apellido|add_class:"w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" }}
+              {% if form.apellido.errors %}
+                {% for error in form.apellido.errors %}
+                  <p class="mt-1 text-sm text-red-600 flex items-center gap-1">
+                    <span class="material-symbols-outlined text-sm">error</span>{{ error }}
+                  </p>
+                {% endfor %}
+              {% endif %}
+            </div>
+
+            <!-- Email -->
+            <div>
+              <label for="{{ form.email.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
+                Email *
+              </label>
+              {{ form.email|add_class:"w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" }}
+              {% if form.email.errors %}
+                {% for error in form.email.errors %}
+                  <p class="mt-1 text-sm text-red-600 flex items-center gap-1">
+                    <span class="material-symbols-outlined text-sm">error</span>{{ error }}
+                  </p>
+                {% endfor %}
+              {% endif %}
+            </div>
+
+            <!-- Razón Social -->
+            <div>
+              <label for="{{ form.razon_social.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
+                Razón Social
+              </label>
+              {{ form.razon_social|add_class:"w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" }}
+              {% if form.razon_social.errors %}
+                {% for error in form.razon_social.errors %}
+                  <p class="mt-1 text-sm text-red-600 flex items-center gap-1">
+                    <span class="material-symbols-outlined text-sm">error</span>{{ error }}
+                  </p>
+                {% endfor %}
+              {% endif %}
+            </div>
+          </div>
+        </div>
+
+        <!-- Sección: Contacto -->
+        <div class="mb-8">
+          <h3 class="text-lg font-medium text-gray-800 mb-4 border-b border-gray-200 pb-2">
+            📞 Información de Contacto
+          </h3>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Teléfono -->
+            <div>
+              <label for="{{ form.telefono.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
+                Teléfono *
+              </label>
+              {{ form.telefono|add_class:"w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" }}
+              {% if form.telefono.errors %}
+                {% for error in form.telefono.errors %}
+                  <p class="mt-1 text-sm text-red-600 flex items-center gap-1">
+                    <span class="material-symbols-outlined text-sm">error</span>{{ error }}
+                  </p>
+                {% endfor %}
+              {% endif %}
+            </div>
+
+            <!-- Celular -->
+            <div>
+              <label for="{{ form.celular.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
+                Celular
+              </label>
+              {{ form.celular|add_class:"w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" }}
+              {% if form.celular.errors %}
+                {% for error in form.celular.errors %}
+                  <p class="mt-1 text-sm text-red-600 flex items-center gap-1">
+                    <span class="material-symbols-outlined text-sm">error</span>{{ error }}
+                  </p>
+                {% endfor %}
+              {% endif %}
+            </div>
+          </div>
+        </div>
+
+        <!-- Sección: Ubicación -->
+        <div class="mb-8">
+          <h3 class="text-lg font-medium text-gray-800 mb-4 border-b border-gray-200 pb-2">
+            📍 Ubicación
+          </h3>
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <!-- Dirección (ocupa todo el ancho en móvil) -->
+            <div class="md:col-span-2 lg:col-span-3">
+              <label for="{{ form.direccion.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
+                Dirección
+              </label>
+              {{ form.direccion|add_class:"w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" }}
+              {% if form.direccion.errors %}
+                {% for error in form.direccion.errors %}
+                  <p class="mt-1 text-sm text-red-600 flex items-center gap-1">
+                    <span class="material-symbols-outlined text-sm">error</span>{{ error }}
+                  </p>
+                {% endfor %}
+              {% endif %}
+            </div>
+
+            <!-- Ciudad -->
+            <div>
+              <label for="{{ form.ciudad.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
+                Ciudad
+              </label>
+              {{ form.ciudad|add_class:"w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" }}
+              
+              {% if form.ciudad.errors %}
+                {% for error in form.ciudad.errors %}
+                  <p class="mt-1 text-sm text-red-600 flex items-center gap-1">
+                    <span class="material-symbols-outlined text-sm">error</span>{{ error }}
+                  </p>
+                {% endfor %}
+              {% endif %}
+            </div>
+
+            <!-- Provincia -->
+            <div>
+              <label for="{{ form.provincia.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
+                Provincia
+              </label>
+              {{ form.provincia|add_class:"w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" }}
+              {% if form.provincia.errors %}
+                {% for error in form.provincia.errors %}
+                  <p class="mt-1 text-sm text-red-600 flex items-center gap-1">
+                    <span class="material-symbols-outlined text-sm">error</span>{{ error }}
+                  </p>
+                {% endfor %}
+              {% endif %}
+            </div>
+
+            <!-- País -->
+            <div>
+              <label for="{{ form.pais.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
+                País
+              </label>
+              {{ form.pais|add_class:"w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" }}
+              {% if form.pais.errors %}
+                {% for error in form.pais.errors %}
+                  <p class="mt-1 text-sm text-red-600 flex items-center gap-1">
+                    <span class="material-symbols-outlined text-sm">error</span>{{ error }}
+                  </p>
+                {% endfor %}
+              {% endif %}
+            </div>
+          </div>
+        </div>
+
+        <!-- Sección: Estado -->
+        <div class="mb-8">
+          <h3 class="text-lg font-medium text-gray-800 mb-4 border-b border-gray-200 pb-2">
+            ⚙️ Configuración
+          </h3>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Estado -->
+            <div>
+              <label for="{{ form.estado.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
+                Estado
+              </label>
+              {{ form.estado|add_class:"w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" }}
+              {% if form.estado.errors %}
+                {% for error in form.estado.errors %}
+                  <p class="mt-1 text-sm text-red-600 flex items-center gap-1">
+                    <span class="material-symbols-outlined text-sm">error</span>{{ error }}
+                  </p>
+                {% endfor %}
+              {% endif %}
+            </div>
+          </div>
+        </div>
+
+        <!-- Errores generales -->
+        {% if form.non_field_errors %}
+          <div class="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+            <h4 class="font-medium text-red-800 mb-2">Errores del formulario:</h4>
+            {% for error in form.non_field_errors %}
+              <p class="text-sm text-red-600 flex items-center gap-1">
+                <span class="material-symbols-outlined text-sm">error</span>{{ error }}
+              </p>
+            {% endfor %}
+          </div>
+        {% endif %}
+
+        <!-- Botones -->
+        <div class="flex flex-col sm:flex-row justify-end gap-3 pt-6 border-t border-gray-200">
+          <a href="{% url 'lista_clientes' %}" 
+             class="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 text-center font-medium">
+            Cancelar
+          </a>
+    <button type="submit" 
+      class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2 font-medium">
+            <span class="material-symbols-outlined">save</span>
+            Guardar Cliente
+          </button>
+        </div>
+      </form>
+    </div>
+
+      
+
+    <!-- Información de ayuda -->
+    <div class="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+      <div class="flex items-start gap-3">
+        <span class="material-symbols-outlined text-blue-600 mt-1">info</span>
+        <div>
+          <h3 class="font-medium text-blue-900 mb-2">Información importante:</h3>
+          <ul class="text-sm text-blue-700 space-y-1">
+            <li>• Los campos marcados con (*) son obligatorios</li>
+            <li>• El email debe ser único en el sistema</li>
+            <li>• Use formato internacional para teléfonos: +54 381 1234567</li>
+            <li>• Todos los campos son validados automáticamente</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

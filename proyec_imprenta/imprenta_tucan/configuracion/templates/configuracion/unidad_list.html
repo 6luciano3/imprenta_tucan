@@ -1,0 +1,40 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+    <h1 class="text-2xl font-bold">Unidades de Medida</h1>
+    <a href="{% url 'unidad_create' %}" class="px-4 py-2 bg-primary text-white rounded hover:bg-primary-dark transition flex items-center gap-2">
+        <span class="material-symbols-outlined text-base">add</span>
+        Agregar Unidad
+    </a>
+</div>
+<div class="bg-white shadow rounded-xl overflow-x-auto">
+    <table class="min-w-full text-sm">
+        <thead class="bg-gray-100 text-gray-700">
+            <tr>
+                <th class="py-3 px-5">Nombre</th>
+                <th class="py-3 px-5">Símbolo</th>
+                <th class="py-3 px-5">Descripción</th>
+                <th class="py-3 px-5">Activo</th>
+                <th class="py-3 px-5">Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for unidad in unidades %}
+            <tr class="border-b">
+                <td class="py-2 px-5">{{ unidad.nombre }}</td>
+                <td class="py-2 px-5">{{ unidad.simbolo }}</td>
+                <td class="py-2 px-5">{{ unidad.descripcion }}</td>
+                <td class="py-2 px-5">{{ unidad.activo|yesno:"Sí,No" }}</td>
+                <td class="py-2 px-5">
+                    <a href="{% url 'unidad_update' unidad.pk %}" class="px-3 py-1 bg-yellow-400 text-white rounded hover:bg-yellow-500 transition text-xs flex items-center justify-center">
+                        <span class="material-symbols-outlined text-base">edit</span>
+                    </a>
+                </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="5" class="py-4 px-5 text-center text-gray-500">No hay unidades registradas.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

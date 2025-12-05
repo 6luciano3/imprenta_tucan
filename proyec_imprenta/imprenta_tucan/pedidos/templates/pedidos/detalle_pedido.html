@@ -1,0 +1,174 @@
+{% extends 'base.html' %}
+{% block title %}Detalle del Pedido{% endblock %}
+
+{% block content %}
+<div class="px-4 md:px-10 lg:px-20 xl:px-40 py-5">
+  <div class="max-w-3xl mx-auto">
+    <div class="flex justify-between items-center mb-6">
+      <h1 class="text-3xl font-black text-[#111418] dark:text-white">Detalle del Pedido</h1>
+      <a href="{% url 'dashboard' %}" class="flex items-center gap-2 bg-gray-500 text-white px-4 py-2 rounded-lg shadow hover:bg-gray-600">
+        <span class="material-symbols-outlined">arrow_back</span>
+        Volver
+      </a>
+    </div>
+    <div class="bg-white rounded-xl shadow p-6">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-gray-700">
+        <div>
+          <p class="font-semibold">ID del Pedido:</p>
+          <p class="mb-4">{{ pedido.id }}</p>
+        </div>
+        <div>
+          <p class="font-semibold">Cliente:</p>
+          <p class="mb-4">{{ pedido.cliente }}</p>
+        </div>
+        <div>
+          <p class="font-semibold">Producto:</p>
+          <p class="mb-4">{{ pedido.producto.nombreProducto }}</p>
+        </div>
+        <div>
+          <p class="font-semibold">Fecha de Pedido:</p>
+          <p class="mb-4">{{ pedido.fecha_pedido|date:"d/m/Y" }}</p>
+        </div>
+        <div>
+          <p class="font-semibold">Fecha de Entrega:</p>
+          <p class="mb-4">{{ pedido.fecha_entrega|date:"d/m/Y" }}</p>
+        </div>
+        <div>
+          <p class="font-semibold">Cantidad:</p>
+          <p class="mb-4">{{ pedido.cantidad }}</p>
+        </div>
+        <div>
+          <p class="font-semibold">Especificaciones:</p>
+          <p class="mb-4">{{ pedido.especificaciones|default:"-" }}</p>
+        </div>
+        <div>
+          <p class="font-semibold">Estado:</p>
+          <p class="mb-4">{{ pedido.estado.nombre }}</p>
+        </div>
+        <div>
+          <p class="font-semibold">Monto Total:</p>
+          <p class="mb-4">${{ pedido.monto_total }}</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-xl shadow p-6 mt-6">
+      <h2 class="text-xl font-bold mb-4">Insumos requeridos</h2>
+      {% if insumos_requeridos and insumos_requeridos|length > 0 %}
+      <div class="overflow-x-auto">
+        <table class="min-w-full">
+          <thead>
+            <tr class="text-left border-b">
+              <th class="py-2 px-2">Código</th>
+              <th class="py-2 px-2">Nombre</th>
+              <th class="py-2 px-2 text-right">Requerido</th>
+              <th class="py-2 px-2 text-right">Stock</th>
+              <th class="py-2 px-2 text-right">Faltan</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for it in insumos_requeridos %}
+            <tr class="border-b">
+              <td class="py-2 px-2">{{ it.codigo }}</td>
+              <td class="py-2 px-2">{{ it.nombre }}</td>
+              <td class="py-2 px-2 text-right">{{ it.requerido|floatformat:2 }}</td>
+              <td class="py-2 px-2 text-right">{{ it.stock|floatformat:2 }}</td>
+              <td class="py-2 px-2 text-right {% if it.faltan > 0 %}text-red-600 font-semibold{% endif %}">{{ it.faltan|floatformat:2 }}</td>
+            </tr>
+            {% if it.faltan > 0 %}
+            <tr>
+              <td colspan="5">
+                <form class="feedback-form bg-yellow-50 border border-yellow-200 rounded p-4 my-4" data-insumo-id="{{ it.id }}">
+                  <div class="font-semibold mb-2">Feedback sobre recomendación de proveedor para <span class="text-blue-900">{{ it.nombre }}</span>:</div>
+                  <div class="flex flex-col md:flex-row gap-2 mb-2">
+                    <label>Decisión:
+                      <select name="decision" class="border rounded px-2 py-1">
+                        <option value="aceptar">Aceptar</option>
+                        <option value="modificar">Modificar</option>
+                        <option value="rechazar">Rechazar</option>
+                      </select>
+                    </label>
+                    <label>Proveedor recomendado:
+                      <input type="number" name="proveedor_recomendado_id" class="border rounded px-2 py-1" placeholder="ID proveedor recomendado" required>
+                    </label>
+                    <label>Proveedor elegido:
+                      <input type="number" name="proveedor_final_id" class="border rounded px-2 py-1" placeholder="ID proveedor elegido" required>
+                    </label>
+                  </div>
+                  <label class="block mb-2">Comentario:
+                    <input type="text" name="comentario" class="border rounded px-2 py-1 w-full" placeholder="Motivo o comentario opcional">
+                  </label>
+                  <div class="flex flex-wrap gap-2 mb-2">
+                    <label>Peso precio: <input type="number" step="0.01" name="feedback_precio" class="border rounded px-2 py-1 w-16" value="0"></label>
+                    <label>Peso cumplimiento: <input type="number" step="0.01" name="feedback_cumplimiento" class="border rounded px-2 py-1 w-16" value="0"></label>
+                    <label>Peso incidencias: <input type="number" step="0.01" name="feedback_incidencias" class="border rounded px-2 py-1 w-16" value="0"></label>
+                    <label>Peso disponibilidad: <input type="number" step="0.01" name="feedback_disponibilidad" class="border rounded px-2 py-1 w-16" value="0"></label>
+                  </div>
+                  <input type="hidden" name="pedido_id" value="{{ pedido.id }}">
+                  <input type="hidden" name="insumo_id" value="{{ it.id }}">
+                  <button type="submit" class="bg-yellow-400 hover:bg-yellow-500 text-gray-900 font-semibold px-4 py-2 rounded shadow">Enviar feedback</button>
+                  <span class="feedback-msg ml-4 text-green-700 font-semibold"></span>
+                </form>
+              </td>
+            </tr>
+            {% endif %}
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+        <p class="text-gray-600">No hay receta definida para este producto o no requiere insumos.</p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+</script>
+<script>
+// Enviar feedback de recomendación de proveedor y autocompletar proveedor recomendado
+document.addEventListener('DOMContentLoaded', function() {
+  document.querySelectorAll('.feedback-form').forEach(function(form) {
+    // Autocompletar proveedor recomendado
+    const insumoId = form.querySelector('input[name="insumo_id"]').value;
+    const recomendadoInput = form.querySelector('input[name="proveedor_recomendado_id"]');
+    const recomendadoLabel = document.createElement('span');
+    recomendadoLabel.className = 'ml-2 text-sm text-gray-600 proveedor-recomendado-label';
+    recomendadoInput.parentNode.appendChild(recomendadoLabel);
+    fetch('/api/recomendar-proveedor/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ insumo_id: insumoId })
+    })
+    .then(r => r.json())
+    .then(data => {
+      if (data.proveedor_id) {
+        recomendadoInput.value = data.proveedor_id;
+        recomendadoLabel.textContent = `(${data.proveedor_nombre})`;
+      } else {
+        recomendadoLabel.textContent = 'No hay recomendación disponible';
+      }
+    })
+    .catch(() => {
+      recomendadoLabel.textContent = 'Error al obtener recomendación';
+    });
+
+    // Enviar feedback
+    form.addEventListener('submit', function(e) {
+      e.preventDefault();
+      const data = Object.fromEntries(new FormData(form));
+      fetch('/api/feedback-recomendacion/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      })
+      .then(r => r.json())
+      .then(resp => {
+        form.querySelector('.feedback-msg').textContent = resp.mensaje || '¡Feedback enviado!';
+      })
+      .catch(() => {
+        form.querySelector('.feedback-msg').textContent = 'Error al enviar feedback';
+      });
+    });
+  });
+});
+</script>
+{% endblock %}

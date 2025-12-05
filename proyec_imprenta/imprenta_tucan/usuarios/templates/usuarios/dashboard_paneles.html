@@ -1,0 +1,62 @@
+{% extends 'usuarios/dashboard.html' %}
+{% block extra_panels %}
+<section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
+    <a href="/auditoria/" class="group bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition">
+        <div class="flex items-center gap-4">
+            <div class="h-12 w-12 rounded-full bg-purple-50 text-purple-700 grid place-items-center">
+                <span class="material-symbols-outlined">fact_check</span>
+            </div>
+            <div>
+                <p class="text-sm text-gray-500">Auditoría</p>
+                <p class="text-lg font-bold group-hover:text-purple-700">Ver registros</p>
+            </div>
+        </div>
+    </a>
+    <a href="/configuracion/" class="group bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition">
+        <div class="flex items-center gap-4">
+            <div class="h-12 w-12 rounded-full bg-cyan-50 text-cyan-700 grid place-items-center">
+                <span class="material-symbols-outlined">settings</span>
+            </div>
+            <div>
+                <p class="text-sm text-gray-500">Configuración</p>
+                <p class="text-lg font-bold group-hover:text-cyan-700">Preferencias</p>
+            </div>
+        </div>
+    </a>
+    <a href="/presupuestos/lista/" class="group bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition">
+        <div class="flex items-center gap-4">
+            <div class="h-12 w-12 rounded-full bg-orange-50 text-orange-700 grid place-items-center">
+                <span class="material-symbols-outlined">request_quote</span>
+            </div>
+            <div>
+                <p class="text-sm text-gray-500">Presupuestos</p>
+                <p class="text-lg font-bold group-hover:text-orange-700">Ver lista</p>
+            </div>
+        </div>
+    </a>
+    <a href="/insumos/lista_proyecciones/" class="group bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition">
+        <div class="flex items-center gap-4">
+            <div class="h-12 w-12 rounded-full bg-blue-50 text-blue-700 grid place-items-center">
+                <span class="material-symbols-outlined">trending_up</span>
+            </div>
+            <div>
+                <p class="text-sm text-gray-500">Proyecciones de Insumos</p>
+                <p class="text-lg font-bold group-hover:text-blue-700">Ver proyecciones</p>
+            </div>
+        </div>
+    </a>
+</section>
+{% endblock %}
+
+{% block notificaciones %}
+<section class="mt-8">
+    <h2 class="text-xl font-bold mb-4">Notificaciones</h2>
+    {% for n in notificaciones %}
+        <div class="bg-blue-50 border-l-4 border-blue-700 p-4 mb-2">
+            <strong>Notificación:</strong> {{ n.mensaje }} <span class="text-xs text-gray-500">{{ n.fecha }}</span>
+        </div>
+    {% empty %}
+        <div class="text-gray-400">No tienes notificaciones nuevas.</div>
+    {% endfor %}
+</section>
+{% endblock %}

@@ -1,0 +1,259 @@
+{% extends 'layouts/list_base.html' %}
+{% block title %}Lista de Clientes{% endblock %}
+
+{% block extra_head %}
+{{ block.super }}
+<style>
+  /* Overrides in-page para asegurar visibilidad inmediata (evita caché) */
+  .list-controls { padding: 0.5rem 0.75rem !important; }
+
+  .list-controls input[type="text"],
+  .list-controls select {
+    font-size: 10pt !important;
+    line-height: 1 !important;
+    height: 1.2em !important;
+    min-height: 0 !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+    border-radius: 0 !important; /* quitar bordes redondeados */
+    box-sizing: border-box;
+  }
+
+  .list-controls select {
+    -webkit-appearance: none; -moz-appearance: none; appearance: none;
+    background-image: url("data:image/svg+xml;utf8,\
+      <svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23666'>\
+        <path d='M7 10l5 5 5-5z'/>\
+      </svg>");
+    background-repeat: no-repeat;
+    background-position: right 0.35rem center;
+    background-size: 0.8em auto;
+    padding-right: 1.5rem !important;
+  }
+  .list-controls select::-ms-expand { display: none; }
+
+  .list-controls button,
+  .list-controls a {
+    font-size: 10pt !important;
+    line-height: 1 !important;
+    height: 1.2em !important;
+    min-height: 0 !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+    padding-left: 0.5rem !important;
+    padding-right: 0.5rem !important;
+    display: inline-flex;
+    align-items: center;
+  }
+
+  /* Botones sin bordes redondeados (Buscar / Ordenar) */
+  .list-controls button { border-radius: 0 !important; }
+
+  .list-controls .material-symbols-outlined {
+    font-size: 1em !important;
+    line-height: 1 !important;
+  }
+
+  /* Limpio: distribución global ya aplicada en styles.css */
+</style>
+{% endblock %}
+
+{% block list_icon %}<span class="material-symbols-outlined text-3xl">group</span>{% endblock %}
+{% block list_title_text %}Lista de Clientes{% endblock %}
+{% block new_button_href %}{% url 'crear_cliente' %}{% endblock %}
+{% block new_button_label %}Nuevo Cliente{% endblock %}
+{% block search_placeholder %}Nombre, apellido, email...{% endblock %}
+{% block clear_url %}{% url 'lista_clientes' %}{% endblock %}
+{% block order_fields_options %}
+  <option value="id" {% if order_by == 'id' %}selected{% endif %}>ID</option>
+  <option value="nombre" {% if order_by == 'nombre' %}selected{% endif %}>Nombre</option>
+  <option value="apellido" {% if order_by == 'apellido' %}selected{% endif %}>Apellido</option>
+  <option value="email" {% if order_by == 'email' %}selected{% endif %}>Email</option>
+  <option value="telefono" {% if order_by == 'telefono' %}selected{% endif %}>Teléfono</option>
+  <option value="direccion" {% if order_by == 'direccion' %}selected{% endif %}>Dirección</option>
+{% endblock %}
+
+
+{% block list_content %}
+
+
+
+
+<!-- Tabla de clientes -->
+<div class="bg-white shadow rounded-xl overflow-hidden table-responsive">
+  <table class="w-full min-w-[980px] text-left text-sm">
+    <thead class="bg-gray-100 text-gray-700">
+      <tr>
+        <th class="py-3 px-5">Nombre</th>
+        <th class="py-3 px-5">Apellido</th>
+        <th class="py-3 px-5 hidden sm:table-cell">Email</th>
+        <th class="py-3 px-5 hidden md:table-cell">Teléfono</th>
+        <th class="py-3 px-5">Estado</th>
+        <th class="py-3 px-5 text-center">Acciones</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for cliente in clientes %}
+      <tr class="border-b hover:bg-gray-50">
+        <td class="py-3 px-5 font-medium">{{ cliente.nombre }}</td>
+        <td class="py-3 px-5">{{ cliente.apellido }}</td>
+        <td class="py-3 px-5 hidden sm:table-cell">{{ cliente.email }}</td>
+        <td class="py-3 px-5 hidden md:table-cell">{{ cliente.telefono }}</td>
+        <td class="py-3 px-5">{{ cliente.estado }}</td>
+        <td class="py-3 px-5 flex justify-center gap-3">
+          <a href="{% url 'detalle_cliente' cliente.id %}"
+             class="text-blue-600 hover:text-blue-800 flex items-center gap-1"
+             title="Ver detalles">
+            <span class="material-symbols-outlined text-sm">visibility</span>
+          </a>
+          <a href="{% url 'editar_cliente' cliente.id %}"
+             class="text-yellow-600 hover:text-yellow-800 flex items-center gap-1"
+             title="Editar">
+            <span class="material-symbols-outlined text-sm">edit</span>
+          </a>
+          <form method="POST" action="{% url 'activar_cliente' cliente.id %}" class="inline">
+            {% csrf_token %}
+            <button type="submit" 
+                    class="{% if cliente.estado == 'Activo' %}text-orange-600 hover:text-orange-800{% else %}text-green-600 hover:text-green-800{% endif %} flex items-center gap-1"
+                    title="{% if cliente.estado == 'Activo' %}Desactivar{% else %}Activar{% endif %}">
+              <span class="material-symbols-outlined text-sm">
+                {% if cliente.estado == 'Activo' %}toggle_on{% else %}toggle_off{% endif %}
+              </span>
+            </button>
+          </form>
+       <a href="#"
+         onclick="return confirmarEliminacion({{ cliente.id }}, '{{ cliente.nombre }} {{ cliente.apellido }}')"
+             class="text-red-600 hover:text-red-800 flex items-center gap-1"
+             title="Eliminar">
+            <span class="material-symbols-outlined text-sm">delete</span>
+          </a>
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="5" class="text-center py-6 text-gray-500">No hay clientes registrados.</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <!-- Controles de paginación -->
+  <div id="paginacion-clientes" class="px-5 py-4 border-t border-gray-200">
+    <div class="flex justify-end items-center gap-2">
+      {% if clientes.has_previous %}
+        <a href="?q={{ query }}&order_by={{ order_by }}&direction={{ direction }}&page=1" class="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm">
+          <span class="material-symbols-outlined text-sm">first_page</span>
+        </a>
+        <a href="?q={{ query }}&order_by={{ order_by }}&direction={{ direction }}&page={{ clientes.previous_page_number }}" class="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm">
+          <span class="material-symbols-outlined text-sm">chevron_left</span>
+        </a>
+      {% endif %}
+
+      <span class="text-sm text-gray-700">
+        Página {{ clientes.number }} de {{ clientes.paginator.num_pages }}
+      </span>
+
+      {% if clientes.has_next %}
+        <a href="?q={{ query }}&order_by={{ order_by }}&direction={{ direction }}&page={{ clientes.next_page_number }}" class="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm">
+          <span class="material-symbols-outlined text-sm">chevron_right</span>
+        </a>
+        <a href="?q={{ query }}&order_by={{ order_by }}&direction={{ direction }}&page={{ clientes.paginator.num_pages }}" class="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm">
+          <span class="material-symbols-outlined text-sm">last_page</span>
+        </a>
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+
+<!-- Modal de confirmación de eliminación -->
+<div id="modalConfirmacion" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full">
+  <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+    <div class="mt-3 text-center">
+      <h3 class="text-lg leading-6 font-medium text-gray-900">Confirmar eliminación</h3>
+      <div class="mt-2 px-7 py-3">
+        <p class="text-sm text-gray-500">
+          ¿Estás seguro que deseas eliminar al cliente <span id="clienteNombre" class="font-medium"></span>?
+        </p>
+      </div>
+      <div class="flex justify-center gap-4 mt-4">
+        <form id="formEliminar" method="POST">
+          {% csrf_token %}
+          <button type="submit" 
+                  class="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700">
+            Eliminar
+          </button>
+        </form>
+        <button onclick="cerrarModal()"
+                class="bg-gray-200 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-300">
+          Cancelar
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function confirmarEliminacion(id, nombre) {
+  document.getElementById('modalConfirmacion').classList.remove('hidden');
+  document.getElementById('clienteNombre').textContent = nombre;
+  document.getElementById('formEliminar').action = "{% url 'eliminar_cliente' 0 %}".replace('0', id);
+  // Prevenir navegación del enlace
+  return false;
+}
+
+function cerrarModal() {
+  document.getElementById('modalConfirmacion').classList.add('hidden');
+}
+// Botón para cargar y resaltar el ranking inteligente
+document.addEventListener('DOMContentLoaded', function() {
+  const btnRanking = document.getElementById('btnRanking');
+  if (btnRanking) {
+    btnRanking.addEventListener('click', function() {
+      fetch('/api/clientes/ranking/')
+        .then(response => response.json())
+        .then(data => {
+          // Soporta respuesta paginada (data.results) o array directa
+          const clientes = Array.isArray(data) ? data : (Array.isArray(data.results) ? data.results : []);
+          let tbody = document.querySelector('table tbody');
+          if (!tbody) return;
+          tbody.innerHTML = '';
+          ocultarPaginacion && ocultarPaginacion();
+          if (clientes.length === 0) {
+            let row = document.createElement('tr');
+            row.innerHTML = `<td colspan="6" class="text-center py-6 text-gray-500">No hay clientes destacados ni con pedidos pendientes.</td>`;
+            tbody.appendChild(row);
+          } else {
+            clientes.forEach(cliente => {
+              let row = document.createElement('tr');
+              row.style.backgroundColor = '#fffbe6';
+              row.style.fontWeight = 'bold';
+              row.innerHTML = `
+                <td class="py-3 px-5 font-medium">${cliente.nombre || cliente.cliente_nombre || ''}</td>
+                <td class="py-3 px-5">${cliente.apellido || cliente.cliente_apellido || ''}</td>
+                <td class="py-3 px-5 hidden sm:table-cell">${cliente.email || cliente.cliente_email || ''}</td>
+                <td class="py-3 px-5 hidden md:table-cell">${cliente.telefono || cliente.cliente_telefono || ''}</td>
+                <td class="py-3 px-5">${cliente.estado || cliente.cliente_estado || ''}</td>
+                <td class="py-3 px-5 text-center">Ranking: ${cliente.score || ''} <span title="Ranking Inteligente">🏆</span></td>
+              `;
+              tbody.appendChild(row);
+            });
+          }
+          btnRanking.disabled = true;
+          btnRanking.textContent = 'Ranking cargado';
+        })
+        .catch(error => {
+          alert('Error al obtener ranking de clientes.');
+          console.error('Error al obtener ranking de clientes:', error);
+        });
+    });
+  }
+  const btnRestaurar = document.getElementById('btnRestaurar');
+  if (btnRestaurar) {
+    btnRestaurar.addEventListener('click', function() {
+      window.location.reload();
+    });
+  }
+});
+</script>
+{% endblock %}

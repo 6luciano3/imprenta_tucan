@@ -1,0 +1,193 @@
+{% extends 'base.html' %}
+{% block title %}Buscar Cliente{% endblock %}
+
+{% block content %}
+<div class="px-4 md:px-10 lg:px-20 xl:px-40 py-5">
+  <div class="max-w-7xl mx-auto">
+
+    <!-- Mensajes del sistema -->
+    {% if messages %}
+      <div class="mb-6">
+        {% for message in messages %}
+          <div class="px-4 py-3 rounded-lg shadow text-white
+                      {% if message.tags == 'success' %}bg-green-600
+                      {% elif message.tags == 'error' %}bg-red-600
+                      {% elif message.tags == 'warning' %}bg-yellow-500
+                      {% else %}bg-gray-600{% endif %}">
+            {{ message }}
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    <div class="flex justify-between items-center mb-6">
+      <h1 class="text-4xl font-black text-[#111418] dark:text-white">Buscar Cliente</h1>
+      <a href="{% url 'lista_clientes' %}"
+         class="flex items-center gap-2 bg-gray-500 text-white px-4 py-2 rounded-lg shadow hover:bg-gray-600">
+        <span class="material-symbols-outlined">arrow_back</span>
+        Volver
+      </a>
+    </div>
+
+    <!-- Controles de búsqueda y orden: dos formularios separados -->
+    <div class="bg-white p-6 rounded-xl shadow mb-6">
+      <div class="flex flex-wrap gap-6 items-end">
+        <!-- Form BUSCAR -->
+        <form method="GET" class="flex flex-wrap gap-4 items-end">
+          <div class="flex-1 min-w-64">
+            <label class="block text-sm font-medium text-gray-700 mb-2">Buscar cliente</label>
+            <input type="text" name="q" value="{{ query }}" 
+                   placeholder="Nombre, apellido, email..."
+                   class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+          </div>
+          <!-- Preservar orden actual al buscar -->
+          <input type="hidden" name="order_by" value="{{ order_by }}" />
+          <input type="hidden" name="direction" value="{{ direction }}" />
+          <button type="submit" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2">
+            <span class="material-symbols-outlined">search</span>
+            Buscar
+          </button>
+          {% if query %}
+          <a href="{% url 'buscar_cliente' %}" class="bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300">
+            Limpiar
+          </a>
+          {% endif %}
+        </form>
+
+        <!-- Form ORDENAR -->
+        <form method="GET" class="flex flex-wrap gap-4 items-end">
+          <div class="min-w-48">
+            <label class="block text-sm font-medium text-gray-700 mb-2">Ordenar por</label>
+            <select name="order_by" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+              <option value="id" {% if order_by == 'id' %}selected{% endif %}>ID</option>
+              <option value="nombre" {% if order_by == 'nombre' %}selected{% endif %}>Nombre</option>
+              <option value="apellido" {% if order_by == 'apellido' %}selected{% endif %}>Apellido</option>
+              <option value="email" {% if order_by == 'email' %}selected{% endif %}>Email</option>
+              <option value="telefono" {% if order_by == 'telefono' %}selected{% endif %}>Teléfono</option>
+              <option value="direccion" {% if order_by == 'direccion' %}selected{% endif %}>Dirección</option>
+            </select>
+          </div>
+          <div class="min-w-32">
+            <label class="block text-sm font-medium text-gray-700 mb-2">Dirección</label>
+            <select name="direction" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+              <option value="asc" {% if direction == 'asc' %}selected{% endif %}>A-Z</option>
+              <option value="desc" {% if direction == 'desc' %}selected{% endif %}>Z-A</option>
+            </select>
+          </div>
+          <!-- Preservar búsqueda actual al ordenar -->
+          <input type="hidden" name="q" value="{{ query }}" />
+          <button type="submit" class="bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700 flex items-center gap-2">
+            <span class="material-symbols-outlined">sort</span>
+            Ordenar
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Resultados -->
+    {% if query %}
+    <div class="mb-4">
+      <p class="text-gray-600">
+        Se encontraron {{ clientes.paginator.count }} cliente{{ clientes.paginator.count|pluralize }} 
+        para "{{ query }}"
+      </p>
+    </div>
+    {% endif %}
+
+    <!-- Tabla mejorada con verificación de campos -->
+    <div class="bg-white shadow rounded-xl overflow-hidden table-responsive">
+      <table class="w-full min-w-[720px] text-left text-sm">
+        <thead class="bg-gray-100 text-gray-700">
+          <tr>
+            <th class="py-3 px-5">ID</th>
+            <th class="py-3 px-5">Nombre</th>
+            <th class="py-3 px-5">Apellido</th>
+            {% if clientes.0.razon_social %}
+            <th class="py-3 px-5 hidden md:table-cell">Razón Social</th>
+            {% endif %}
+            <th class="py-3 px-5 hidden sm:table-cell">Email</th>
+            <th class="py-3 px-5 hidden md:table-cell">Teléfono</th>
+            {% if clientes.0.direccion %}
+            <th class="py-3 px-5 hidden lg:table-cell">Dirección</th>
+            {% endif %}
+            <th class="py-3 px-5 text-center">Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for cliente in clientes %}
+          <tr class="border-b hover:bg-gray-50">
+            <td class="py-3 px-5 text-gray-500 text-xs">{{ cliente.id }}</td>
+            <td class="py-3 px-5 font-medium">{{ cliente.nombre|default:"-" }}</td>
+            <td class="py-3 px-5">{{ cliente.apellido|default:"-" }}</td>
+            {% if cliente.razon_social %}
+            <td class="py-3 px-5 hidden md:table-cell">{{ cliente.razon_social|default:"-" }}</td>
+            {% endif %}
+            <td class="py-3 px-5 hidden sm:table-cell">{{ cliente.email|default:"-" }}</td>
+            <td class="py-3 px-5 hidden md:table-cell">{{ cliente.telefono|default:"-" }}</td>
+            {% if cliente.direccion %}
+            <td class="py-3 px-5 hidden lg:table-cell">{{ cliente.direccion|default:"-"|truncatechars:30 }}</td>
+            {% endif %}
+            <td class="py-3 px-5 flex justify-center gap-3">
+              <a href="{% url 'editar_cliente' cliente.id %}" 
+                 class="text-yellow-600 hover:text-yellow-800 flex items-center gap-1">
+                <span class="material-symbols-outlined text-sm">edit</span>
+                <span class="hidden md:inline">Editar</span>
+              </a>
+              <a href="#" 
+                 onclick="confirmarEliminacion({{ cliente.id }}, '{{ cliente.nombre }} {{ cliente.apellido }}')"
+                 class="text-red-600 hover:text-red-800 flex items-center gap-1">
+                <span class="material-symbols-outlined text-sm">delete</span>
+                <span class="hidden md:inline">Eliminar</span>
+              </a>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="5" class="text-center py-8 text-gray-500">
+              {% if query %}
+                No se encontraron clientes que coincidan con "{{ query }}"
+              {% else %}
+                Realiza una búsqueda para ver resultados
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      <!-- Paginación -->
+      {% if clientes.paginator.num_pages > 1 %}
+      <div class="px-5 py-4 border-t border-gray-200">
+        <div class="flex justify-end items-center gap-2">
+          {% if clientes.has_previous %}
+            <a href="?q={{ query }}&page=1&order_by={{ order_by }}&direction={{ direction }}" 
+               class="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm">
+              <span class="material-symbols-outlined text-sm">first_page</span>
+            </a>
+            <a href="?q={{ query }}&page={{ clientes.previous_page_number }}&order_by={{ order_by }}&direction={{ direction }}"
+               class="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm">
+              <span class="material-symbols-outlined text-sm">chevron_left</span>
+            </a>
+          {% endif %}
+
+          <span class="text-sm text-gray-700">
+            Página {{ clientes.number }} de {{ clientes.paginator.num_pages }}
+          </span>
+
+          {% if clientes.has_next %}
+            <a href="?q={{ query }}&page={{ clientes.next_page_number }}&order_by={{ order_by }}&direction={{ direction }}"
+               class="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm">
+              <span class="material-symbols-outlined text-sm">chevron_right</span>
+            </a>
+            <a href="?q={{ query }}&page={{ clientes.paginator.num_pages }}&order_by={{ order_by }}&direction={{ direction }}"
+               class="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm">
+              <span class="material-symbols-outlined text-sm">last_page</span>
+            </a>
+          {% endif %}
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

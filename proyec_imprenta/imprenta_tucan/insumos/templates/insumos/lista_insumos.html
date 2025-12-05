@@ -1,0 +1,155 @@
+{% extends 'layouts/list_base.html' %}
+{% block title %}Lista de Insumos{% endblock %}
+
+{% block list_icon %}<span class="material-symbols-outlined text-3xl">inventory</span>{% endblock %}
+{% block list_title_text %}Lista de Insumos{% endblock %}
+{% block new_button %}
+	{% if can_insumos_crear %}
+		<a href="{% url 'alta_insumo' %}"
+			 class="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg shadow hover:bg-green-700">
+			<span class="material-symbols-outlined">add</span>
+			Nuevo Insumo
+		</a>
+	{% endif %}
+{% endblock %}
+{% block search_placeholder %}Nombre, código, proveedor, categoría...{% endblock %}
+{% block clear_url %}{% url 'lista_insumos' %}{% endblock %}
+{% block order_fields_options %}
+  <option value="idInsumo" {% if order_by == 'idInsumo' %}selected{% endif %}>ID</option>
+  <option value="codigo" {% if order_by == 'codigo' %}selected{% endif %}>Código</option>
+  <option value="nombre" {% if order_by == 'nombre' %}selected{% endif %}>Nombre</option>
+  <option value="categoria" {% if order_by == 'categoria' %}selected{% endif %}>Categoría</option>
+  <option value="stock" {% if order_by == 'stock' %}selected{% endif %}>Stock</option>
+  <option value="precio" {% if order_by == 'precio' %}selected{% endif %}>Precio</option>
+  <option value="created_at" {% if order_by == 'created_at' %}selected{% endif %}>Fecha creación</option>
+{% endblock %}
+
+{% block list_content %}
+
+		<div class="bg-white shadow rounded-xl overflow-hidden table-responsive">
+			{% if insumos %}
+			<table class="w-full min-w-[980px] text-left text-sm">
+				<thead class="bg-gray-100 text-gray-700">
+					<tr>
+						<th class="py-3 px-5">Código</th>
+						<th class="py-3 px-5">Nombre</th>
+						<th class="py-3 px-5 hidden sm:table-cell">Categoría</th>
+						<th class="py-3 px-5 hidden md:table-cell">Stock</th>
+						<th class="py-3 px-5 hidden md:table-cell">Precio</th>
+						<th class="py-3 px-5 text-center">Acciones</th>
+					</tr>
+				</thead>
+				<tbody>
+					{% for insumo in insumos %}
+					<tr class="border-b hover:bg-gray-50">
+						<td class="py-3 px-5 font-medium">{{ insumo.codigo|default:"-" }}</td>
+						<td class="py-3 px-5">
+							{{ insumo.nombre|default:"-" }}
+						</td>
+						<td class="py-3 px-5 hidden sm:table-cell">{{ insumo.categoria|default:"-" }}</td>
+						<td class="py-3 px-5 hidden md:table-cell">{{ insumo.stock|default:"-" }}</td>
+						<td class="py-3 px-5 hidden md:table-cell">{{ insumo.precio|default:"-" }}</td>
+												<td class="py-3 px-5 text-center">
+													<div class="flex items-center justify-center gap-3">
+														<a href="{% url 'detalle_insumo' insumo.pk %}" class="text-blue-600 hover:text-blue-800 flex items-center gap-1" title="Ver detalles">
+															<span class="material-symbols-outlined text-sm">visibility</span>
+														</a>
+														{% if can_insumos_editar %}
+														<a href="{% url 'modificar_insumo' insumo.pk %}" class="text-yellow-600 hover:text-yellow-800 flex items-center gap-1" title="Editar">
+															<span class="material-symbols-outlined text-sm">edit</span>
+														</a>
+														{% endif %}
+														{% if can_insumos_activar %}
+														  {% if insumo.activo %}
+														  <form method="POST" action="{% url 'activar_insumo' insumo.pk %}" class="inline">
+															  {% csrf_token %}
+															  <button type="submit" 
+																  class="text-orange-600 hover:text-orange-800 flex items-center gap-1"
+																  title="Desactivar">
+																  <span class="material-symbols-outlined text-sm">toggle_on</span>
+															  </button>
+														  </form>
+														  {% else %}
+														  <form method="POST" action="{% url 'activar_insumo' insumo.pk %}" class="inline">
+															  {% csrf_token %}
+															  <button type="submit" 
+																  class="text-green-600 hover:text-green-800 flex items-center gap-1"
+																  title="Activar">
+																  <span class="material-symbols-outlined text-sm">toggle_off</span>
+															  </button>
+														  </form>
+														  {% endif %}
+														{% endif %}
+														{% if can_insumos_eliminar %}
+														<a href="#" onclick="return confirmarEliminacionInsumo({{ insumo.pk }}, '{{ insumo.nombre|escapejs }}')" class="text-red-600 hover:text-red-800 flex items-center gap-1" title="Eliminar">
+															<span class="material-symbols-outlined text-sm">delete</span>
+														</a>
+														{% endif %}
+													</div>
+												</td>
+					</tr>
+					{% endfor %}
+				</tbody>
+			</table>
+			<!-- Controles de paginación -->
+			<div class="px-5 py-4 border-t border-gray-200">
+				<div class="flex justify-end items-center gap-2">
+					{% if insumos.has_previous %}
+						<a href="?q={{ query }}&order_by={{ order_by }}&direction={{ direction }}&page=1" class="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm">
+							<span class="material-symbols-outlined text-sm">first_page</span>
+						</a>
+						<a href="?q={{ query }}&order_by={{ order_by }}&direction={{ direction }}&page={{ insumos.previous_page_number }}" class="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm">
+							<span class="material-symbols-outlined text-sm">chevron_left</span>
+						</a>
+					{% endif %}
+
+					<span class="text-sm text-gray-700">
+						Página {{ insumos.number }} de {{ insumos.paginator.num_pages }}
+					</span>
+
+					{% if insumos.has_next %}
+						<a href="?q={{ query }}&order_by={{ order_by }}&direction={{ direction }}&page={{ insumos.next_page_number }}" class="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm">
+							<span class="material-symbols-outlined text-sm">chevron_right</span>
+						</a>
+						<a href="?q={{ query }}&order_by={{ order_by }}&direction={{ direction }}&page={{ insumos.paginator.num_pages }}" class="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm">
+							<span class="material-symbols-outlined text-sm">last_page</span>
+						</a>
+					{% endif %}
+				</div>
+			</div>
+			{% else %}
+			<div class="p-8 text-center text-gray-500">No hay insumos para mostrar.</div>
+			{% endif %}
+		</div>
+<!-- Modal de confirmación de eliminación de insumo -->
+<div id="modalEliminarInsumo" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full">
+	<div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+		<div class="mt-3 text-center">
+			<h3 class="text-lg leading-6 font-medium text-gray-900">Confirmar eliminación</h3>
+			<div class="mt-2 px-7 py-3">
+				<p class="text-sm text-gray-500">
+					¿Estás seguro que deseas eliminar el insumo <span id="insumoNombre" class="font-medium"></span>?
+				</p>
+			</div>
+			<div class="flex justify-center gap-4 mt-4">
+				<form id="formEliminarInsumo" method="POST">
+					{% csrf_token %}
+					<button type="submit" class="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700">Eliminar</button>
+				</form>
+				<button onclick="cerrarModalEliminarInsumo()" class="bg-gray-200 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-300">Cancelar</button>
+			</div>
+		</div>
+	</div>
+	<script>
+	function confirmarEliminacionInsumo(id, nombre) {
+		document.getElementById('modalEliminarInsumo').classList.remove('hidden');
+		document.getElementById('insumoNombre').textContent = nombre;
+		document.getElementById('formEliminarInsumo').action = "{% url 'eliminar_insumo' 0 %}".replace('0', id);
+		return false;
+	}
+	function cerrarModalEliminarInsumo() {
+		document.getElementById('modalEliminarInsumo').classList.add('hidden');
+	}
+	</script>
+ 
+{% endblock %}
