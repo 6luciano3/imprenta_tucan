@@ -45,21 +45,21 @@ def verificar_insumos_para_lineas(lineas: list[tuple]) -> tuple[bool, dict]:
     """
     try:
         from insumos.models import Insumo
-        from productos.models import ProductoInsumo
+        from configuracion.models import RecetaProducto
     except Exception:
         return False, {}
 
     requeridos = defaultdict(float)  # insumo_id -> cantidad requerida
-
     hay_receta = False
     for producto, cantidad in lineas:
         if not producto or not cantidad:
             continue
-        receta = list(ProductoInsumo.objects.filter(producto=producto).only('insumo_id', 'cantidad_por_unidad'))
+        receta = RecetaProducto.objects.filter(producto=producto, activo=True).prefetch_related('insumos').first()
         if receta:
             hay_receta = True
-            for r in receta:
-                requeridos[r.insumo_id] += float(r.cantidad_por_unidad) * float(cantidad)
+            for insumo in receta.insumos.all():
+                # Por compatibilidad, asumimos 1 unidad por insumo (ajustar si hay campo cantidad)
+                requeridos[insumo.idInsumo] += float(cantidad)
 
     if not hay_receta:
         # Si no hay recetas en ninguna línea, mantener la validación simple por cada línea

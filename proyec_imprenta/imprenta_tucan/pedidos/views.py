@@ -116,19 +116,12 @@ def alta_pedido(request):
                     except Exception:
                         info = {}
                     detalle = ", ".join([
-                        f"{info.get(iid, ('-', f'Insumo {iid}'))
-                           [0]} - {info.get(iid, ('-', f'Insumo {iid}'))[1]}: faltan {falt:.2f}"
+                        f"{info.get(iid, ('-', f'Insumo {iid}'))[0]} - {info.get(iid, ('-', f'Insumo {iid}'))[1]}: faltan {falt:.2f}"
                         for iid, falt in faltantes.items()
                     ])
-                    messages.error(request, f"No hay insumos suficientes: {detalle}")
+                    messages.warning(request, f"No hay insumos suficientes: {detalle}. El pedido se guardó igualmente.")
                 else:
-                    messages.error(request, "No hay insumos suficientes para las cantidades solicitadas.")
-                precios = {p.pk: float(p.precio) for p in Producto.objects.all()}
-                return render(
-                    request,
-                    "pedidos/alta_pedido.html",
-                    {"header_form": header_form, "formset": formset, "precios": precios},
-                )
+                    messages.warning(request, "No hay insumos suficientes para las cantidades solicitadas. El pedido se guardó igualmente.")
 
             subtotal = Decimal("0")
             # Descontar stock y crear pedidos en una transacción

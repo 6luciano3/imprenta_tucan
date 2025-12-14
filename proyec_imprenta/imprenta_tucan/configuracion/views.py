@@ -264,3 +264,15 @@ def receta_producto_delete(request, pk):
         receta.delete()
         return redirect('receta_producto_list')
     return render(request, 'configuracion/receta_producto_confirm_delete.html', {'receta': receta})
+
+
+def lista_recetas_productos(request):
+    recetas = RecetaProducto.objects.select_related('producto').prefetch_related('insumos').all()
+
+    # Para saber si el producto está en algún pedido
+    productos_con_pedidos = set()
+    from pedidos.models import Pedido
+    for receta in recetas:
+        if Pedido.objects.filter(producto=receta.producto).exists():
+            productos_con_pedidos.add(receta.producto.idProducto)
+    return render(request, 'configuracion/lista_recetas_productos.html', {'recetas': recetas, 'productos_con_pedidos': productos_con_pedidos})
