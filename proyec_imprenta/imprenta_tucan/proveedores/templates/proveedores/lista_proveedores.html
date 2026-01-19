@@ -53,22 +53,22 @@
   <table class="w-full min-w-[980px] text-left text-sm">
     <thead class="bg-gray-100 text-gray-700">
       <tr>
-        <th class="py-3 px-5">Nombre</th>
-        <th class="py-3 px-5">CUIT</th>
+        <th class="py-3 px-2 w-1/6">Nombre</th>
+        <th class="py-3 px-8 w-1/6">CUIT</th>
         <th class="py-3 px-5 hidden sm:table-cell">Email</th>
-        <th class="py-3 px-5 hidden md:table-cell">Rubro</th>
-        <th class="py-3 px-5 hidden md:table-cell">Teléfono</th>
+        <th class="py-3 px-2 hidden md:table-cell w-1/12">Rubro</th>
+        <th class="py-3 px-8 hidden md:table-cell w-1/6">Teléfono</th>
         <th class="py-3 px-5 text-center">Acciones</th>
       </tr>
     </thead>
     <tbody>
       {% for proveedor in proveedores %}
       <tr class="border-b hover:bg-gray-50">
-        <td class="py-3 px-5 font-medium">{{ proveedor.nombre }}</td>
-        <td class="py-3 px-5">{{ proveedor.cuit|default:"-" }}</td>
+        <td class="py-3 px-2 font-medium w-1/6">{{ proveedor.nombre }}</td>
+        <td class="py-3 px-8 w-1/6">{{ proveedor.cuit|default:"-" }}</td>
         <td class="py-3 px-5 hidden sm:table-cell">{{ proveedor.email }}</td>
-        <td class="py-3 px-5 hidden md:table-cell">{{ proveedor.rubro|default:"-" }}</td>
-        <td class="py-3 px-5 hidden md:table-cell">{{ proveedor.telefono }}</td>
+        <td class="py-3 px-2 hidden md:table-cell w-1/12">{{ proveedor.rubro|default:"-" }}</td>
+        <td class="py-3 px-8 hidden md:table-cell w-1/6">{{ proveedor.telefono }}</td>
         <td class="py-3 px-5 flex justify-center gap-3">
           <a href="{% url 'detalle_proveedor' proveedor.id %}" 
              class="text-blue-600 hover:text-blue-800 flex items-center gap-1" 
