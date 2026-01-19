@@ -24,7 +24,7 @@
       <table class="w-full min-w-[980px] text-left text-sm">
         <thead class="bg-gray-100 dark:bg-gray-800 text-left text-xs uppercase text-gray-600 dark:text-gray-400">
           <tr>
-            <th class="px-6 py-3">ID</th>
+            <th class="px-6 py-3">ID de Usuario</th>
             <th class="px-6 py-3">Nombre</th>
             <th class="px-6 py-3">Email</th>
             <th class="px-6 py-3">Teléfono</th>
@@ -36,7 +36,7 @@
         <tbody>
           {% for usuario in usuarios %}
           <tr class="border-t border-[#dbe0e6] dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition">
-            <td class="px-6 py-4 text-[#617589] dark:text-gray-400">{{ usuario.id }}</td>
+            <td class="px-6 py-4 text-[#617589] dark:text-gray-400">{{ usuario.codigo }}</td>
             <td class="px-6 py-4 text-[#111418] dark:text-white">{{ usuario.nombre }} {{ usuario.apellido }}</td>
             <td class="px-6 py-4 text-[#111418] dark:text-white">{{ usuario.email }}</td>
             <td class="px-6 py-4 text-[#111418] dark:text-white">{{ usuario.telefono }}</td>

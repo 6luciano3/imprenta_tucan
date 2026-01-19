@@ -38,14 +38,17 @@ def lista_clientes(request):
 
     clientes_qs = Cliente.objects.all()
     if query:
-        clientes_qs = clientes_qs.filter(
-            Q(nombre__icontains=query) |
-            Q(apellido__icontains=query) |
-            Q(razon_social__icontains=query) |
-            Q(email__icontains=query) |
-            Q(telefono__icontains=query) |
-            Q(direccion__icontains=query)
-        )
+        if order_by == 'id' and query.isdigit():
+            clientes_qs = clientes_qs.filter(id=int(query))
+        else:
+            clientes_qs = clientes_qs.filter(
+                Q(nombre__icontains=query) |
+                Q(apellido__icontains=query) |
+                Q(razon_social__icontains=query) |
+                Q(email__icontains=query) |
+                Q(telefono__icontains=query) |
+                Q(direccion__icontains=query)
+            )
 
     # Orden
     order_field = f'-{order_by}' if direction == 'desc' else order_by

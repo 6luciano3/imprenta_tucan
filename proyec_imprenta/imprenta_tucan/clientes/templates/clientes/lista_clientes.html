@@ -65,7 +65,7 @@
 {% block search_placeholder %}Nombre, apellido, email...{% endblock %}
 {% block clear_url %}{% url 'lista_clientes' %}{% endblock %}
 {% block order_fields_options %}
-  <option value="id" {% if order_by == 'id' %}selected{% endif %}>ID</option>
+  <option value="id" {% if order_by == 'id' %}selected{% endif %}>ID de Cliente</option>
   <option value="nombre" {% if order_by == 'nombre' %}selected{% endif %}>Nombre</option>
   <option value="apellido" {% if order_by == 'apellido' %}selected{% endif %}>Apellido</option>
   <option value="email" {% if order_by == 'email' %}selected{% endif %}>Email</option>

@@ -28,14 +28,17 @@ def lista_proveedores(request):
     proveedores_qs = Proveedor.objects.all()
 
     if query:
-        proveedores_qs = proveedores_qs.filter(
-            Q(nombre__icontains=query) |
-            Q(cuit__icontains=query) |
-            Q(email__icontains=query) |
-            Q(telefono__icontains=query) |
-            Q(rubro__icontains=query) |
-            Q(direccion__icontains=query)
-        )
+        if order_by == 'id' and query.isdigit():
+            proveedores_qs = proveedores_qs.filter(id=int(query))
+        else:
+            proveedores_qs = proveedores_qs.filter(
+                Q(nombre__icontains=query) |
+                Q(cuit__icontains=query) |
+                Q(email__icontains=query) |
+                Q(telefono__icontains=query) |
+                Q(rubro__icontains=query) |
+                Q(direccion__icontains=query)
+            )
 
     order_field = f'-{order_by}' if direction == 'desc' else order_by
     proveedores_qs = proveedores_qs.order_by(order_field)

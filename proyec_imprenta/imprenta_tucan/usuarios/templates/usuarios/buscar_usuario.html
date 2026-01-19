@@ -48,7 +48,7 @@
       <table class="w-full text-sm">
         <thead class="bg-white dark:bg-gray-800">
           <tr>
-            <th class="px-6 py-3 text-left text-[#111418] dark:text-white font-medium">ID</th>
+            <th class="px-6 py-3 text-left text-[#111418] dark:text-white font-medium">ID de Usuario</th>
             <th class="px-6 py-3 text-left text-[#111418] dark:text-white font-medium">Nombre</th>
             <th class="px-6 py-3 text-left text-[#111418] dark:text-white font-medium">Apellido</th>
             <th class="px-6 py-3 text-left text-[#111418] dark:text-white font-medium">Email</th>
@@ -60,7 +60,7 @@
         <tbody>
           {% for usuario in usuarios %}
           <tr class="border-t border-[#dbe0e6] dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition">
-            <td class="px-6 py-4 text-[#617589] dark:text-gray-400">{{ usuario.id }}</td>
+            <td class="px-6 py-4 text-[#617589] dark:text-gray-400">{{ usuario.codigo }}</td>
             <td class="px-6 py-4 text-[#111418] dark:text-white">{{ usuario.nombre }}</td>
             <td class="px-6 py-4 text-[#111418] dark:text-white">{{ usuario.apellido }}</td>
             <td class="px-6 py-4 text-[#111418] dark:text-white">{{ usuario.email }}</td>

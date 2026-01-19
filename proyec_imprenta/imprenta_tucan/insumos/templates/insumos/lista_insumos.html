@@ -15,7 +15,7 @@
 {% block search_placeholder %}Nombre, código, proveedor, categoría...{% endblock %}
 {% block clear_url %}{% url 'lista_insumos' %}{% endblock %}
 {% block order_fields_options %}
-  <option value="idInsumo" {% if order_by == 'idInsumo' %}selected{% endif %}>ID</option>
+	{# <option value="idInsumo" {% if order_by == 'idInsumo' %}selected{% endif %}>ID</option> #}
   <option value="codigo" {% if order_by == 'codigo' %}selected{% endif %}>Código</option>
   <option value="nombre" {% if order_by == 'nombre' %}selected{% endif %}>Nombre</option>
   <option value="categoria" {% if order_by == 'categoria' %}selected{% endif %}>Categoría</option>

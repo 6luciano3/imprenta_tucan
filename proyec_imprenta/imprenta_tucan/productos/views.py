@@ -36,13 +36,16 @@ def lista_productos(request):
 
     if query:
         from django.db.models import Q
-        qs = qs.filter(
-            Q(nombreProducto__icontains=query) |
-            Q(descripcion__icontains=query) |
-            Q(categoriaProducto__nombreCategoria__icontains=query) |
-            Q(tipoProducto__nombreTipoProducto__icontains=query) |
-            Q(unidadMedida__nombreUnidad__icontains=query)
-        )
+        if order_by == 'idProducto' and query.isdigit():
+            qs = qs.filter(idProducto=int(query))
+        else:
+            qs = qs.filter(
+                Q(nombreProducto__icontains=query) |
+                Q(descripcion__icontains=query) |
+                Q(categoriaProducto__nombreCategoria__icontains=query) |
+                Q(tipoProducto__nombreTipoProducto__icontains=query) |
+                Q(unidadMedida__nombreUnidad__icontains=query)
+            )
 
     order_field = f'-{order_by}' if direction == 'desc' else order_by
     qs = qs.order_by(order_field)

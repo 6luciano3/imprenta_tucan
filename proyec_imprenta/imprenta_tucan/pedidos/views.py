@@ -44,13 +44,21 @@ def lista_pedidos(request):
     qs = Pedido.objects.select_related("cliente", "producto", "estado")
 
     if query:
-        qs = qs.filter(
-            Q(cliente__nombre__icontains=query) |
-            Q(cliente__apellido__icontains=query) |
-            Q(cliente__razon_social__icontains=query) |
-            Q(producto__nombreProducto__icontains=query) |
-            Q(estado__nombre__icontains=query)
-        )
+        if query.isdigit():
+            qs = qs.filter(Q(id=int(query)) |
+                           Q(cliente__nombre__icontains=query) |
+                           Q(cliente__apellido__icontains=query) |
+                           Q(cliente__razon_social__icontains=query) |
+                           Q(producto__nombreProducto__icontains=query) |
+                           Q(estado__nombre__icontains=query))
+        else:
+            qs = qs.filter(
+                Q(cliente__nombre__icontains=query) |
+                Q(cliente__apellido__icontains=query) |
+                Q(cliente__razon_social__icontains=query) |
+                Q(producto__nombreProducto__icontains=query) |
+                Q(estado__nombre__icontains=query)
+            )
 
     order_field = f"-{order_by}" if direction == "desc" else order_by
     qs = qs.order_by(order_field)
