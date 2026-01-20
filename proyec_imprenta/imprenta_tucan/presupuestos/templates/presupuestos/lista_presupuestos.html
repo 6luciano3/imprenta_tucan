@@ -1,31 +1,48 @@
-{% extends 'base.html' %}
+
+{% extends 'layouts/list_base.html' %}
 {% block title %}Lista de Presupuestos{% endblock %}
-{% block content %}
-<div class="container mx-auto py-8">
-  <h1 class="text-2xl font-bold mb-6">Presupuestos</h1>
-  <a href="{% url 'presupuestos:crear' %}" class="bg-blue-600 text-white px-4 py-2 rounded mb-4 inline-block">Nuevo presupuesto</a>
-  <table class="min-w-full bg-white rounded shadow">
-    <thead>
+
+{% block list_icon %}<span class="material-symbols-outlined text-3xl">request_quote</span>{% endblock %}
+{% block list_title_text %}Lista de Presupuestos{% endblock %}
+{% block new_button_href %}{% url 'presupuestos:crear' %}{% endblock %}
+{% block new_button_label %}Nuevo presupuesto{% endblock %}
+{% block search_placeholder %}N° presupuesto, cliente, estado...{% endblock %}
+{% block clear_url %}{% url 'presupuestos:lista' %}{% endblock %}
+{% block order_fields_options %}
+  <option value="id" {% if order_by == 'id' %}selected{% endif %}>ID</option>
+  <option value="numero" {% if order_by == 'numero' %}selected{% endif %}>N°</option>
+  <option value="cliente__apellido" {% if order_by == 'cliente__apellido' %}selected{% endif %}>Apellido Cliente</option>
+  <option value="cliente__nombre" {% if order_by == 'cliente__nombre' %}selected{% endif %}>Nombre Cliente</option>
+  <option value="fecha" {% if order_by == 'fecha' %}selected{% endif %}>Fecha</option>
+  <option value="validez" {% if order_by == 'validez' %}selected{% endif %}>Validez</option>
+  <option value="total" {% if order_by == 'total' %}selected{% endif %}>Total</option>
+  <option value="estado" {% if order_by == 'estado' %}selected{% endif %}>Estado</option>
+{% endblock %}
+
+{% block list_content %}
+<div class="bg-white rounded-xl shadow overflow-x-auto">
+  <table class="min-w-full text-left text-sm">
+    <thead class="bg-gray-100">
       <tr>
-        <th class="py-2 px-4 border-b">N°</th>
-        <th class="py-2 px-4 border-b">Cliente</th>
-        <th class="py-2 px-4 border-b">Fecha</th>
-        <th class="py-2 px-4 border-b">Validez</th>
-        <th class="py-2 px-4 border-b">Total</th>
-        <th class="py-2 px-4 border-b">Estado</th>
-        <th class="py-2 px-4 border-b">Acciones</th>
+        <th class="py-2 px-4">N°</th>
+        <th class="py-2 px-4">Cliente</th>
+        <th class="py-2 px-4">Fecha</th>
+        <th class="py-2 px-4">Validez</th>
+        <th class="py-2 px-4">Total</th>
+        <th class="py-2 px-4">Estado</th>
+        <th class="py-2 px-4">Acciones</th>
       </tr>
     </thead>
     <tbody>
       {% for presupuesto in presupuestos %}
       <tr>
-        <td class="py-2 px-4 border-b">{{ presupuesto.numero }}</td>
-        <td class="py-2 px-4 border-b">{{ presupuesto.cliente }}</td>
-        <td class="py-2 px-4 border-b">{{ presupuesto.fecha }}</td>
-        <td class="py-2 px-4 border-b">{{ presupuesto.validez|default:'-' }}</td>
-        <td class="py-2 px-4 border-b">${{ presupuesto.total }}</td>
-        <td class="py-2 px-4 border-b">{{ presupuesto.estado }}</td>
-        <td class="py-2 px-4 border-b">
+        <td class="py-2 px-4">{{ presupuesto.numero }}</td>
+        <td class="py-2 px-4">{{ presupuesto.cliente }}</td>
+        <td class="py-2 px-4">{{ presupuesto.fecha|date:'d/m/Y' }}</td>
+        <td class="py-2 px-4">{{ presupuesto.validez|date:'d/m/Y'|default:'-' }}</td>
+        <td class="py-2 px-4">${{ presupuesto.total }}</td>
+        <td class="py-2 px-4">{{ presupuesto.estado }}</td>
+        <td class="py-2 px-4">
           <a href="{% url 'presupuestos:editar' presupuesto.pk %}" class="text-blue-600">Editar</a> |
           <a href="{% url 'presupuestos:eliminar' presupuesto.pk %}" class="text-red-600">Eliminar</a>
         </td>

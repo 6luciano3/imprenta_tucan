@@ -6,17 +6,10 @@
   <div class="max-w-3xl mx-auto bg-white rounded-xl shadow p-6">
     <div class="flex justify-between items-center mb-6">
       <h1 class="text-3xl font-black text-[#111418] dark:text-white">✏️ Editar Presupuesto</h1>
-      {% if return_url %}
-        <a href="{% url return_url %}" class="flex items-center gap-2 bg-gray-500 text-white px-4 py-2 rounded-lg shadow hover:bg-gray-600">
-          <span class="material-symbols-outlined">arrow_back</span>
-          Volver
-        </a>
-      {% else %}
-        <a href="{% url 'dashboard' %}" class="flex items-center gap-2 bg-gray-500 text-white px-4 py-2 rounded-lg shadow hover:bg-gray-600">
-          <span class="material-symbols-outlined">arrow_back</span>
-          Volver
-        </a>
-      {% endif %}
+      <a href="{% url 'presupuestos:lista' %}" class="flex items-center gap-2 bg-gray-500 text-white px-4 py-2 rounded-lg shadow hover:bg-gray-600">
+        <span class="material-symbols-outlined">arrow_back</span>
+        Volver
+      </a>
     </div>
 
     {% if form %}
