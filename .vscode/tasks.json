@@ -28,6 +28,80 @@
 				"C:\\Users\\Public\\Documents\\facultad\\3er Año\\Trabajo Final\\proyecto_imprenta\\proyec_imprenta\\imprenta_tucan\\manage.py",
 				"inspect_usuario_columns"
 			]
+		},
+		{
+			"label": "🔎 Inspeccionar columnas clientes",
+			"type": "shell",
+			"command": "C:\\Users\\Public\\Documents\\facultad\\3er Año\\Trabajo Final\\proyecto_imprenta\\imprenta_tuc\\Scripts\\python.exe",
+			"args": [
+				"C:\\Users\\Public\\Documents\\facultad\\3er Año\\Trabajo Final\\proyecto_imprenta\\proyec_imprenta\\imprenta_tucan\\manage.py",
+				"inspect_table_columns",
+				"--table",
+				"clientes_cliente"
+			]
+		},
+		{
+			"label": "🔎 Inspeccionar columnas clientes (2)",
+			"type": "shell",
+			"command": "C:\\Users\\Public\\Documents\\facultad\\3er Año\\Trabajo Final\\proyecto_imprenta\\imprenta_tuc\\Scripts\\python.exe",
+			"args": [
+				"C:\\Users\\Public\\Documents\\facultad\\3er Año\\Trabajo Final\\proyecto_imprenta\\proyec_imprenta\\imprenta_tucan\\manage.py",
+				"inspect_table_columns",
+				"--table",
+				"clientes_cliente"
+			]
+		},
+		{
+			"label": "🛠️ Migrar clientes",
+			"type": "shell",
+			"command": "C:\\Users\\Public\\Documents\\facultad\\3er Año\\Trabajo Final\\proyecto_imprenta\\imprenta_tuc\\Scripts\\python.exe",
+			"args": [
+				"C:\\Users\\Public\\Documents\\facultad\\3er Año\\Trabajo Final\\proyecto_imprenta\\proyec_imprenta\\imprenta_tucan\\manage.py",
+				"makemigrations",
+				"clientes"
+			]
+		},
+		{
+			"label": "🧱 Aplicar migraciones",
+			"type": "shell",
+			"command": "C:\\Users\\Public\\Documents\\facultad\\3er Año\\Trabajo Final\\proyecto_imprenta\\imprenta_tuc\\Scripts\\python.exe",
+			"args": [
+				"C:\\Users\\Public\\Documents\\facultad\\3er Año\\Trabajo Final\\proyecto_imprenta\\proyec_imprenta\\imprenta_tucan\\manage.py",
+				"migrate",
+				"clientes"
+			]
+		},
+		{
+			"label": "📜 Ver migraciones clientes",
+			"type": "shell",
+			"command": "C:\\Users\\Public\\Documents\\facultad\\3er Año\\Trabajo Final\\proyecto_imprenta\\imprenta_tuc\\Scripts\\python.exe",
+			"args": [
+				"C:\\Users\\Public\\Documents\\facultad\\3er Año\\Trabajo Final\\proyecto_imprenta\\proyec_imprenta\\imprenta_tucan\\manage.py",
+				"showmigrations",
+				"clientes"
+			]
+		},
+		{
+			"label": "🔎 Validar columnas clientes renombradas",
+			"type": "shell",
+			"command": "C:\\Users\\Public\\Documents\\facultad\\3er Año\\Trabajo Final\\proyecto_imprenta\\imprenta_tuc\\Scripts\\python.exe",
+			"args": [
+				"C:\\Users\\Public\\Documents\\facultad\\3er Año\\Trabajo Final\\proyecto_imprenta\\proyec_imprenta\\imprenta_tucan\\manage.py",
+				"inspect_table_columns",
+				"--table",
+				"clientes_cliente"
+			]
+		},
+		{
+			"label": "🔎 Validar columnas clientes renombradas (2)",
+			"type": "shell",
+			"command": "C:\\Users\\Public\\Documents\\facultad\\3er Año\\Trabajo Final\\proyecto_imprenta\\imprenta_tuc\\Scripts\\python.exe",
+			"args": [
+				"C:\\Users\\Public\\Documents\\facultad\\3er Año\\Trabajo Final\\proyecto_imprenta\\proyec_imprenta\\imprenta_tucan\\manage.py",
+				"inspect_table_columns",
+				"--table",
+				"clientes_cliente"
+			]
 		}
 	]
 }
