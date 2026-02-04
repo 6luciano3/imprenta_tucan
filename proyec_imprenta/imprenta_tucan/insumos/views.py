@@ -324,8 +324,29 @@ def eliminar_insumo(request, idInsumo: int):
 @login_required
 def lista_proyecciones(request):
     from configuracion.services import get_page_size
-    proyecciones_qs = ProyeccionInsumo.objects.filter(periodo=timezone.now().strftime('%Y-%m'))
-    paginator = Paginator(proyecciones_qs, get_page_size())
+    periodo_actual = timezone.now().strftime('%Y-%m')
+    proyecciones_qs = ProyeccionInsumo.objects.filter(periodo=periodo_actual)
+    # Generar proyecciones automáticamente si no existen para el período actual
+    if not proyecciones_qs.exists():
+        proveedores_ids = _filtro_industria_grafica_queryset()
+        proveedores = list(Proveedor.objects.filter(id__in=proveedores_ids)) if proveedores_ids else list(Proveedor.objects.filter(activo=True))
+        for insumo in Insumo.objects.filter(activo=True):
+            # Heurística simple: reponer hasta un objetivo de 500 unidades
+            objetivo = 500
+            faltante = max(0, objetivo - (insumo.stock or 0))
+            cantidad_proyectada = faltante if faltante > 0 else 100  # mínimo sugerido
+            proveedor_sugerido = insumo.proveedor or (proveedores[0] if proveedores else None)
+            ProyeccionInsumo.objects.update_or_create(
+                insumo=insumo,
+                periodo=periodo_actual,
+                defaults={
+                    'cantidad_proyectada': cantidad_proyectada,
+                    'proveedor_sugerido': proveedor_sugerido,
+                    'estado': 'pendiente',
+                }
+            )
+        proyecciones_qs = ProyeccionInsumo.objects.filter(periodo=periodo_actual)
+    paginator = Paginator(proyecciones_qs.order_by('insumo__nombre'), get_page_size())
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
     return render(request, 'insumos/lista_proyecciones.html', {'proyecciones': page_obj})
