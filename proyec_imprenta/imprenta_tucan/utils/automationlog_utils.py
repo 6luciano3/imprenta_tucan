@@ -1,4 +1,4 @@
-from .core_models import AutomationLog
+from automatizacion.models import AutomationLog
 from django.contrib.auth import get_user_model
 
 

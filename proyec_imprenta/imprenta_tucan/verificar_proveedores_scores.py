@@ -1,10 +1,4 @@
-from automatizacion.models import ScoreProveedor
-from proveedores.models import Proveedor
-
-print('Proveedores existentes:')
-for p in Proveedor.objects.all():
-    print(f"ID: {p.id}, Nombre: {p.nombre}")
-
-print('\nScores existentes:')
-for s in ScoreProveedor.objects.all():
-    print(f"ID: {s.id}, Proveedor ID: {s.proveedor_id}, Score: {s.score}")
+import sys
+print("Este script fue reemplazado por el comando de Django 'verificar_proveedores_scores'.")
+print("Usa: python manage.py verificar_proveedores_scores")
+sys.exit(0)

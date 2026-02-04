@@ -22,6 +22,9 @@ class Proveedor(models.Model):
     email = models.EmailField()
     telefono = models.CharField(max_length=20)
     direccion = models.TextField()
+    # Campo nuevo para normalizar rubro como catálogo
+    rubro_fk = models.ForeignKey('proveedores.Rubro', on_delete=models.PROTECT, null=True, blank=True, related_name='proveedores')
+    # Campo textual legado para compatibilidad; puede eliminarse luego de migrar formularios/vistas
     rubro = models.CharField(max_length=50)
     fecha_creacion = models.DateTimeField(auto_now_add=True)
     activo = models.BooleanField(default=True)
@@ -29,6 +32,10 @@ class Proveedor(models.Model):
     def __str__(self):
         # Mostrar nombre y CUIT si está disponible
         return f"{self.nombre}{f' ({self.cuit})' if self.cuit else ''}"
+
+    @property
+    def rubro_nombre(self):
+        return (self.rubro_fk.nombre if self.rubro_fk else None) or (self.rubro or None)
 
 
 # Modelo para parametrización de proveedores
