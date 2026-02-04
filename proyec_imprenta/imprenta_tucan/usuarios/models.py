@@ -39,7 +39,8 @@ class Notificacion(models.Model):
 class Usuario(AbstractUser):
     username = None  # Eliminamos el campo por defecto
     email = models.EmailField(unique=True, verbose_name="Correo Electrónico")
-    nombre = models.CharField(max_length=100, verbose_name="Nombre")
+    # Mapear a columna 'nombreUsuario' en la base
+    nombre = models.CharField(max_length=100, verbose_name="Nombre", db_column='nombreUsuario')
     apellido = models.CharField(max_length=100, verbose_name="Apellido")
     telefono = models.CharField(max_length=15, blank=True, verbose_name="Teléfono")
     rol = models.ForeignKey(Rol, on_delete=models.SET_NULL, null=True, verbose_name="Rol")
