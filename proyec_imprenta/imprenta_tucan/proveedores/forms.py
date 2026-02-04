@@ -12,7 +12,7 @@ class ProveedorForm(forms.ModelForm):
 
     class Meta:
         model = Proveedor
-        fields = ['nombre', 'cuit', 'email', 'telefono', 'direccion', 'rubro']
+        fields = ['nombre', 'cuit', 'email', 'telefono', 'direccion', 'rubro', 'rubro_fk']
         widgets = {
             'nombre': forms.TextInput(attrs={'placeholder': 'Ingrese el nombre del proveedor'}),
             'cuit': forms.TextInput(attrs={'placeholder': 'XX-XXXXXXXX-X'}),
@@ -21,6 +21,7 @@ class ProveedorForm(forms.ModelForm):
             'direccion': forms.TextInput(attrs={'placeholder': 'Ingrese la dirección completa'}),
             # Campo textual para mantener compatibilidad. Si se elige del catálogo, se sobrescribe en clean().
             'rubro': forms.TextInput(attrs={'placeholder': 'Escriba el rubro (si no usa catálogo)'}),
+            'rubro_fk': forms.HiddenInput(),
         }
 
     def __init__(self, *args, **kwargs):
@@ -38,6 +39,15 @@ class ProveedorForm(forms.ModelForm):
         if rl:
             # Sobre-escribir campo rubro textual con el nombre del Rubro seleccionado
             cleaned['rubro'] = rl.nombre
+            cleaned['rubro_fk'] = rl
+        else:
+            # Si no se seleccionó catálogo, intentar mapear texto a FK
+            nombre_txt = (cleaned.get('rubro') or '').strip()
+            if nombre_txt:
+                try:
+                    cleaned['rubro_fk'] = Rubro.objects.get(nombre__iexact=nombre_txt)
+                except Rubro.DoesNotExist:
+                    cleaned['rubro_fk'] = None
         return cleaned
 
 

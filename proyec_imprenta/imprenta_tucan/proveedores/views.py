@@ -38,6 +38,7 @@ def lista_proveedores(request):
                 Q(email__icontains=query) |
                 Q(telefono__icontains=query) |
                 Q(rubro__icontains=query) |
+                Q(rubro_fk__nombre__icontains=query) |
                 Q(direccion__icontains=query)
             )
 
@@ -76,12 +77,20 @@ def crear_proveedor(request):
         rubro_lookup_id = request.POST.get('rubro_lookup')
         rubro_text = request.POST.get('rubro')
         rubro = rubro_text
+        rubro_fk = None
         if rubro_lookup_id:
             try:
                 rubro_obj = Rubro.objects.get(pk=rubro_lookup_id)
                 rubro = rubro_obj.nombre
+                rubro_fk = rubro_obj
             except Rubro.DoesNotExist:
                 pass
+        elif rubro_text:
+            # Intentar mapear texto a FK
+            try:
+                rubro_fk = Rubro.objects.get(nombre__iexact=rubro_text.strip())
+            except Rubro.DoesNotExist:
+                rubro_fk = None
 
         if nombre and email and telefono:
             Proveedor.objects.create(
@@ -90,7 +99,8 @@ def crear_proveedor(request):
                 email=email,
                 telefono=telefono,
                 direccion=direccion,
-                rubro=rubro
+                rubro=rubro,
+                rubro_fk=rubro_fk
             )
             messages.success(request, f'El proveedor {nombre} ha sido creado exitosamente.')
             return redirect('lista_proveedores')
@@ -113,6 +123,19 @@ def editar_proveedor(request, id):
         proveedor.telefono = request.POST.get('telefono', proveedor.telefono)
         proveedor.direccion = request.POST.get('direccion', proveedor.direccion)
         proveedor.rubro = request.POST.get('rubro', proveedor.rubro)
+        rubro_lookup_id = request.POST.get('rubro_lookup')
+        if rubro_lookup_id:
+            try:
+                proveedor.rubro_fk = Rubro.objects.get(pk=rubro_lookup_id)
+                proveedor.rubro = proveedor.rubro_fk.nombre
+            except Rubro.DoesNotExist:
+                pass
+        elif proveedor.rubro:
+            # Mapear texto a FK si existe catálogo
+            try:
+                proveedor.rubro_fk = Rubro.objects.get(nombre__iexact=proveedor.rubro.strip())
+            except Rubro.DoesNotExist:
+                proveedor.rubro_fk = None
 
         proveedor.save()
         messages.success(request, f'El proveedor {proveedor.nombre} ha sido actualizado exitosamente.')

@@ -82,7 +82,7 @@
         <td class="py-3 px-2 font-medium w-1/6">{{ proveedor.nombre }}</td>
         <td class="py-3 px-8 w-1/6">{{ proveedor.cuit|default:"-" }}</td>
         <td class="py-3 px-5 hidden sm:table-cell">{{ proveedor.email }}</td>
-        <td class="py-3 px-2 hidden md:table-cell w-1/12">{{ proveedor.rubro|default:"-" }}</td>
+        <td class="py-3 px-2 hidden md:table-cell w-1/12">{{ proveedor.rubro_nombre|default:"-" }}</td>
         <td class="py-3 px-2 hidden md:table-cell w-1/12">
           {% if scores_map and scores_map|get_item:proveedor.id %}
             <span class="inline-flex items-center gap-1 text-yellow-600"><span class="material-symbols-outlined text-sm">star</span>{{ scores_map|get_item:proveedor.id }}</span>

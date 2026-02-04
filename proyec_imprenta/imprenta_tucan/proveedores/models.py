@@ -16,7 +16,7 @@ class Rubro(models.Model):
 
 
 class Proveedor(models.Model):
-    nombre = models.CharField(max_length=100)
+    nombre = models.CharField(max_length=100, db_column='nombreProveedor')
     apellido = models.CharField(max_length=100, default='Ejemplo')
     cuit = models.CharField(max_length=13, unique=True)  # Formato: XX-XXXXXXXX-X
     email = models.EmailField()
