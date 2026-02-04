@@ -135,7 +135,32 @@ MESSAGE_TAGS = {
 # Configuración Celery
 CELERY_BROKER_URL = 'redis://localhost:6379/0'
 CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
-CELERY_BEAT_SCHEDULE = {}
+CELERY_BEAT_SCHEDULE = {
+    'prediccion-demanda-cada-hora': {
+        'task': 'automatizacion.tasks.tarea_prediccion_demanda',
+        'schedule': 60 * 60,
+    },
+    'anticipacion-compras-cada-2-horas': {
+        'task': 'automatizacion.tasks.tarea_anticipacion_compras',
+        'schedule': 2 * 60 * 60,
+    },
+    'ranking-clientes-diario': {
+        'task': 'automatizacion.tasks.tarea_ranking_clientes',
+        'schedule': 24 * 60 * 60,
+    },
+    'scores-proveedores-diario': {
+        'task': 'automatizacion.tasks.tarea_recalcular_scores_proveedores',
+        'schedule': 24 * 60 * 60,
+    },
+    'generar-ofertas-diario': {
+        'task': 'automatizacion.tasks.tarea_generar_ofertas',
+        'schedule': 24 * 60 * 60,
+    },
+    'alertas-retraso-cada-30min': {
+        'task': 'automatizacion.tasks.tarea_alertas_retraso',
+        'schedule': 30 * 60,
+    },
+}
 
 from .celery import app as celery_app
 __all__ = ('celery_app',)

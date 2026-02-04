@@ -7,6 +7,7 @@ from django.contrib.auth.decorators import login_required, user_passes_test
 from django.core.management import call_command
 from django.template.loader import render_to_string
 from .models import Proveedor, Rubro
+from automatizacion.models import ScoreProveedor
 from .forms import ProveedorForm, RubroForm
 
 
@@ -48,11 +49,17 @@ def lista_proveedores(request):
     page = request.GET.get('page')
     proveedores = paginator.get_page(page)
 
+    # Mapa de scores por proveedor para mostrar "Ranking cargado" en la lista
+    proveedor_ids = [p.id for p in proveedores.object_list]
+    scores_qs = ScoreProveedor.objects.filter(proveedor_id__in=proveedor_ids)
+    scores_map = {s.proveedor_id: s.score for s in scores_qs}
+
     return render(request, 'proveedores/lista_proveedores.html', {
         'proveedores': proveedores,
         'query': query,
         'order_by': order_by,
         'direction': direction,
+        'scores_map': scores_map,
     })
 
 

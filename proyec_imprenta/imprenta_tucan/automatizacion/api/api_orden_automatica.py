@@ -2,7 +2,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from insumos.models import Insumo
-from pedidos.models import Pedido
+from pedidos.models import OrdenCompra
 from proveedores.models import Proveedor
 from .services import ProveedorInteligenteService
 from django.utils import timezone
@@ -18,17 +18,20 @@ class OrdenCompraAutomaticaAPIView(APIView):
             insumo = Insumo.objects.get(id=insumo_id)
         except Insumo.DoesNotExist:
             return Response({'error': 'Insumo no encontrado'}, status=status.HTTP_404_NOT_FOUND)
+
         proveedor = ProveedorInteligenteService.recomendar_proveedor(insumo)
         if not proveedor:
             return Response({'error': 'No se encontró proveedor recomendado'}, status=status.HTTP_404_NOT_FOUND)
-        # Generar borrador de pedido/orden de compra
-        pedido = Pedido.objects.create(
+
+        # Generar orden de compra en estado "sugerida"
+        orden = OrdenCompra.objects.create(
             insumo=insumo,
             proveedor=proveedor,
-            cantidad=cantidad,
-            estado='Borrador',
-            fecha_creacion=timezone.now()
+            cantidad=int(cantidad),
+            estado='sugerida',
+            comentario='Generada automáticamente desde API'
         )
+
         # Simular consulta de stock (en un sistema real, aquí se enviaría la consulta al proveedor)
         stock_disponible = 100  # Simulación
         if int(cantidad) <= stock_disponible:
@@ -37,11 +40,12 @@ class OrdenCompraAutomaticaAPIView(APIView):
             disponibilidad = 'Parcial'
         else:
             disponibilidad = 'No disponible'
+
         # Registrar respuesta y devolver al admin
         return Response({
-            'pedido_id': pedido.id,
+            'orden_id': orden.id,
             'proveedor_id': proveedor.id,
             'proveedor_nombre': proveedor.nombre,
             'disponibilidad': disponibilidad,
-            'mensaje': 'Orden de compra generada y consulta de stock realizada.'
+            'mensaje': 'Orden de compra sugerida y consulta de stock realizada.'
         })

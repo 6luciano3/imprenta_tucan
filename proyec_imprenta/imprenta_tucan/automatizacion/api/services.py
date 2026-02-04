@@ -1,6 +1,6 @@
 from proveedores.models import Proveedor
 from insumos.models import Insumo
-from pedidos.models import Pedido
+from pedidos.models import OrdenCompra
 from automatizacion.models import ScoreProveedor
 from django.db import transaction
 from django.utils import timezone
@@ -36,32 +36,27 @@ class ProveedorInteligenteService:
 
     @staticmethod
     def _precio_promedio(proveedor, insumo):
-        # Normalizado: menor precio es mejor (0 a 1)
-        precios = Pedido.objects.filter(proveedor=proveedor, insumo=insumo).values_list('precio_unitario', flat=True)
-        if not precios:
-            return 1
-        min_precio = min(precios)
-        max_precio = max(precios)
-        actual = precios[-1]
-        if max_precio == min_precio:
-            return 1
-        return (max_precio - actual) / (max_precio - min_precio)
+        # No hay precio_unitario en OrdenCompra: retornar neutro (1)
+        # Si en el futuro se agrega precio, ajustar esta métrica.
+        return 1
 
     @staticmethod
     def _cumplimiento(proveedor):
-        pedidos = Pedido.objects.filter(proveedor=proveedor)
-        if not pedidos:
+        # Proxy: proporción de órdenes confirmadas sobre el total
+        ordenes = OrdenCompra.objects.filter(proveedor=proveedor)
+        if not ordenes:
             return 1
-        cumplidos = pedidos.filter(entregado_a_tiempo=True).count()
-        return cumplidos / pedidos.count()
+        confirmadas = ordenes.filter(estado='confirmada').count()
+        return confirmadas / ordenes.count()
 
     @staticmethod
     def _incidencias(proveedor):
-        pedidos = Pedido.objects.filter(proveedor=proveedor)
-        if not pedidos:
+        # Proxy: proporción de órdenes rechazadas sobre el total
+        ordenes = OrdenCompra.objects.filter(proveedor=proveedor)
+        if not ordenes:
             return 0
-        con_incidencias = pedidos.filter(incidencia=True).count()
-        return con_incidencias / pedidos.count()
+        rechazadas = ordenes.filter(estado='rechazada').count()
+        return rechazadas / ordenes.count()
 
     @staticmethod
     def _disponibilidad(proveedor, insumo):

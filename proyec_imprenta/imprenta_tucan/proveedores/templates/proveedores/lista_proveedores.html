@@ -1,4 +1,5 @@
 {% extends 'layouts/list_base.html' %}
+{% load proveedor_extras %}
 {% block title %}Lista de Proveedores{% endblock %}
 
 {% block list_icon %}<span class="material-symbols-outlined text-3xl">business</span>{% endblock %}
@@ -32,13 +33,26 @@
 
 <!-- Tabla de ranking de scores (se muestra dinámicamente) -->
 <div id="rankingProveedoresContainer" class="mb-6 hidden">
+  <!-- Encabezado del ranking -->
+  <div class="flex items-center mb-2">
+    <h2 class="text-sm md:text-base font-semibold text-gray-700 flex items-center gap-2">
+      <span class="material-symbols-outlined text-base md:text-lg">star</span>
+      Ranking de Proveedores
+    </h2>
+  </div>
   <div class="bg-white shadow rounded-xl overflow-hidden table-responsive">
-    <table class="w-full min-w-[600px] text-left text-sm">
+    <table class="w-full min-w-[900px] text-left text-sm">
       <thead class="bg-yellow-100 text-gray-700">
         <tr>
           <th class="py-3 px-5">Proveedor</th>
+          <th class="py-3 px-5 w-56 whitespace-nowrap">CUIT</th>
+          <th class="py-3 px-5">Rubro</th>
           <th class="py-3 px-5">Score</th>
-          <th class="py-3 px-5">Actualizado</th>
+          <th class="py-3 px-5">Cumplimiento (%)</th>
+          <th class="py-3 px-5">Incidencias (%)</th>
+          <th class="py-3 px-5">Órdenes 90d</th>
+          <th class="py-3 px-5">Volumen 90d</th>
+          <th class="py-3 px-5">Última actividad</th>
         </tr>
       </thead>
       <tbody id="rankingProveedoresBody">
@@ -57,7 +71,8 @@
         <th class="py-3 px-8 w-1/6">CUIT</th>
         <th class="py-3 px-5 hidden sm:table-cell">Email</th>
         <th class="py-3 px-2 hidden md:table-cell w-1/12">Rubro</th>
-        <th class="py-3 px-8 hidden md:table-cell w-1/6">Teléfono</th>
+        <th class="py-3 px-2 hidden md:table-cell w-1/12">Ranking</th>
+        <th class="py-3 px-8 hidden md:table-cell w-64 whitespace-nowrap">Teléfono</th>
         <th class="py-3 px-5 text-center">Acciones</th>
       </tr>
     </thead>
@@ -68,7 +83,14 @@
         <td class="py-3 px-8 w-1/6">{{ proveedor.cuit|default:"-" }}</td>
         <td class="py-3 px-5 hidden sm:table-cell">{{ proveedor.email }}</td>
         <td class="py-3 px-2 hidden md:table-cell w-1/12">{{ proveedor.rubro|default:"-" }}</td>
-        <td class="py-3 px-8 hidden md:table-cell w-1/6">{{ proveedor.telefono }}</td>
+        <td class="py-3 px-2 hidden md:table-cell w-1/12">
+          {% if scores_map and scores_map|get_item:proveedor.id %}
+            <span class="inline-flex items-center gap-1 text-yellow-600"><span class="material-symbols-outlined text-sm">star</span>{{ scores_map|get_item:proveedor.id }}</span>
+          {% else %}
+            <span class="text-gray-400">-</span>
+          {% endif %}
+        </td>
+        <td class="py-3 px-8 hidden md:table-cell w-64 whitespace-nowrap">{{ proveedor.telefono }}</td>
         <td class="py-3 px-5 flex justify-center gap-3">
           <a href="{% url 'detalle_proveedor' proveedor.id %}" 
              class="text-blue-600 hover:text-blue-800 flex items-center gap-1" 
@@ -179,36 +201,52 @@ document.addEventListener('DOMContentLoaded', function() {
   const tbody = document.getElementById('rankingProveedoresBody');
   if (btnRanking && container && tbody) {
     btnRanking.addEventListener('click', function() {
+      // Toggle: si está visible, ocultar y restaurar el texto del botón
+      if (!container.classList.contains('hidden')) {
+        container.classList.add('hidden');
+        btnRanking.textContent = 'Mostrar Ranking de Proveedores';
+        btnRanking.disabled = false;
+        return;
+      }
+      // Si está oculto, cargar (una vez) y mostrar
+      const originalLabel = 'Mostrar Ranking de Proveedores';
       fetch('/api/score-proveedores/')
         .then(response => response.json())
         .then(data => {
-          // Soporta respuesta paginada (data.results) o array directa
           const scores = Array.isArray(data) ? data : (Array.isArray(data.results) ? data.results : []);
           tbody.innerHTML = '';
           if (scores.length === 0) {
-            let row = document.createElement('tr');
-            row.innerHTML = `<td colspan="3" class="text-center py-6 text-gray-500">No hay scores registrados.</td>`;
+            const row = document.createElement('tr');
+            row.innerHTML = `<td colspan="9" class="text-center py-6 text-gray-500">No hay scores registrados.</td>`;
             tbody.appendChild(row);
           } else {
-            // Ordenar por score descendente y mostrar top 10
             scores.sort((a, b) => (b.score || 0) - (a.score || 0));
             scores.slice(0, 10).forEach(item => {
-              let row = document.createElement('tr');
+              const row = document.createElement('tr');
               row.innerHTML = `
                 <td class="py-3 px-5 font-medium">${item.proveedor_nombre || item.proveedor || ''}</td>
+                <td class="py-3 px-5 w-56 whitespace-nowrap">${item.proveedor_cuit || '-'}</td>
+                <td class="py-3 px-5">${item.proveedor_rubro || '-'}</td>
                 <td class="py-3 px-5">${item.score != null ? item.score : '-'}</td>
-                <td class="py-3 px-5">${item.actualizado ? item.actualizado.split('T')[0] : '-'}</td>
+                <td class="py-3 px-5">${item.cumplimiento != null ? item.cumplimiento : '-'}</td>
+                <td class="py-3 px-5">${item.incidencias != null ? item.incidencias : '-'}</td>
+                <td class="py-3 px-5">${item.ordenes_90d != null ? item.ordenes_90d : '-'}</td>
+                <td class="py-3 px-5">${item.volumen_90d != null ? item.volumen_90d : '-'}</td>
+                <td class="py-3 px-5">${item.ultima_actividad ? item.ultima_actividad.split('T')[0] : '-'}</td>
               `;
               tbody.appendChild(row);
             });
           }
           container.classList.remove('hidden');
-          btnRanking.disabled = true;
-          btnRanking.textContent = 'Ranking cargado';
+          // Cambiar texto para permitir ocultar nuevamente
+          btnRanking.textContent = 'Ocultar Ranking';
+          btnRanking.disabled = false;
         })
         .catch(error => {
           alert('Error al obtener ranking de proveedores.');
           console.error('Error al obtener ranking de proveedores:', error);
+          btnRanking.textContent = originalLabel;
+          btnRanking.disabled = false;
         });
     });
   }

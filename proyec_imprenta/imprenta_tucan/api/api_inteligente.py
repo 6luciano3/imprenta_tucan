@@ -1,6 +1,7 @@
 from rest_framework import mixins
 from rest_framework import routers, serializers, viewsets
 from automatizacion.models import RankingCliente, ScoreProveedor, OrdenSugerida, OfertaAutomatica, AprobacionAutomatica, AutomationLog
+from automatizacion.api.services import ProveedorInteligenteService
 from clientes.models import Cliente
 from pedidos.models import Pedido, EstadoPedido
 
@@ -35,15 +36,67 @@ class RankingClienteSerializer(serializers.ModelSerializer):
 
 class ScoreProveedorSerializer(serializers.ModelSerializer):
     proveedor_nombre = serializers.SerializerMethodField()
+    proveedor_cuit = serializers.SerializerMethodField()
+    proveedor_rubro = serializers.SerializerMethodField()
+    cumplimiento = serializers.SerializerMethodField()
+    incidencias = serializers.SerializerMethodField()
+    ordenes_90d = serializers.SerializerMethodField()
+    volumen_90d = serializers.SerializerMethodField()
+    ultima_actividad = serializers.SerializerMethodField()
 
     class Meta:
         model = ScoreProveedor
         fields = '__all__'
-        extra_fields = ['proveedor_nombre']
+        extra_fields = [
+            'proveedor_nombre', 'proveedor_cuit', 'proveedor_rubro',
+            'cumplimiento', 'incidencias', 'ordenes_90d', 'volumen_90d', 'ultima_actividad'
+        ]
 
     def get_proveedor_nombre(self, obj):
         # Devuelve el nombre del proveedor relacionado
         return getattr(obj.proveedor, 'nombre', None)
+
+    def get_proveedor_cuit(self, obj):
+        return getattr(obj.proveedor, 'cuit', None)
+
+    def get_proveedor_rubro(self, obj):
+        return getattr(obj.proveedor, 'rubro', None)
+
+    def _ordenes_ventana(self, obj):
+        from django.utils import timezone
+        from datetime import timedelta
+        desde = timezone.now() - timedelta(days=90)
+        from pedidos.models import OrdenCompra
+        return OrdenCompra.objects.filter(proveedor=obj.proveedor, fecha_creacion__gte=desde)
+
+    def get_cumplimiento(self, obj):
+        qs = self._ordenes_ventana(obj)
+        total = qs.count()
+        if total == 0:
+            return 0.0
+        confirmadas = qs.filter(estado='confirmada').count()
+        return round((confirmadas / total) * 100.0, 2)
+
+    def get_incidencias(self, obj):
+        qs = self._ordenes_ventana(obj)
+        total = qs.count()
+        if total == 0:
+            return 0.0
+        rechazadas = qs.filter(estado='rechazada').count()
+        return round((rechazadas / total) * 100.0, 2)
+
+    def get_ordenes_90d(self, obj):
+        return self._ordenes_ventana(obj).count()
+
+    def get_volumen_90d(self, obj):
+        from django.db.models import Sum
+        agg = self._ordenes_ventana(obj).aggregate(volumen=Sum('cantidad'))
+        return agg.get('volumen') or 0
+
+    def get_ultima_actividad(self, obj):
+        qs = self._ordenes_ventana(obj)
+        last = qs.order_by('-fecha_creacion').values_list('fecha_creacion', flat=True).first()
+        return last.isoformat() if last else None
 
 
 class OrdenSugeridaSerializer(serializers.ModelSerializer):
@@ -110,6 +163,21 @@ class RankingClienteViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
 class ScoreProveedorViewSet(viewsets.ModelViewSet):
     queryset = ScoreProveedor.objects.all()
     serializer_class = ScoreProveedorSerializer
+
+    def get_queryset(self):
+        qs = ScoreProveedor.objects.select_related('proveedor').all()
+        if not qs.exists():
+            # Fallback: calcular y persistir scores para proveedores activos
+            from proveedores.models import Proveedor
+            for proveedor in Proveedor.objects.filter(activo=True):
+                # Usa servicio inteligente para cálculo real
+                score = ProveedorInteligenteService.calcular_score(proveedor, insumo=None)
+                ScoreProveedor.objects.update_or_create(
+                    proveedor=proveedor,
+                    defaults={'score': score}
+                )
+            qs = ScoreProveedor.objects.select_related('proveedor').all()
+        return qs
 
 
 class OrdenSugeridaViewSet(viewsets.ModelViewSet):
