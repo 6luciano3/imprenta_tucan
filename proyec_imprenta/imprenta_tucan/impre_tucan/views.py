@@ -73,7 +73,8 @@ def dashboard(request):
         'ultima_fecha_insumos': ultima_fecha_insumos,
         'ultima_fecha_pedidos': ultima_fecha_pedidos,
     }
-    return render(request, 'dashboard.html', context)
+    # Usar el dashboard con paneles inteligentes y logs
+    return render(request, 'usuarios/dashboard_paneles.html', context)
 
 # Vista para confirmar y ejecutar la eliminación de un cliente
 

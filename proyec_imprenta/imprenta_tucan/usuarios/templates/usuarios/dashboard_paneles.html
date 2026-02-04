@@ -45,6 +45,131 @@
             </div>
         </div>
     </a>
+    <!-- Panel Inteligencia: Clientes destacados -->
+    <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+        <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center gap-3">
+                <div class="h-12 w-12 rounded-full bg-yellow-50 text-yellow-700 grid place-items-center">
+                    <span class="material-symbols-outlined">trophy</span>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-500">Inteligencia</p>
+                    <p class="text-lg font-bold">Clientes destacados</p>
+                </div>
+            </div>
+            <button id="btnTopClientes" class="bg-yellow-400 hover:bg-yellow-500 text-gray-900 font-semibold px-3 py-2 rounded">Ver Top 10</button>
+        </div>
+        <div id="topClientesContainer" class="hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead class="bg-yellow-100">
+                        <tr>
+                            <th class="py-2 px-3">Nombre</th>
+                            <th class="py-2 px-3 hidden sm:table-cell">Email</th>
+                            <th class="py-2 px-3">Teléfono</th>
+                            <th class="py-2 px-3">Estado</th>
+                            <th class="py-2 px-3">Score</th>
+                        </tr>
+                    </thead>
+                    <tbody id="topClientesBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Panel Inteligencia: Ranking de Proveedores -->
+    <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+        <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center gap-3">
+                <div class="h-12 w-12 rounded-full bg-green-50 text-green-700 grid place-items-center">
+                    <span class="material-symbols-outlined">star</span>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-500">Inteligencia</p>
+                    <p class="text-lg font-bold">Ranking de Proveedores</p>
+                </div>
+            </div>
+            <button id="btnTopProveedores" class="bg-green-400 hover:bg-green-500 text-gray-900 font-semibold px-3 py-2 rounded">Ver Top 10</button>
+        </div>
+        <div id="topProveedoresContainer" class="hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead class="bg-green-100">
+                        <tr>
+                            <th class="py-2 px-3">Proveedor</th>
+                            <th class="py-2 px-3">CUIT</th>
+                            <th class="py-2 px-3">Rubro</th>
+                            <th class="py-2 px-3">Score</th>
+                            <th class="py-2 px-3">Cumplimiento (%)</th>
+                            <th class="py-2 px-3">Incidencias (%)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="topProveedoresBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Panel Automatización: Órdenes y Ofertas -->
+    <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+        <div class="flex items-center gap-3 mb-3">
+            <div class="h-12 w-12 rounded-full bg-blue-50 text-blue-700 grid place-items-center">
+                <span class="material-symbols-outlined">auto_mode</span>
+            </div>
+            <div>
+                <p class="text-sm text-gray-500">Automatización</p>
+                <p class="text-lg font-bold">Órdenes sugeridas y Ofertas</p>
+            </div>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <div class="flex items-center justify-between mb-2">
+                    <h3 class="font-semibold">Órdenes sugeridas</h3>
+                    <button id="btnOrdenes" class="bg-blue-400 hover:bg-blue-500 text-white text-sm px-3 py-1 rounded">Actualizar</button>
+                </div>
+                <ul id="ordenesLista" class="text-sm space-y-1"></ul>
+            </div>
+            <div>
+                <div class="flex items-center justify-between mb-2">
+                    <h3 class="font-semibold">Ofertas automáticas</h3>
+                    <button id="btnOfertas" class="bg-pink-400 hover:bg-pink-500 text-white text-sm px-3 py-1 rounded">Actualizar</button>
+                </div>
+                <ul id="ofertasLista" class="text-sm space-y-1"></ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Panel Automatización: Logs de Automatización -->
+    <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+        <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center gap-3">
+                <div class="h-12 w-12 rounded-full bg-gray-50 text-gray-700 grid place-items-center">
+                    <span class="material-symbols-outlined">event</span>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-500">Automatización</p>
+                    <p class="text-lg font-bold">Logs de Automatización</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                <button id="btnLogsDemo" class="bg-gray-200 hover:bg-gray-300 text-gray-900 font-semibold px-3 py-2 rounded">Generar demo</button>
+                <button id="btnLogs" class="bg-gray-300 hover:bg-gray-400 text-gray-900 font-semibold px-3 py-2 rounded">Actualizar</button>
+            </div>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead class="bg-gray-100">
+                    <tr>
+                        <th class="py-2 px-3">Fecha</th>
+                        <th class="py-2 px-3">Evento</th>
+                        <th class="py-2 px-3">Descripción</th>
+                        <th class="py-2 px-3 hidden md:table-cell">Usuario</th>
+                    </tr>
+                </thead>
+                <tbody id="logsBody"></tbody>
+            </table>
+        </div>
+    </div>
 </section>
 {% endblock %}
 
@@ -59,4 +184,183 @@
         <div class="text-gray-400">No tienes notificaciones nuevas.</div>
     {% endfor %}
 </section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Clientes destacados
+    const btnTopClientes = document.getElementById('btnTopClientes');
+    const topClientesContainer = document.getElementById('topClientesContainer');
+    const topClientesBody = document.getElementById('topClientesBody');
+    if (btnTopClientes && topClientesContainer && topClientesBody) {
+        btnTopClientes.addEventListener('click', () => {
+            const showing = !topClientesContainer.classList.contains('hidden');
+            if (showing) { topClientesContainer.classList.add('hidden'); btnTopClientes.textContent = 'Ver Top 10'; return; }
+            fetch('/api/clientes/ranking/')
+                .then(r => r.json())
+                .then(data => {
+                    const clientes = Array.isArray(data) ? data : (Array.isArray(data.results) ? data.results : []);
+                    topClientesBody.innerHTML = '';
+                    if (clientes.length === 0) {
+                        topClientesBody.innerHTML = '<tr><td colspan="5" class="py-3 px-3 text-center text-gray-500">Sin datos</td></tr>';
+                    } else {
+                        clientes.slice(0, 10).forEach(c => {
+                            const tr = document.createElement('tr');
+                            tr.innerHTML = `
+                                <td class="py-2 px-3 font-medium">${c.nombre || ''}</td>
+                                <td class="py-2 px-3 hidden sm:table-cell">${c.email || ''}</td>
+                                <td class="py-2 px-3">${c.telefono || ''}</td>
+                                <td class="py-2 px-3">${c.estado || ''}</td>
+                                <td class="py-2 px-3">${c.score != null ? c.score : '-'}</td>
+                            `;
+                            topClientesBody.appendChild(tr);
+                        });
+                    }
+                    topClientesContainer.classList.remove('hidden');
+                    btnTopClientes.textContent = 'Ocultar';
+                })
+                .catch(() => alert('Error al obtener clientes destacados'));
+        });
+    }
+
+    // Ranking proveedores
+    const btnTopProveedores = document.getElementById('btnTopProveedores');
+    const topProveedoresContainer = document.getElementById('topProveedoresContainer');
+    const topProveedoresBody = document.getElementById('topProveedoresBody');
+    if (btnTopProveedores && topProveedoresContainer && topProveedoresBody) {
+        btnTopProveedores.addEventListener('click', () => {
+            const showing = !topProveedoresContainer.classList.contains('hidden');
+            if (showing) { topProveedoresContainer.classList.add('hidden'); btnTopProveedores.textContent = 'Ver Top 10'; return; }
+            fetch('/api/score-proveedores/')
+                .then(r => r.json())
+                .then(data => {
+                    const scores = Array.isArray(data) ? data : (Array.isArray(data.results) ? data.results : []);
+                    topProveedoresBody.innerHTML = '';
+                    if (scores.length === 0) {
+                        topProveedoresBody.innerHTML = '<tr><td colspan="6" class="py-3 px-3 text-center text-gray-500">Sin datos</td></tr>';
+                    } else {
+                        scores.sort((a, b) => (b.score || 0) - (a.score || 0));
+                        scores.slice(0, 10).forEach(item => {
+                            const tr = document.createElement('tr');
+                            tr.innerHTML = `
+                                <td class="py-2 px-3 font-medium">${item.proveedor_nombre || ''}</td>
+                                <td class="py-2 px-3">${item.proveedor_cuit || '-'}</td>
+                                <td class="py-2 px-3">${item.proveedor_rubro || '-'}</td>
+                                <td class="py-2 px-3">${item.score != null ? item.score : '-'}</td>
+                                <td class="py-2 px-3">${item.cumplimiento != null ? item.cumplimiento : '-'}</td>
+                                <td class="py-2 px-3">${item.incidencias != null ? item.incidencias : '-'}</td>
+                            `;
+                            topProveedoresBody.appendChild(tr);
+                        });
+                    }
+                    topProveedoresContainer.classList.remove('hidden');
+                    btnTopProveedores.textContent = 'Ocultar';
+                })
+                .catch(() => alert('Error al obtener ranking de proveedores'));
+        });
+    }
+
+    // Órdenes sugeridas
+    const btnOrdenes = document.getElementById('btnOrdenes');
+    const ordenesLista = document.getElementById('ordenesLista');
+    if (btnOrdenes && ordenesLista) {
+        btnOrdenes.addEventListener('click', () => {
+            fetch('/api/ordenes-sugeridas/')
+                .then(r => r.json())
+                .then(data => {
+                    const items = Array.isArray(data) ? data : (Array.isArray(data.results) ? data.results : []);
+                    ordenesLista.innerHTML = '';
+                    if (items.length === 0) {
+                        ordenesLista.innerHTML = '<li class="text-gray-500">Sin órdenes sugeridas</li>';
+                    } else {
+                        items.slice(0, 6).forEach(o => {
+                            const li = document.createElement('li');
+                            li.textContent = `Pedido ${o.pedido} - Insumo ${o.insumo} - Cant. ${o.cantidad}`;
+                            ordenesLista.appendChild(li);
+                        });
+                    }
+                })
+                .catch(() => alert('Error al obtener órdenes sugeridas'));
+        });
+    }
+
+    // Ofertas automáticas
+    const btnOfertas = document.getElementById('btnOfertas');
+    const ofertasLista = document.getElementById('ofertasLista');
+    if (btnOfertas && ofertasLista) {
+        btnOfertas.addEventListener('click', () => {
+            fetch('/api/ofertas-automaticas/')
+                .then(r => r.json())
+                .then(data => {
+                    const items = Array.isArray(data) ? data : (Array.isArray(data.results) ? data.results : []);
+                    ofertasLista.innerHTML = '';
+                    if (items.length === 0) {
+                        ofertasLista.innerHTML = '<li class="text-gray-500">Sin ofertas activas</li>';
+                    } else {
+                        items.slice(0, 6).forEach(o => {
+                            const li = document.createElement('li');
+                            li.textContent = `${o.descripcion} (desde ${o.fecha_inicio?.split('T')[0]} hasta ${o.fecha_fin?.split('T')[0]})`;
+                            ofertasLista.appendChild(li);
+                        });
+                    }
+                })
+                .catch(() => alert('Error al obtener ofertas automáticas'));
+        });
+    }
+
+    // Logs de Automatización
+    const btnLogs = document.getElementById('btnLogs');
+    const logsBody = document.getElementById('logsBody');
+    const btnLogsDemo = document.getElementById('btnLogsDemo');
+    if (btnLogsDemo) {
+            // Utilidad CSRF
+            function getCookie(name) {
+                const value = `; ${document.cookie}`;
+                const parts = value.split(`; ${name}=`);
+                if (parts.length === 2) return parts.pop().split(';').shift();
+            }
+            const csrftoken = getCookie('csrftoken');
+        btnLogsDemo.addEventListener('click', () => {
+                fetch('/api/automation-logs/demo/', {
+                    method: 'POST',
+                    headers: { 'X-CSRFToken': csrftoken, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({})
+                })
+                .then(r => r.json())
+                .then(() => {
+                    // Después de crear demo, actualizar la tabla
+                    btnLogs.click();
+                })
+                .catch(() => alert('Error al generar logs de demo'));
+        });
+    }
+    if (btnLogs && logsBody) {
+        btnLogs.addEventListener('click', () => {
+            fetch('/api/automation-logs/')
+                .then(r => r.json())
+                .then(data => {
+                    const items = Array.isArray(data) ? data : (Array.isArray(data.results) ? data.results : []);
+                    logsBody.innerHTML = '';
+                    if (items.length === 0) {
+                        logsBody.innerHTML = '<tr><td colspan="4" class="py-3 px-3 text-center text-gray-500">Sin eventos recientes</td></tr>';
+                    } else {
+                        items.slice(0, 10).forEach(ev => {
+                            const tr = document.createElement('tr');
+                            const fecha = ev.fecha ? ev.fecha.split('T')[0] : '-';
+                            tr.innerHTML = `
+                                <td class="py-2 px-3">${fecha}</td>
+                                <td class="py-2 px-3">${ev.evento || '-'}</td>
+                                <td class="py-2 px-3">${ev.descripcion || '-'}</td>
+                                <td class="py-2 px-3 hidden md:table-cell">${ev.usuario || '-'}</td>
+                            `;
+                            logsBody.appendChild(tr);
+                        });
+                    }
+                })
+                .catch(() => alert('Error al obtener logs de automatización'));
+        });
+    }
+});
+</script>
 {% endblock %}

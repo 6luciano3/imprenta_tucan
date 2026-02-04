@@ -1,6 +1,10 @@
 from rest_framework import mixins
 from rest_framework import routers, serializers, viewsets
+from rest_framework.decorators import action
+from rest_framework.response import Response
 from automatizacion.models import RankingCliente, ScoreProveedor, OrdenSugerida, OfertaAutomatica, AprobacionAutomatica, AutomationLog
+from django.contrib.auth import get_user_model
+from utils.automationlog_utils import registrar_automation_log
 from automatizacion.api.services import ProveedorInteligenteService
 from clientes.models import Cliente
 from pedidos.models import Pedido, EstadoPedido
@@ -198,6 +202,35 @@ class AprobacionAutomaticaViewSet(viewsets.ModelViewSet):
 class AutomationLogViewSet(viewsets.ModelViewSet):
     queryset = AutomationLog.objects.all()
     serializer_class = AutomationLogSerializer
+
+    @action(detail=False, methods=['get', 'post'])
+    def demo(self, request):
+        """Genera 3 eventos de demo para validar el panel de logs."""
+        User = get_user_model()
+        usuario = User.objects.filter(is_superuser=True).first()
+
+        registrar_automation_log(
+            'DEMO_RANKING',
+            'Se ejecutó ranking de clientes (demo).',
+            usuario=usuario,
+            datos={'source': 'demo', 'modulo': 'ranking_clientes'}
+        )
+
+        registrar_automation_log(
+            'DEMO_OFERTAS',
+            'Se generaron ofertas automáticas (demo).',
+            usuario=usuario,
+            datos={'source': 'demo', 'modulo': 'ofertas_automaticas', 'count': 2}
+        )
+
+        registrar_automation_log(
+            'DEMO_APROBACION',
+            'Se aprobó automáticamente un pedido (demo).',
+            usuario=usuario,
+            datos={'source': 'demo', 'modulo': 'aprobaciones', 'pedido_id': 0, 'aprobado': True}
+        )
+
+        return Response({'created': 3})
 
 
 router = routers.DefaultRouter()
