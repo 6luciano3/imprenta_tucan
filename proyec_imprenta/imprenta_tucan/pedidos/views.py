@@ -112,6 +112,21 @@ def alta_pedido(request):
                 lineas.append((producto, cantidad, especificaciones))
 
             # Validación de insumos en conjunto (usa receta si existe)
+            # Primero advertir si algún producto no tiene receta definida
+            try:
+                from productos.models import ProductoInsumo
+                productos_sin_receta = [
+                    p.nombreProducto for (p, _c, _e) in lineas
+                    if not ProductoInsumo.objects.filter(producto=p).exists()
+                ]
+                if productos_sin_receta:
+                    messages.warning(
+                        request,
+                        f"Los siguientes productos no tienen receta definida y deberían configurarse: {', '.join(productos_sin_receta)}"
+                    )
+            except Exception:
+                pass
+
             ok, faltantes = verificar_insumos_para_lineas([(p, c) for (p, c, _e) in lineas])
             if not ok:
                 if faltantes:

@@ -45,7 +45,7 @@ def verificar_insumos_para_lineas(lineas: list[tuple]) -> tuple[bool, dict]:
     """
     try:
         from insumos.models import Insumo
-        from configuracion.models import RecetaProducto
+        from productos.models import ProductoInsumo
     except Exception:
         return False, {}
 
@@ -54,12 +54,12 @@ def verificar_insumos_para_lineas(lineas: list[tuple]) -> tuple[bool, dict]:
     for producto, cantidad in lineas:
         if not producto or not cantidad:
             continue
-        receta = RecetaProducto.objects.filter(producto=producto, activo=True).prefetch_related('insumos').first()
-        if receta:
+        # Usar receta detallada por producto-insumo con cantidad_por_unidad
+        receta_items = list(ProductoInsumo.objects.filter(producto=producto).only('insumo_id', 'cantidad_por_unidad'))
+        if receta_items:
             hay_receta = True
-            for insumo in receta.insumos.all():
-                # Por compatibilidad, asumimos 1 unidad por insumo (ajustar si hay campo cantidad)
-                requeridos[insumo.idInsumo] += float(cantidad)
+            for r in receta_items:
+                requeridos[r.insumo_id] += float(r.cantidad_por_unidad) * float(cantidad)
 
     if not hay_receta:
         # Si no hay recetas en ninguna línea, mantener la validación simple por cada línea
@@ -69,9 +69,9 @@ def verificar_insumos_para_lineas(lineas: list[tuple]) -> tuple[bool, dict]:
         return True, {}
 
     faltantes = {}
-    stocks = {i.idInsumo: i.stock for i in Insumo.objects.filter(idInsumo__in=requeridos.keys())}
+    stocks = {i.idInsumo: float(i.stock) for i in Insumo.objects.filter(idInsumo__in=requeridos.keys())}
     for insumo_id, req in requeridos.items():
-        disp = float(stocks.get(insumo_id, 0))
+        disp = float(stocks.get(insumo_id, 0.0))
         if disp < req:
             faltantes[insumo_id] = req - disp
     return (len(faltantes) == 0), faltantes

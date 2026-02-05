@@ -1,6 +1,7 @@
 {% extends 'usuarios/dashboard.html' %}
 {% block extra_panels %}
 <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
+    <!-- Auditoría -->
     <a href="{% url 'lista_auditoria' %}" class="group bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition">
         <div class="flex items-center gap-4">
             <div class="h-12 w-12 rounded-full bg-purple-50 text-purple-700 grid place-items-center">
@@ -12,6 +13,32 @@
             </div>
         </div>
     </a>
+    <!-- Automatización: Órdenes sugeridas y Ofertas -->
+    <a href="{% url 'automatizacion_panel' %}" class="group bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition block">
+        <div class="flex items-center gap-3 mb-3">
+            <div class="h-12 w-12 rounded-full bg-blue-50 text-blue-700 grid place-items-center">
+                <span class="material-symbols-outlined">auto_mode</span>
+            </div>
+            <div>
+                <p class="text-sm text-gray-500">Automatización</p>
+                <p class="text-lg font-bold">Órdenes sugeridas y Ofertas</p>
+                <p class="text-xs text-gray-400 group-hover:text-gray-600">Ir al panel de automatización</p>
+            </div>
+        </div>
+    </a>
+    <!-- Clientes -->
+    <a href="{% url 'lista_clientes' %}" class="group bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition">
+        <div class="flex items-center gap-4">
+            <div class="h-12 w-12 rounded-full bg-pink-50 text-pink-700 grid place-items-center">
+                <span class="material-symbols-outlined">group</span>
+            </div>
+            <div>
+                <p class="text-sm text-gray-500">Clientes</p>
+                <p class="text-lg font-bold group-hover:text-pink-700">Ver clientes</p>
+            </div>
+        </div>
+    </a>
+    <!-- Configuración -->
     <a href="/configuracion/" class="group bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition">
         <div class="flex items-center gap-4">
             <div class="h-12 w-12 rounded-full bg-cyan-50 text-cyan-700 grid place-items-center">
@@ -23,29 +50,31 @@
             </div>
         </div>
     </a>
-    <a href="{% url 'presupuestos:lista' %}" class="group bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition">
+    <!-- Estadísticas -->
+    <a href="{% url 'estadisticas:dashboard' %}" class="group bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition">
         <div class="flex items-center gap-4">
-            <div class="h-12 w-12 rounded-full bg-orange-50 text-orange-700 grid place-items-center">
-                <span class="material-symbols-outlined">request_quote</span>
+            <div class="h-12 w-12 rounded-full bg-sky-50 text-sky-700 grid place-items-center">
+                <span class="material-symbols-outlined">insights</span>
             </div>
             <div>
-                <p class="text-sm text-gray-500">Presupuestos</p>
-                <p class="text-lg font-bold group-hover:text-orange-700">Ver lista</p>
+                <p class="text-sm text-gray-500">Estadísticas</p>
+                <p class="text-lg font-bold group-hover:text-sky-700">Dashboard de métricas</p>
             </div>
         </div>
     </a>
-    <a href="{% url 'lista_proyecciones' %}" class="group bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition">
+    <!-- Insumos -->
+    <a href="{% url 'lista_insumos' %}" class="group bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition">
         <div class="flex items-center gap-4">
-            <div class="h-12 w-12 rounded-full bg-blue-50 text-blue-700 grid place-items-center">
-                <span class="material-symbols-outlined">trending_up</span>
+            <div class="h-12 w-12 rounded-full bg-teal-50 text-teal-700 grid place-items-center">
+                <span class="material-symbols-outlined">inventory_2</span>
             </div>
             <div>
-                <p class="text-sm text-gray-500">Proyecciones de Insumos</p>
-                <p class="text-lg font-bold group-hover:text-blue-700">Ver proyecciones</p>
+                <p class="text-sm text-gray-500">Insumos</p>
+                <p class="text-lg font-bold group-hover:text-teal-700">Ver insumos</p>
             </div>
         </div>
     </a>
-    <!-- Panel Inteligencia: Clientes destacados (comportamiento consistente: navegar a Clientes) -->
+    <!-- Inteligencia: Clientes destacados -->
     <a href="{% url 'lista_clientes' %}" class="group bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition block">
         <div class="flex items-center justify-between mb-3">
             <div class="flex items-center gap-3">
@@ -60,8 +89,7 @@
             <span class="text-xs text-gray-400 group-hover:text-gray-600">Ir a Clientes</span>
         </div>
     </a>
-
-    <!-- Panel Inteligencia: Ranking de Proveedores (comportamiento consistente: navegar a Proveedores) -->
+    <!-- Inteligencia: Ranking de Proveedores -->
     <a href="{% url 'lista_proveedores' %}" class="group bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition block">
         <div class="flex items-center justify-between mb-3">
             <div class="flex items-center gap-3">
@@ -76,17 +104,87 @@
             <span class="text-xs text-gray-400 group-hover:text-gray-600">Ir a Proveedores</span>
         </div>
     </a>
-
-    <!-- Panel Automatización: Órdenes y Ofertas (comportamiento consistente: navegar al panel) -->
-    <a href="{% url 'automatizacion_panel' %}" class="group bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition block">
-        <div class="flex items-center gap-3 mb-3">
-            <div class="h-12 w-12 rounded-full bg-blue-50 text-blue-700 grid place-items-center">
-                <span class="material-symbols-outlined">auto_mode</span>
+    <!-- Pedidos -->
+    <a href="{% url 'lista_pedidos' %}" class="group bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition">
+        <div class="flex items-center gap-4">
+            <div class="h-12 w-12 rounded-full bg-indigo-50 text-indigo-700 grid place-items-center">
+                <span class="material-symbols-outlined">shopping_cart</span>
             </div>
             <div>
-                <p class="text-sm text-gray-500">Automatización</p>
-                <p class="text-lg font-bold">Órdenes sugeridas y Ofertas</p>
-                <p class="text-xs text-gray-400 group-hover:text-gray-600">Ir al panel de automatización</p>
+                <p class="text-sm text-gray-500">Pedidos</p>
+                <p class="text-lg font-bold group-hover:text-indigo-700">Ver pedidos</p>
+            </div>
+        </div>
+    </a>
+    <!-- Permisos -->
+    <a href="{% url 'lista_permisos' %}" class="group bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition">
+        <div class="flex items-center gap-4">
+            <div class="h-12 w-12 rounded-full bg-red-50 text-red-700 grid place-items-center">
+                <span class="material-symbols-outlined">lock</span>
+            </div>
+            <div>
+                <p class="text-sm text-gray-500">Permisos</p>
+                <p class="text-lg font-bold group-hover:text-red-700">Ver permisos</p>
+            </div>
+        </div>
+    </a>
+    <!-- Presupuestos -->
+    <a href="{% url 'presupuestos:lista' %}" class="group bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition">
+        <div class="flex items-center gap-4">
+            <div class="h-12 w-12 rounded-full bg-orange-50 text-orange-700 grid place-items-center">
+                <span class="material-symbols-outlined">request_quote</span>
+            </div>
+            <div>
+                <p class="text-sm text-gray-500">Presupuestos</p>
+                <p class="text-lg font-bold group-hover:text-orange-700">Ver lista</p>
+            </div>
+        </div>
+    </a>
+    <!-- Proveedores -->
+    <a href="{% url 'lista_proveedores' %}" class="group bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition">
+        <div class="flex items-center gap-4">
+            <div class="h-12 w-12 rounded-full bg-lime-50 text-lime-700 grid place-items-center">
+                <span class="material-symbols-outlined">store</span>
+            </div>
+            <div>
+                <p class="text-sm text-gray-500">Proveedores</p>
+                <p class="text-lg font-bold group-hover:text-lime-700">Ver proveedores</p>
+            </div>
+        </div>
+    </a>
+    <!-- Proyecciones de Insumos -->
+    <a href="{% url 'lista_proyecciones' %}" class="group bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition">
+        <div class="flex items-center gap-4">
+            <div class="h-12 w-12 rounded-full bg-blue-50 text-blue-700 grid place-items-center">
+                <span class="material-symbols-outlined">trending_up</span>
+            </div>
+            <div>
+                <p class="text-sm text-gray-500">Proyecciones de Insumos</p>
+                <p class="text-lg font-bold group-hover:text-blue-700">Ver proyecciones</p>
+            </div>
+        </div>
+    </a>
+    <!-- Receta de Productos -->
+    <a href="{% url 'lista_recetas_productos' %}" class="group bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition">
+        <div class="flex items-center gap-4">
+            <div class="h-12 w-12 rounded-full bg-amber-50 text-amber-700 grid place-items-center">
+                <span class="material-symbols-outlined">receipt_long</span>
+            </div>
+            <div>
+                <p class="text-sm text-gray-500">Receta de Productos</p>
+                <p class="text-lg font-bold group-hover:text-amber-700">Ver recetas</p>
+            </div>
+        </div>
+    </a>
+    <!-- Usuarios -->
+    <a href="{% url 'lista_usuarios' %}" class="group bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition">
+        <div class="flex items-center gap-4">
+            <div class="h-12 w-12 rounded-full bg-purple-50 text-purple-700 grid place-items-center">
+                <span class="material-symbols-outlined">person</span>
+            </div>
+            <div>
+                <p class="text-sm text-gray-500">Usuarios</p>
+                <p class="text-lg font-bold group-hover:text-purple-700">Ver usuarios</p>
             </div>
         </div>
     </a>
