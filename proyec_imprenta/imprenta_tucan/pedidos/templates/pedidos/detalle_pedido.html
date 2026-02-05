@@ -89,7 +89,7 @@
                       </select>
                     </label>
                     <label>Proveedor recomendado:
-                      <input type="number" name="proveedor_recomendado_id" class="border rounded px-2 py-1" placeholder="ID proveedor recomendado" required>
+                      <input type="number" name="proveedor_recomendado_id" class="border rounded px-2 py-1" placeholder="ID proveedor recomendado" required readonly>
                     </label>
                     <label>Proveedor elegido:
                       <input type="number" name="proveedor_final_id" class="border rounded px-2 py-1" placeholder="ID proveedor elegido" required>
@@ -106,7 +106,7 @@
                   </div>
                   <input type="hidden" name="pedido_id" value="{{ pedido.id }}">
                   <input type="hidden" name="insumo_id" value="{{ it.id }}">
-                  <button type="submit" class="bg-yellow-400 hover:bg-yellow-500 text-gray-900 font-semibold px-4 py-2 rounded shadow">Enviar feedback</button>
+                  <button type="submit" class="bg-yellow-400 hover:bg-yellow-500 text-gray-900 font-semibold px-4 py-2 rounded shadow opacity-50 cursor-not-allowed" disabled>Enviar feedback</button>
                   <span class="feedback-msg ml-4 text-green-700 font-semibold"></span>
                 </form>
               </td>
@@ -133,6 +133,16 @@ document.addEventListener('DOMContentLoaded', function() {
     const recomendadoLabel = document.createElement('span');
     recomendadoLabel.className = 'ml-2 text-sm text-gray-600 proveedor-recomendado-label';
     recomendadoInput.parentNode.appendChild(recomendadoLabel);
+    // Preparar elementos para autocompletar proveedor final y decisión
+    const finalInput = form.querySelector('input[name="proveedor_final_id"]');
+    const finalLabel = document.createElement('span');
+    finalLabel.className = 'ml-2 text-sm text-gray-600 proveedor-final-label';
+    finalInput.parentNode.appendChild(finalLabel);
+    const decisionSelect = form.querySelector('select[name="decision"]');
+    const comentarioInput = form.querySelector('input[name="comentario"]');
+
+    // Mostrar estado de carga mientras se consulta la recomendación
+    recomendadoLabel.textContent = 'Buscando recomendación...';
     fetch('/api/recomendar-proveedor/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -143,12 +153,92 @@ document.addEventListener('DOMContentLoaded', function() {
       if (data.proveedor_id) {
         recomendadoInput.value = data.proveedor_id;
         recomendadoLabel.textContent = `(${data.proveedor_nombre})`;
+        // Autocompletar proveedor elegido con el recomendado
+        finalInput.value = data.proveedor_id;
+        finalLabel.textContent = `(${data.proveedor_nombre})`;
+        // Seleccionar decisión por defecto
+        if (decisionSelect) {
+          decisionSelect.value = 'aceptar';
+        }
+        // Prefijar comentario informativo si está vacío
+        if (comentarioInput && !comentarioInput.value) {
+          comentarioInput.value = `Autocompletado: proveedor recomendado ${data.proveedor_nombre}`;
+        }
+        // Autocompletar pesos de criterios desde API
+        fetch('/api/criterios-pesos/', { method: 'GET' })
+          .then(r => r.json())
+          .then(weights => {
+            const precio = form.querySelector('input[name="feedback_precio"]');
+            const cumplimiento = form.querySelector('input[name="feedback_cumplimiento"]');
+            const incidencias = form.querySelector('input[name="feedback_incidencias"]');
+            const disponibilidad = form.querySelector('input[name="feedback_disponibilidad"]');
+            if (precio) precio.value = weights.precio ?? 0;
+            if (cumplimiento) cumplimiento.value = weights.cumplimiento ?? 0;
+            if (incidencias) incidencias.value = weights.incidencias ?? 0;
+            if (disponibilidad) disponibilidad.value = weights.disponibilidad ?? 0;
+            // Habilitar botón de envío cuando todos los campos fueron completados
+            const submitBtn = form.querySelector('button[type="submit"]');
+            if (submitBtn) {
+              submitBtn.disabled = false;
+              submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            }
+          })
+          .catch(() => { /* dejar valores por defecto */ });
       } else {
-        recomendadoLabel.textContent = 'No hay recomendación disponible';
+        // Fallback: tomar el primer proveedor con score disponible
+        fetch('/api/score-proveedores/', { method: 'GET' })
+          .then(r => r.json())
+          .then(list => {
+            if (Array.isArray(list) && list.length > 0) {
+              const p = list[0];
+              if (p && p.proveedor) {
+                recomendadoInput.value = p.proveedor;
+                recomendadoLabel.textContent = `(${p.proveedor_nombre || 'Proveedor'})`;
+                finalInput.value = p.proveedor;
+                finalLabel.textContent = `(${p.proveedor_nombre || 'Proveedor'})`;
+                if (decisionSelect) {
+                  decisionSelect.value = 'aceptar';
+                }
+                if (comentarioInput && !comentarioInput.value) {
+                  comentarioInput.value = `Autocompletado (fallback): ${p.proveedor_nombre || 'Proveedor'}`;
+                }
+                // Cargar pesos y habilitar botón
+                fetch('/api/criterios-pesos/', { method: 'GET' })
+                  .then(r2 => r2.json())
+                  .then(weights => {
+                    const precio = form.querySelector('input[name="feedback_precio"]');
+                    const cumplimiento = form.querySelector('input[name="feedback_cumplimiento"]');
+                    const incidencias = form.querySelector('input[name="feedback_incidencias"]');
+                    const disponibilidad = form.querySelector('input[name="feedback_disponibilidad"]');
+                    if (precio) precio.value = weights.precio ?? 0;
+                    if (cumplimiento) cumplimiento.value = weights.cumplimiento ?? 0;
+                    if (incidencias) incidencias.value = weights.incidencias ?? 0;
+                    if (disponibilidad) disponibilidad.value = weights.disponibilidad ?? 0;
+                    const submitBtn = form.querySelector('button[type="submit"]');
+                    if (submitBtn) {
+                      submitBtn.disabled = false;
+                      submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                    }
+                  })
+                  .catch(() => { /* ignore */ });
+              } else {
+                recomendadoLabel.textContent = 'No hay proveedores disponibles';
+                finalLabel.textContent = '';
+              }
+            } else {
+              recomendadoLabel.textContent = 'No hay proveedores disponibles';
+              finalLabel.textContent = '';
+            }
+          })
+          .catch(() => {
+            recomendadoLabel.textContent = 'Error al obtener recomendación';
+            finalLabel.textContent = '';
+          });
       }
     })
     .catch(() => {
       recomendadoLabel.textContent = 'Error al obtener recomendación';
+      finalLabel.textContent = '';
     });
 
     // Enviar feedback

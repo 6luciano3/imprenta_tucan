@@ -14,6 +14,7 @@ class Command(BaseCommand):
         from clientes.models import Cliente
         from productos.models import Producto
         from configuracion.models import Formula
+        from proveedores.models import Proveedor, Rubro
 
         created = {"insumo": False, "cliente": False, "estado": False, "formula": False, "producto": False, "pedidos": 0, "ordenes": 0}
 
@@ -29,6 +30,25 @@ class Command(BaseCommand):
                 activo=True,
             )
             created["insumo"] = True
+
+        # Asegurar rubro y proveedor demo, y vincular al insumo si falta proveedor
+        rubro, _ = Rubro.objects.get_or_create(nombre="Papelería", defaults={"descripcion": "Rubro demo"})
+        proveedor_demo, _ = Proveedor.objects.get_or_create(
+            cuit="20-00000000-0",
+            defaults={
+                "nombre": "Proveedor Demo",
+                "apellido": "",
+                "email": "proveedor.demo@tucan.local",
+                "telefono": "0000000",
+                "direccion": "Av. Proveedor 123",
+                "rubro_fk": rubro,
+                "rubro": rubro.nombre,
+                "activo": True,
+            },
+        )
+        if getattr(insumo, "proveedor", None) is None:
+            insumo.proveedor = proveedor_demo
+            insumo.save()
 
         cliente, ccreated = Cliente.objects.get_or_create(
             email="demo@tucan.local",
