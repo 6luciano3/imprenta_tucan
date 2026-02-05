@@ -1,0 +1,61 @@
+{% extends 'usuarios/dashboard.html' %}
+{% block extra_panels %}
+<section class="mt-8 bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+  <div class="flex items-center gap-3 mb-3">
+    <div class="h-12 w-12 rounded-full bg-pink-50 text-pink-700 grid place-items-center">
+      <span class="material-symbols-outlined">local_offer</span>
+    </div>
+    <div>
+      <p class="text-sm text-gray-500">Automatización</p>
+      <p class="text-lg font-bold">Ofertas automáticas</p>
+    </div>
+  </div>
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead class="bg-pink-100">
+        <tr>
+          <th class="py-2 px-3">Cliente</th>
+          <th class="py-2 px-3">Descripción</th>
+          <th class="py-2 px-3">Inicio</th>
+          <th class="py-2 px-3">Fin</th>
+          <th class="py-2 px-3">Activa</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for of in ofertas %}
+          <tr>
+            <td class="py-2 px-3">{{ of.cliente_id|default:'Todos' }}</td>
+            <td class="py-2 px-3">{{ of.descripcion }}</td>
+            <td class="py-2 px-3">{{ of.fecha_inicio|date:'Y-m-d H:i' }}</td>
+            <td class="py-2 px-3">{{ of.fecha_fin|date:'Y-m-d H:i' }}</td>
+            <td class="py-2 px-3">{% if of.activa %}Sí{% else %}No{% endif %}</td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="5" class="py-3 px-3 text-center text-gray-500">Sin ofertas activas</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+<div class="px-5 py-4">
+  <div class="flex justify-end items-center gap-2">
+    {% if ofertas.has_previous %}
+      <a href="?page=1" class="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm">
+        <span class="material-symbols-outlined text-sm">first_page</span>
+      </a>
+      <a href="?page={{ ofertas.previous_page_number }}" class="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm">
+        <span class="material-symbols-outlined text-sm">chevron_left</span>
+      </a>
+    {% endif %}
+    <span class="text-sm text-gray-700">Página {{ ofertas.number }} de {{ ofertas.paginator.num_pages }}</span>
+    {% if ofertas.has_next %}
+      <a href="?page={{ ofertas.next_page_number }}" class="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm">
+        <span class="material-symbols-outlined text-sm">chevron_right</span>
+      </a>
+      <a href="?page={{ ofertas.paginator.num_pages }}" class="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm">
+        <span class="material-symbols-outlined text-sm">last_page</span>
+      </a>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

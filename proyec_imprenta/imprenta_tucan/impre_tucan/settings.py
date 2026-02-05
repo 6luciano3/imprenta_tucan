@@ -144,13 +144,13 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'automatizacion.tasks.tarea_anticipacion_compras',
         'schedule': 2 * 60 * 60,
     },
-    'ranking-clientes-diario': {
+    'ranking-clientes-cada-hora': {
         'task': 'automatizacion.tasks.tarea_ranking_clientes',
-        'schedule': 24 * 60 * 60,
+        'schedule': 60 * 60,
     },
-    'scores-proveedores-diario': {
+    'scores-proveedores-cada-6-horas': {
         'task': 'automatizacion.tasks.tarea_recalcular_scores_proveedores',
-        'schedule': 24 * 60 * 60,
+        'schedule': 6 * 60 * 60,
     },
     'generar-ofertas-diario': {
         'task': 'automatizacion.tasks.tarea_generar_ofertas',

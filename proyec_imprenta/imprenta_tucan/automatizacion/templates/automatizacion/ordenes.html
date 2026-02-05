@@ -1,0 +1,78 @@
+{% extends 'usuarios/dashboard.html' %}
+{% block extra_panels %}
+<section class="mt-8 bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+  <div class="flex items-center gap-3 mb-3">
+    <div class="h-12 w-12 rounded-full bg-blue-50 text-blue-700 grid place-items-center">
+      <span class="material-symbols-outlined">auto_mode</span>
+    </div>
+    <div>
+      <p class="text-sm text-gray-500">Automatización</p>
+      <p class="text-lg font-bold">Órdenes sugeridas</p>
+    </div>
+  </div>
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead class="bg-blue-100">
+        <tr>
+          <th class="py-2 px-3">Pedido</th>
+          <th class="py-2 px-3">Insumo</th>
+          <th class="py-2 px-3">Cantidad</th>
+          <th class="py-2 px-3">Generada</th>
+          <th class="py-2 px-3">Confirmada</th>
+          <th class="py-2 px-3">Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for o in ordenes %}
+          <tr>
+            <td class="py-2 px-3">
+              <span class="text-gray-800">
+                Pedido {{ o.pedido_id }} — {{ o.pedido.cliente.nombre }} {{ o.pedido.cliente.apellido }}
+              </span>
+              <div class="text-xs text-gray-500">
+                Producto: {{ o.pedido.producto.nombreProducto }} | Cant.: {{ o.pedido.cantidad }} | Estado: {{ o.pedido.estado.nombre }}
+              </div>
+            </td>
+            <td class="py-2 px-3">
+              {{ o.insumo.codigo }} — {{ o.insumo.nombre }}
+            </td>
+            <td class="py-2 px-3">{{ o.cantidad }}</td>
+            <td class="py-2 px-3">{{ o.generada|date:'Y-m-d H:i' }}</td>
+            <td class="py-2 px-3">{% if o.confirmada %}Sí{% else %}No{% endif %}</td>
+            <td class="py-2 px-3">
+              <a href="{% url 'detalle_pedido' o.pedido_id %}"
+                 class="inline-flex items-center gap-1 px-3 py-1 text-sm rounded-md bg-blue-600 text-white hover:bg-blue-700">
+                <span class="material-symbols-outlined text-sm">visibility</span>
+                Ver detalle
+              </a>
+            </td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="5" class="py-3 px-3 text-center text-gray-500">Sin órdenes sugeridas</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+<div class="px-5 py-4">
+  <div class="flex justify-end items-center gap-2">
+    {% if ordenes.has_previous %}
+      <a href="?page=1" class="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm">
+        <span class="material-symbols-outlined text-sm">first_page</span>
+      </a>
+      <a href="?page={{ ordenes.previous_page_number }}" class="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm">
+        <span class="material-symbols-outlined text-sm">chevron_left</span>
+      </a>
+    {% endif %}
+    <span class="text-sm text-gray-700">Página {{ ordenes.number }} de {{ ordenes.paginator.num_pages }}</span>
+    {% if ordenes.has_next %}
+      <a href="?page={{ ordenes.next_page_number }}" class="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm">
+        <span class="material-symbols-outlined text-sm">chevron_right</span>
+      </a>
+      <a href="?page={{ ordenes.paginator.num_pages }}" class="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm">
+        <span class="material-symbols-outlined text-sm">last_page</span>
+      </a>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

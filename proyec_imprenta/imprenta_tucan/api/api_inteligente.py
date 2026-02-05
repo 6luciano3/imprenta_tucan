@@ -135,33 +135,61 @@ class RankingClienteViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     queryset = RankingCliente.objects.all()  # Necesario para DRF router
 
     def get_queryset(self):
-        # Top 10 clientes con score > 50
-        destacados = list(RankingCliente.objects.select_related('cliente').filter(score__gt=50).order_by('-score')[:10])
+        # Intentar obtener top 10 clientes con score calculado
+        destacados = list(
+            RankingCliente.objects.select_related('cliente')
+            .order_by('-score')[:10]
+        )
         if destacados:
             return destacados
-        # Si no hay destacados, buscar los 10 primeros clientes con pedidos pendientes
-        # Consideramos 'Pendiente' como estado de pedido pendiente
-        estado_pendiente = EstadoPedido.objects.filter(nombre__iexact='pendiente').first()
-        if estado_pendiente:
-            clientes_pendientes_ids = Pedido.objects.filter(
-                estado=estado_pendiente).values_list('cliente_id', flat=True).distinct()[:10]
-        else:
-            # Si no existe el estado 'Pendiente', tomar los 10 primeros clientes con cualquier pedido
-            clientes_pendientes_ids = Pedido.objects.values_list('cliente_id', flat=True).distinct()[:10]
-        clientes = Cliente.objects.filter(id__in=clientes_pendientes_ids)
-        # Creamos objetos simulados de RankingCliente para compatibilidad con el serializer
 
-        class FakeRanking:
-            def __init__(self, cliente):
-                self.cliente = cliente
-                self.score = None
-                self.actualizado = None
-            # Para compatibilidad con el serializer
+        # Si la tabla está vacía, calcular y persistir ranking basado en actividad de pedidos últimos 90 días
+        from django.utils import timezone
+        from datetime import timedelta
+        from django.db.models import Sum, Count
 
-            @property
-            def estado(self):
-                return getattr(self.cliente, 'estado', None)
-        return [FakeRanking(c) for c in clientes]
+        try:
+            desde = timezone.now().date() - timedelta(days=90)
+            agregados = (
+                Pedido.objects.filter(fecha_pedido__gte=desde)
+                .values('cliente_id')
+                .annotate(total=Sum('monto_total'), cantidad=Count('id'))
+            )
+
+            if agregados:
+                max_total = max(a['total'] or 0 for a in agregados) or 1
+                max_cant = max(a['cantidad'] or 0 for a in agregados) or 1
+
+                for a in agregados:
+                    total_norm = (a['total'] or 0) / max_total
+                    cant_norm = (a['cantidad'] or 0) / max_cant
+                    score = round(0.7 * total_norm + 0.3 * cant_norm, 4) * 100
+                    RankingCliente.objects.update_or_create(
+                        cliente_id=a['cliente_id'],
+                        defaults={'score': score}
+                    )
+
+                return list(
+                    RankingCliente.objects.select_related('cliente')
+                    .order_by('-score')[:10]
+                )
+
+        except Exception:
+            # Si falla el cálculo, continuar con un fallback mínimo
+            pass
+
+        # Fallback: crear entradas con score 0 para clientes con pedidos recientes
+        clientes_ids = (
+            Pedido.objects.order_by('-fecha_pedido')
+            .values_list('cliente_id', flat=True)
+            .distinct()[:10]
+        )
+        for cid in clientes_ids:
+            RankingCliente.objects.update_or_create(
+                cliente_id=cid,
+                defaults={'score': 0}
+            )
+        return RankingCliente.objects.filter(cliente_id__in=clientes_ids).select_related('cliente').order_by('-score')
 
 
 class ScoreProveedorViewSet(viewsets.ModelViewSet):

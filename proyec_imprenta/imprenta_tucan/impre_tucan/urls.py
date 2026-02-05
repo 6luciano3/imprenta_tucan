@@ -28,6 +28,7 @@ urlpatterns = [
     path('estadisticas/', include('estadisticas.urls')),
     path('geo/', include('geo.urls')),
     path('auditoria/', include('auditoria.urls')),
+    path('automatizacion/', include('automatizacion.urls')),
     path('configuracion/', include('configuracion.urls')),
 
     # Página principal
