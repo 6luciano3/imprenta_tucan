@@ -14,6 +14,7 @@ def lista_presupuestos(request):
     query = request.GET.get('q', '') or request.GET.get('criterio', '')
     order_by = request.GET.get('order_by', 'fecha')
     direction = request.GET.get('direction', 'desc')
+    fecha = request.GET.get('fecha')
 
     valid_order_fields = ['id', 'numero', 'cliente__apellido', 'cliente__nombre', 'fecha', 'validez', 'total', 'estado']
     if order_by not in valid_order_fields:
@@ -29,6 +30,10 @@ def lista_presupuestos(request):
             Q(estado__icontains=query)
         )
 
+    # Filtro por fecha exacta (día específico)
+    if fecha:
+        qs = qs.filter(fecha=fecha)
+
     order_field = f'-{order_by}' if direction == 'desc' else order_by
     qs = qs.order_by(order_field)
 
@@ -42,6 +47,7 @@ def lista_presupuestos(request):
         'query': query,
         'order_by': order_by,
         'direction': direction,
+        'fecha': fecha,
     })
 
 

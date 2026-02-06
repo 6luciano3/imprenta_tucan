@@ -80,6 +80,159 @@
     .list-controls--compact .list-controls__row > form:first-of-type,
     .list-controls--compact .list-controls__row > form:last-of-type { grid-template-columns: 1fr; }
   }
+
+  /* Rediseño moderno del campo de Búsqueda */
+  .list-controls--compact .search-modern input[type="text"] {
+    font-size: 1rem !important;
+    line-height: 1.5 !important;
+    height: auto !important;
+    min-height: 2.5rem !important;
+    padding: 0.75rem 2.5rem 0.75rem 2.25rem !important;
+    border-radius: 9999px !important; /* pill */
+    border: 1px solid #e5e7eb !important; /* gray-200 */
+    background-color: rgba(255,255,255,0.9) !important;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.04) !important;
+  }
+  .list-controls--compact .search-modern input[type="text"]::placeholder {
+    color: #9ca3af !important; /* gray-400 */
+    opacity: 1;
+  }
+  .list-controls--compact .search-modern input[type="text"]:focus {
+    outline: none !important;
+    border-color: #3b82f6 !important; /* blue-500 */
+    box-shadow: 0 0 0 3px rgba(59,130,246,0.2) !important; /* focus ring */
+    background-color: #fff !important;
+  }
+  .list-controls--compact .search-modern .material-symbols-outlined.search-icon {
+    font-size: 1.25rem !important;
+    color: #9ca3af !important;
+  }
+  .list-controls--compact .search-modern .search-clear {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    border-radius: 9999px;
+    background-color: #f3f4f6; /* gray-100 */
+  }
+  .list-controls--compact .search-modern .search-clear:hover {
+    background-color: #e5e7eb; /* gray-200 */
+  }
+
+  /* Rediseño moderno de Acciones (Buscar/Ordenar) */
+  .list-controls--compact .actions-modern .btn {
+    font-size: 0.95rem !important;
+    line-height: 1.5 !important;
+    min-height: 2.75rem !important;
+    padding: 0.625rem 1rem !important;
+    border-radius: 9999px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 0.5rem !important;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important;
+    transition: background-color 150ms ease, box-shadow 150ms ease !important;
+  }
+  .list-controls--compact .actions-modern .btn .material-symbols-outlined { font-size: 1.2rem !important; }
+  .list-controls--compact .actions-modern .btn-search {
+    background-color: #2563eb !important; /* blue-600 */
+    color: #fff !important;
+  }
+  .list-controls--compact .actions-modern .btn-search:hover {
+    background-color: #1d4ed8 !important; /* blue-700 */
+    box-shadow: 0 2px 6px rgba(29,78,216,0.25) !important;
+  }
+  .list-controls--compact .actions-modern .btn-order {
+    background-color: #4f46e5 !important; /* indigo-600 */
+    color: #fff !important;
+  }
+  .list-controls--compact .actions-modern .btn-order:hover {
+    background-color: #4338ca !important; /* indigo-700 */
+    box-shadow: 0 2px 6px rgba(67,56,202,0.25) !important;
+  }
+
+  /* Rediseño moderno del campo de Fecha */
+  .list-controls--compact .date-modern input[type="date"] {
+    font-size: 0.95rem !important;
+    line-height: 1.5 !important;
+    height: auto !important;
+    min-height: 2.5rem !important;
+    padding: 0.5rem 0.75rem !important;
+    border-radius: 0.75rem !important;
+    border: 1px solid #e5e7eb !important;
+    background-color: rgba(255,255,255,0.9) !important;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.04) !important;
+  }
+  .list-controls--compact .date-modern input[type="date"]:focus {
+    outline: none !important;
+    border-color: #3b82f6 !important;
+    box-shadow: 0 0 0 3px rgba(59,130,246,0.2) !important;
+    background-color: #fff !important;
+  }
+
+  /* Rediseño moderno del campo Ordenar por */
+  .list-controls--compact .order-modern .order-select {
+    font-size: 0.95rem !important;
+    line-height: 1.5 !important;
+    min-height: 2.5rem !important;
+    padding: 0.625rem 2.25rem 0.625rem 2.25rem !important;
+    border-radius: 9999px !important; /* pill */
+    border: 1px solid #e5e7eb !important;
+    background-color: rgba(255,255,255,0.9) !important;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.04) !important;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    background-image: url("data:image/svg+xml;utf8,\
+      <svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23666'>\
+        <path d='M7 10l5 5 5-5z'/>\
+      </svg>");
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+    background-size: 1rem auto;
+  }
+  .list-controls--compact .order-modern .order-select:focus {
+    outline: none !important;
+    border-color: #6366f1 !important; /* indigo-500 */
+    box-shadow: 0 0 0 3px rgba(99,102,241,0.2) !important;
+    background-color: #fff !important;
+  }
+  .list-controls--compact .order-modern .order-icon {
+    font-size: 1.1rem !important;
+    color: #9ca3af !important; /* gray-400 */
+  }
+
+  /* Rediseño moderno del campo Dirección */
+  .list-controls--compact .direction-modern .direction-select {
+    font-size: 0.95rem !important;
+    line-height: 1.5 !important;
+    min-height: 2.5rem !important;
+    padding: 0.625rem 2.25rem 0.625rem 2.25rem !important;
+    border-radius: 9999px !important;
+    border: 1px solid #e5e7eb !important;
+    background-color: rgba(255,255,255,0.9) !important;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.04) !important;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    background-image: url("data:image/svg+xml;utf8,\
+      <svg xmlns='http://www.w3.org/200/svg' viewBox='0 0 24 24' fill='%23666'>\
+        <path d='M7 10l5 5 5-5z'/>\
+      </svg>");
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+    background-size: 1rem auto;
+  }
+  .list-controls--compact .direction-modern .direction-select:focus {
+    outline: none !important;
+    border-color: #10b981 !important; /* emerald-500 */
+    box-shadow: 0 0 0 3px rgba(16,185,129,0.2) !important;
+    background-color: #fff !important;
+  }
+  .list-controls--compact .direction-modern .direction-icon {
+    font-size: 1.1rem !important;
+    color: #9ca3af !important;
+  }
 </style>
 {% endblock %}
 
@@ -107,37 +260,52 @@
 
   <div class="bg-white p-4 rounded-xl shadow mb-6 list-controls list-controls--compact">
     <form method="GET" class="flex flex-wrap md:flex-nowrap gap-2 items-center w-full">
-      <div class="flex-1 min-w-48 field-search">
+      <div class="flex-1 min-w-48 field-search search-modern">
         <label for="list-search-input" class="sr-only">Buscar</label>
         <div class="relative">
-          <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">search</span>
+          <span class="material-symbols-outlined search-icon absolute left-3 top-1/2 -translate-y-1/2">search</span>
           <input id="list-search-input" type="text" name="q" value="{{ query }}"
                  placeholder="{% block search_placeholder %}Buscar...{% endblock %}"
-                 class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" />
+                 aria-label="Buscar en la lista"
+                 class="w-full pl-10 pr-10 py-3 rounded-full border border-gray-300 bg-white/90 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 placeholder-gray-400 shadow-sm" />
+          {% if query %}
+            <a href="{{ request.path }}?order_by={{ order_by }}&direction={{ direction }}"
+               class="search-clear absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+               aria-label="Limpiar búsqueda">
+              <span class="material-symbols-outlined">close</span>
+            </a>
+          {% endif %}
         </div>
       </div>
-      <div class="min-w-40 field-order-by">
+      {% block extra_filters %}{% endblock %}
+      <div class="min-w-40 field-order-by order-modern">
         <label for="order-by-select" class="sr-only">Ordenar por</label>
-        <select id="order-by-select" name="order_by" class="w-full px-4 py-2 border border-gray-300 rounded-lg" aria-label="Ordenar por">
-          {% block order_fields_options %}{% endblock %}
-        </select>
+        <div class="relative">
+          <span class="material-symbols-outlined order-icon absolute left-3 top-1/2 -translate-y-1/2">sort</span>
+          <select id="order-by-select" name="order_by" class="order-select w-full pl-10 pr-8" aria-label="Ordenar por">
+            {% block order_fields_options %}{% endblock %}
+          </select>
+        </div>
       </div>
-      <div class="min-w-32 field-direction">
+      <div class="min-w-32 field-direction direction-modern">
         <label for="direction-select" class="sr-only">Dirección</label>
-        <select id="direction-select" name="direction" class="w-full px-4 py-2 border border-gray-300 rounded-lg" aria-label="Dirección">
-          <option value="asc" {% if direction == 'asc' %}selected{% endif %}>A-Z</option>
-          <option value="desc" {% if direction == 'desc' %}selected{% endif %}>Z-A</option>
-        </select>
+        <div class="relative">
+          <span class="material-symbols-outlined direction-icon absolute left-3 top-1/2 -translate-y-1/2">swap_vert</span>
+          <select id="direction-select" name="direction" class="direction-select w-full pl-10 pr-8" aria-label="Dirección">
+            <option value="asc" {% if direction == 'asc' %}selected{% endif %}>A-Z</option>
+            <option value="desc" {% if direction == 'desc' %}selected{% endif %}>Z-A</option>
+          </select>
+        </div>
       </div>
       <div class="flex gap-2">
-        <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2">
-          <span class="material-symbols-outlined">search</span>
-          Buscar
-        </button>
-        <button type="submit" name="ordenar" value="1" class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 flex items-center gap-2">
-          <span class="material-symbols-outlined">sort</span>
-          Ordenar
-        </button>
+          <button type="submit" class="btn btn-search">
+            <span class="material-symbols-outlined">search</span>
+            Buscar
+          </button>
+          <button type="submit" name="ordenar" value="1" class="btn btn-order">
+            <span class="material-symbols-outlined">sort</span>
+            Ordenar
+          </button>
         {% if query %}
           <a href="{% block clear_url %}#{% endblock %}" class="bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 flex items-center gap-2">
             <span class="material-symbols-outlined">close</span>

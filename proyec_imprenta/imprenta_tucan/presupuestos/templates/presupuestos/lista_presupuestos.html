@@ -56,3 +56,12 @@
   </table>
 </div>
 {% endblock %}
+
+{% block extra_filters %}
+  <div class="flex items-center gap-2 date-modern">
+    <div>
+      <label for="fecha" class="sr-only">Fecha</label>
+      <input id="fecha" name="fecha" type="date" value="{{ fecha }}" aria-label="Fecha" />
+    </div>
+  </div>
+{% endblock %}
