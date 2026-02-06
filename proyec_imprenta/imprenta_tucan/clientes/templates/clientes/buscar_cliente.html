@@ -157,35 +157,7 @@
 
       <!-- Paginación -->
       {% if clientes.paginator.num_pages > 1 %}
-      <div class="px-5 py-4 border-t border-gray-200">
-        <div class="flex justify-end items-center gap-2">
-          {% if clientes.has_previous %}
-            <a href="?q={{ query }}&page=1&order_by={{ order_by }}&direction={{ direction }}" 
-               class="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm">
-              <span class="material-symbols-outlined text-sm">first_page</span>
-            </a>
-            <a href="?q={{ query }}&page={{ clientes.previous_page_number }}&order_by={{ order_by }}&direction={{ direction }}"
-               class="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm">
-              <span class="material-symbols-outlined text-sm">chevron_left</span>
-            </a>
-          {% endif %}
-
-          <span class="text-sm text-gray-700">
-            Página {{ clientes.number }} de {{ clientes.paginator.num_pages }}
-          </span>
-
-          {% if clientes.has_next %}
-            <a href="?q={{ query }}&page={{ clientes.next_page_number }}&order_by={{ order_by }}&direction={{ direction }}"
-               class="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm">
-              <span class="material-symbols-outlined text-sm">chevron_right</span>
-            </a>
-            <a href="?q={{ query }}&page={{ clientes.paginator.num_pages }}&order_by={{ order_by }}&direction={{ direction }}"
-               class="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm">
-              <span class="material-symbols-outlined text-sm">last_page</span>
-            </a>
-          {% endif %}
-        </div>
-      </div>
+      {% include 'layouts/pagination.html' with page_obj=clientes %}
       {% endif %}
     </div>
   </div>

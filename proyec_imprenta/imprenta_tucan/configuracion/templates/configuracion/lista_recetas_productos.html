@@ -1,38 +1,61 @@
 {% extends 'base.html' %}
 {% block content %}
-<h1>Recetas de Productos</h1>
-<table class="table table-bordered">
-    <thead>
-        <tr>
-            <th>Producto</th>
-            <th>Insumos</th>
-            <th>Descripción</th>
-            <th style="border-left:2px solid #adb5bd;">Activo</th>
-            <th style="border-left:2px solid #adb5bd;">En Pedido</th>
-            <th style="border-left:2px solid #adb5bd;">Acciones</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for receta in recetas %}
-        <tr class="{% if receta.producto.id in productos_con_pedidos %}table-success{% else %}table-secondary{% endif %}" style="border-bottom:1px solid #dee2e6;">
-            <td>{{ receta.producto }}</td>
-            <td>
-                <ul>
-                {% for insumo in receta.insumos.all %}
-                    <li>{{ insumo.codigo }} - {{ insumo.nombre }}</li>
-                {% empty %}
-                    <li><em>Sin insumos</em></li>
-                {% endfor %}
-                </ul>
-            </td>
-            <td>{{ receta.descripcion }}</td>
-            <td>{{ receta.activo|yesno:"Sí,No" }}</td>
-            <td>{% if receta.producto.id in productos_con_pedidos %}<span class="badge bg-success">Sí</span>{% else %}<span class="badge bg-secondary">No</span>{% endif %}</td>
-            <td>
-                <a href="{% url 'receta_producto_update' receta.id %}" class="btn btn-sm btn-primary">Editar</a>
-            </td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
+<div class="flex items-center justify-between mb-4">
+    <h1 class="text-2xl font-bold">Recetas de Productos</h1>
+</div>
+
+<div class="bg-white rounded-xl shadow overflow-x-auto">
+    <table class="min-w-full text-left text-sm">
+        <thead class="bg-gray-100">
+            <tr>
+                <th class="py-2 px-4">Producto</th>
+                <th class="py-2 px-4">Insumos</th>
+                <th class="py-2 px-4">Descripción</th>
+                <th class="py-2 px-4">Activo</th>
+                <th class="py-2 px-4">En Pedido</th>
+                <th class="py-2 px-4">Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for receta in recetas %}
+            <tr class="border-b border-gray-200">
+                <td class="py-2 px-4">{{ receta.producto }}</td>
+                <td class="py-2 px-4">
+                    <ul class="list-disc pl-5 space-y-1">
+                        {% for insumo in receta.insumos.all %}
+                            <li>{{ insumo.codigo }} - {{ insumo.nombre }}</li>
+                        {% empty %}
+                            <li class="text-gray-500"><em>Sin insumos</em></li>
+                        {% endfor %}
+                    </ul>
+                </td>
+                <td class="py-2 px-4">{{ receta.descripcion }}</td>
+                <td class="py-2 px-4">
+                    {% if receta.activo %}
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">Sí</span>
+                    {% else %}
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">No</span>
+                    {% endif %}
+                </td>
+                <td class="py-2 px-4">
+                    {% if receta.producto.id in productos_con_pedidos or receta.producto.idProducto in productos_con_pedidos %}
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">Sí</span>
+                    {% else %}
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">No</span>
+                    {% endif %}
+                </td>
+                <td class="py-2 px-4">
+                    <a href="{% url 'receta_producto_update' receta.id %}" class="text-blue-600 hover:underline">Editar</a>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="6" class="py-4 px-5 text-center text-gray-500">No hay recetas registradas.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% include 'layouts/pagination.html' with page_obj=recetas %}
 {% endblock %}

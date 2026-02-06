@@ -217,8 +217,13 @@ def desactivar_formula(request, pk):
 @login_required
 @require_perm('Recetas', 'Ver')
 def receta_producto_list(request):
-    recetas = RecetaProducto.objects.select_related(
+    qs = RecetaProducto.objects.select_related(
         'producto').prefetch_related('insumos').all().order_by('-actualizado_en')
+    from configuracion.services import get_page_size
+    from django.core.paginator import Paginator
+    paginator = Paginator(qs, get_page_size())
+    page = request.GET.get('page')
+    recetas = paginator.get_page(page)
     formulas = Formula.objects.filter(activo=True).order_by('nombre')
     import json
     formulas_json = [{'id': f.id, 'nombre': f.nombre} for f in formulas]
@@ -267,12 +272,23 @@ def receta_producto_delete(request, pk):
 
 
 def lista_recetas_productos(request):
-    recetas = RecetaProducto.objects.select_related('producto').prefetch_related('insumos').all()
+    qs = RecetaProducto.objects.select_related('producto').prefetch_related('insumos').all()
+    from configuracion.services import get_page_size
+    from django.core.paginator import Paginator
+    paginator = Paginator(qs, get_page_size())
+    page = request.GET.get('page')
+    recetas = paginator.get_page(page)
 
-    # Para saber si el producto está en algún pedido
+    # Para saber si el producto está en algún pedido (solo los de la página actual)
     productos_con_pedidos = set()
     from pedidos.models import Pedido
     for receta in recetas:
         if Pedido.objects.filter(producto=receta.producto).exists():
-            productos_con_pedidos.add(receta.producto.idProducto)
-    return render(request, 'configuracion/lista_recetas_productos.html', {'recetas': recetas, 'productos_con_pedidos': productos_con_pedidos})
+            # Compatibilidad según nombre de campo de Producto (id/idProducto)
+            prod_id = getattr(receta.producto, 'idProducto', None) or getattr(receta.producto, 'id', None)
+            if prod_id is not None:
+                productos_con_pedidos.add(prod_id)
+    return render(request, 'configuracion/lista_recetas_productos.html', {
+        'recetas': recetas,
+        'productos_con_pedidos': productos_con_pedidos
+    })

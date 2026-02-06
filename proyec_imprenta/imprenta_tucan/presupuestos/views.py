@@ -4,12 +4,14 @@ from django.db.models import Q
 from .models import Presupuesto, PresupuestoDetalle
 from .forms import PresupuestoForm
 from .formsets import PresupuestoDetalleFormSet
+from configuracion.permissions import require_perm
 
 
 def index(request):
     return redirect('lista_presupuestos')
 
 
+@require_perm('Presupuestos', 'Listar')
 def lista_presupuestos(request):
     query = request.GET.get('q', '') or request.GET.get('criterio', '')
     order_by = request.GET.get('order_by', 'fecha')

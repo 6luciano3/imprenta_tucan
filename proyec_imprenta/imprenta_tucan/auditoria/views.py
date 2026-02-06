@@ -2,6 +2,7 @@ from django.shortcuts import redirect, get_object_or_404
 from .models import AuditEntry
 from django.shortcuts import render
 from django.contrib import messages
+from django.core.paginator import Paginator
 
 
 def ver_auditoria(request, pk):
@@ -29,8 +30,25 @@ def lista_auditoria(request):
     if fecha:
         auditorias = auditorias.filter(timestamp__date=fecha)
 
-    auditorias = auditorias.order_by('-timestamp')[:100]
-    return render(request, 'auditoria/lista_auditoria.html', {'auditorias': auditorias})
+    auditorias = auditorias.order_by('-timestamp')
+
+    # Paginación consistente con otras listas
+    try:
+        from configuracion.services import get_page_size
+        page_size = get_page_size()
+    except Exception:
+        page_size = 10
+    paginator = Paginator(auditorias, page_size)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
+    return render(request, 'auditoria/lista_auditoria.html', {
+        'auditorias': page_obj,
+        'modelo': modelo,
+        'evento': evento,
+        'usuario': usuario,
+        'fecha': fecha,
+    })
 
 
 def eliminar_auditoria(request, pk):
