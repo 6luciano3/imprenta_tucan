@@ -328,6 +328,7 @@ def calcular_consumo(request, producto_id: int, cantidad: int):
             stock = float(ins.stock)
             faltan = max(0.0, float(req) - stock)
             detalle.append({
+                'id': ins.idInsumo,
                 'codigo': ins.codigo,
                 'nombre': ins.nombre,
                 'requerido': float(req),
@@ -343,5 +344,35 @@ def calcular_consumo(request, producto_id: int, cantidad: int):
             'ok': ok,
             'consumo': detalle,
         })
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=400)
+
+
+def receta_insumos(request, producto_id: int):
+    """Devuelve la lista de insumos definidos en la Receta de Producto activa (si existe)."""
+    try:
+        producto = get_object_or_404(Producto, pk=producto_id)
+        from configuracion.models import RecetaProducto
+        receta = RecetaProducto.objects.filter(producto=producto, activo=True).prefetch_related('insumos').first()
+        items = []
+        if receta and receta.insumos.exists():
+            for ins in receta.insumos.all():
+                items.append({
+                    'id': getattr(ins, 'idInsumo', None),
+                    'codigo': getattr(ins, 'codigo', ''),
+                    'nombre': getattr(ins, 'nombre', ''),
+                })
+        # Fallback: usar receta de ProductoInsumo si no hay RecetaProducto activa
+        if not items:
+            from productos.models import ProductoInsumo
+            for r in ProductoInsumo.objects.filter(producto=producto).select_related('insumo'):
+                ins = r.insumo
+                items.append({
+                    'id': getattr(ins, 'idInsumo', None),
+                    'codigo': getattr(ins, 'codigo', ''),
+                    'nombre': getattr(ins, 'nombre', ''),
+                    'cantidad_por_unidad': float(getattr(r, 'cantidad_por_unidad', 0) or 0),
+                })
+        return JsonResponse({'success': True, 'producto': producto.nombreProducto, 'insumos': items})
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=400)

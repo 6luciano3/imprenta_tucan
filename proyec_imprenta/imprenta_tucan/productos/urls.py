@@ -28,4 +28,5 @@ urlpatterns = [
     path('eliminar/<int:idProducto>/', views.eliminar_producto, name='eliminar_producto'),
     path('detalle/<int:idProducto>/', views.detalle_producto, name='detalle_producto'),
     path('calcular-consumo/<int:producto_id>/<int:cantidad>/', views.calcular_consumo, name='calcular_consumo_producto'),
+    path('receta-insumos/<int:producto_id>/', views.receta_insumos, name='receta_insumos_producto'),
 ]

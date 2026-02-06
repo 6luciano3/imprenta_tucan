@@ -54,6 +54,14 @@
              class="text-blue-600 hover:text-blue-800 flex items-center gap-1" title="Ver detalles">
             <span class="material-symbols-outlined text-sm">visibility</span>
           </a>
+          <button type="button"
+                  class="text-indigo-600 hover:text-indigo-800 flex items-center gap-1 btn-ver-insumos"
+                  data-producto-id="{{ producto.idProducto }}"
+                  data-producto-nombre="{{ producto.nombreProducto }}"
+                  title="Ver detalle de insumos">
+            <span class="material-symbols-outlined text-sm">list_alt</span>
+            <span class="hidden md:inline">Ver detalle de insumos</span>
+          </button>
           {% if can_productos_editar %}
           <a href="{% url 'modificar_producto' producto.idProducto %}"
              class="text-amber-600 hover:text-amber-800 flex items-center gap-1" title="Modificar">
@@ -89,4 +97,154 @@
   </table>
   {% include 'layouts/pagination.html' with page_obj=productos %}
  </div>
+  <!-- Modal Detalle de Insumos -->
+  <div id="modal-detalle-insumos" class="fixed inset-0 bg-black bg-opacity-40 hidden items-center justify-center z-50">
+    <div class="bg-white dark:bg-white text-black dark:text-black rounded-xl shadow-xl w-full max-w-2xl">
+      <div class="flex items-center justify-between px-4 py-3 border-b">
+        <h3 class="font-semibold" id="mdi-title">Detalle de insumos</h3>
+        <button type="button" class="material-symbols-outlined text-gray-600 hover:text-gray-800" id="mdi-close">close</button>
+      </div>
+      <div class="px-4 py-3 space-y-3">
+        <div class="flex items-end gap-3">
+          <div class="flex-1">
+            <label class="block text-sm text-gray-700">Producto</label>
+            <div id="mdi-producto" class="text-sm font-medium"></div>
+          </div>
+          <div>
+            <label for="mdi-cantidad" class="block text-sm text-gray-700">Cantidad</label>
+            <input id="mdi-cantidad" type="number" min="1" value="1" class="border rounded px-2 py-1 w-24 text-black dark:text-black">
+          </div>
+          <button id="mdi-recalcular" class="bg-indigo-600 text-white px-3 py-2 rounded-lg hover:bg-indigo-700">Calcular</button>
+        </div>
+        <div id="mdi-receta" class="text-xs text-gray-600"></div>
+        <div id="mdi-alert" class="hidden text-sm"></div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead class="bg-gray-100 text-gray-700">
+              <tr>
+                <th class="py-2 px-3">Código</th>
+                <th class="py-2 px-3">Insumo</th>
+                <th class="py-2 px-3 text-right">Requerido</th>
+                <th class="py-2 px-3 text-right">Stock</th>
+                <th class="py-2 px-3 text-right">Faltan</th>
+              </tr>
+            </thead>
+            <tbody id="mdi-body"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="px-4 py-3 border-t flex justify-end gap-2">
+        <button class="px-4 py-2 rounded-lg bg-gray-200 hover:bg-gray-300" id="mdi-cerrar">Cerrar</button>
+      </div>
+    </div>
+    <!-- URL template para calcular consumo -->
+    <span id="mdi-url-template" data-url="{% url 'calcular_consumo_producto' 0 0 %}" class="hidden"></span>
+    <span id="mdi-url-receta" data-url="{% url 'receta_insumos_producto' 0 %}" class="hidden"></span>
+  </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  (function() {
+    const modal = document.getElementById('modal-detalle-insumos');
+    const title = document.getElementById('mdi-title');
+    const productoEl = document.getElementById('mdi-producto');
+    const cantidadEl = document.getElementById('mdi-cantidad');
+    const bodyEl = document.getElementById('mdi-body');
+    const alertEl = document.getElementById('mdi-alert');
+    const urlTpl = document.getElementById('mdi-url-template').dataset.url;
+    const urlRecetaTpl = document.getElementById('mdi-url-receta').dataset.url;
+    const recetaEl = document.getElementById('mdi-receta');
+    let currentProductoId = null;
+    let recetaItems = [];
+
+    function openModal(pid, nombre) {
+      currentProductoId = pid;
+      productoEl.textContent = nombre || '';
+      cantidadEl.value = Math.max(1, Number(cantidadEl.value) || 1);
+      bodyEl.innerHTML = '';
+      alertEl.classList.add('hidden');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      cargarReceta().then(calcular).catch(calcular);
+    }
+
+    function closeModal() {
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+      currentProductoId = null;
+    }
+
+    async function calcular() {
+      try {
+        const cant = Math.max(1, Number(cantidadEl.value) || 1);
+        const url = urlTpl.replace('/0/0/', `/${currentProductoId}/${cant}/`);
+        const resp = await fetch(url);
+        if (!resp.ok) throw new Error('No se pudo obtener el detalle');
+        const data = await resp.json();
+        productoEl.textContent = data.producto || productoEl.textContent;
+        renderDetalle(data);
+      } catch (err) {
+        alertEl.textContent = err?.message || String(err);
+        alertEl.classList.remove('hidden');
+      }
+    }
+
+    async function cargarReceta() {
+      recetaItems = [];
+      recetaEl.textContent = '';
+      try {
+        const url = urlRecetaTpl.replace('/0', `/${currentProductoId}`);
+        const resp = await fetch(url);
+        if (!resp.ok) return;
+        const data = await resp.json();
+        recetaItems = Array.isArray(data.insumos) ? data.insumos : [];
+        if (recetaItems.length) {
+          const nombres = recetaItems.map(i => i.codigo ? `${i.codigo}` : (i.nombre || '')).filter(Boolean);
+          recetaEl.textContent = `Receta: ${nombres.join(', ')}`;
+        }
+      } catch (_) { /* noop */ }
+    }
+
+    function renderDetalle(data) {
+      const byIdCons = {};
+      (data.consumo || []).forEach(item => { if (item.id) byIdCons[item.id] = item; });
+      // Merge receta items ensuring presence
+      const merged = [...(data.consumo || [])];
+      recetaItems.forEach(r => {
+        if (r.id && !byIdCons[r.id]) {
+          merged.push({ id: r.id, codigo: r.codigo, nombre: r.nombre, requerido: 0, stock: '', faltan: 0 });
+        }
+      });
+
+      const rows = merged.map(item => {
+        const req = Number(item.requerido || 0);
+        const stk = Number(item.stock || 0);
+        const falt = Number(item.faltan || 0);
+        const cls = falt > 0 ? 'text-red-600' : 'text-green-700';
+        return `
+          <tr class="border-b">
+            <td class="py-2 px-3">${item.codigo || ''}</td>
+            <td class="py-2 px-3">${item.nombre || ''}</td>
+            <td class="py-2 px-3 text-right">${req.toLocaleString()}</td>
+            <td class="py-2 px-3 text-right">${stk.toLocaleString()}</td>
+            <td class="py-2 px-3 text-right ${cls}">${falt.toLocaleString()}</td>
+          </tr>
+        `;
+      }).join('');
+      bodyEl.innerHTML = rows || '<tr><td colspan="5" class="py-3 px-3 text-center text-gray-500">Sin receta definida para este producto.</td></tr>';
+    }
+
+    document.querySelectorAll('.btn-ver-insumos').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const pid = btn.dataset.productoId;
+        const nombre = btn.dataset.productoNombre;
+        openModal(pid, nombre);
+      });
+    });
+    document.getElementById('mdi-close')?.addEventListener('click', closeModal);
+    document.getElementById('mdi-cerrar')?.addEventListener('click', closeModal);
+    document.getElementById('mdi-recalcular')?.addEventListener('click', calcular);
+  })();
+</script>
 {% endblock %}

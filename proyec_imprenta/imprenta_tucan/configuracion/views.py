@@ -217,18 +217,54 @@ def desactivar_formula(request, pk):
 @login_required
 @require_perm('Recetas', 'Ver')
 def receta_producto_list(request):
-    qs = RecetaProducto.objects.select_related(
-        'producto').prefetch_related('insumos').all().order_by('-actualizado_en')
+    # Parámetros de búsqueda y orden
+    from django.db.models import Q
+    query = request.GET.get('q', '').strip()
+    order_by = request.GET.get('order_by', 'actualizado')
+    direction = request.GET.get('direction', 'desc')
+
+    # Base queryset
+    qs = RecetaProducto.objects.select_related('producto').prefetch_related('insumos').all()
+
+    # Filtros de búsqueda (producto, insumo, descripción)
+    if query:
+        qs = qs.filter(
+            Q(producto__nombreProducto__icontains=query) |
+            Q(descripcion__icontains=query) |
+            Q(insumos__nombre__icontains=query) |
+            Q(insumos__codigo__icontains=query)
+        ).distinct()
+
+    # Mapa de orden
+    order_map = {
+        'producto': 'producto__nombreProducto',
+        'activo': 'activo',
+        'actualizado': 'actualizado_en',
+        'creado': 'creado_en',
+    }
+    order_field = order_map.get(order_by, 'actualizado_en')
+    if direction == 'desc':
+        order_field = '-' + order_field
+    qs = qs.order_by(order_field)
+
+    # Paginación
     from configuracion.services import get_page_size
     from django.core.paginator import Paginator
     paginator = Paginator(qs, get_page_size())
     page = request.GET.get('page')
     recetas = paginator.get_page(page)
+
+    # Fórmulas activas para el modal
     formulas = Formula.objects.filter(activo=True).order_by('nombre')
     import json
     formulas_json = [{'id': f.id, 'nombre': f.nombre} for f in formulas]
+
     return render(request, 'configuracion/receta_producto_list.html', {
         'recetas': recetas,
+        'page_obj': recetas,
+        'query': query,
+        'order_by': order_by,
+        'direction': direction,
         'formulas': formulas,
         'formulas_json': json.dumps(formulas_json, ensure_ascii=False)
     })

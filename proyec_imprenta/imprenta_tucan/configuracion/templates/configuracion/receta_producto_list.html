@@ -1,14 +1,20 @@
-{% extends 'base.html' %}
-{% block content %}
-<div class="flex items-center justify-between mb-6">
-    <h1 class="text-2xl font-bold">Recetas de Productos</h1>
-    <a href="{% url 'receta_producto_create' %}" class="px-4 py-2 bg-primary text-white rounded hover:bg-primary-dark transition flex items-center gap-2">
-        <span class="material-symbols-outlined text-base">add</span>
-        Agregar Receta
-    </a>
-</div>
-<div class="bg-white shadow rounded-xl overflow-x-auto">
-    <table class="min-w-full text-sm">
+{% extends 'layouts/list_base.html' %}
+
+{% block list_icon %}{% endblock %}
+{% block list_title_text %}Recetas de Productos{% endblock %}
+{% block new_button %}{% endblock %}
+{% block search_placeholder %}Producto, insumo, descripción...{% endblock %}
+{% block clear_url %}{% url 'receta_producto_list' %}{% endblock %}
+{% block order_fields_options %}
+    <option value="actualizado" {% if order_by == 'actualizado' %}selected{% endif %}>Actualizado</option>
+    <option value="creado" {% if order_by == 'creado' %}selected{% endif %}>Creado</option>
+    <option value="producto" {% if order_by == 'producto' %}selected{% endif %}>Producto</option>
+    <option value="activo" {% if order_by == 'activo' %}selected{% endif %}>Activo</option>
+{% endblock %}
+
+{% block list_content %}
+<div class="bg-white shadow rounded-xl overflow-hidden table-responsive">
+    <table class="w-full min-w-[980px] text-left text-sm">
         <thead class="bg-gray-100 text-gray-700">
             <tr>
                 <th class="py-3 px-5">Producto</th>
@@ -16,58 +22,67 @@
                 <th class="py-3 px-5">Insumos</th>
                 <th class="py-3 px-5">Descripción</th>
                 <th class="py-3 px-5">Activo</th>
-                <th class="py-3 px-5">Acciones</th>
+                <th class="py-3 px-5 text-center">Acciones</th>
             </tr>
         </thead>
         <tbody>
             {% for receta in recetas %}
-            <tr class="border-b">
+            <tr class="border-b hover:bg-gray-50">
                 <td class="py-2 px-5">{{ receta.producto }}</td>
                 <td class="py-2 px-5">
                     <span id="formula-label-{{ receta.pk }}">{{ receta.producto.formula|default_if_none:'' }}</span>
-                    <button type="button" class="ml-2 btn-edit-formula text-xs px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition" data-id="{{ receta.pk }}" data-formula="{{ receta.producto.formula.id|default_if_none:'' }}">
+                    <button type="button"
+                                    class="ml-2 btn-edit-formula text-xs px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition"
+                                    data-id="{{ receta.pk }}"
+                                    data-formula="{{ receta.producto.formula.id|default_if_none:'' }}">
                         Editar
                     </button>
                 </td>
-                {% comment %} Modal para edición rápida de fórmula {% endcomment %}
-                <div id="formula-modal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-40 z-50 hidden">
-                    <div class="bg-white rounded-lg shadow-lg p-6 w-full max-w-xs">
-                        <h3 class="text-lg font-bold mb-4">Asignar Fórmula</h3>
-                        <form id="formula-edit-form" onsubmit="return false;">
-                            {% csrf_token %}
-                            <div class="mb-4 font-semibold text-center">
-                                <select id="formula-select" name="formula_id" class="w-full border rounded px-2 py-1">
-                                    {% for formula in formulas %}
-                                        <option value="{{ formula.id }}">{{ formula.nombre }}</option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-                            <div class="flex justify-end gap-2">
-                                <button type="button" id="formula-cancel-btn" class="px-3 py-1 bg-gray-300 text-gray-700 rounded hover:bg-gray-400">Cancelar</button>
-                                <button type="button" id="formula-save-btn" class="px-3 py-1 bg-primary text-white rounded hover:bg-primary-dark">Guardar</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-
-                {% include 'configuracion/receta_producto_list_script.html' %}
                 <td class="py-2 px-5">{% for insumo in receta.insumos.all %}{{ insumo }}{% if not forloop.last %}, {% endif %}{% endfor %}</td>
                 <td class="py-2 px-5">{{ receta.descripcion|default:'-' }}</td>
                 <td class="py-2 px-5">{{ receta.activo|yesno:"Sí,No" }}</td>
-                <td class="py-2 px-5">
-                    <a href="{% url 'receta_producto_update' receta.pk %}" class="px-3 py-1 bg-yellow-400 text-white rounded hover:bg-yellow-500 transition text-xs flex items-center justify-center">
+                <td class="py-2 px-5 text-center">
+                    <a href="{% url 'receta_producto_update' receta.pk %}"
+                         class="px-3 py-1 bg-yellow-400 text-white rounded hover:bg-yellow-500 transition text-xs inline-flex items-center justify-center">
                         <span class="material-symbols-outlined text-base">edit</span>
                     </a>
-                    <a href="{% url 'receta_producto_delete' receta.pk %}" class="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 transition text-xs flex items-center justify-center ml-2">
+                    <a href="{% url 'receta_producto_delete' receta.pk %}"
+                         class="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 transition text-xs inline-flex items-center justify-center ml-2">
                         <span class="material-symbols-outlined text-base">delete</span>
                     </a>
                 </td>
             </tr>
             {% empty %}
-            <tr><td colspan="6" class="py-4 px-5 text-center text-gray-500">No hay recetas registradas.</td></tr>
+            <tr>
+                <td colspan="6" class="py-4 px-5 text-center text-gray-500">No hay recetas registradas.</td>
+            </tr>
             {% endfor %}
         </tbody>
     </table>
+
+    <!-- Paginación -->
+    {% include 'layouts/pagination.html' with page_obj=recetas %}
 </div>
-{% include 'layouts/pagination.html' with page_obj=recetas %}
 {% endblock %}
+{# Modal único fuera de la tabla para evitar duplicados/estructura inválida #}
+<div id="formula-modal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-40 z-50 hidden">
+    <div class="bg-white dark:bg-white rounded-lg shadow-lg p-6 w-full max-w-xs text-black dark:text-black">
+        <h3 class="text-lg font-bold mb-4">Asignar Fórmula</h3>
+        <form id="formula-edit-form" onsubmit="return false;">
+            {% csrf_token %}
+            <div class="mb-4 font-semibold text-center">
+                <select id="formula-select" name="formula_id" class="w-full border rounded px-2 py-1 text-black dark:text-black">
+                    {% for formula in formulas %}
+                        <option value="{{ formula.id }}">{{ formula.nombre }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="flex justify-end gap-2">
+                <button type="button" id="formula-cancel-btn" class="px-3 py-1 bg-gray-300 text-gray-700 rounded hover:bg-gray-400">Cancelar</button>
+                <button type="button" id="formula-save-btn" class="px-3 py-1 bg-primary text-white rounded hover:bg-primary-dark">Guardar</button>
+            </div>
+        </form>
+    </div>
+</div>
+{# Incluir el script una sola vez fuera del contenedor del modal #}
+{% include 'configuracion/receta_producto_list_script.html' %}
