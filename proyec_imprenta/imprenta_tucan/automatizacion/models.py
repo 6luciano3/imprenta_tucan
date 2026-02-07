@@ -117,3 +117,62 @@ class AutomationLog(models.Model):
 
     def __str__(self):
         return f"{self.evento} - {self.fecha}"
+
+
+# --- Automatización de presupuestos con criterios ponderados ---
+class ConsultaStockProveedor(models.Model):
+    ESTADOS = [
+        ('pendiente', 'Pendiente'),
+        ('disponible', 'Disponible'),
+        ('parcial', 'Parcialmente disponible'),
+        ('no', 'No disponible'),
+        ('error', 'Error de consulta'),
+    ]
+
+    proveedor = models.ForeignKey('proveedores.Proveedor', on_delete=models.CASCADE)
+    insumo = models.ForeignKey('insumos.Insumo', on_delete=models.CASCADE)
+    cantidad = models.PositiveIntegerField()
+    estado = models.CharField(max_length=20, choices=ESTADOS, default='pendiente')
+    respuesta = models.JSONField(default=dict, blank=True)
+    creado = models.DateTimeField(auto_now_add=True)
+    actualizado = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Consulta {self.proveedor} / {self.insumo} ({self.cantidad}) - {self.estado}"
+
+
+class CompraPropuesta(models.Model):
+    ESTADOS = [
+        ('pendiente', 'Pendiente'),
+        ('consultado', 'Consulta enviada'),
+        ('respuesta_disponible', 'Respuesta disponible'),
+        ('parcial', 'Disponibilidad parcial'),
+        ('no_disponible', 'No disponible'),
+        ('aceptada', 'Aceptada'),
+        ('rechazada', 'Rechazada'),
+        ('modificada', 'Modificada'),
+    ]
+
+    TRIGGER = [
+        ('faltante_stock', 'Faltante de stock'),
+        ('pedido_mayor_stock', 'Pedido supera stock'),
+        ('stock_minimo_vencido', 'Stock mínimo vencido'),
+    ]
+
+    insumo = models.ForeignKey('insumos.Insumo', on_delete=models.CASCADE)
+    cantidad_requerida = models.PositiveIntegerField()
+    proveedor_recomendado = models.ForeignKey('proveedores.Proveedor', on_delete=models.SET_NULL, null=True, blank=True)
+    pesos_usados = models.JSONField(default=dict, blank=True)  # {'precio':0.4,'cumplimiento':0.3,...}
+    motivo_trigger = models.CharField(max_length=30, choices=TRIGGER)
+    estado = models.CharField(max_length=30, choices=ESTADOS, default='pendiente')
+    borrador_oc = models.ForeignKey('pedidos.OrdenCompra', on_delete=models.SET_NULL, null=True, blank=True)
+    consulta_stock = models.ForeignKey(ConsultaStockProveedor, on_delete=models.SET_NULL, null=True, blank=True)
+    administrador = models.ForeignKey(get_user_model(), on_delete=models.SET_NULL, null=True, blank=True)
+    decision = models.CharField(max_length=20, blank=True)  # 'aceptar'|'rechazar'|'modificar'
+    comentario_admin = models.TextField(blank=True)
+    feedback_pesos = models.JSONField(default=dict, blank=True)  # {'precio':+0.05,'cumplimiento':-0.05,...}
+    creada = models.DateTimeField(auto_now_add=True)
+    actualizada = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Propuesta {self.insumo} x {self.cantidad_requerida} - {self.estado}"

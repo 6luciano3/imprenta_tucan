@@ -1,0 +1,162 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="px-6 py-4">
+  {% if messages %}
+  <div class="mb-3">
+    {% for message in messages %}
+      <div class="px-3 py-2 rounded text-sm {% if message.tags == 'success' %}bg-emerald-50 text-emerald-700 border border-emerald-200{% elif message.tags == 'warning' %}bg-amber-50 text-amber-700 border border-amber-200{% elif message.tags == 'error' %}bg-rose-50 text-rose-700 border border-rose-200{% else %}bg-slate-50 text-slate-700 border border-slate-200{% endif %}">
+        {{ message }}
+      </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+  <div class="flex items-center gap-3 mb-4">
+    <span class="material-symbols-outlined text-3xl text-sky-600">shopping_cart_checkout</span>
+    <h1 class="text-xl font-semibold">Automatización de presupuestos con criterios ponderados</h1>
+  </div>
+
+  <div class="flex items-center justify-between mb-3">
+    <div></div>
+    <a href="{% url 'generar_compras_propuestas' %}" class="px-3 py-2 rounded bg-emerald-600 text-white text-sm">Generar propuestas</a>
+  </div>
+  <div class="bg-white shadow rounded-xl overflow-hidden">
+    <table class="min-w-full text-sm">
+      <thead class="bg-slate-50 border-b">
+        <tr>
+          <th class="px-4 py-2 text-left">Fecha</th>
+          <th class="px-4 py-2 text-left">Insumo</th>
+          <th class="px-4 py-2 text-left">Cantidad</th>
+          <th class="px-4 py-2 text-left">Proveedor recomendado</th>
+          <th class="px-4 py-2 text-left">Estado</th>
+          <th class="px-4 py-2 text-left">Orden Compra</th>
+          <th class="px-4 py-2 text-left">Consulta Stock</th>
+          <th class="px-4 py-2 text-center w-40">Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in propuestas %}
+        <tr class="border-t hover:bg-slate-50">
+          <td class="px-4 py-2">{{ p.creada|date:'d/m/Y' }}</td>
+          <td class="px-4 py-2">{{ p.insumo }}</td>
+          <td class="px-4 py-2">{{ p.cantidad_requerida }}</td>
+          <td class="px-4 py-2">{{ p.proveedor_recomendado }}</td>
+          <td class="px-4 py-2">
+            <span class="inline-flex items-center gap-1">
+              <span class="material-symbols-outlined text-sky-600 text-base">flag</span>
+              {{ p.estado }}
+            </span>
+          </td>
+          <td class="px-4 py-2">
+            {% if p.borrador_oc %}
+              <div class="flex items-center gap-2">
+                <span class="material-symbols-outlined text-amber-600 text-base">receipt_long</span>
+                #{{ p.borrador_oc.id }} ({{ p.borrador_oc.estado }})
+              </div>
+            {% else %}
+              <span class="text-slate-400">—</span>
+            {% endif %}
+          </td>
+          <td class="px-4 py-2">
+            {% if p.consulta_stock %}
+              {{ p.consulta_stock.estado }}
+            {% else %}
+              <span class="text-slate-400">pendiente</span>
+            {% endif %}
+          </td>
+          <td class="px-4 py-2 w-40 text-center">
+            <div class="flex flex-nowrap gap-1 items-center justify-center">
+              <button type="button" class="p-0.5 rounded hover:bg-slate-100 text-sky-600" title="Ver detalles" onclick="openPropuestaModal('{{ p.id }}')">
+                <span class="material-symbols-outlined text-sm">info</span>
+              </button>
+              <!-- Aceptar propuesta -->
+              <form method="post" action="{% url 'aceptar_compra_propuesta' p.id %}">
+                {% csrf_token %}
+                <button type="submit" class="p-0.5 rounded hover:bg-slate-100 text-emerald-600" title="Aceptar propuesta">
+                  <span class="material-symbols-outlined text-sm">check_circle</span>
+                </button>
+              </form>
+              <!-- Rechazar propuesta -->
+              <form method="post" action="{% url 'rechazar_compra_propuesta' p.id %}">
+                {% csrf_token %}
+                <button type="submit" class="p-0.5 rounded hover:bg-slate-100 text-rose-600" title="Rechazar propuesta">
+                  <span class="material-symbols-outlined text-sm">close</span>
+                </button>
+              </form>
+              <!-- Proveedor alternativo -->
+              <a href="{% url 'recalcular_alternativo_propuesta' p.id %}" class="p-0.5 rounded hover:bg-slate-100 text-amber-600" title="Proveedor alternativo">
+                <span class="material-symbols-outlined text-sm">swap_horizontal_circle</span>
+              </a>
+            </div>
+          </td>
+        </tr>
+        <div id="modal-propuesta-{{ p.id }}" class="fixed inset-0 bg-black/40 z-50 hidden">
+          <div class="bg-white rounded-xl shadow-xl w-full max-w-lg mx-auto mt-24 p-4">
+            <div class="flex items-center justify-between">
+              <h2 class="text-lg font-semibold">Detalle propuesta #{{ p.id }}</h2>
+              <button type="button" class="p-1 rounded hover:bg-slate-100" onclick="closePropuestaModal('{{ p.id }}')">
+                <span class="material-symbols-outlined">close</span>
+              </button>
+            </div>
+            <div class="mt-3">
+              <div class="text-sm text-slate-600">Orden de Compra</div>
+              {% if p.borrador_oc %}
+              <div class="mt-1 text-sm">
+                <div>ID: #{{ p.borrador_oc.id }}</div>
+                <div>Estado: {{ p.borrador_oc.estado }}</div>
+                <div>Proveedor: {{ p.borrador_oc.proveedor }}</div>
+              </div>
+              {% else %}
+              <div class="mt-1 text-sm text-slate-500">Sin orden de compra</div>
+              {% endif %}
+              <div class="mt-4 text-sm text-slate-600">Consulta de Stock</div>
+              {% if p.consulta_stock %}
+              <div class="mt-1 text-sm">
+                <div>Proveedor: {{ p.consulta_stock.proveedor }}</div>
+                <div>Insumo: {{ p.consulta_stock.insumo }}</div>
+                <div>Cantidad: {{ p.consulta_stock.cantidad }}</div>
+                <div>Estado: {{ p.consulta_stock.estado }}</div>
+                <div>Respuesta: {{ p.consulta_stock.respuesta }}</div>
+              </div>
+              {% else %}
+              <div class="mt-1 text-sm text-slate-500">Sin consulta registrada</div>
+              {% endif %}
+            </div>
+            <div class="mt-4 text-right">
+              <button type="button" class="px-3 py-2 rounded bg-slate-700 text-white text-sm" onclick="closePropuestaModal('{{ p.id }}')">Cerrar</button>
+            </div>
+          </div>
+        </div>
+        {% empty %}
+        <tr>
+          <td colspan="8" class="px-4 py-6 text-center text-slate-500">No hay propuestas generadas aún.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="mt-4 flex items-center justify-between">
+    <div class="text-sm text-slate-600">Página {{ propuestas.number }} de {{ propuestas.paginator.num_pages }}</div>
+    <div class="flex gap-2">
+      {% if propuestas.has_previous %}
+      <a href="?page={{ propuestas.previous_page_number }}" class="px-3 py-1 border rounded">Anterior</a>
+      {% endif %}
+      {% if propuestas.has_next %}
+      <a href="?page={{ propuestas.next_page_number }}" class="px-3 py-1 border rounded">Siguiente</a>
+      {% endif %}
+    </div>
+  </div>
+</div>
+<script>
+  function openPropuestaModal(id) {
+    var m = document.getElementById('modal-propuesta-' + id);
+    if (m) { m.classList.remove('hidden'); }
+  }
+  function closePropuestaModal(id) {
+    var m = document.getElementById('modal-propuesta-' + id);
+    if (m) { m.classList.add('hidden'); }
+  }
+</script>
+{% endblock %}

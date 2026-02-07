@@ -1,4 +1,5 @@
 from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib import messages
 from django.core.paginator import Paginator
 from django.http import JsonResponse
 from .models import OrdenSugerida, OfertaAutomatica, RankingCliente, RankingHistorico, OfertaPropuesta
@@ -372,3 +373,158 @@ def _ensure_demo_ordenes():
 
 
 # Logs de Automatización removidos del panel y rutas
+
+
+# --- Automatización de presupuestos con criterios ponderados (Admin) ---
+from django.views.decorators.http import require_POST
+
+
+@login_required
+def compras_propuestas_admin(request):
+    from automatizacion.models import CompraPropuesta
+    try:
+        from configuracion.services import get_page_size
+        page_size = get_page_size()
+    except Exception:
+        page_size = 10
+    qs = CompraPropuesta.objects.select_related('insumo', 'proveedor_recomendado', 'borrador_oc', 'consulta_stock').order_by('-creada')
+    paginator = Paginator(qs, page_size)
+    page = request.GET.get('page')
+    propuestas = paginator.get_page(page)
+    return render(request, 'automatizacion/compras_propuestas.html', {'propuestas': propuestas})
+
+
+@login_required
+@require_POST
+def consultar_stock_propuesta(request, propuesta_id):
+    from automatizacion.models import CompraPropuesta, ConsultaStockProveedor
+    propuesta = get_object_or_404(CompraPropuesta, pk=propuesta_id)
+    # Simulación de consulta: establecer estado según input admin (si viene)
+    estado = request.POST.get('estado')  # 'disponible'|'parcial'|'no'
+    detalle = request.POST.get('detalle', '')
+    consulta = propuesta.consulta_stock
+    if not consulta:
+        from decimal import Decimal
+        consulta = ConsultaStockProveedor.objects.create(
+            proveedor=propuesta.proveedor_recomendado,
+            insumo=propuesta.insumo,
+            cantidad=int(Decimal(str(propuesta.cantidad_requerida))),
+            estado='pendiente',
+            respuesta={}
+        )
+        propuesta.consulta_stock = consulta
+    if estado in {'disponible', 'parcial', 'no'}:
+        consulta.estado = estado
+        consulta.respuesta = {'detalle': detalle}
+        consulta.save()
+        propuesta.estado = 'respuesta_disponible' if estado == 'disponible' else ('parcial' if estado == 'parcial' else 'no_disponible')
+        propuesta.save()
+        messages.success(request, f"Consulta de stock marcada: {estado}.")
+    else:
+        consulta.estado = 'pendiente'
+        consulta.save()
+        messages.info(request, "Consulta de stock pendiente.")
+    return redirect('compras_propuestas')
+
+
+@login_required
+@require_POST
+def aceptar_compra_propuesta(request, propuesta_id):
+    from automatizacion.models import CompraPropuesta
+    propuesta = get_object_or_404(CompraPropuesta, pk=propuesta_id)
+    oc = propuesta.borrador_oc
+    if oc:
+        oc.estado = 'confirmada'
+        oc.save()
+    # Impacto en registros: actualizar proveedor del insumo y stock proyectado
+    try:
+        insumo = propuesta.insumo
+        proveedor = propuesta.proveedor_recomendado or (oc.proveedor if oc else None)
+        if proveedor:
+            insumo.proveedor = proveedor
+        # Incrementa stock como compromiso asegurado (pendiente de recepción)
+        insumo.stock = (insumo.stock or 0) + int(propuesta.cantidad_requerida or 0)
+        insumo.save(update_fields=['proveedor', 'stock'])
+    except Exception:
+        pass
+    propuesta.estado = 'aceptada'
+    propuesta.administrador = request.user
+    propuesta.decision = 'aceptar'
+    propuesta.comentario_admin = request.POST.get('comentario', '')
+    # Feedback opcional
+    try:
+        feedback = {
+            'precio': float(request.POST.get('feedback_precio', 0) or 0),
+            'cumplimiento': float(request.POST.get('feedback_cumplimiento', 0) or 0),
+            'incidencias': float(request.POST.get('feedback_incidencias', 0) or 0),
+            'disponibilidad': float(request.POST.get('feedback_disponibilidad', 0) or 0),
+        }
+        propuesta.feedback_pesos = feedback
+        from automatizacion.api.services import ProveedorInteligenteService
+        ProveedorInteligenteService.actualizar_pesos_feedback(feedback)
+    except Exception:
+        pass
+    propuesta.save()
+    messages.success(request, 'Propuesta aceptada. Orden confirmada y abastecimiento actualizado.')
+    return redirect('compras_propuestas')
+
+
+@login_required
+@require_POST
+def rechazar_compra_propuesta(request, propuesta_id):
+    from automatizacion.models import CompraPropuesta
+    propuesta = get_object_or_404(CompraPropuesta, pk=propuesta_id)
+    oc = propuesta.borrador_oc
+    if oc:
+        oc.estado = 'rechazada'
+        oc.save()
+    propuesta.estado = 'rechazada'
+    propuesta.administrador = request.user
+    propuesta.decision = 'rechazar'
+    propuesta.comentario_admin = request.POST.get('comentario', '')
+    propuesta.save()
+    return redirect('compras_propuestas')
+
+
+@login_required
+def recalcular_alternativo_propuesta(request, propuesta_id):
+    from automatizacion.models import CompraPropuesta
+    from automatizacion.api.services import ProveedorInteligenteService
+    propuesta = get_object_or_404(CompraPropuesta, pk=propuesta_id)
+    # Elegir alternativa (segundo mejor)
+    alt = None
+    try:
+        # Generar ranking simple y tomar segundo
+        from proveedores.models import Proveedor
+        candidatos = []
+        for p in Proveedor.objects.filter(activo=True):
+            sc = ProveedorInteligenteService.calcular_score(p, propuesta.insumo)
+            candidatos.append((p, sc))
+        candidatos.sort(key=lambda x: x[1], reverse=True)
+        if len(candidatos) > 1:
+            alt = candidatos[1][0]
+    except Exception:
+        alt = None
+    if alt:
+        propuesta.proveedor_recomendado = alt
+        propuesta.estado = 'modificada'
+        propuesta.decision = 'modificar'
+        propuesta.administrador = request.user
+        propuesta.save()
+        oc = propuesta.borrador_oc
+        if oc:
+            oc.proveedor = alt
+            oc.save()
+    return redirect('compras_propuestas')
+
+
+@login_required
+def generar_compras_propuestas_demo(request):
+    # Ejecuta la lógica de generación de propuestas (sin Celery) y redirige a la lista
+    try:
+        from automatizacion.tasks import tarea_automatizacion_presupuestos_ponderada
+        tarea_automatizacion_presupuestos_ponderada()
+        messages.success(request, 'Se generaron propuestas automáticamente.')
+    except Exception as e:
+        messages.warning(request, f'No se pudieron generar propuestas: {e}')
+    return redirect('compras_propuestas')

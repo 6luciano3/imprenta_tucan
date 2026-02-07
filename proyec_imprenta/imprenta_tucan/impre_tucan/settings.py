@@ -160,6 +160,10 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'automatizacion.tasks.tarea_alertas_retraso',
         'schedule': 30 * 60,
     },
+    'presupuestos-ponderados-cada-30min': {
+        'task': 'automatizacion.tasks.tarea_automatizacion_presupuestos_ponderada',
+        'schedule': 30 * 60,
+    },
 }
 
 from .celery import app as celery_app

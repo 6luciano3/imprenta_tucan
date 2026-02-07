@@ -351,3 +351,112 @@ def tarea_alertas_retraso():
         return "alertas_retraso: ejecutado (placeholder)"
     except Exception as e:
         return f"alertas_retraso: error {e}"
+
+
+@shared_task
+def tarea_automatizacion_presupuestos_ponderada():
+    """Detecta necesidades de compra y genera propuestas automáticas:
+    - Cruza pedidos recientes y stock de insumos
+    - Recomienda proveedor óptimo (precio, cumplimiento, incidencias, disponibilidad)
+    - Genera borrador de Orden de Compra
+    - Registra consulta de stock al proveedor
+    """
+    try:
+        from decimal import Decimal
+        from django.db import transaction
+        from pedidos.services import calcular_consumo_pedido, verificar_stock_consumo
+        from automatizacion.api.services import ProveedorInteligenteService, CRITERIOS_PESOS
+        from automatizacion.models import CompraPropuesta, ConsultaStockProveedor
+        from pedidos.models import OrdenCompra
+        from insumos.models import Insumo
+
+        # 1) Revisar pedidos recientes (últimos 7 días) y/o parametrizable
+        ventana_dias = int(Parametro.get('AUTOPRESUPUESTO_VENTANA_DIAS', 7))
+        desde = timezone.now().date() - timedelta(days=ventana_dias)
+        pedidos_recientes = Pedido.objects.filter(fecha_pedido__gte=desde).select_related('producto')
+
+        propuestas_creadas = 0
+
+        for pedido in pedidos_recientes:
+            consumo = calcular_consumo_pedido(pedido)
+            ok, faltantes = verificar_stock_consumo(consumo)
+            if ok:
+                continue  # no hay faltante
+            for insumo_id, faltan in faltantes.items():
+                try:
+                    insumo = Insumo.objects.get(idInsumo=insumo_id)
+                except Insumo.DoesNotExist:
+                    continue
+                cantidad_req = int(Decimal(str(faltan)))
+                # 2) Recomendar proveedor óptimo
+                proveedor = ProveedorInteligenteService.recomendar_proveedor(insumo)
+                # 3) Generar borrador de Orden de Compra
+                with transaction.atomic():
+                    oc = OrdenCompra.objects.create(
+                        insumo=insumo,
+                        cantidad=cantidad_req,
+                        proveedor=proveedor,
+                        estado='sugerida',
+                        comentario=f"Auto por pedido {pedido.id}: faltante {cantidad_req}"
+                    )
+                    # 4) Registrar consulta de stock
+                    consulta = ConsultaStockProveedor.objects.create(
+                        proveedor=proveedor,
+                        insumo=insumo,
+                        cantidad=cantidad_req,
+                        estado='pendiente',
+                        respuesta={}
+                    )
+                    # 5) Crear propuesta consolidada
+                    CompraPropuesta.objects.create(
+                        insumo=insumo,
+                        cantidad_requerida=cantidad_req,
+                        proveedor_recomendado=proveedor,
+                        pesos_usados=CRITERIOS_PESOS,
+                        motivo_trigger='pedido_mayor_stock',
+                        estado='consultado',
+                        borrador_oc=oc,
+                        consulta_stock=consulta,
+                    )
+                    propuestas_creadas += 1
+
+        # 6) Revisar insumos bajo stock mínimo global
+        stock_minimo = int(Parametro.get('STOCK_MINIMO_GLOBAL', 10))
+        bajos = Insumo.objects.filter(stock__lte=stock_minimo, activo=True)
+        for insumo in bajos:
+            # evitar duplicar si ya hay propuesta reciente del mismo insumo
+            ya = CompraPropuesta.objects.filter(insumo=insumo, creada__gte=timezone.now()-timedelta(days=3)).exists()
+            if ya:
+                continue
+            proveedor = ProveedorInteligenteService.recomendar_proveedor(insumo)
+            cantidad_req = max(1, stock_minimo * 2)
+            with transaction.atomic():
+                oc = OrdenCompra.objects.create(
+                    insumo=insumo,
+                    cantidad=cantidad_req,
+                    proveedor=proveedor,
+                    estado='sugerida',
+                    comentario=f"Auto stock mínimo: sugerido {cantidad_req}"
+                )
+                consulta = ConsultaStockProveedor.objects.create(
+                    proveedor=proveedor,
+                    insumo=insumo,
+                    cantidad=cantidad_req,
+                    estado='pendiente',
+                    respuesta={}
+                )
+                CompraPropuesta.objects.create(
+                    insumo=insumo,
+                    cantidad_requerida=cantidad_req,
+                    proveedor_recomendado=proveedor,
+                    pesos_usados=CRITERIOS_PESOS,
+                    motivo_trigger='stock_minimo_vencido',
+                    estado='consultado',
+                    borrador_oc=oc,
+                    consulta_stock=consulta,
+                )
+                propuestas_creadas += 1
+
+        return f"auto_presupuesto: {propuestas_creadas} propuestas generadas"
+    except Exception as e:
+        return f"auto_presupuesto: error {e}"

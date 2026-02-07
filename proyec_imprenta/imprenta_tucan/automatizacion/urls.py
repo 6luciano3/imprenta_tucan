@@ -16,4 +16,11 @@ urlpatterns = [
     path('mis-ofertas/<int:oferta_id>/confirmar/', views.confirmar_oferta_cliente, name='confirmar_oferta_cliente'),
     path('mis-ofertas/<int:oferta_id>/rechazar/', views.rechazar_oferta_cliente, name='rechazar_oferta_cliente'),
     path('demo/', views.generar_demo, name='automatizacion_demo'),
+        # Automatización de presupuestos ponderados
+        path('compras/', views.compras_propuestas_admin, name='compras_propuestas'),
+        path('compras/generar/', views.generar_compras_propuestas_demo, name='generar_compras_propuestas'),
+        path('compras/<int:propuesta_id>/consultar/', views.consultar_stock_propuesta, name='consultar_stock_propuesta'),
+        path('compras/<int:propuesta_id>/aceptar/', views.aceptar_compra_propuesta, name='aceptar_compra_propuesta'),
+        path('compras/<int:propuesta_id>/rechazar/', views.rechazar_compra_propuesta, name='rechazar_compra_propuesta'),
+        path('compras/<int:propuesta_id>/alternativo/', views.recalcular_alternativo_propuesta, name='recalcular_alternativo_propuesta'),
 ]
