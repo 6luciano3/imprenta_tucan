@@ -3,8 +3,10 @@ from datetime import timedelta
 from django.utils import timezone
 from django.db.models import Sum, Count
 
-from automatizacion.models import RankingCliente, ScoreProveedor
+from automatizacion.models import RankingCliente, ScoreProveedor, RankingHistorico, OfertaPropuesta
 from clientes.models import Cliente
+from configuracion.models import Parametro, RecetaProducto
+from productos.models import ProductoInsumo
 from pedidos.models import Pedido
 from proveedores.models import Proveedor
 
@@ -48,27 +50,150 @@ def tarea_anticipacion_compras():
 
 @shared_task
 def tarea_ranking_clientes():
-    # Recalcular RankingCliente basado en actividad de pedidos últimos 90 días
+    # Recalcular RankingCliente basado en algoritmo multicriterio configurable (últimos N días)
     try:
-        desde = timezone.now().date() - timedelta(days=90)
+        # Parámetros
+        periodo_conf = Parametro.get('RANKING_PERIODICIDAD', 'mensual')  # 'mensual' | 'trimestral'
+        ventana_dias = Parametro.get('RANKING_VENTANA_DIAS', 90)  # por defecto 90
+        umbral_precio_critico = Parametro.get('INSUMO_CRITICO_UMBRAL_PRECIO', 500.0)
+
+        desde = timezone.now().date() - timedelta(days=int(ventana_dias))
+        # Agregados básicos: total y cantidad de pedidos
+        pedidos_qs = Pedido.objects.filter(fecha_pedido__gte=desde)
         agregados = (
-            Pedido.objects.filter(fecha_pedido__gte=desde)
+            pedidos_qs
             .values('cliente_id')
             .annotate(total=Sum('monto_total'), cantidad=Count('id'))
         )
         if not agregados:
             return "ranking_clientes: sin datos recientes"
-        max_total = max(a['total'] or 0 for a in agregados) or 1
-        max_cant = max(a['cantidad'] or 0 for a in agregados) or 1
+
+        # Productos que usan insumos críticos (por precio)
+        productos_criticos = set(
+            RecetaProducto.objects.filter(insumos__precio_unitario__gte=umbral_precio_critico)
+            .values_list('producto_id', flat=True)
+            .distinct()
+        )
+
+        # Precalcular costo unitario por producto (para margen)
+        producto_ids = list(pedidos_qs.values_list('producto_id', flat=True).distinct())
+        costo_unitario_por_producto = {}
+        if producto_ids:
+            # Traer receta BOM por producto y sumar cantidad_por_unidad * precio_unitario
+            bom = ProductoInsumo.objects.select_related('insumo').filter(producto_id__in=producto_ids)
+            for pi in bom:
+                pid = pi.producto_id
+                costo_unit = costo_unitario_por_producto.get(pid, 0.0)
+                costo_unit += float(pi.cantidad_por_unidad) * float(pi.insumo.precio_unitario or 0)
+                costo_unitario_por_producto[pid] = costo_unit
+
+        # Métricas por cliente
+        # Frecuencia: pedidos por mes dentro de la ventana
+        meses_ventana = max(1, int(int(ventana_dias) / 30))
+        # Construir mapa cliente -> métricas
+        cliente_metrics = {}
+        # Para margen, iterar pedidos del cliente
+        pedidos_por_cliente = {}
+        for p in pedidos_qs.select_related('producto').all():
+            pedidos_por_cliente.setdefault(p.cliente_id, []).append(p)
+
         for a in agregados:
-            total_norm = (a['total'] or 0) / max_total
-            cant_norm = (a['cantidad'] or 0) / max_cant
-            score = round(0.7 * total_norm + 0.3 * cant_norm, 4) * 100
+            cliente_id = a['cliente_id']
+            total = float(a['total'] or 0)
+            cant = int(a['cantidad'] or 0)
+            freq = cant / meses_ventana
+            # Consumo crítico: total de pedidos con productos críticos
+            crit_total = (
+                Pedido.objects.filter(fecha_pedido__gte=desde, cliente_id=cliente_id, producto_id__in=productos_criticos)
+                .aggregate(s=Sum('monto_total'))['s'] or 0
+            )
+            # Margen total: ingresos - costo insumos (usando BOM por unidad)
+            margin_total = 0.0
+            for p in pedidos_por_cliente.get(cliente_id, []):
+                costo_unit = float(costo_unitario_por_producto.get(p.producto_id, 0.0))
+                costo_total = costo_unit * float(p.cantidad or 0)
+                ingreso = float(p.monto_total or 0)
+                margin_total += max(0.0, ingreso - costo_total)
+            cliente_metrics[cliente_id] = {
+                'total': total,
+                'cant': cant,
+                'freq': float(freq),
+                'crit_total': float(crit_total),
+                'margin_total': float(margin_total),
+            }
+
+        # Normalización
+        max_total = max(m['total'] for m in cliente_metrics.values()) or 1
+        max_cant = max(m['cant'] for m in cliente_metrics.values()) or 1
+        max_freq = max(m['freq'] for m in cliente_metrics.values()) or 1
+        max_crit = max(m['crit_total'] for m in cliente_metrics.values()) or 1
+        max_margin = max(m['margin_total'] for m in cliente_metrics.values()) or 1
+
+        # Pesos configurables (porcentaje)
+        peso_cant = float(Parametro.get('RANKING_PESO_CANTIDAD', 25)) / 100.0
+        peso_valor = float(Parametro.get('RANKING_PESO_VALOR_TOTAL', 30)) / 100.0
+        peso_freq = float(Parametro.get('RANKING_PESO_FRECUENCIA', 20)) / 100.0
+        peso_crit = float(Parametro.get('RANKING_PESO_CONSUMO_CRITICO', 20)) / 100.0
+        peso_margen = float(Parametro.get('RANKING_PESO_MARGEN', 30)) / 100.0
+
+        # Determinar periodo string
+        now = timezone.now()
+        if periodo_conf == 'trimestral':
+            q = (now.month - 1) // 3 + 1
+            periodo_str = f"{now.year}-Q{q}"
+        else:
+            periodo_str = now.strftime('%Y-%m')
+
+        # Calcular score y actualizar registros
+        for cliente_id, m in cliente_metrics.items():
+            total_norm = (m['total']) / max_total
+            cant_norm = (m['cant']) / max_cant
+            freq_norm = (m['freq']) / max_freq
+            crit_norm = (m['crit_total']) / max_crit
+            margen_norm = (m['margin_total']) / max_margin
+            # Normalizar por suma de pesos para mantener escala 0-100
+            peso_sum = max(0.0001, (peso_cant + peso_valor + peso_freq + peso_crit + peso_margen))
+            score = round(
+                ((peso_cant * cant_norm) +
+                 (peso_valor * total_norm) +
+                 (peso_freq * freq_norm) +
+                 (peso_crit * crit_norm) +
+                 (peso_margen * margen_norm)) / peso_sum, 4
+            ) * 100.0
+
             RankingCliente.objects.update_or_create(
-                cliente_id=a['cliente_id'],
+                cliente_id=cliente_id,
                 defaults={'score': score}
             )
-        return f"ranking_clientes: {len(agregados)} clientes actualizados"
+
+            # Actualizar cliente
+            Cliente.objects.filter(id=cliente_id).update(
+                puntaje_estrategico=score,
+                fecha_ultima_actualizacion=timezone.now()
+            )
+
+            # Histórico y variación
+            previo = RankingHistorico.objects.filter(cliente_id=cliente_id).order_by('-generado').first()
+            variacion = 0.0
+            if previo and previo.periodo != periodo_str:
+                variacion = round(score - float(previo.score), 4)
+
+            RankingHistorico.objects.update_or_create(
+                cliente_id=cliente_id, periodo=periodo_str,
+                defaults={
+                    'score': score,
+                    'variacion': variacion,
+                    'metricas': {
+                        'total_norm': round(total_norm, 4),
+                        'cant_norm': round(cant_norm, 4),
+                        'freq_norm': round(freq_norm, 4),
+                        'crit_norm': round(crit_norm, 4),
+                        'margen_norm': round(margen_norm, 4),
+                    }
+                }
+            )
+
+        return f"ranking_clientes: {len(cliente_metrics)} clientes actualizados ({periodo_str})"
     except Exception as e:
         return f"ranking_clientes: error {e}"
 
@@ -93,10 +218,128 @@ def tarea_recalcular_scores_proveedores():
 
 @shared_task
 def tarea_generar_ofertas():
-    # Generar ofertas automáticas basadas en reglas (placeholder)
+    # Generar ofertas automáticas basadas en reglas parametrizables (JSON)
     try:
-        # Conectar a core.ai_ml.ofertas si existe
-        return "generar_ofertas: ejecutado (placeholder)"
+        now = timezone.now()
+        periodo_conf = Parametro.get('RANKING_PERIODICIDAD', 'mensual')
+        if periodo_conf == 'trimestral':
+            q = (now.month - 1) // 3 + 1
+            periodo_str = f"{now.year}-Q{q}"
+        else:
+            periodo_str = now.strftime('%Y-%m')
+
+        # Reglas parametrizables (JSON): lista de objetos con 'condiciones' y 'accion'
+        default_rules = [
+            {
+                'nombre': 'Descuento por alto desempeño',
+                'condiciones': {'score_gte': 80},
+                'accion': {
+                    'tipo': 'descuento',
+                    'titulo': 'Descuento por alto desempeño',
+                    'descripcion': 'Descuento del 10% en el próximo pedido.',
+                    'parametros': {'descuento': 10}
+                }
+            },
+            {
+                'nombre': 'Fidelización por caída',
+                'condiciones': {'decline_periods_gte': 2, 'decline_delta_lte': -10},
+                'accion': {
+                    'tipo': 'fidelizacion',
+                    'titulo': 'Oferta de fidelización',
+                    'descripcion': 'Condiciones de pago mejoradas (30 días sin intereses).',
+                    'parametros': {'dias_sin_interes': 30}
+                }
+            },
+            {
+                'nombre': 'Prioridad por criticidad',
+                'condiciones': {'crit_norm_gte': 0.7},
+                'accion': {
+                    'tipo': 'prioridad_stock',
+                    'titulo': 'Beneficio por consumo crítico',
+                    'descripcion': 'Prioridad en stock para insumos críticos.',
+                    'parametros': {'prioridad': 'alta'}
+                }
+            },
+            {
+                'nombre': 'Promoción por buen margen',
+                'condiciones': {'margen_norm_gte': 0.6},
+                'accion': {
+                    'tipo': 'promocion',
+                    'titulo': 'Promoción especial',
+                    'descripcion': 'Bonificación en servicios complementarios en el próximo pedido.',
+                    'parametros': {'bonificacion': 'servicio_complementario'}
+                }
+            }
+        ]
+
+        reglas = Parametro.get('OFERTAS_REGLAS_JSON', default_rules)
+
+        generadas = 0
+        # Cache de históricos por cliente
+        historicos_cliente = {}
+
+        for rc in RankingCliente.objects.select_related('cliente').all():
+            cliente = rc.cliente
+            # Métricas del período actual
+            rh_actual = RankingHistorico.objects.filter(cliente=cliente, periodo=periodo_str).first()
+            metricas = (rh_actual.metricas if rh_actual else {})
+            crit_norm = float(metricas.get('crit_norm', 0) or 0)
+            margen_norm = float(metricas.get('margen_norm', 0) or 0)
+
+            # Métricas de caída consecutiva
+            if cliente.id not in historicos_cliente:
+                historicos_cliente[cliente.id] = list(
+                    RankingHistorico.objects.filter(cliente=cliente).order_by('-generado')[:5]
+                )
+            historicos = historicos_cliente[cliente.id]
+            decline_periods = 0
+            decline_delta = 0.0
+            for i in range(1, len(historicos)):
+                delta = float(historicos[i-1].score) - float(historicos[i].score)
+                if delta < 0:
+                    # si el score actual es menor, cuenta caída
+                    decline_periods += 1
+                decline_delta = min(decline_delta, delta)
+
+            # Evaluar reglas
+            for regla in reglas:
+                cond = regla.get('condiciones', {})
+                ok = True
+                if 'score_gte' in cond:
+                    ok = ok and (float(rc.score) >= float(cond['score_gte']))
+                if 'crit_norm_gte' in cond:
+                    ok = ok and (crit_norm >= float(cond['crit_norm_gte']))
+                if 'margen_norm_gte' in cond:
+                    ok = ok and (margen_norm >= float(cond['margen_norm_gte']))
+                if 'decline_periods_gte' in cond:
+                    ok = ok and (decline_periods >= int(cond['decline_periods_gte']))
+                if 'decline_delta_lte' in cond:
+                    ok = ok and (decline_delta <= float(cond['decline_delta_lte']))
+
+                if not ok:
+                    continue
+
+                accion = regla.get('accion', {})
+                tipo = accion.get('tipo', 'promocion')
+                titulo = accion.get('titulo', 'Oferta personalizada')
+                descripcion = accion.get('descripcion', '')
+                params = accion.get('parametros', {})
+
+                OfertaPropuesta.objects.get_or_create(
+                    cliente=cliente,
+                    titulo=titulo,
+                    defaults={
+                        'descripcion': descripcion,
+                        'tipo': tipo,
+                        'estado': 'pendiente',
+                        'periodo': periodo_str,
+                        'score_al_generar': rc.score,
+                        'parametros': params,
+                    }
+                )
+                generadas += 1
+
+        return f"generar_ofertas: {generadas} propuestas generadas ({periodo_str})"
     except Exception as e:
         return f"generar_ofertas: error {e}"
 

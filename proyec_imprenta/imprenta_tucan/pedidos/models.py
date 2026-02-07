@@ -24,6 +24,28 @@ class Pedido(models.Model):
     def save(self, *args, **kwargs):
         # Detectar cambio de estado a 'proceso' y descontar stock
         from .services import reservar_insumos_para_pedido
+        # Aplicar descuento automático si hay oferta aceptada para el cliente (próximo pedido)
+        oferta_aceptada = None
+        try:
+            from automatizacion.models import OfertaPropuesta
+            from decimal import Decimal
+            # Solo para nuevos pedidos
+            if not self.pk:
+                oferta_aceptada = (
+                    OfertaPropuesta.objects
+                    .filter(cliente=self.cliente, tipo='descuento', estado='aceptada')
+                    .order_by('-creada')
+                    .first()
+                )
+                if oferta_aceptada:
+                    porcentaje = Decimal(str(oferta_aceptada.parametros.get('descuento', 10)))
+                    factor = (Decimal('100') - porcentaje) / Decimal('100')
+                    try:
+                        self.monto_total = (self.monto_total * factor).quantize(self.monto_total)
+                    except Exception:
+                        self.monto_total = self.monto_total * factor
+        except Exception:
+            pass
         estado_proceso = None
         if not self.pk:
             # Nuevo pedido, buscar el estado 'proceso' si existe
@@ -37,6 +59,16 @@ class Pedido(models.Model):
             if old_estado != 'proceso' and new_estado == 'proceso':
                 reservar_insumos_para_pedido(self)
         super().save(*args, **kwargs)
+        # Marcar oferta como aplicada luego de guardar (si corresponde)
+        try:
+            if oferta_aceptada:
+                oferta_aceptada.estado = 'aplicada'
+                params = oferta_aceptada.parametros or {}
+                params['aplicada_pedido_id'] = self.pk
+                oferta_aceptada.parametros = params
+                oferta_aceptada.save()
+        except Exception:
+            pass
 
 
 class OrdenCompra(models.Model):

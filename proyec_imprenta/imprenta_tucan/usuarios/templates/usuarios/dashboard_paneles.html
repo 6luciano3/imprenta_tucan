@@ -15,6 +15,21 @@
             </div>
         </div>
     </a>
+    {% if puede_configurar_ofertas %}
+    <!-- Reglas de Ofertas -->
+    <a href="{% url 'editar_reglas_ofertas' %}" class="group bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition block">
+        <div class="flex items-center gap-3 mb-3">
+            <div class="h-12 w-12 rounded-full bg-indigo-50 text-indigo-700 grid place-items-center">
+                <span class="material-symbols-outlined">tune</span>
+            </div>
+            <div>
+                <p class="text-sm text-gray-500">Ofertas</p>
+                <p class="text-lg font-bold">Reglas de ofertas</p>
+                <p class="text-xs text-gray-400 group-hover:text-gray-600">Editar condiciones y acciones</p>
+            </div>
+        </div>
+    </a>
+    {% endif %}
     <!-- Pedidos -->
     <a href="{% url 'lista_pedidos' %}" class="group bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition">
         <div class="flex items-center gap-4">

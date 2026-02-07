@@ -1,0 +1,90 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ranking de Clientes | Imprenta Tucán</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
+    <style>
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 500, 'GRAD' 0, 'opsz' 24; }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800 font-sans min-h-screen">
+    <header class="sticky top-0 z-30 bg-white/90 backdrop-blur border-b border-gray-200">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <span class="material-symbols-outlined text-indigo-700">bar_chart_4_bars</span>
+                <span class="font-black">Ranking de Clientes</span>
+                <span class="text-gray-300">|</span>
+                <span class="text-gray-600">Período {{ periodo }}</span>
+            </div>
+            <nav class="hidden md:flex items-center gap-4">
+                <a href="{% url 'dashboard' %}" class="text-sm text-gray-600 hover:text-gray-900 flex items-center gap-1"><span class="material-symbols-outlined text-sm">home</span>Dashboard</a>
+            </nav>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div class="mb-6 flex items-center justify-between">
+            <div>
+                <h1 class="text-2xl font-black tracking-tight">Ranking de Clientes</h1>
+                <p class="text-gray-500">Ordenado por puntaje multicriterio (volumen, criticidad, margen).</p>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-x-auto">
+            <table class="min-w-full text-sm">
+                <thead class="bg-gray-50 text-gray-600 uppercase text-xs">
+                    <tr>
+                        <th class="py-3 px-4 text-left">Cliente</th>
+                        <th class="py-3 px-4 text-left">Score</th>
+                        <th class="py-3 px-4 text-left">Variación</th>
+                        <th class="py-3 px-4 text-left">Volumen (norm)</th>
+                        <th class="py-3 px-4 text-left">Criticidad (norm)</th>
+                        <th class="py-3 px-4 text-left">Margen (norm)</th>
+                        <th class="py-3 px-4 text-left">Clasificación</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                    {% for it in items %}
+                    <tr>
+                        <td class="py-3 px-4">{{ it.cliente.nombre }} {{ it.cliente.apellido }}</td>
+                        <td class="py-3 px-4 font-semibold">{{ it.score|floatformat:2 }}</td>
+                        <td class="py-3 px-4">{{ it.variacion|default:"0" }}</td>
+                        <td class="py-3 px-4 text-gray-600">{{ it.metricas.total_norm|default:"-" }}</td>
+                        <td class="py-3 px-4 text-gray-600">{{ it.metricas.crit_norm|default:"-" }}</td>
+                        <td class="py-3 px-4 text-gray-600">{{ it.metricas.margen_norm|default:"-" }}</td>
+                        <td class="py-3 px-4">
+                            {% if it.clasificacion == 'Estratégico' %}
+                            <span class="inline-flex items-center px-2 py-1 rounded bg-indigo-50 text-indigo-700 text-xs font-medium">Estratégico</span>
+                            {% else %}
+                            <span class="inline-flex items-center px-2 py-1 rounded bg-gray-100 text-gray-700 text-xs">Estándar</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="py-6 px-4 text-center text-gray-500">No hay datos de ranking para este período.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="mt-4 flex items-center justify-between">
+            <div class="text-sm text-gray-500">Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</div>
+            <div class="flex items-center gap-2">
+                {% if page_obj.has_previous %}
+                <a href="?page={{ page_obj.previous_page_number }}" class="px-3 py-1.5 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200">Anterior</a>
+                {% endif %}
+                {% if page_obj.has_next %}
+                <a href="?page={{ page_obj.next_page_number }}" class="px-3 py-1.5 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200">Siguiente</a>
+                {% endif %}
+            </div>
+        </div>
+    </main>
+</body>
+</html>

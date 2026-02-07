@@ -14,6 +14,9 @@ class Cliente(models.Model):
     celular = models.CharField(max_length=20, blank=True, null=True)
     email = models.EmailField(unique=True)
     estado = models.CharField(max_length=10, choices=[('Activo', 'Activo'), ('Inactivo', 'Inactivo')], default='Activo', db_column='estadoCliente')
+    # Ranking dinámico de clientes estratégicos
+    puntaje_estrategico = models.FloatField(default=0)
+    fecha_ultima_actualizacion = models.DateTimeField(blank=True, null=True)
 
     def __str__(self):
         return f"{self.nombre} {self.apellido} ({self.razon_social or 'Sin razón social'})"

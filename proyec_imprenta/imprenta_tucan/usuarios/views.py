@@ -140,8 +140,15 @@ def dashboard(request):
         from usuarios.models import Notificacion
         notificaciones = Notificacion.objects.filter(usuario=request.user, leida=False).order_by('-fecha')[:5]
     # ...otros datos del dashboard...
+    puede_configurar_ofertas = False
+    if request.user.is_authenticated:
+        try:
+            puede_configurar_ofertas = request.user.is_staff or request.user.groups.filter(name='Comercial').exists()
+        except Exception:
+            puede_configurar_ofertas = request.user.is_staff
     context = {
         'notificaciones': notificaciones,
+        'puede_configurar_ofertas': puede_configurar_ofertas,
         # ...otros context...
     }
     return render(request, 'usuarios/dashboard_paneles.html', context)

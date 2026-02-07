@@ -9,6 +9,7 @@ from django.shortcuts import redirect, get_object_or_404
 from .models import Parametro, GrupoParametro, Formula, FormulaHistorial
 from .services import UnidadDeMedidaRepository
 from .forms import UnidadDeMedidaForm
+from .forms import OfertasReglasForm
 from .models import UnidadDeMedida
 from django.shortcuts import render
 from .forms import RecetaProductoForm
@@ -328,3 +329,95 @@ def lista_recetas_productos(request):
         'recetas': recetas,
         'productos_con_pedidos': productos_con_pedidos
     })
+
+
+# --- UI rápida para editar reglas de ofertas (sin Admin) ---
+@login_required
+def editar_reglas_ofertas(request):
+    # Permitir a staff o grupo "Comercial"
+    es_staff = getattr(request.user, 'is_staff', False)
+    pertenece_comercial = request.user.groups.filter(name='Comercial').exists()
+    if not (es_staff or pertenece_comercial):
+        from django.http import HttpResponseForbidden
+        return HttpResponseForbidden("No tienes permisos para editar reglas de ofertas.")
+
+    # Cargar reglas actuales (o por defecto)
+    default_rules = [
+        {
+            'nombre': 'Descuento por alto desempeño',
+            'condiciones': {'score_gte': 80},
+            'accion': {
+                'tipo': 'descuento',
+                'titulo': 'Descuento por alto desempeño',
+                'descripcion': 'Descuento del 10% en el próximo pedido.',
+                'parametros': {'descuento': 10}
+            }
+        },
+        {
+            'nombre': 'Fidelización por caída',
+            'condiciones': {'decline_periods_gte': 2, 'decline_delta_lte': -10},
+            'accion': {
+                'tipo': 'fidelizacion',
+                'titulo': 'Oferta de fidelización',
+                'descripcion': 'Condiciones de pago mejoradas (30 días sin intereses).',
+                'parametros': {'dias_sin_interes': 30}
+            }
+        },
+        {
+            'nombre': 'Prioridad por criticidad',
+            'condiciones': {'crit_norm_gte': 0.7},
+            'accion': {
+                'tipo': 'prioridad_stock',
+                'titulo': 'Beneficio por consumo crítico',
+                'descripcion': 'Prioridad en stock para insumos críticos.',
+                'parametros': {'prioridad': 'alta'}
+            }
+        },
+        {
+            'nombre': 'Promoción por buen margen',
+            'condiciones': {'margen_norm_gte': 0.6},
+            'accion': {
+                'tipo': 'promocion',
+                'titulo': 'Promoción especial',
+                'descripcion': 'Bonificación en servicios complementarios en el próximo pedido.',
+                'parametros': {'bonificacion': 'servicio_complementario'}
+            }
+        }
+    ]
+
+    import json
+    reglas_actuales = Parametro.get('OFERTAS_REGLAS_JSON', default_rules)
+    initial_text = json.dumps(reglas_actuales, ensure_ascii=False, indent=2)
+
+    saved = False
+    if request.method == 'POST':
+        form = OfertasReglasForm(request.POST)
+        if form.is_valid():
+            raw = form.cleaned_data['reglas_json']
+            data = json.loads(raw)
+            # Asegurar grupo "AUTOMATIZACION" para este parámetro
+            grupo, _ = GrupoParametro.objects.get_or_create(
+                codigo='AUTOMATIZACION',
+                defaults={'nombre': 'Automatización', 'descripcion': 'Parámetros de automatización y ofertas'}
+            )
+            Parametro.set(
+                'OFERTAS_REGLAS_JSON',
+                data,
+                tipo=Parametro.TIPO_JSON,
+                grupo=grupo,
+                nombre='Reglas de Ofertas (JSON)',
+                descripcion='Reglas parametrizables para generación de ofertas',
+            )
+            saved = True
+            initial_text = json.dumps(data, ensure_ascii=False, indent=2)
+        else:
+            # Mantener texto ingresado si hay error
+            initial_text = request.POST.get('reglas_json', initial_text)
+    else:
+        form = OfertasReglasForm(initial={'reglas_json': initial_text})
+
+    context = {
+        'form': form,
+        'saved': saved,
+    }
+    return render(request, 'configuracion/ofertas_reglas.html', context)
