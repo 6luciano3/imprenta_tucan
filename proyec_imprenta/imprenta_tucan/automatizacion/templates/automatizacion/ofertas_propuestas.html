@@ -1,72 +1,57 @@
-{% load static %}
-<!DOCTYPE html>
-<html lang="es" class="light">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ranking dinámico de clientes estratégicos | Imprenta Tucán</title>
-    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&display=swap" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
-    <style>.material-symbols-outlined{font-variation-settings:'FILL' 0,'wght' 500,'GRAD' 0,'opsz' 24;}</style>
-</head>
-<body class="bg-gray-50 text-gray-800 font-sans min-h-screen">
-<header class="sticky top-0 z-30 bg-white/90 backdrop-blur border-b border-gray-200">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-        <div class="flex items-center gap-3">
-            <span class="material-symbols-outlined text-green-700">loyalty</span>
-            <span class="font-black">Ranking dinámico de clientes estratégicos</span>
-        </div>
-        <nav class="hidden md:flex items-center gap-4">
-            <a href="{% url 'dashboard' %}" class="text-sm text-gray-600 hover:text-gray-900 flex items-center gap-1"><span class="material-symbols-outlined text-sm">home</span>Dashboard</a>
-        </nav>
+{% extends 'base.html' %}
+{% block title %}Validación de Ofertas{% endblock %}
+
+{% block content %}
+    <!-- Encabezado unificado -->
+    <h1 class="text-3xl font-black mb-2 flex items-center gap-2">
+        <span class="material-symbols-outlined text-3xl">loyalty</span>
+        Validación de Ofertas
+    </h1>
+    <p class="text-gray-600 mb-4">Aprueba, ajusta o rechaza propuestas antes de enviarlas al cliente.</p>
+
+    {% if msg %}
+    <div class="mb-4 px-4 py-3 rounded-lg shadow text-white text-sm
+                {% if ok == '1' %}bg-green-600{% elif ok == '0' %}bg-red-600{% else %}bg-gray-600{% endif %}">
+        <span class="material-symbols-outlined align-middle mr-1">{% if ok == '1' %}check_circle{% elif ok == '0' %}error{% else %}info{% endif %}</span>
+        {{ msg }}
     </div>
-</header>
-<main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    {% endif %}
+
+    <!-- Acción principal -->
     <div class="mb-6">
-        <h1 class="text-2xl font-black tracking-tight">Validación de Ofertas</h1>
-        <p class="text-gray-500">Aprueba, ajusta o rechaza propuestas antes de enviarlas al cliente.</p>
-        {% if msg %}
-        <div class="mt-3 p-3 rounded-lg border text-sm {{ ok|yesno:'border-green-200 bg-green-50 text-green-700,border-red-200 bg-red-50 text-red-700' }}">
-            <span class="material-symbols-outlined align-middle">{{ ok|yesno:'check_circle,error' }}</span>
-            {{ msg }}
-        </div>
-        {% endif %}
-        <div class="mt-4">
-            <form method="post" action="{% url 'generar_propuestas' %}">
-                {% csrf_token %}
-                <button type="submit" class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700">
-                    <span class="material-symbols-outlined text-sm">auto_mode</span>
-                    Generar propuestas
-                </button>
-            </form>
-        </div>
+        <form method="post" action="{% url 'generar_propuestas' %}">
+            {% csrf_token %}
+            <button type="submit" class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700">
+                <span class="material-symbols-outlined text-sm">auto_mode</span>
+                Generar propuestas
+            </button>
+        </form>
     </div>
-    <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-x-auto">
-        <table class="min-w-full text-sm">
-            <thead class="bg-gray-50 text-gray-600 uppercase text-xs">
+    <div class="bg-white shadow rounded-xl overflow-hidden table-responsive">
+        <table class="w-full min-w-[980px] text-left text-sm">
+            <thead class="bg-gray-100 text-gray-700">
             <tr>
-                <th class="py-3 px-4 text-left">Cliente</th>
-                <th class="py-3 px-4 text-left">Título</th>
-                <th class="py-3 px-4 text-left">Descripción</th>
-                <th class="py-3 px-4 text-left">Tipo</th>
-                <th class="py-3 px-4 text-left">Estado</th>
-                <th class="py-3 px-4 text-left">Score</th>
-                <th class="py-3 px-4 text-left">Parámetros</th>
-                <th class="py-3 px-4 text-left">Validación</th>
-                <th class="py-3 px-4 text-left">Acciones</th>
+                <th class="py-3 px-5">Cliente</th>
+                <th class="py-3 px-5">Título</th>
+                <th class="py-3 px-5">Descripción</th>
+                <th class="py-3 px-5">Tipo</th>
+                <th class="py-3 px-5">Estado</th>
+                <th class="py-3 px-5">Score</th>
+                <th class="py-3 px-5">Parámetros</th>
+                <th class="py-3 px-5">Validación</th>
+                <th class="py-3 px-5 text-center">Acciones</th>
             </tr>
             </thead>
-            <tbody class="divide-y divide-gray-100">
+            <tbody>
             {% for o in ofertas %}
-                <tr>
-                    <td class="py-3 px-4">{{ o.cliente.nombre }} {{ o.cliente.apellido }}</td>
-                    <td class="py-3 px-4">{{ o.titulo }}</td>
-                    <td class="py-3 px-4 text-gray-600">{{ o.descripcion }}</td>
-                    <td class="py-3 px-4">{{ o.get_tipo_display }}</td>
-                    <td class="py-3 px-4">{{ o.get_estado_display }}</td>
-                    <td class="py-3 px-4">{{ o.score_al_generar|floatformat:2 }}</td>
-                    <td class="py-3 px-4">
+                <tr class="border-b hover:bg-gray-50">
+                    <td class="py-3 px-5 font-medium">{{ o.cliente.nombre }} {{ o.cliente.apellido }}</td>
+                    <td class="py-3 px-5">{{ o.titulo }}</td>
+                    <td class="py-3 px-5 text-gray-600">{{ o.descripcion }}</td>
+                    <td class="py-3 px-5">{{ o.get_tipo_display }}</td>
+                    <td class="py-3 px-5">{{ o.get_estado_display }}</td>
+                    <td class="py-3 px-5">{{ o.score_al_generar|floatformat:2 }}</td>
+                    <td class="py-3 px-5">
                         {% with p=o.parametros %}
                             {% if o.tipo == 'descuento' %}
                                 <span class="inline-flex items-center gap-1"><span class="material-symbols-outlined text-sm">percent</span>{{ p.descuento|default:'-' }}%</span>
@@ -81,7 +66,7 @@
                             {% endif %}
                         {% endwith %}
                     </td>
-                    <td class="py-3 px-4">
+                    <td class="py-3 px-5">
                         {% if o.fecha_validacion %}
                             <div class="text-gray-700">{{ o.fecha_validacion|date:"d/m/Y" }}</div>
                             {% if o.administrador %}
@@ -91,12 +76,16 @@
                             <span class="text-gray-400">Pendiente</span>
                         {% endif %}
                     </td>
-                    <td class="py-3 px-4">
-                        <div class="flex items-center gap-2">
-                            <a href="{% url 'aprobar_oferta' o.id %}" title="Enviar" aria-label="Enviar" class="p-2 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 inline-flex items-center justify-center">
+                    <td class="py-3 px-5">
+                        <div class="flex justify-center gap-3">
+                            <a href="{% url 'aprobar_oferta' o.id %}"
+                               class="text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                               title="Enviar">
                                 <span class="material-symbols-outlined text-sm">outgoing_mail</span>
                             </a>
-                            <a href="{% url 'rechazar_oferta' o.id %}" title="Rechazar" aria-label="Rechazar" class="p-2 rounded-lg bg-red-50 text-red-700 hover:bg-red-100 inline-flex items-center justify-center">
+                            <a href="{% url 'rechazar_oferta' o.id %}"
+                               class="text-red-600 hover:text-red-800 flex items-center gap-1"
+                               title="Rechazar">
                                 <span class="material-symbols-outlined text-sm">cancel</span>
                             </a>
                         </div>
@@ -104,13 +93,36 @@
                 </tr>
             {% empty %}
                 <tr>
-                    <td colspan="9" class="py-6 px-4 text-center text-gray-500">No hay ofertas propuestas.</td>
+                    <td colspan="9" class="py-6 px-5 text-center text-gray-500">No hay ofertas propuestas.</td>
                 </tr>
             {% endfor %}
             </tbody>
         </table>
     </div>
-    <div class="mt-4 text-sm text-gray-500">Página {{ ofertas.number }} de {{ ofertas.paginator.num_pages }}</div>
-</main>
-</body>
-</html>
+        <!-- Paginación similar a listas -->
+        <div class="px-5 py-4 border-t border-gray-200 mt-2">
+            <div class="flex justify-end items-center gap-2">
+                {% if ofertas.has_previous %}
+                    <a href="?page=1" class="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm">
+                        <span class="material-symbols-outlined text-sm">first_page</span>
+                    </a>
+                    <a href="?page={{ ofertas.previous_page_number }}" class="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm">
+                        <span class="material-symbols-outlined text-sm">chevron_left</span>
+                    </a>
+                {% endif %}
+
+                <span class="text-sm text-gray-700">
+                    Página {{ ofertas.number }} de {{ ofertas.paginator.num_pages }}
+                </span>
+
+                {% if ofertas.has_next %}
+                    <a href="?page={{ ofertas.next_page_number }}" class="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm">
+                        <span class="material-symbols-outlined text-sm">chevron_right</span>
+                    </a>
+                    <a href="?page={{ ofertas.paginator.num_pages }}" class="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm">
+                        <span class="material-symbols-outlined text-sm">last_page</span>
+                    </a>
+                {% endif %}
+            </div>
+        </div>
+{% endblock %}
