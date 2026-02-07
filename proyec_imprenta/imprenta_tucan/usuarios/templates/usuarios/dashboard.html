@@ -74,13 +74,7 @@
             <h1 class="text-3xl font-black tracking-tight">Panel de Control</h1>
             <p class="text-gray-500">Bienvenido {{ user.nombre }} {{ user.apellido }} — administra los módulos principales del sistema.</p>
         </div>
-        <!-- ACCESO DIRECTO PROYECCIONES DE INSUMOS -->
-        <div class="mb-8">
-            <a href="/insumos/lista_proyecciones/" class="block w-full md:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-6 rounded-xl shadow-lg text-center text-lg transition flex items-center justify-center gap-2">
-                <span class="material-symbols-outlined text-2xl">trending_up</span>
-                Acceso directo: Proyecciones de Insumos
-            </a>
-        </div>
+        
         <!-- STATS CARDS -->
         <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
             <a href="{% url 'lista_productos' %}" class="group bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition">
@@ -102,6 +96,18 @@
                     <div>
                         <p class="text-sm text-gray-500">Roles</p>
                         <p class="text-2xl font-bold">{{ total_roles }}</p>
+                    </div>
+                </div>
+            </a>
+            <!-- Acceso directo: Proyecciones de Insumos (una columna de grilla) -->
+            <a href="/insumos/lista_proyecciones/" class="group bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition">
+                <div class="flex items-center gap-4">
+                    <div class="h-12 w-12 rounded-full bg-blue-50 text-blue-700 grid place-items-center">
+                        <span class="material-symbols-outlined">trending_up</span>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-500">Proyecciones de Insumos</p>
+                        <p class="text-lg font-bold group-hover:text-blue-700">Acceso directo</p>
                     </div>
                 </div>
             </a>
