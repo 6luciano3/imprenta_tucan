@@ -1,6 +1,7 @@
 {% extends 'usuarios/dashboard.html' %}
 {% block extra_panels %}
-<section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
+<h3 class="mt-8 mb-2 text-sm font-semibold text-gray-600">Operaciones</h3>
+<section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
     <!-- Automatización -->
     <a href="{% url 'automatizacion_panel' %}" class="group bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition block">
         <div class="flex items-center gap-3 mb-3">
@@ -62,6 +63,10 @@
             </div>
         </div>
     </a>
+</section>
+
+<h3 class="mt-8 mb-2 text-sm font-semibold text-gray-600">Analítica</h3>
+<section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
     <!-- Proyección de Insumos -->
     <a href="{% url 'lista_proyecciones' %}" class="group bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition">
         <div class="flex items-center gap-4">
@@ -98,6 +103,10 @@
             </div>
         </div>
     </a>
+</section>
+
+<h3 class="mt-8 mb-2 text-sm font-semibold text-gray-600">Administración</h3>
+<section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
     <!-- Usuarios -->
     <a href="{% url 'lista_usuarios' %}" class="group bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition">
         <div class="flex items-center gap-4">
