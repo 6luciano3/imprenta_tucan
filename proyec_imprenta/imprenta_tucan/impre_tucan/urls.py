@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
-from impre_tucan.views import dashboard
+from impre_tucan.views import dashboard, privacidad
 from usuarios.views import inicio
 from impre_tucan.views import confirmar_eliminacion_cliente
 from . import views
@@ -34,6 +34,7 @@ urlpatterns = [
 
     # Página principal
     path('dashboard/', dashboard, name='dashboard'),
+    path('privacidad/', privacidad, name='privacidad'),
     # Endpoints API Inteligente
     path('', include('api.urls')),
 ]

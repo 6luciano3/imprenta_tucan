@@ -58,7 +58,8 @@
 </nav>
 {% endif %}
 
-<div class="flex min-h-screen">
+<div class="min-h-screen flex flex-col">
+  <div class="flex flex-1">
   {% if not request.GET.popup %}
 
   <!-- Sidebar responsive -->
@@ -163,6 +164,28 @@
 
     {% block content %}{% endblock %}
   </main>
+  </div>
+
+  {% if not request.GET.popup %}
+  <footer class="bg-white border-t border-gray-200">
+    <div class="container mx-auto px-4 py-3 md:py-4 flex flex-col md:flex-row items-center justify-between gap-2 text-sm md:text-base">
+      <div class="flex items-center gap-2 text-gray-600">
+        <span class="material-symbols-outlined text-blue-600">local_printshop</span>
+        <span class="font-semibold">Imprenta Tucán</span>
+        <span class="hidden md:inline">·</span>
+        <span class="text-gray-400">Panel Administrativo</span>
+        <span class="hidden md:inline">·</span>
+        <span class="text-gray-400">&copy; {{ now|default:None|date:'Y' }}</span>
+      </div>
+      <div class="flex items-center gap-4">
+        <span class="text-gray-500">Versión v2026.02</span>
+        <a href="mailto:info@imprenta.com.ar" class="text-blue-600 hover:text-blue-800">Contacto</a>
+        <a href="{% url 'privacidad' %}" class="text-blue-600 hover:text-blue-800">Política de Privacidad</a>
+        {% block footer_extra %}{% endblock %}
+      </div>
+    </div>
+  </footer>
+  {% endif %}
 
 <!-- Sin JS de menú móvil: el encabezado solo muestra "Imprenta Tucán" -->
 {% block extra_js %}{% endblock %}

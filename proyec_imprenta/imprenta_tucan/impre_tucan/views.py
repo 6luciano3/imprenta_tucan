@@ -119,3 +119,9 @@ def buscar_cliente(request):
         'clientes': clientes,
         'criterio': criterio
     })
+
+
+# Política de Privacidad
+@login_required
+def privacidad(request):
+    return render(request, 'privacidad.html')
