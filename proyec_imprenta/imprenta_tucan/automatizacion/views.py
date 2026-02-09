@@ -541,3 +541,43 @@ def recalcular_scores_proveedores(request):
         messages.warning(request, f'No se pudieron recalcular los scores: {e}')
     # Volver al panel de automatización para visualizar cambios
     return redirect('automatizacion_panel')
+
+
+@csrf_exempt
+def webhook_consulta_stock(request, propuesta_id):
+    """Webhook externo para que proveedores reporten disponibilidad de stock.
+    Autenticación simple por token en encabezado `X-Webhook-Token` o parámetro `token`.
+    """
+    from automatizacion.models import CompraPropuesta, ConsultaStockProveedor
+    from configuracion.models import Parametro
+    # Validación de token
+    token = request.headers.get('X-Webhook-Token') or request.POST.get('token') or request.GET.get('token')
+    expected = Parametro.get('WEBHOOK_TOKEN', '')
+    if not expected or token != expected:
+        return JsonResponse({'error': 'forbidden'}, status=403)
+    # Datos
+    estado = request.POST.get('estado') or request.GET.get('estado')  # 'disponible'|'parcial'|'no'
+    detalle = request.POST.get('detalle') or request.GET.get('detalle') or ''
+    propuesta = get_object_or_404(CompraPropuesta, pk=propuesta_id)
+    consulta = propuesta.consulta_stock
+    if not consulta:
+        # crear consulta si no existiera
+        consulta = ConsultaStockProveedor.objects.create(
+            proveedor=propuesta.proveedor_recomendado,
+            insumo=propuesta.insumo,
+            cantidad=int(propuesta.cantidad_requerida or 0),
+            estado='pendiente',
+            respuesta={}
+        )
+        propuesta.consulta_stock = consulta
+    if estado in {'disponible', 'parcial', 'no'}:
+        consulta.estado = estado
+        consulta.respuesta = {'detalle': detalle}
+        consulta.save()
+        propuesta.estado = 'respuesta_disponible' if estado == 'disponible' else ('parcial' if estado == 'parcial' else 'no_disponible')
+        propuesta.save()
+        return JsonResponse({'ok': True, 'estado': estado})
+    else:
+        consulta.estado = 'pendiente'
+        consulta.save()
+        return JsonResponse({'ok': True, 'estado': 'pendiente'})

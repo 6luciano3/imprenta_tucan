@@ -25,4 +25,6 @@ urlpatterns = [
         path('compras/<int:propuesta_id>/alternativo/', views.recalcular_alternativo_propuesta, name='recalcular_alternativo_propuesta'),
         # Acciones rápidas
         path('acciones/recalcular-scores/', views.recalcular_scores_proveedores, name='recalcular_scores_proveedores'),
+        # Webhook externo para proveedores
+        path('webhook/consulta-stock/<int:propuesta_id>/', views.webhook_consulta_stock, name='webhook_consulta_stock'),
 ]

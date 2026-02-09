@@ -457,6 +457,43 @@ def tarea_automatizacion_presupuestos_ponderada():
                 )
                 propuestas_creadas += 1
 
-        return f"auto_presupuesto: {propuestas_creadas} propuestas generadas"
+        # 7) Auto-aceptación según parámetros si hay respuesta disponible y el proveedor cumple umbral
+        auto_aprobar = bool(Parametro.get('AUTO_APROBAR_PROPUESTAS', False))
+        aceptadas_auto = 0
+        if auto_aprobar:
+            umbral_score = float(Parametro.get('UMBRAL_SCORE_PROVEEDOR', 70))
+            # Propuestas en estado consultado o con respuesta disponible
+            from automatizacion.models import CompraPropuesta
+            from automatizacion.models import ScoreProveedor
+            propuestas = CompraPropuesta.objects.select_related('insumo', 'proveedor_recomendado', 'consulta_stock', 'borrador_oc')\
+                .filter(estado__in=['consultado', 'respuesta_disponible'])
+            for p in propuestas:
+                try:
+                    consulta_ok = p.consulta_stock and p.consulta_stock.estado == 'disponible'
+                    proveedor = p.proveedor_recomendado
+                    score_ok = False
+                    if proveedor:
+                        sp = ScoreProveedor.objects.filter(proveedor=proveedor).first()
+                        score_ok = (sp and float(sp.score or 0) >= umbral_score)
+                    if consulta_ok and score_ok:
+                        oc = p.borrador_oc
+                        if oc:
+                            oc.estado = 'confirmada'
+                            oc.save()
+                        insumo = p.insumo
+                        if proveedor:
+                            insumo.proveedor = proveedor
+                        insumo.stock = (insumo.stock or 0) + int(p.cantidad_requerida or 0)
+                        insumo.save(update_fields=['proveedor', 'stock'])
+                        p.estado = 'aceptada'
+                        p.decision = 'aceptar'
+                        p.comentario_admin = 'Aceptada automáticamente por umbrales'
+                        p.save()
+                        aceptadas_auto += 1
+                except Exception:
+                    # seguir con las demás
+                    pass
+
+        return f"auto_presupuesto: {propuestas_creadas} propuestas generadas; {aceptadas_auto} aceptadas automáticamente"
     except Exception as e:
         return f"auto_presupuesto: error {e}"
