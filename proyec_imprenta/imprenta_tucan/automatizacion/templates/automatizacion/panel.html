@@ -1,5 +1,5 @@
-{% extends 'usuarios/dashboard.html' %}
-{% block extra_panels %}
+{% extends 'base.html' %}
+{% block content %}
 <div class="flex justify-end mb-4">
   <a href="{% url 'dashboard' %}" class="inline-flex items-center gap-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold py-2 px-4 rounded shadow">
     <span class="material-symbols-outlined text-base">arrow_back</span>
@@ -21,6 +21,7 @@
       <div class="flex items-center gap-3">
         <button id="btnDemoAutomatizacion" class="text-xs px-2 py-1 rounded bg-gray-100 text-gray-700 hover:bg-gray-200" type="button">Generar demo</button>
         <a href="{% url 'automatizacion_ordenes' %}" class="text-xs text-blue-600 hover:underline">Ver todas</a>
+        <a href="{% url 'generar_compras_propuestas' %}" class="text-xs text-emerald-600 hover:underline">Generar propuestas de compras</a>
       </div>
     </div>
     <ul id="ordenesResumen" class="text-sm space-y-1">
@@ -53,8 +54,45 @@
     </ul>
   </div>
 </section>
+
+<!-- Acciones rápidas -->
+<section class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+  <a href="{% url 'ranking_clientes' %}" class="bg-white border border-gray-200 rounded-xl p-4 shadow-sm hover:shadow-md transition block">
+    <div class="flex items-center gap-3">
+      <div class="h-10 w-10 rounded-full bg-indigo-50 text-indigo-700 grid place-items-center">
+        <span class="material-symbols-outlined">star_rate</span>
+      </div>
+      <div>
+        <p class="text-sm text-gray-500">Inteligencia</p>
+        <p class="text-base font-semibold">Ver ranking de clientes</p>
+      </div>
+    </div>
+  </a>
+  <a href="{% url 'compras_propuestas' %}" class="bg-white border border-gray-200 rounded-xl p-4 shadow-sm hover:shadow-md transition block">
+    <div class="flex items-center gap-3">
+      <div class="h-10 w-10 rounded-full bg-emerald-50 text-emerald-700 grid place-items-center">
+        <span class="material-symbols-outlined">shopping_bag</span>
+      </div>
+      <div>
+        <p class="text-sm text-gray-500">Compras</p>
+        <p class="text-base font-semibold">Propuestas de compra</p>
+      </div>
+    </div>
+  </a>
+  <a href="{% url 'recalcular_scores_proveedores' %}" class="bg-white border border-gray-200 rounded-xl p-4 shadow-sm hover:shadow-md transition block">
+    <div class="flex items-center gap-3">
+      <div class="h-10 w-10 rounded-full bg-amber-50 text-amber-700 grid place-items-center">
+        <span class="material-symbols-outlined">refresh</span>
+      </div>
+      <div>
+        <p class="text-sm text-gray-500">Proveedores</p>
+        <p class="text-base font-semibold">Recalcular scores</p>
+      </div>
+    </div>
+  </a>
+</section>
 {% endblock %}
-{% block scripts %}
+{% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function(){
   const btnDemo = document.getElementById('btnDemoAutomatizacion');

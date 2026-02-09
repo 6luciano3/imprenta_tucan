@@ -5,6 +5,10 @@
 
 <form method="get" class="mb-6 flex flex-wrap gap-4 items-end bg-gray-50 p-4 rounded-lg shadow">
     <div>
+        <label for="app" class="block text-xs font-semibold mb-1">App</label>
+        <input type="text" name="app" id="app" value="{{ request.GET.app }}" class="border rounded px-2 py-1 text-sm" placeholder="App">
+    </div>
+    <div>
         <label for="modelo" class="block text-xs font-semibold mb-1">Modelo</label>
         <input type="text" name="modelo" id="modelo" value="{{ request.GET.modelo }}" class="border rounded px-2 py-1 text-sm" placeholder="Modelo">
     </div>
@@ -22,18 +26,40 @@
         <input type="text" name="usuario" id="usuario" value="{{ request.GET.usuario }}" class="border rounded px-2 py-1 text-sm" placeholder="Usuario">
     </div>
     <div>
-        <label for="fecha" class="block text-xs font-semibold mb-1">Fecha</label>
-        <input type="date" name="fecha" id="fecha" value="{{ request.GET.fecha }}" class="border rounded px-2 py-1 text-sm">
+        <label for="fecha_desde" class="block text-xs font-semibold mb-1">Desde</label>
+        <input type="date" name="fecha_desde" id="fecha_desde" value="{{ request.GET.fecha_desde }}" class="border rounded px-2 py-1 text-sm">
+    </div>
+    <div>
+        <label for="fecha_hasta" class="block text-xs font-semibold mb-1">Hasta</label>
+        <input type="date" name="fecha_hasta" id="fecha_hasta" value="{{ request.GET.fecha_hasta }}" class="border rounded px-2 py-1 text-sm">
+    </div>
+    <div>
+        <label for="categoria" class="block text-xs font-semibold mb-1">Categoría</label>
+        <select name="categoria" id="categoria" class="border rounded px-2 py-1 text-sm">
+            <option value="">Todas</option>
+            <option value="stock-movement" {% if request.GET.categoria == 'stock-movement' %}selected{% endif %}>Movimientos de stock</option>
+            <option value="pedidos" {% if request.GET.categoria == 'pedidos' %}selected{% endif %}>Pedidos</option>
+            <option value="automatizacion" {% if request.GET.categoria == 'automatizacion' %}selected{% endif %}>Automatización</option>
+            <option value="insumos" {% if request.GET.categoria == 'insumos' %}selected{% endif %}>Insumos</option>
+            <option value="productos" {% if request.GET.categoria == 'productos' %}selected{% endif %}>Productos</option>
+            <option value="proveedores" {% if request.GET.categoria == 'proveedores' %}selected{% endif %}>Proveedores</option>
+            <option value="clientes" {% if request.GET.categoria == 'clientes' %}selected{% endif %}>Clientes</option>
+            <option value="usuarios" {% if request.GET.categoria == 'usuarios' %}selected{% endif %}>Usuarios</option>
+            <option value="presupuestos" {% if request.GET.categoria == 'presupuestos' %}selected{% endif %}>Presupuestos</option>
+        </select>
     </div>
     <div class="flex gap-2 items-end">
         <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 rounded">Buscar</button>
         <a href="{% url 'lista_auditoria' %}" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold px-4 py-2 rounded inline-block">Limpiar</a>
+        <a href="{% url 'exportar_auditoria_csv' %}?{{ export_params }}" class="bg-green-600 hover:bg-green-700 text-white font-semibold px-4 py-2 rounded inline-block">Exportar CSV</a>
+        <a href="{% url 'exportar_auditoria_xlsx' %}?{{ export_params }}" class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-2 rounded inline-block">Exportar Excel</a>
     </div>
 </form>
 <table class="min-w-full border text-sm">
     <thead class="bg-gray-100">
         <tr>
             <th class="px-2 py-1">ID</th>
+            <th class="px-2 py-1">App</th>
             <th class="px-2 py-1">Modelo/Registro</th>
             <th class="px-2 py-1">Evento</th>
             <th class="px-2 py-1">Usuario</th>
@@ -45,6 +71,7 @@
         {% for a in auditorias %}
         <tr>
             <td class="px-2 py-1">{{ a.id }}</td>
+            <td class="px-2 py-1">{{ a.app_label }}</td>
             <td class="px-2 py-1">{{ a.model }} / {{ a.object_repr|truncatechars:30 }}</td>
             <td class="px-2 py-1">{{ a.get_action_display }}</td>
             <td class="px-2 py-1">{{ a.user|default_if_none:"" }}</td>

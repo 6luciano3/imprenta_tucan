@@ -23,4 +23,6 @@ urlpatterns = [
         path('compras/<int:propuesta_id>/aceptar/', views.aceptar_compra_propuesta, name='aceptar_compra_propuesta'),
         path('compras/<int:propuesta_id>/rechazar/', views.rechazar_compra_propuesta, name='rechazar_compra_propuesta'),
         path('compras/<int:propuesta_id>/alternativo/', views.recalcular_alternativo_propuesta, name='recalcular_alternativo_propuesta'),
+        # Acciones rápidas
+        path('acciones/recalcular-scores/', views.recalcular_scores_proveedores, name='recalcular_scores_proveedores'),
 ]

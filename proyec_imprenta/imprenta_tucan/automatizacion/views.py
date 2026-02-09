@@ -528,3 +528,16 @@ def generar_compras_propuestas_demo(request):
     except Exception as e:
         messages.warning(request, f'No se pudieron generar propuestas: {e}')
     return redirect('compras_propuestas')
+
+
+@login_required
+def recalcular_scores_proveedores(request):
+    """Acción rápida: recalcula `ScoreProveedor` para todos los proveedores activos."""
+    try:
+        from automatizacion.tasks import tarea_recalcular_scores_proveedores
+        tarea_recalcular_scores_proveedores()
+        messages.success(request, 'Scores de proveedores recalculados correctamente.')
+    except Exception as e:
+        messages.warning(request, f'No se pudieron recalcular los scores: {e}')
+    # Volver al panel de automatización para visualizar cambios
+    return redirect('automatizacion_panel')

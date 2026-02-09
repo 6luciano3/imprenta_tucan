@@ -75,11 +75,32 @@ def audit_pre_save(sender, instance, **kwargs):
         # se manejará en post_save como create
         instance._audit_before = None
     else:
-        # capturamos estado previo
+        # Capturar estado previo desde la base de datos para detectar cambios reales
+        try:
+            current = sender.objects.get(pk=instance.pk)
+        except sender.DoesNotExist:
+            instance._audit_before = None
+            return
         before = {}
         for f in sender._meta.get_fields():
             if getattr(f, 'editable', False) and hasattr(f, 'attname') and not f.many_to_many and not f.one_to_many:
-                before[f.name] = get_field_value(instance, f)
+                # Obtener valor del registro persistido (current)
+                try:
+                    value = getattr(current, f.name, None)
+                except Exception:
+                    value = None
+                # Serializar valor
+                if value is None:
+                    before[f.name] = None
+                else:
+                    # Representar FK por PK si aplica
+                    if f.many_to_one or f.one_to_one:
+                        try:
+                            before[f.name] = serialize_value(getattr(value, 'pk', None))
+                        except Exception:
+                            before[f.name] = None
+                    else:
+                        before[f.name] = serialize_value(value)
         instance._audit_before = before
 
 
@@ -98,6 +119,7 @@ def audit_post_save(sender, instance, created, **kwargs):
     if created:
         changes = {k: {'before': None, 'after': v} for k, v in after.items() if v is not None}
         action = AuditEntry.ACTION_CREATE
+        before = {}
     else:
         before = getattr(instance, '_audit_before', {}) or {}
         changes = build_diff(before, after)
@@ -121,6 +143,45 @@ def audit_post_save(sender, instance, created, **kwargs):
         changes_json = json.dumps({k: {sk: _stringify(sv) for sk, sv in v.items()}
                                   for k, v in (changes or {}).items()}, ensure_ascii=False) if changes else None
 
+    # Agregar información específica para movimientos de stock de Insumo
+    extra_json = None
+    try:
+        if model_name == 'Insumo' and 'stock' in changes:
+            before_stock = changes['stock']['before'] if 'stock' in changes else before.get('stock')
+            after_stock = changes['stock']['after'] if 'stock' in changes else after.get('stock')
+            try:
+                delta = (after_stock or 0) - (before_stock or 0)
+            except Exception:
+                delta = None
+
+            # Inferir origen según el path
+            path = getattr(request, 'path', '') if request else ''
+            method = getattr(request, 'method', '') if request else ''
+            if path.startswith('/pedidos/'):
+                reason = 'pedido'
+            elif path.startswith('/insumos/alta') or path.startswith('/insumos/editar'):
+                reason = 'insumo-form'
+            elif path.startswith('/automatizacion/') or '/compras/' in path:
+                reason = 'automatizacion'
+            else:
+                reason = 'desconocido'
+
+            extra_payload = {
+                'category': 'stock-movement',
+                'delta': delta,
+                'before': before_stock,
+                'after': after_stock,
+                'source': {
+                    'path': path,
+                    'method': method,
+                    'reason': reason,
+                }
+            }
+            extra_json = json.dumps(extra_payload, ensure_ascii=False)
+    except Exception:
+        # no bloquear auditoría por error en extra
+        extra_json = None
+
     AuditEntry.objects.create(
         user=user,
         ip_address=getattr(request, 'META', {}).get('REMOTE_ADDR') if request else None,
@@ -132,6 +193,7 @@ def audit_post_save(sender, instance, created, **kwargs):
         object_repr=str(instance),
         action=action,
         changes=changes_json,
+        extra=extra_json or json.dumps({'category': sender._meta.app_label}, ensure_ascii=False),
     )
 
 
@@ -156,6 +218,8 @@ def audit_pre_delete(sender, instance, **kwargs):
     except TypeError:
         changes_json = json.dumps({'before': str(before)}, ensure_ascii=False) if before else None
 
+    # Categoría por defecto basada en app
+    default_extra = json.dumps({'category': sender._meta.app_label}, ensure_ascii=False)
     AuditEntry.objects.create(
         user=user,
         ip_address=getattr(request, 'META', {}).get('REMOTE_ADDR') if request else None,
@@ -167,4 +231,5 @@ def audit_pre_delete(sender, instance, **kwargs):
         object_repr=str(instance),
         action=AuditEntry.ACTION_DELETE,
         changes=changes_json,
+        extra=default_extra,
     )
