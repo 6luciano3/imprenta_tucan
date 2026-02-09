@@ -12,6 +12,14 @@
 		</a>
 	{% endif %}
 {% endblock %}
+{% block list_actions_right %}
+  <a href="{% url 'reporte_stock' %}"
+     class="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg shadow hover:bg-blue-700"
+     title="Ver reporte de stock disponible">
+    <span class="material-symbols-outlined">description</span>
+    Reporte
+  </a>
+{% endblock %}
 {% block search_placeholder %}Nombre, código, proveedor, categoría...{% endblock %}
 {% block clear_url %}{% url 'lista_insumos' %}{% endblock %}
 {% block order_fields_options %}

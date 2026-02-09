@@ -30,6 +30,7 @@ urlpatterns = [
     path('auditoria/', include('auditoria.urls')),
     path('automatizacion/', include('automatizacion.urls')),
     path('configuracion/', include('configuracion.urls')),
+    path('reportes/', include('reportes.urls')),
 
     # Página principal
     path('dashboard/', dashboard, name='dashboard'),

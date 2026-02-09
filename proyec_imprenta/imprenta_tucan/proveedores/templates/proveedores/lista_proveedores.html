@@ -18,7 +18,14 @@
   <option value="direccion" {% if order_by == 'direccion' %}selected{% endif %}>Dirección</option>
 {% endblock %}
 
-{% block list_actions_right %}{% endblock %}
+{% block list_actions_right %}
+  <a href="{% url 'reporte_proveedores_activos' %}"
+     class="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg shadow hover:bg-blue-700"
+     title="Ver reporte de proveedores activos">
+    <span class="material-symbols-outlined">description</span>
+    Reporte
+  </a>
+{% endblock %}
 
 
 {% block list_content %}

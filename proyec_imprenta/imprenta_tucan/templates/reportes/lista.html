@@ -1,0 +1,62 @@
+{% extends 'base.html' %}
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="p-6">
+  <div class="flex items-center justify-between mb-4">
+    <h1 class="text-2xl font-bold">{{ title }}</h1>
+    <div class="flex gap-2">
+      {% if preview_url %}
+      <a href="{{ preview_url }}" class="px-3 py-2 bg-purple-600 text-white rounded">Vista previa</a>
+      {% endif %}
+      <a href="?format=pdf" class="px-3 py-2 bg-red-600 text-white rounded">PDF</a>
+      <a href="?format=csv" class="px-3 py-2 bg-gray-700 text-white rounded">CSV</a>
+      <a href="?format=xlsx" class="px-3 py-2 bg-green-600 text-white rounded">Excel</a>
+      <a href="?format=json" class="px-3 py-2 bg-blue-600 text-white rounded">JSON</a>
+    </div>
+  </div>
+  <div class="bg-white shadow rounded-xl overflow-hidden">
+    <div class="overflow-x-auto">
+    <table class="min-w-full border border-gray-300 bg-white">
+      <thead>
+        <tr class="bg-gray-100">
+          {% for h in headers %}
+          <th class="px-3 py-2 text-left border-b">{{ h }}</th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% if rows_page %}
+        {% for row in rows_page %}
+        <tr class="hover:bg-gray-50">
+          {% for col in row %}
+          <td class="px-3 py-2 border-b">{{ col }}</td>
+          {% endfor %}
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="{{ headers|length }}" class="px-3 py-4 text-center text-gray-500">No hay datos.</td>
+        </tr>
+        {% endfor %}
+        {% else %}
+        {% for row in rows %}
+        <tr class="hover:bg-gray-50">
+          {% for col in row %}
+          <td class="px-3 py-2 border-b">{{ col }}</td>
+          {% endfor %}
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="{{ headers|length }}" class="px-3 py-4 text-center text-gray-500">No hay datos.</td>
+        </tr>
+        {% endfor %}
+        {% endif %}
+      </tbody>
+    </table>
+    </div>
+    {% if page_obj %}
+      {% include 'layouts/pagination.html' with page_obj=page_obj %}
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

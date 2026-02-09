@@ -1,6 +1,15 @@
 {% extends 'layouts/list_base.html' %}
 {% block title %}Lista de Clientes{% endblock %}
 
+{% block list_actions_right %}
+  <a href="{% url 'reporte_clientes_frecuentes' %}"
+     class="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg shadow hover:bg-blue-700"
+     title="Ver reporte de clientes frecuentes">
+    <span class="material-symbols-outlined">description</span>
+    Reporte
+  </a>
+{% endblock %}
+
 {% block extra_head %}
 {{ block.super }}
 <style>
