@@ -27,7 +27,7 @@ except Exception:
 
 try:
     # ReportLab for PDF
-    from reportlab.lib.pagesizes import A4, LETTER, landscape
+    from reportlab.lib.pagesizes import A4, LETTER, LEGAL, landscape
     from reportlab.lib import colors
     from reportlab.lib.enums import TA_CENTER
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -124,11 +124,34 @@ def _export_pdf(title: str, headers: list[str], rows: list[list], page_setup: di
     # Page setup
     paper = (page_setup or {}).get('paper', 'A4').upper()
     orientation = (page_setup or {}).get('orientation', 'portrait').lower()
-    base_size = A4 if paper == 'A4' else LETTER
+    # Mapear tamaños de papel soportados
+    PAPER_SIZES = {
+        'A4': A4,
+        'LETTER': LETTER,
+        'LEGAL': LEGAL,
+        # TABLOID: 11x17 pulgadas (792x1224 puntos)
+        'TABLOID': (792, 1224),
+    }
+    base_size = PAPER_SIZES.get(paper, A4)
     pagesize = landscape(base_size) if orientation == 'landscape' else base_size
     buf = io.BytesIO()
-    doc = SimpleDocTemplate(buf, pagesize=pagesize, leftMargin=40, rightMargin=40, topMargin=60, bottomMargin=60)
+    # Márgenes "Moderados": top ≈ 1" (72pt), left/right ≈ 0.75" (54pt)
+    # En apaisada, reducir margen inferior para aprovechar el espacio al no tener pie
+    bottom_margin = 48 if orientation == 'landscape' else 72
+    doc = SimpleDocTemplate(
+        buf,
+        pagesize=pagesize,
+        leftMargin=54,
+        rightMargin=54,
+        topMargin=72,
+        bottomMargin=bottom_margin,
+    )
     styles = getSampleStyleSheet()
+    # Texto general (fecha, cuerpo) a 9 pt
+    try:
+        styles['Normal'].fontSize = 9
+    except Exception:
+        pass
     centered_heading = ParagraphStyle(
         name='CenteredHeading',
         parent=styles['Heading2'],
@@ -153,14 +176,18 @@ def _export_pdf(title: str, headers: list[str], rows: list[list], page_setup: di
             pass
     if logo_path:
         try:
-            img = Image(logo_path, width=120, height=60)
+            img = Image(logo_path, width=140, height=70)
+            # Alinear el logo a la izquierda
+            try:
+                img.hAlign = 'LEFT'
+            except Exception:
+                pass
             story.append(img)
         except Exception:
             story.append(Paragraph("Imprenta Tucán", styles['Title']))
     else:
         story.append(Paragraph("Imprenta Tucán", styles['Title']))
 
-    story.append(Spacer(1, 12))
     story.append(Paragraph(title, centered_heading))
     story.append(Paragraph(datetime.now().strftime('%Y-%m-%d %H:%M'), styles['Normal']))
     story.append(Spacer(1, 12))
@@ -174,6 +201,7 @@ def _export_pdf(title: str, headers: list[str], rows: list[list], page_setup: di
         ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
         ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
+        ('FONTSIZE', (0, 0), (-1, -1), 9),
         ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#9ca3af')),
     ]))
     story.append(table)
@@ -329,9 +357,21 @@ def reporte_clientes_frecuentes(request):
 
 
 def _preview_context(title: str, headers: list[str], rows: list[list]):
-    logo_static_path = 'img/logo_tucan.png'
-    logo_found = bool(finders.find(logo_static_path))
-    logo_url = static(logo_static_path) if logo_found else None
+    # Intentar ubicar el logo en static con varios nombres posibles
+    candidates = [
+        'img/logo_tucan.png',
+        'img/Logo Tucan_Mesa de trabajo 1.png',
+        'img/logo.png',
+    ]
+    logo_static_path = None
+    for cand in candidates:
+        try:
+            if finders.find(cand):
+                logo_static_path = cand
+                break
+        except Exception:
+            pass
+    logo_url = static(logo_static_path) if logo_static_path else None
     return {
         'title': title,
         'headers': headers,
@@ -401,8 +441,9 @@ def preview_clientes_frecuentes(request):
     orientation = (request.GET.get('orientation') or 'portrait').lower()
     ctx['paper'] = paper
     ctx['orientation'] = orientation
-    ctx['export_pdf_url'] = reverse('reporte_clientes_frecuentes') + f'?format=pdf&paper={paper}&orientation={orientation}'
     ctx['simple_preview'] = True
+    # Mejorar diseño de controles en esta vista
+    ctx['controls_variant'] = 'pill'
     # Solicitud: eliminar pie de página en paisaje para esta vista previa
     if orientation == 'landscape':
         ctx['hide_footer'] = True

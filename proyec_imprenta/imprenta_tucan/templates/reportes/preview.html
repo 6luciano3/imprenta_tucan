@@ -15,6 +15,14 @@
     .btn-back { background:#6b7280; }
     .container { max-width: 1024px; margin: 16px auto; background: white; }
 
+    /* Controles tipo "pill" (segmentados) */
+    .seg-group { display:flex; align-items:center; gap:10px; }
+    .seg-label { font-size:12px; color: var(--gray-600); }
+    .seg { display:inline-flex; background:#fff; border:1px solid var(--gray-300); border-radius:999px; padding:4px; gap:4px; }
+    .seg-btn { display:inline-block; padding:6px 12px; border-radius:999px; color:#1f2937; text-decoration:none; border:0; background:transparent; }
+    .seg-btn:hover { background: var(--gray-100); }
+    .seg-btn.active { background:#2563eb; color:#fff; box-shadow: 0 1px 2px rgba(0,0,0,0.08); }
+
     .sheet { page-break-after: always; }
     header { display:flex; align-items:center; justify-content:space-between; padding: 16px 0; border-bottom:1px solid var(--gray-300); }
     header .title { font-size: 22px; font-weight: 700; }
@@ -33,7 +41,19 @@
 
     @media print {
       .no-print { display: none !important; }
-      @page { size: {{ paper|default:"A4" }} {{ orientation|default:"portrait" }}; margin: 20mm; }
+      /* Márgenes "Moderados"; en apaisada, reducir margen inferior */
+      @page {
+        size: {{ paper|default:"A4" }} {{ orientation|default:"portrait" }};
+        {% if orientation == 'landscape' %}
+        /* top right bottom left */
+        margin: 25mm 19mm 15mm 19mm;
+        {% else %}
+        margin: 25mm 19mm;
+        {% endif %}
+      }
+      /* Texto de impresión a 9pt */
+      body { font-size: 9pt; }
+      table thead th, table tbody td, header .meta { font-size: 9pt; }
       body { margin: 0; }
       .container { margin: 0; }
     }
@@ -44,11 +64,37 @@
     <div style="display:flex; align-items:center; gap:12px;">
       {% if simple_preview %}
         <strong>{{ title }}</strong>
+        {% if controls_variant == 'pill' %}
+        <div style="display:flex; align-items:center; gap:16px; margin-left:12px;">
+          <div class="seg-group">
+            <span class="seg-label">Orientación:</span>
+            <div class="seg" role="group" aria-label="Orientación">
+              <a href="#" onclick="setOrientation('portrait'); return false;" class="seg-btn {% if orientation == 'portrait' %}active{% endif %}">Vertical</a>
+              <a href="#" onclick="setOrientation('landscape'); return false;" class="seg-btn {% if orientation == 'landscape' %}active{% endif %}">Apaisada</a>
+            </div>
+          </div>
+          <div class="seg-group">
+            <span class="seg-label">Tamaño:</span>
+            <div class="seg" role="group" aria-label="Tamaño de papel">
+              <a href="#" onclick="setPaper('A4'); return false;" class="seg-btn {% if paper == 'A4' %}active{% endif %}">A4</a>
+              <a href="#" onclick="setPaper('LETTER'); return false;" class="seg-btn {% if paper == 'LETTER' %}active{% endif %}">Carta</a>
+              <a href="#" onclick="setPaper('LEGAL'); return false;" class="seg-btn {% if paper == 'LEGAL' %}active{% endif %}">Legal</a>
+              <a href="#" onclick="setPaper('TABLOID'); return false;" class="seg-btn {% if paper == 'TABLOID' %}active{% endif %}">Tabloide</a>
+            </div>
+          </div>
+        </div>
+        {% else %}
         <div style="display:flex; align-items:center; gap:6px; margin-left:12px;">
           <span style="font-size:12px; color: var(--gray-600);">Orientación:</span>
           <a href="#" onclick="setOrientation('portrait'); return false;" class="btn btn-back" style="background:#e5e7eb; color:#1f2937; padding:6px 10px; border-radius:6px; {% if orientation == 'portrait' %}box-shadow: inset 0 0 0 2px #4b5563;{% endif %}">Vertical</a>
           <a href="#" onclick="setOrientation('landscape'); return false;" class="btn btn-back" style="background:#e5e7eb; color:#1f2937; padding:6px 10px; border-radius:6px; {% if orientation == 'landscape' %}box-shadow: inset 0 0 0 2px #4b5563;{% endif %}">Apaisada</a>
+          <span style="font-size:12px; color: var(--gray-600); margin-left:12px;">Tamaño:</span>
+          <a href="#" onclick="setPaper('A4'); return false;" class="btn btn-back" style="background:#e5e7eb; color:#1f2937; padding:6px 10px; border-radius:6px; {% if paper == 'A4' %}box-shadow: inset 0 0 0 2px #4b5563;{% endif %}">A4</a>
+          <a href="#" onclick="setPaper('LETTER'); return false;" class="btn btn-back" style="background:#e5e7eb; color:#1f2937; padding:6px 10px; border-radius:6px; {% if paper == 'LETTER' %}box-shadow: inset 0 0 0 2px #4b5563;{% endif %}">Carta</a>
+          <a href="#" onclick="setPaper('LEGAL'); return false;" class="btn btn-back" style="background:#e5e7eb; color:#1f2937; padding:6px 10px; border-radius:6px; {% if paper == 'LEGAL' %}box-shadow: inset 0 0 0 2px #4b5563;{% endif %}">Legal</a>
+          <a href="#" onclick="setPaper('TABLOID'); return false;" class="btn btn-back" style="background:#e5e7eb; color:#1f2937; padding:6px 10px; border-radius:6px; {% if paper == 'TABLOID' %}box-shadow: inset 0 0 0 2px #4b5563;{% endif %}">Tabloide</a>
         </div>
+        {% endif %}
       {% else %}
         <strong>{{ title }}</strong> — Vista previa
         <form method="get" style="display:flex; gap:8px; align-items:center;">
@@ -155,6 +201,16 @@
         // Fallback para navegadores antiguos
         var sep = window.location.search ? '&' : '?';
         window.location.href = window.location.pathname + window.location.search + sep + 'orientation=' + encodeURIComponent(val);
+      }
+    }
+    function setPaper(val) {
+      try {
+        var url = new URL(window.location.href);
+        url.searchParams.set('paper', val);
+        window.location.href = url.toString();
+      } catch (e) {
+        var sep = window.location.search ? '&' : '?';
+        window.location.href = window.location.pathname + window.location.search + sep + 'paper=' + encodeURIComponent(val);
       }
     }
   </script>
