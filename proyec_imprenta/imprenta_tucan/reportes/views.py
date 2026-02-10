@@ -392,7 +392,6 @@ def preview_stock(request):
     orientation = (request.GET.get('orientation') or 'portrait').lower()
     ctx['paper'] = paper
     ctx['orientation'] = orientation
-    ctx['export_pdf_url'] = reverse('reporte_stock') + f'?format=pdf&paper={paper}&orientation={orientation}'
     ctx['simple_preview'] = True  # ocultar controles de tamaño/orientación y etiqueta "Vista previa"
     # Solicitud: eliminar pie de página en esta vista previa (todas las orientaciones)
     ctx['hide_footer'] = True
@@ -408,11 +407,9 @@ def preview_proveedores_activos(request):
     orientation = (request.GET.get('orientation') or 'portrait').lower()
     ctx['paper'] = paper
     ctx['orientation'] = orientation
-    ctx['export_pdf_url'] = reverse('reporte_proveedores_activos') + f'?format=pdf&paper={paper}&orientation={orientation}'
     ctx['simple_preview'] = True
-    # Solicitud: eliminar pie de página en paisaje para esta vista previa
-    if orientation == 'landscape':
-        ctx['hide_footer'] = True
+    # Solicitud: eliminar pie de página en esta vista previa
+    ctx['hide_footer'] = True
     return render(request, 'reportes/preview.html', ctx)
 
 
@@ -444,7 +441,6 @@ def preview_clientes_frecuentes(request):
     ctx['simple_preview'] = True
     # Mejorar diseño de controles en esta vista
     ctx['controls_variant'] = 'pill'
-    # Solicitud: eliminar pie de página en paisaje para esta vista previa
-    if orientation == 'landscape':
-        ctx['hide_footer'] = True
+    # Solicitud: eliminar pie de página en esta vista previa
+    ctx['hide_footer'] = True
     return render(request, 'reportes/preview.html', ctx)

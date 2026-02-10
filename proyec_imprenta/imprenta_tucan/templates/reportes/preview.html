@@ -64,7 +64,6 @@
     <div style="display:flex; align-items:center; gap:12px;">
       {% if simple_preview %}
         <strong>{{ title }}</strong>
-        {% if controls_variant == 'pill' %}
         <div style="display:flex; align-items:center; gap:16px; margin-left:12px;">
           <div class="seg-group">
             <span class="seg-label">Orientación:</span>
@@ -83,18 +82,6 @@
             </div>
           </div>
         </div>
-        {% else %}
-        <div style="display:flex; align-items:center; gap:6px; margin-left:12px;">
-          <span style="font-size:12px; color: var(--gray-600);">Orientación:</span>
-          <a href="#" onclick="setOrientation('portrait'); return false;" class="btn btn-back" style="background:#e5e7eb; color:#1f2937; padding:6px 10px; border-radius:6px; {% if orientation == 'portrait' %}box-shadow: inset 0 0 0 2px #4b5563;{% endif %}">Vertical</a>
-          <a href="#" onclick="setOrientation('landscape'); return false;" class="btn btn-back" style="background:#e5e7eb; color:#1f2937; padding:6px 10px; border-radius:6px; {% if orientation == 'landscape' %}box-shadow: inset 0 0 0 2px #4b5563;{% endif %}">Apaisada</a>
-          <span style="font-size:12px; color: var(--gray-600); margin-left:12px;">Tamaño:</span>
-          <a href="#" onclick="setPaper('A4'); return false;" class="btn btn-back" style="background:#e5e7eb; color:#1f2937; padding:6px 10px; border-radius:6px; {% if paper == 'A4' %}box-shadow: inset 0 0 0 2px #4b5563;{% endif %}">A4</a>
-          <a href="#" onclick="setPaper('LETTER'); return false;" class="btn btn-back" style="background:#e5e7eb; color:#1f2937; padding:6px 10px; border-radius:6px; {% if paper == 'LETTER' %}box-shadow: inset 0 0 0 2px #4b5563;{% endif %}">Carta</a>
-          <a href="#" onclick="setPaper('LEGAL'); return false;" class="btn btn-back" style="background:#e5e7eb; color:#1f2937; padding:6px 10px; border-radius:6px; {% if paper == 'LEGAL' %}box-shadow: inset 0 0 0 2px #4b5563;{% endif %}">Legal</a>
-          <a href="#" onclick="setPaper('TABLOID'); return false;" class="btn btn-back" style="background:#e5e7eb; color:#1f2937; padding:6px 10px; border-radius:6px; {% if paper == 'TABLOID' %}box-shadow: inset 0 0 0 2px #4b5563;{% endif %}">Tabloide</a>
-        </div>
-        {% endif %}
       {% else %}
         <strong>{{ title }}</strong> — Vista previa
         <form method="get" style="display:flex; gap:8px; align-items:center;">

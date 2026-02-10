@@ -88,6 +88,11 @@
                                title="Rechazar">
                                 <span class="material-symbols-outlined text-sm">cancel</span>
                             </a>
+                                     <button type="button"
+                                         class="text-gray-600 hover:text-gray-800 flex items-center gap-1 delete-offer-btn"
+                                         data-oferta-id="{{ o.id }}" data-oferta-title="{{ o.titulo }}" data-oferta-cliente="{{ o.cliente.nombre }} {{ o.cliente.apellido }}" title="Eliminar">
+                                <span class="material-symbols-outlined text-sm">delete</span>
+                            </button>
                         </div>
                     </td>
                 </tr>
@@ -125,4 +130,67 @@
                 {% endif %}
             </div>
         </div>
+                <!-- Modal de confirmación de eliminación -->
+                <div id="deleteModal" class="fixed inset-0 bg-black/40 hidden items-center justify-center z-50">
+                        <div class="bg-white rounded-xl shadow-lg w-full max-w-md">
+                                <div class="p-5 border-b border-gray-200">
+                                        <h3 class="text-lg font-semibold flex items-center gap-2">
+                                                <span class="material-symbols-outlined text-red-600">delete</span>
+                                                Confirmar eliminación
+                                        </h3>
+                                </div>
+                                <div class="p-5 text-sm text-gray-700 space-y-1">
+                                    <p>¿Seguro que deseas eliminar esta oferta? Esta acción no se puede deshacer.</p>
+                                    <p><span class="font-semibold">Cliente:</span> <span id="modalCliente" class="text-gray-900"></span></p>
+                                    <p><span class="font-semibold">Oferta:</span> <span id="modalTitulo" class="text-gray-900"></span></p>
+                                </div>
+                                <div class="p-5 flex justify-end gap-3 border-t border-gray-200">
+                                        <button type="button" id="cancelDeleteBtn" class="px-4 py-2 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200">Cancelar</button>
+                                        <form id="deleteForm" method="post" action="#">
+                                                {% csrf_token %}
+                                                <button type="submit" class="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700">Eliminar</button>
+                                        </form>
+                                </div>
+                        </div>
+                </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    (function() {
+        const modal = document.getElementById('deleteModal');
+        const deleteForm = document.getElementById('deleteForm');
+        const cancelBtn = document.getElementById('cancelDeleteBtn');
+        const prefix = '/automatizacion/propuestas/';
+
+        function openModal(ofertaId, title, cliente) {
+            deleteForm.action = prefix + ofertaId + '/eliminar/';
+            document.getElementById('modalTitulo').innerText = title || '';
+            document.getElementById('modalCliente').innerText = cliente || '';
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeModal() {
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            deleteForm.action = '#';
+        }
+
+        document.querySelectorAll('.delete-offer-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const ofertaId = this.getAttribute('data-oferta-id');
+                const title = this.getAttribute('data-oferta-title');
+                const cliente = this.getAttribute('data-oferta-cliente');
+                openModal(ofertaId, title, cliente);
+            });
+        });
+
+        cancelBtn.addEventListener('click', closeModal);
+        // Close on overlay click
+        modal.addEventListener('click', function(e) {
+            if (e.target === modal) closeModal();
+        });
+    })();
+</script>
 {% endblock %}

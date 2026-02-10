@@ -1,6 +1,8 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.core.paginator import Paginator
+from django.db.models import OuterRef, Subquery, F
+from clientes.models import Cliente
 from django.http import JsonResponse
 from .models import OrdenSugerida, OfertaAutomatica, RankingCliente, RankingHistorico, OfertaPropuesta
 from django.utils import timezone
@@ -105,12 +107,12 @@ def lista_ranking_clientes(request):
 # --- Gestión de ofertas propuestas (Administrador) ---
 @login_required
 def ofertas_propuestas_admin(request):
-    qs = OfertaPropuesta.objects.select_related('cliente').order_by('-creada')
-    try:
-        from configuracion.services import get_page_size
-        page_size = get_page_size()
-    except Exception:
-        page_size = 10
+    # Mostrar una sola oferta por cliente: la de mayor score (si empata, la más reciente)
+    base_qs = OfertaPropuesta.objects.select_related('cliente')
+    best_id_sub = base_qs.filter(cliente_id=OuterRef('cliente_id')).order_by('-score_al_generar', '-creada').values('id')[:1]
+    qs = base_qs.annotate(best_id=Subquery(best_id_sub)).filter(id=F('best_id')).order_by('-score_al_generar', '-creada')
+    # Mostrar exactamente 10 clientes por página
+    page_size = 10
     paginator = Paginator(qs, page_size)
     page = request.GET.get('page')
     ofertas = paginator.get_page(page)
@@ -152,6 +154,19 @@ def rechazar_oferta(request, oferta_id):
     except Exception:
         pass
     return redirect('ofertas_propuestas')
+
+
+@login_required
+def eliminar_oferta(request, oferta_id):
+    # Seguridad: solo permitir vía POST
+    if request.method != 'POST':
+        return redirect("/automatizacion/propuestas/?ok=0&msg=Confirmaci%C3%B3n%20requerida")
+    oferta = get_object_or_404(OfertaPropuesta, pk=oferta_id)
+    try:
+        oferta.delete()
+        return redirect("/automatizacion/propuestas/?ok=1&msg=Oferta%20eliminada")
+    except Exception:
+        return redirect("/automatizacion/propuestas/?ok=0&msg=No%20se%20pudo%20eliminar")
 
 
 # --- Ofertas para cliente (confirmación/rechazo) ---
