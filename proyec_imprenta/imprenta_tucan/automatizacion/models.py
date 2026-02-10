@@ -97,6 +97,68 @@ class OfertaPropuesta(models.Model):
         return f"{self.titulo} - {self.cliente} ({self.estado})"
 
 
+class MensajeOferta(models.Model):
+    ESTADOS = [
+        ('enviado', 'Enviado'),
+        ('entregado', 'Entregado'),
+        ('leido', 'Leído'),
+        ('fallido', 'Fallido'),
+    ]
+
+    CANALES = [
+        ('email', 'Email'),
+        ('sms', 'SMS'),
+        ('whatsapp', 'WhatsApp'),
+    ]
+
+    oferta = models.ForeignKey(OfertaPropuesta, on_delete=models.CASCADE, related_name='mensajes')
+    cliente = models.ForeignKey('clientes.Cliente', on_delete=models.CASCADE)
+    estado = models.CharField(max_length=20, choices=ESTADOS)
+    canal = models.CharField(max_length=20, choices=CANALES, default='email')
+    provider_id = models.CharField(max_length=120, blank=True)
+    detalle = models.TextField(blank=True)
+    enviado_en = models.DateTimeField(auto_now_add=True)
+    actualizado = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ('-actualizado',)
+
+    def __str__(self):
+        return f"Mensaje {self.get_estado_display()} ({self.canal}) - Oferta {self.oferta_id}"
+
+
+class AccionCliente(models.Model):
+    TIPOS = [
+        ('vista', 'Vista de oferta/listado'),
+        ('click', 'Click en enlace/botón'),
+        ('aceptar', 'Aceptó la oferta'),
+        ('rechazar', 'Rechazó la oferta'),
+        ('consulta', 'Realizó una consulta'),
+        ('leido', 'Leyó el mensaje'),
+    ]
+
+    CANALES = [
+        ('web', 'Web'),
+        ('email', 'Email'),
+        ('sms', 'SMS'),
+        ('whatsapp', 'WhatsApp'),
+    ]
+
+    cliente = models.ForeignKey('clientes.Cliente', on_delete=models.CASCADE, related_name='acciones_cliente')
+    oferta = models.ForeignKey(OfertaPropuesta, on_delete=models.CASCADE, null=True, blank=True, related_name='acciones_cliente')
+    tipo = models.CharField(max_length=20, choices=TIPOS)
+    canal = models.CharField(max_length=20, choices=CANALES, default='web')
+    detalle = models.TextField(blank=True)
+    metadata = models.JSONField(default=dict, blank=True)
+    creado = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ('-creado',)
+
+    def __str__(self):
+        return f"Acción {self.tipo} ({self.canal}) - Cliente {self.cliente_id} Oferta {self.oferta_id}"
+
+
 class AprobacionAutomatica(models.Model):
     pedido = models.ForeignKey('pedidos.Pedido', on_delete=models.CASCADE)
     aprobado_por = models.ForeignKey(get_user_model(), on_delete=models.SET_NULL, null=True, blank=True)

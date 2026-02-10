@@ -1,7 +1,7 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.core.paginator import Paginator
-from django.db.models import OuterRef, Subquery, F
+from django.db.models import OuterRef, Subquery, F, Count
 from clientes.models import Cliente
 from django.http import JsonResponse
 from .models import OrdenSugerida, OfertaAutomatica, RankingCliente, RankingHistorico, OfertaPropuesta
@@ -110,7 +110,34 @@ def ofertas_propuestas_admin(request):
     # Mostrar una sola oferta por cliente: la de mayor score (si empata, la más reciente)
     base_qs = OfertaPropuesta.objects.select_related('cliente')
     best_id_sub = base_qs.filter(cliente_id=OuterRef('cliente_id')).order_by('-score_al_generar', '-creada').values('id')[:1]
-    qs = base_qs.annotate(best_id=Subquery(best_id_sub)).filter(id=F('best_id')).order_by('-score_al_generar', '-creada')
+    from .models import MensajeOferta, AccionCliente
+    # Último estado de mensaje por oferta
+    last_msg_state_sub = MensajeOferta.objects.filter(oferta_id=OuterRef('pk')).order_by('-actualizado').values('estado')[:1]
+    last_msg_time_sub = MensajeOferta.objects.filter(oferta_id=OuterRef('pk')).order_by('-actualizado').values('actualizado')[:1]
+    # Última acción del cliente por oferta y cantidad total de acciones
+    last_action_type_sub = AccionCliente.objects.filter(oferta_id=OuterRef('pk')).order_by('-creado').values('tipo')[:1]
+    last_action_time_sub = AccionCliente.objects.filter(oferta_id=OuterRef('pk')).order_by('-creado').values('creado')[:1]
+    actions_count_sub = (
+        AccionCliente.objects
+        .filter(oferta_id=OuterRef('pk'))
+        .order_by()
+        .values('oferta_id')
+        .annotate(c=Count('id'))
+        .values('c')[:1]
+    )
+    qs = (
+        base_qs
+        .annotate(best_id=Subquery(best_id_sub))
+        .filter(id=F('best_id'))
+        .annotate(
+            estado_mensaje=Subquery(last_msg_state_sub),
+            mensaje_actualizado=Subquery(last_msg_time_sub),
+            ultima_accion=Subquery(last_action_type_sub),
+            accion_actualizada=Subquery(last_action_time_sub),
+            acciones_count=Subquery(actions_count_sub),
+        )
+        .order_by('-score_al_generar', '-creada')
+    )
     # Mostrar exactamente 10 clientes por página
     page_size = 10
     paginator = Paginator(qs, page_size)
@@ -128,6 +155,12 @@ def aprobar_oferta(request, oferta_id):
     oferta.fecha_validacion = timezone.now()
     oferta.administrador = request.user
     oferta.save()
+    # Registrar estado de mensaje "enviado" (inicial)
+    try:
+        from .models import MensajeOferta
+        MensajeOferta.objects.create(oferta=oferta, cliente=oferta.cliente, estado='enviado', detalle='Mensaje inicial marcado como enviado')
+    except Exception:
+        pass
     return redirect('ofertas_propuestas')
 
 
@@ -169,6 +202,53 @@ def eliminar_oferta(request, oferta_id):
         return redirect("/automatizacion/propuestas/?ok=0&msg=No%20se%20pudo%20eliminar")
 
 
+@csrf_exempt
+def mensaje_callback(request):
+    """Webhook para actualizar estado de mensajes de ofertas.
+    Espera JSON con: estado (enviado|entregado|leido|fallido), oferta_id, cliente_id,
+    opcional: canal (email|sms|whatsapp), provider_id, detalle.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'ok': False, 'error': 'Método inválido'}, status=405)
+    try:
+        payload = json.loads(request.body.decode('utf-8'))
+    except Exception:
+        return JsonResponse({'ok': False, 'error': 'JSON inválido'}, status=400)
+
+    estado = payload.get('estado')
+    oferta_id = payload.get('oferta_id')
+    cliente_id = payload.get('cliente_id')
+    canal = (payload.get('canal') or 'email').lower()
+    provider_id = payload.get('provider_id') or ''
+    detalle = payload.get('detalle') or ''
+
+    from .models import MensajeOferta, OfertaPropuesta
+
+    # Validaciones básicas
+    valid_estados = {k for k, _ in MensajeOferta.ESTADOS}
+    valid_canales = {k for k, _ in MensajeOferta.CANALES}
+    if not (estado and oferta_id and cliente_id):
+        return JsonResponse({'ok': False, 'error': 'Campos requeridos: estado, oferta_id, cliente_id'}, status=400)
+    if estado not in valid_estados:
+        return JsonResponse({'ok': False, 'error': 'Estado inválido'}, status=400)
+    if canal not in valid_canales:
+        return JsonResponse({'ok': False, 'error': 'Canal inválido'}, status=400)
+
+    oferta = OfertaPropuesta.objects.filter(pk=oferta_id, cliente_id=cliente_id).first()
+    if not oferta:
+        return JsonResponse({'ok': False, 'error': 'Oferta/Cliente no encontrado'}, status=404)
+
+    msg = MensajeOferta.objects.create(
+        oferta=oferta,
+        cliente_id=cliente_id,
+        estado=estado,
+        canal=canal,
+        provider_id=provider_id,
+        detalle=detalle,
+    )
+    return JsonResponse({'ok': True, 'mensaje_id': msg.id})
+
+
 # --- Ofertas para cliente (confirmación/rechazo) ---
 @login_required
 def mis_ofertas_cliente(request):
@@ -190,6 +270,18 @@ def confirmar_oferta_cliente(request, oferta_id):
     oferta.estado = 'aceptada'
     oferta.fecha_validacion = timezone.now()
     oferta.save()
+    # Registrar acción del cliente
+    try:
+        from .models import AccionCliente
+        AccionCliente.objects.create(
+            cliente=oferta.cliente,
+            oferta=oferta,
+            tipo='aceptar',
+            canal='web',
+            detalle='Cliente confirmó la oferta desde el portal',
+        )
+    except Exception:
+        pass
     return redirect('mis_ofertas_cliente')
 
 
@@ -201,6 +293,18 @@ def rechazar_oferta_cliente(request, oferta_id):
     oferta.estado = 'rechazada'
     oferta.fecha_validacion = timezone.now()
     oferta.save()
+    # Registrar acción del cliente
+    try:
+        from .models import AccionCliente
+        AccionCliente.objects.create(
+            cliente=oferta.cliente,
+            oferta=oferta,
+            tipo='rechazar',
+            canal='web',
+            detalle='Cliente rechazó la oferta desde el portal',
+        )
+    except Exception:
+        pass
     # Notificar área comercial y registrar log
     try:
         from usuarios.models import Usuario, Notificacion
@@ -217,6 +321,54 @@ def rechazar_oferta_cliente(request, oferta_id):
     except Exception:
         pass
     return redirect('mis_ofertas_cliente')
+
+
+@csrf_exempt
+def accion_callback(request):
+    """Webhook genérico para registrar acciones del cliente.
+    Espera JSON con: cliente_id, oferta_id (opcional), tipo (vista|click|aceptar|rechazar|consulta|leido),
+    opcional: canal (web|email|sms|whatsapp), detalle, metadata.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'ok': False, 'error': 'Método inválido'}, status=405)
+    try:
+        import json
+        payload = json.loads(request.body.decode('utf-8'))
+    except Exception:
+        return JsonResponse({'ok': False, 'error': 'JSON inválido'}, status=400)
+
+    cliente_id = payload.get('cliente_id')
+    oferta_id = payload.get('oferta_id')
+    tipo = (payload.get('tipo') or '').lower()
+    canal = (payload.get('canal') or 'web').lower()
+    detalle = payload.get('detalle') or ''
+    metadata = payload.get('metadata') or {}
+
+    from .models import AccionCliente, OfertaPropuesta
+    # Validaciones básicas
+    valid_tipos = {k for k, _ in AccionCliente.TIPOS}
+    valid_canales = {k for k, _ in AccionCliente.CANALES}
+    if not (cliente_id and tipo):
+        return JsonResponse({'ok': False, 'error': 'Campos requeridos: cliente_id, tipo'}, status=400)
+    if tipo not in valid_tipos:
+        return JsonResponse({'ok': False, 'error': 'Tipo inválido'}, status=400)
+    if canal not in valid_canales:
+        return JsonResponse({'ok': False, 'error': 'Canal inválido'}, status=400)
+
+    kwargs = {
+        'cliente_id': cliente_id,
+        'tipo': tipo,
+        'canal': canal,
+        'detalle': detalle,
+        'metadata': metadata,
+    }
+    if oferta_id:
+        of = OfertaPropuesta.objects.filter(pk=oferta_id, cliente_id=cliente_id).first()
+        if not of:
+            return JsonResponse({'ok': False, 'error': 'Oferta/Cliente no encontrado'}, status=404)
+        kwargs['oferta'] = of
+    accion = AccionCliente.objects.create(**kwargs)
+    return JsonResponse({'ok': True, 'accion_id': accion.id})
 
 
 # --- Acción manual: generar propuestas de ofertas ---

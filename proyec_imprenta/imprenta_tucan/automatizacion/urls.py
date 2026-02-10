@@ -8,6 +8,8 @@ urlpatterns = [
     path('ranking/', views.lista_ranking_clientes, name='ranking_clientes'),
     # Gestión de ofertas propuestas (admin)
     path('propuestas/', views.ofertas_propuestas_admin, name='ofertas_propuestas'),
+    path('mensajes/callback/', views.mensaje_callback, name='mensaje_callback'),
+    path('acciones/callback/', views.accion_callback, name='accion_callback'),
     path('propuestas/<int:oferta_id>/aprobar/', views.aprobar_oferta, name='aprobar_oferta'),
     path('propuestas/<int:oferta_id>/rechazar/', views.rechazar_oferta, name='rechazar_oferta'),
     path('propuestas/<int:oferta_id>/eliminar/', views.eliminar_oferta, name='eliminar_oferta'),
