@@ -1,3 +1,65 @@
+# Endpoints públicos para aceptar/rechazar desde email
+from .models import OfertaPropuesta, AccionCliente
+from django.utils import timezone
+
+def aceptar_oferta_token(request, token):
+    oferta = get_object_or_404(OfertaPropuesta, token_email=token)
+    if oferta.estado != 'aceptada':
+        oferta.estado = 'aceptada'
+        oferta.fecha_validacion = timezone.now()
+        oferta.save()
+        AccionCliente.objects.create(
+            cliente=oferta.cliente,
+            oferta=oferta,
+            tipo='aceptar',
+            canal='email',
+            detalle='Cliente aceptó la oferta desde el email',
+        )
+    return render(request, 'automatizacion/accion_confirmada.html', {'oferta': oferta, 'accion': 'aceptada'})
+
+def rechazar_oferta_token(request, token):
+    oferta = get_object_or_404(OfertaPropuesta, token_email=token)
+    if oferta.estado != 'rechazada':
+        oferta.estado = 'rechazada'
+        oferta.fecha_validacion = timezone.now()
+        oferta.save()
+        AccionCliente.objects.create(
+            cliente=oferta.cliente,
+            oferta=oferta,
+            tipo='rechazar',
+            canal='email',
+            detalle='Cliente rechazó la oferta desde el email',
+        )
+    return render(request, 'automatizacion/accion_confirmada.html', {'oferta': oferta, 'accion': 'rechazada'})
+# --- Importaciones necesarias ---
+from django.views.decorators.csrf import csrf_exempt
+from django.http import HttpResponse
+# --- Tracking pixel para registrar "leído" ---
+@csrf_exempt
+def pixel_leido(request):
+    """Vista para tracking pixel: registra acción 'leido' al cargar la imagen."""
+    cliente_id = request.GET.get('cliente_id')
+    oferta_id = request.GET.get('oferta_id')
+    tipo = request.GET.get('tipo', 'leido')
+    canal = request.GET.get('canal', 'email')
+    if cliente_id and oferta_id:
+        from .models import AccionCliente, OfertaPropuesta
+        try:
+            oferta = OfertaPropuesta.objects.filter(pk=oferta_id, cliente_id=cliente_id).first()
+            if oferta:
+                AccionCliente.objects.create(
+                    cliente_id=cliente_id,
+                    oferta=oferta,
+                    tipo=tipo,
+                    canal=canal,
+                    detalle='Tracking pixel (leído)',
+                )
+        except Exception:
+            pass
+    # 1x1 GIF transparente
+    gif = b'GIF89a\x01\x00\x01\x00\x80\x00\x00\x00\x00\x00\xff\xff\xff!\xf9\x04\x01\x00\x00\x00\x00,\x00\x00\x00\x00\x01\x00\x01\x00\x00\x02\x02D\x01\x00;'
+    return HttpResponse(gif, content_type='image/gif')
+from django.views.decorators.csrf import csrf_exempt
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.core.paginator import Paginator
@@ -6,10 +68,8 @@ from clientes.models import Cliente
 from django.http import JsonResponse
 from .models import OrdenSugerida, OfertaAutomatica, RankingCliente, RankingHistorico, OfertaPropuesta
 from django.utils import timezone
-from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import get_user_model
-from django.core.paginator import Paginator
 from django import forms
 from .services import enviar_oferta_email
 

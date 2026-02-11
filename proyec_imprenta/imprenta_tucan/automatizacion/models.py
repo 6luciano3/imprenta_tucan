@@ -1,3 +1,4 @@
+from django.utils.crypto import get_random_string
 from django.db import models
 from django.contrib.auth import get_user_model
 
@@ -65,6 +66,12 @@ class OfertaAutomatica(models.Model):
 
 
 class OfertaPropuesta(models.Model):
+    token_email = models.CharField(max_length=32, blank=True, null=True, unique=True)
+
+    def save(self, *args, **kwargs):
+        if not self.token_email:
+            self.token_email = get_random_string(32)
+        super().save(*args, **kwargs)
     ESTADOS = [
         ('pendiente', 'Pendiente de aprobación'),
         ('enviada', 'Enviada al cliente'),

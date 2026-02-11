@@ -1,0 +1,13 @@
+{% extends 'base.html' %}
+{% block title %}Acción registrada{% endblock %}
+{% block content %}
+<div class="max-w-xl mx-auto mt-12 bg-white shadow rounded-xl p-8 text-center">
+  <h1 class="text-2xl font-bold mb-4">¡Acción registrada!</h1>
+  {% if accion == 'aceptada' %}
+    <p class="text-green-700 text-lg mb-2">Has aceptado la oferta correctamente.</p>
+  {% elif accion == 'rechazada' %}
+    <p class="text-red-700 text-lg mb-2">Has rechazado la oferta correctamente.</p>
+  {% endif %}
+  <a href="/automatizacion/mis-ofertas/" class="mt-4 inline-block px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Ver mis ofertas</a>
+</div>
+{% endblock %}

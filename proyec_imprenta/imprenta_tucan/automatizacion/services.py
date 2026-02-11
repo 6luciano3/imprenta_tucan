@@ -10,30 +10,45 @@ def enviar_oferta_email(oferta, request=None):
     if not oferta.cliente or not oferta.cliente.email:
         return False, 'Cliente sin email definido'
     subject = f"Nueva oferta: {oferta.titulo}"
-    # Link a la página de ofertas del cliente si se dispone de request
-    url = ''
-    try:
-        if request is not None:
-            url = request.build_absolute_uri(reverse('mis_ofertas_cliente'))
-    except Exception:
-        url = ''
-    body_lines = [
-        f"Hola {oferta.cliente.nombre or oferta.cliente.razon_social or ''},",
-        "Tenemos una oferta para vos:",
-        f"Título: {oferta.titulo}",
-        f"Descripción: {oferta.descripcion}",
-    ]
-    if url:
-        body_lines.append("")
-        body_lines.append(f"Podés verla y aceptarla acá: {url}")
-    body = "\n".join(body_lines)
+    # Construir links de acción y tracking pixel
+    url_base = ''
+    if request is not None:
+        url_base = request.build_absolute_uri('/')[:-1]  # quitar barra final
+    oferta_id = oferta.id
+    cliente_id = oferta.cliente.id
+    # Links de acción con token único
+    token = oferta.token_email or ''
+    link_aceptar = f"{url_base}/automatizacion/oferta/{token}/aceptar/"
+    link_rechazar = f"{url_base}/automatizacion/oferta/{token}/rechazar/"
+    link_ver = f"{url_base}/automatizacion/mis-ofertas/"
+    # Tracking pixel
+    tracking_pixel = f'<img src="{url_base}/automatizacion/acciones/callback/?cliente_id={cliente_id}&oferta_id={oferta_id}&tipo=leido&canal=email" width="1" height="1" style="display:none;" alt="" />'
+    # Email HTML
+    html_body = f'''
+    <p>Hola {oferta.cliente.nombre or oferta.cliente.razon_social or ''},</p>
+    <p>Tenemos una oferta para vos:</p>
+    <ul>
+        <li><b>Título:</b> {oferta.titulo}</li>
+        <li><b>Descripción:</b> {oferta.descripcion}</li>
+    </ul>
+    <p>
+        <a href="{link_aceptar}" style="background:#22c55e;color:white;padding:8px 16px;border-radius:6px;text-decoration:none;">Aceptar oferta</a>
+        &nbsp;
+        <a href="{link_rechazar}" style="background:#ef4444;color:white;padding:8px 16px;border-radius:6px;text-decoration:none;">Rechazar oferta</a>
+    </p>
+    <p>
+        <a href="{link_ver}">Ver todas mis ofertas</a>
+    </p>
+    {tracking_pixel}
+    '''
     try:
         send_mail(
             subject,
-            body,
+            '',  # plain text vacío
             getattr(settings, 'DEFAULT_FROM_EMAIL', 'no-reply@imprenta.local'),
             [oferta.cliente.email],
             fail_silently=False,
+            html_message=html_body
         )
         return True, None
     except Exception as e:
