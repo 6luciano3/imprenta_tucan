@@ -15,7 +15,7 @@ def aceptar_oferta_token(request, token):
             canal='email',
             detalle='Cliente aceptó la oferta desde el email',
         )
-    return render(request, 'automatizacion/accion_confirmada.html', {'oferta': oferta, 'accion': 'aceptada'})
+    return redirect('/automatizacion/propuestas/')
 
 def rechazar_oferta_token(request, token):
     oferta = get_object_or_404(OfertaPropuesta, token_email=token)
@@ -30,7 +30,7 @@ def rechazar_oferta_token(request, token):
             canal='email',
             detalle='Cliente rechazó la oferta desde el email',
         )
-    return render(request, 'automatizacion/accion_confirmada.html', {'oferta': oferta, 'accion': 'rechazada'})
+    return redirect('/automatizacion/propuestas/')
 # --- Importaciones necesarias ---
 from django.views.decorators.csrf import csrf_exempt
 from django.http import HttpResponse
