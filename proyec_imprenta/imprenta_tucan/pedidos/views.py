@@ -26,6 +26,9 @@ from .utils import (
     ajustar_insumos_por_diferencia,
 )
 from productos.models import Producto
+from proveedores.models import Proveedor
+from insumos.models import Insumo
+from .models import OrdenCompra
 
 
 def lista_pedidos(request):
@@ -475,3 +478,31 @@ def eliminar_pedido(request, idPedido: int):
         messages.success(request, f"{descripcion} fue eliminado correctamente.")
         return redirect("lista_pedidos")
     return redirect("lista_pedidos")
+
+
+def orden_compra_detalle(request, pk):
+    orden = OrdenCompra.objects.select_related('proveedor', 'insumo').get(pk=pk)
+    proveedor = orden.proveedor
+    # Datos de la empresa (puedes reemplazar por tu modelo/config real)
+    empresa = {
+        'razon_social': 'Imprenta Tucán S.A.',
+        'cuit': '30-12345678-9',
+        'domicilio': 'Av. Principal 123, Tucumán',
+        'telefono': '381-4000000',
+        'email': 'info@imprentatucan.com',
+        'condicion_iva': 'Responsable Inscripto',
+    }
+    # Cálculos
+    precio_unitario = orden.insumo.precio_unitario
+    subtotal = float(precio_unitario) * orden.cantidad
+    iva = subtotal * 0.21
+    total = subtotal + iva
+    context = {
+        'orden': orden,
+        'proveedor': proveedor,
+        'empresa': empresa,
+        'subtotal': '{:.2f}'.format(subtotal),
+        'iva': '{:.2f}'.format(iva),
+        'total': '{:.2f}'.format(total),
+    }
+    return render(request, 'pedidos/orden_compra_detalle.html', context)

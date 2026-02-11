@@ -26,6 +26,10 @@ class Proveedor(models.Model):
     rubro_fk = models.ForeignKey('proveedores.Rubro', on_delete=models.PROTECT, null=True, blank=True, related_name='proveedores')
     # Campo textual legado para compatibilidad; puede eliminarse luego de migrar formularios/vistas
     rubro = models.CharField(max_length=50)
+
+    # URL de API para consulta de stock en proveedor real
+    api_stock_url = models.URLField(blank=True, null=True, help_text="Endpoint para consulta de stock en proveedor real")
+
     fecha_creacion = models.DateTimeField(auto_now_add=True)
     activo = models.BooleanField(default=True)
 

@@ -1,0 +1,100 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto bg-white shadow rounded-xl p-8 mt-8">
+  <div class="mb-4">
+    <a href="/automatizacion/compras/" class="inline-flex items-center gap-2 px-3 py-2 rounded bg-sky-600 text-white text-sm hover:bg-sky-700">
+      <span class="material-symbols-outlined text-base align-middle">arrow_back</span>
+      Volver a propuestas
+    </a>
+  </div>
+  <div class="flex items-center gap-4 mb-6">
+    <img src="{% static 'logo.png' %}" alt="Logo" class="h-16 w-16 object-contain">
+    <div>
+      <h1 class="text-2xl font-bold">{{ empresa.razon_social }}</h1>
+      <div class="text-sm text-slate-600">CUIT: {{ empresa.cuit }}</div>
+      <div class="text-sm text-slate-600">{{ empresa.domicilio }}</div>
+      <div class="text-sm text-slate-600">Tel: {{ empresa.telefono }} | Email: {{ empresa.email }}</div>
+      <div class="text-sm text-slate-600">IVA: {{ empresa.condicion_iva }}</div>
+    </div>
+  </div>
+  <div class="mb-6 border-b pb-4 flex flex-wrap gap-8">
+    <div>
+      <div class="font-semibold">ORDEN DE COMPRA Nº:</div>
+      <div class="text-lg font-bold">{{ orden.id|stringformat:'06d' }}</div>
+    </div>
+    <div>
+      <div class="font-semibold">Fecha de emisión:</div>
+      <div>{{ orden.fecha_creacion|date:'d/m/Y' }}</div>
+    </div>
+    <div>
+      <div class="font-semibold">Condición de pago:</div>
+      <div>{{ orden.condicion_pago|default:'Contado' }}</div>
+    </div>
+    <div>
+      <div class="font-semibold">Moneda:</div>
+      <div>{{ orden.moneda|default:'ARS' }}</div>
+    </div>
+  </div>
+  <div class="mb-6">
+    <div class="font-semibold mb-1">Proveedor</div>
+    <div class="text-sm text-slate-700">Razón Social: {{ proveedor.nombre }}</div>
+    <div class="text-sm text-slate-700">CUIT: {{ proveedor.cuit }}</div>
+    <div class="text-sm text-slate-700">Dirección: {{ proveedor.direccion }}</div>
+    <div class="text-sm text-slate-700">Contacto: {{ proveedor.apellido }}</div>
+    <div class="text-sm text-slate-700">Email: {{ proveedor.email }}</div>
+  </div>
+  <div class="mb-6">
+    <div class="font-semibold mb-2">Detalle de Productos</div>
+    <table class="min-w-full text-sm border">
+      <thead class="bg-slate-50">
+        <tr>
+          <th class="px-2 py-1 border">Código</th>
+          <th class="px-2 py-1 border">Descripción</th>
+          <th class="px-2 py-1 border">Cantidad</th>
+          <th class="px-2 py-1 border">Unidad</th>
+          <th class="px-2 py-1 border">Precio Unitario</th>
+          <th class="px-2 py-1 border">Subtotal</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="border px-2 py-1">{{ orden.insumo.codigo }}</td>
+          <td class="border px-2 py-1">{{ orden.insumo.nombre }}</td>
+          <td class="border px-2 py-1">{{ orden.cantidad }}</td>
+          <td class="border px-2 py-1">un</td>
+          <td class="border px-2 py-1">${{ orden.insumo.precio_unitario }}</td>
+          <td class="border px-2 py-1">${{ subtotal }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="mb-6 flex flex-col items-end gap-1">
+    <div>Subtotal: ${{ subtotal }}</div>
+    <div>IVA 21%: ${{ iva }}</div>
+    <div class="font-bold text-lg">Total: ${{ total }}</div>
+  </div>
+  <div class="mb-6">
+    <div class="font-semibold mb-1">Condiciones de Entrega</div>
+    <div>Lugar de entrega: {{ orden.lugar_entrega|default:'-' }}</div>
+    <div>Fecha estimada de entrega: {{ orden.fecha_entrega|date:'d/m/Y'|default:'-' }}</div>
+    <div>Transporte a cargo de: {{ orden.transporte|default:'-' }}</div>
+    <div>Observaciones: {{ orden.observaciones|default:'-' }}</div>
+  </div>
+  <div class="mt-8 flex items-center gap-8">
+    <div>
+      <div class="h-16 border-b border-slate-400"></div>
+      <div class="text-sm text-slate-600">Firma autorizada</div>
+    </div>
+    <div>
+      <div class="h-16 border-b border-slate-400"></div>
+      <div class="text-sm text-slate-600">Aclaración</div>
+    </div>
+    <div>
+      <div class="h-16 border-b border-slate-400"></div>
+      <div class="text-sm text-slate-600">Cargo</div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -50,10 +50,10 @@
           </td>
           <td class="px-4 py-2">
             {% if p.borrador_oc %}
-              <div class="flex items-center gap-2">
+              <a href="{% url 'orden_compra_detalle' p.borrador_oc.id %}" target="_blank" class="flex items-center gap-2 text-sky-700 hover:underline">
                 <span class="material-symbols-outlined text-amber-600 text-base">receipt_long</span>
                 #{{ p.borrador_oc.id }} ({{ p.borrador_oc.estado }})
-              </div>
+              </a>
             {% else %}
               <span class="text-slate-400">—</span>
             {% endif %}

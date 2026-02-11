@@ -102,6 +102,28 @@
 				"--table",
 				"clientes_cliente"
 			]
+		},
+		{
+			"label": "🛠️ Migrar proveedores (api_stock_url)",
+			"type": "shell",
+			"command": "C:\\Users\\Public\\Documents\\facultad\\3er Año\\Trabajo Final\\proyecto_imprenta\\imprenta_tuc\\Scripts\\python.exe",
+			"args": [
+				"C:\\Users\\Public\\Documents\\facultad\\3er Año\\Trabajo Final\\proyecto_imprenta\\proyec_imprenta\\imprenta_tucan\\manage.py",
+				"makemigrations",
+				"proveedores"
+			],
+			"group": "build"
+		},
+		{
+			"label": "🧱 Aplicar migraciones proveedores (api_stock_url)",
+			"type": "shell",
+			"command": "C:\\Users\\Public\\Documents\\facultad\\3er Año\\Trabajo Final\\proyecto_imprenta\\imprenta_tuc\\Scripts\\python.exe",
+			"args": [
+				"C:\\Users\\Public\\Documents\\facultad\\3er Año\\Trabajo Final\\proyecto_imprenta\\proyec_imprenta\\imprenta_tucan\\manage.py",
+				"migrate",
+				"proveedores"
+			],
+			"group": "build"
 		}
 	]
 }

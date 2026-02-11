@@ -4,6 +4,7 @@ from django.utils import timezone
 from django.db.models import Sum, Count
 
 from automatizacion.models import RankingCliente, ScoreProveedor, RankingHistorico, OfertaPropuesta
+import requests
 from clientes.models import Cliente
 from configuracion.models import Parametro, RecetaProducto
 from productos.models import ProductoInsumo
@@ -407,6 +408,28 @@ def tarea_automatizacion_presupuestos_ponderada():
                         estado='pendiente',
                         respuesta={}
                     )
+                    # --- INTEGRACIÓN REAL: consulta HTTP si el proveedor tiene api_stock_url ---
+                    if proveedor.api_stock_url:
+                        try:
+                            resp = requests.post(
+                                proveedor.api_stock_url,
+                                json={
+                                    'insumo_id': insumo.id,
+                                    'cantidad': cantidad_req
+                                },
+                                timeout=10
+                            )
+                            data = resp.json()
+                            estado = data.get('estado')  # 'disponible', 'parcial', 'no', etc.
+                            detalle = data.get('detalle', '')
+                            if estado in {'disponible', 'parcial', 'no'}:
+                                consulta.estado = estado
+                                consulta.respuesta = {'detalle': detalle}
+                                consulta.save()
+                        except Exception as e:
+                            consulta.estado = 'error'
+                            consulta.respuesta = {'detalle': str(e)}
+                            consulta.save()
                     # 5) Crear propuesta consolidada
                     CompraPropuesta.objects.create(
                         insumo=insumo,
@@ -445,6 +468,28 @@ def tarea_automatizacion_presupuestos_ponderada():
                     estado='pendiente',
                     respuesta={}
                 )
+                # --- INTEGRACIÓN REAL: consulta HTTP si el proveedor tiene api_stock_url ---
+                if proveedor.api_stock_url:
+                    try:
+                        resp = requests.post(
+                            proveedor.api_stock_url,
+                            json={
+                                'insumo_id': insumo.id,
+                                'cantidad': cantidad_req
+                            },
+                            timeout=10
+                        )
+                        data = resp.json()
+                        estado = data.get('estado')
+                        detalle = data.get('detalle', '')
+                        if estado in {'disponible', 'parcial', 'no'}:
+                            consulta.estado = estado
+                            consulta.respuesta = {'detalle': detalle}
+                            consulta.save()
+                    except Exception as e:
+                        consulta.estado = 'error'
+                        consulta.respuesta = {'detalle': str(e)}
+                        consulta.save()
                 CompraPropuesta.objects.create(
                     insumo=insumo,
                     cantidad_requerida=cantidad_req,
