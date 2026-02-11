@@ -182,7 +182,14 @@ AWS_REGION = os.environ.get('AWS_REGION', 'us-east-1').strip()
 ANYMAIL_PROVIDER = 'ses'
 
 # Backend de email: SES únicamente
-EMAIL_BACKEND = 'anymail.backends.amazon_ses.EmailBackend'
+
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = '6luciano10@gmail.com'
+EMAIL_HOST_PASSWORD = 'hpmybzczlzuksshb'  # Contraseña de aplicación de Google para envío real
+DEFAULT_FROM_EMAIL = '6luciano10@gmail.com'
 
 # Configuración Anymail para SES. Las credenciales provienen de AWS SSO/IAM (boto3).
 ANYMAIL = {
