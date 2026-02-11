@@ -716,7 +716,10 @@ def compras_propuestas_admin(request):
         page_size = get_page_size()
     except Exception:
         page_size = 10
-    qs = CompraPropuesta.objects.select_related('insumo', 'proveedor_recomendado', 'borrador_oc', 'consulta_stock').order_by('-creada')
+    qs = CompraPropuesta.objects.select_related('insumo', 'proveedor_recomendado', 'borrador_oc', 'consulta_stock') \
+        .exclude(insumo__categoria__icontains='instrumento') \
+        .exclude(insumo__categoria__icontains='calibrador') \
+        .order_by('-creada')
     paginator = Paginator(qs, page_size)
     page = request.GET.get('page')
     propuestas = paginator.get_page(page)
