@@ -30,7 +30,7 @@
     </div>
     <div>
       <div class="font-semibold">Condición de pago:</div>
-      <div>{{ orden.condicion_pago|default:'Contado' }}</div>
+      <div>30 días</div>
     </div>
     <div>
       <div class="font-semibold">Moneda:</div>
@@ -67,9 +67,7 @@
     </table>
   </div>
   <div class="mb-6 flex flex-col items-end gap-1">
-    <div>Subtotal: ${{ subtotal }}</div>
-    <div>IVA 21%: ${{ iva }}</div>
-    <div class="font-bold text-lg">Total: ${{ total }}</div>
+    
   </div>
   <div class="mb-6">
     <div class="font-semibold mb-1">Condiciones de Entrega</div>
