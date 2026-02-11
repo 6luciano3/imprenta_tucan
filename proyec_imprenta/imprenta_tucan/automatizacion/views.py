@@ -10,6 +10,8 @@ from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import get_user_model
 from django.core.paginator import Paginator
+from django import forms
+from .services import enviar_oferta_email
 
 
 def panel(request):
@@ -148,6 +150,97 @@ def ofertas_propuestas_admin(request):
     return render(request, 'automatizacion/ofertas_propuestas.html', {'ofertas': ofertas, 'msg': msg, 'ok': ok})
 
 
+class OfertaManualForm(forms.Form):
+    cliente_email = forms.EmailField(label='Email del cliente', required=False)
+    cliente_id = forms.IntegerField(label='ID del cliente', required=False, min_value=1)
+    titulo = forms.CharField(max_length=120)
+    descripcion = forms.CharField(widget=forms.Textarea)
+    tipo = forms.ChoiceField(choices=[
+        ('descuento', 'Descuento'),
+        ('fidelizacion', 'Fidelización'),
+        ('prioridad_stock', 'Prioridad en stock'),
+        ('promocion', 'Promoción'),
+    ])
+    parametros = forms.CharField(label='Parámetros (JSON)', required=False)
+    score_al_generar = forms.FloatField(label='Score (opcional)', required=False)
+    enviar_ahora = forms.BooleanField(label='Enviar inmediatamente', required=False)
+
+
+@login_required
+def nueva_oferta_manual(request):
+    """Crear y opcionalmente enviar una oferta manual a un cliente específico."""
+    if request.method == 'POST':
+        form = OfertaManualForm(request.POST)
+        if form.is_valid():
+            from clientes.models import Cliente
+            cliente = None
+            cid = form.cleaned_data.get('cliente_id')
+            email = form.cleaned_data.get('cliente_email')
+            if cid:
+                cliente = Cliente.objects.filter(pk=cid).first()
+            elif email:
+                cliente = Cliente.objects.filter(email=email).first()
+            if not cliente:
+                messages.error(request, 'Cliente no encontrado por ID o email.')
+                return render(request, 'automatizacion/oferta_nueva.html', {'form': form})
+
+            parametros_raw = form.cleaned_data.get('parametros') or ''
+            try:
+                import json
+                parametros = json.loads(parametros_raw) if parametros_raw.strip() else {}
+            except Exception:
+                parametros = {}
+
+            score = form.cleaned_data.get('score_al_generar')
+            try:
+                score = float(score) if score is not None else None
+            except Exception:
+                score = None
+            # Si no hay score, intentar usar RankingCliente
+            if score is None:
+                rc = RankingCliente.objects.filter(cliente=cliente).first()
+                score = float(rc.score) if rc else 0.0
+
+            oferta = OfertaPropuesta.objects.create(
+                cliente=cliente,
+                titulo=form.cleaned_data['titulo'],
+                descripcion=form.cleaned_data['descripcion'],
+                tipo=form.cleaned_data['tipo'],
+                parametros=parametros,
+                score_al_generar=score or 0.0,
+                estado='pendiente',
+                administrador=request.user,
+            )
+
+            if form.cleaned_data.get('enviar_ahora'):
+                oferta.estado = 'enviada'
+                oferta.fecha_validacion = timezone.now()
+                oferta.save()
+                try:
+                    from .models import MensajeOferta
+                    ok, err = enviar_oferta_email(oferta, request=request)
+                    MensajeOferta.objects.create(
+                        oferta=oferta,
+                        cliente=cliente,
+                        estado='enviado' if ok else 'fallido',
+                        detalle='Oferta enviada manualmente por admin' if ok else f'Error al enviar: {err}',
+                    )
+                    messages.success(request, 'Oferta creada y enviada correctamente.' if ok else f'Oferta creada pero el envío falló: {err}')
+                except Exception:
+                    pass
+            else:
+                oferta.save()
+                messages.success(request, 'Oferta creada como pendiente. Puedes enviarla desde la lista.')
+            return redirect('ofertas_propuestas')
+        else:
+            return render(request, 'automatizacion/oferta_nueva.html', {'form': form})
+    else:
+        form = OfertaManualForm()
+        return render(request, 'automatizacion/oferta_nueva.html', {
+            'form': form,
+        })
+
+
 @login_required
 def aprobar_oferta(request, oferta_id):
     oferta = get_object_or_404(OfertaPropuesta, pk=oferta_id)
@@ -155,10 +248,16 @@ def aprobar_oferta(request, oferta_id):
     oferta.fecha_validacion = timezone.now()
     oferta.administrador = request.user
     oferta.save()
-    # Registrar estado de mensaje "enviado" (inicial)
+    # Enviar email al cliente y registrar estado de mensaje
     try:
         from .models import MensajeOferta
-        MensajeOferta.objects.create(oferta=oferta, cliente=oferta.cliente, estado='enviado', detalle='Mensaje inicial marcado como enviado')
+        ok, err = enviar_oferta_email(oferta, request=request)
+        MensajeOferta.objects.create(
+            oferta=oferta,
+            cliente=oferta.cliente,
+            estado='enviado' if ok else 'fallido',
+            detalle='Oferta enviada automáticamente' if ok else f'Error al enviar: {err}',
+        )
     except Exception:
         pass
     return redirect('ofertas_propuestas')

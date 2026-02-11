@@ -18,7 +18,7 @@
     {% endif %}
 
     <!-- Acción principal -->
-    <div class="mb-6">
+    <div class="mb-6 flex items-center gap-3">
         <form method="post" action="{% url 'generar_propuestas' %}">
             {% csrf_token %}
             <button type="submit" class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700">
@@ -26,6 +26,10 @@
                 Generar propuestas
             </button>
         </form>
+        <a href="{% url 'nueva_oferta_manual' %}" class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-teal-600 text-white hover:bg-teal-700">
+            <span class="material-symbols-outlined text-sm">add_card</span>
+            Nueva oferta manual
+        </a>
     </div>
     <div class="bg-white shadow rounded-xl overflow-hidden table-responsive">
         <table class="w-full min-w-[980px] text-left text-sm">

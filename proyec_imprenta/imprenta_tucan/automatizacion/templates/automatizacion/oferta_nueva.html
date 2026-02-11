@@ -1,0 +1,59 @@
+{% extends 'base.html' %}
+{% load widget_tweaks %}
+{% block title %}Nueva oferta manual{% endblock %}
+
+{% block content %}
+<h1 class="text-3xl font-black mb-4 flex items-center gap-2">
+  <span class="material-symbols-outlined text-3xl">add_card</span>
+  Nueva oferta manual
+</h1>
+<p class="text-gray-600 mb-4">Crea una oferta para un cliente específico y opcionalmente envíala ahora.</p>
+
+<div class="bg-white shadow rounded-xl p-6 max-w-3xl">
+  <form method="post" action="">
+    {% csrf_token %}
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700">Email del cliente</label>
+        {{ form.cliente_email|add_class:"mt-1 block w-full border rounded-md px-3 py-2" }}
+        <p class="text-xs text-gray-500 mt-1">También puedes usar el ID del cliente.</p>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700">ID del cliente</label>
+        {{ form.cliente_id|add_class:"mt-1 block w-full border rounded-md px-3 py-2" }}
+      </div>
+      <div class="md:col-span-2">
+        <label class="block text-sm font-medium text-gray-700">Título</label>
+        {{ form.titulo|add_class:"mt-1 block w-full border rounded-md px-3 py-2" }}
+      </div>
+      <div class="md:col-span-2">
+        <label class="block text-sm font-medium text-gray-700">Descripción</label>
+        {{ form.descripcion|add_class:"mt-1 block w-full border rounded-md px-3 py-2" }}
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700">Tipo</label>
+        {{ form.tipo|add_class:"mt-1 block w-full border rounded-md px-3 py-2" }}
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700">Score (opcional)</label>
+        {{ form.score_al_generar|add_class:"mt-1 block w-full border rounded-md px-3 py-2" }}
+      </div>
+      <div class="md:col-span-2">
+        <label class="block text-sm font-medium text-gray-700">Parámetros (JSON) opcional</label>
+        {{ form.parametros|add_class:"mt-1 block w-full border rounded-md px-3 py-2" }}
+        <p class="text-xs text-gray-500 mt-1">Ejemplo: {"descuento":10}</p>
+      </div>
+    </div>
+    <div class="flex items-center justify-between mt-6">
+      <label class="inline-flex items-center gap-2">
+        {{ form.enviar_ahora }}
+        <span class="text-sm text-gray-700">Enviar inmediatamente</span>
+      </label>
+      <div class="flex gap-3">
+        <a href="{% url 'ofertas_propuestas' %}" class="px-4 py-2 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200">Cancelar</a>
+        <button type="submit" class="px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700">Crear oferta</button>
+      </div>
+    </div>
+  </form>
+</div>
+{% endblock %}

@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     'geo',
     'automatizacion',
     'rest_framework',
+    'anymail',
 ]
 
 # Modelo de usuario personalizado
@@ -168,3 +169,24 @@ CELERY_BEAT_SCHEDULE = {
 
 from .celery import app as celery_app
 __all__ = ('celery_app',)
+
+# Email
+# FORZAR SES como backend único de envío.
+# Ignoramos variables de entorno que intenten cambiar el backend.
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'no-reply@imprenta.local')
+EMAIL_FILE_PATH = os.environ.get('EMAIL_FILE_PATH', str(BASE_DIR / 'sent_emails'))
+
+# Anymail (SES exclusivo) vía API/SSO/IAM
+# Se fuerza el uso de Amazon SES sin permitir SendGrid/Mailgun.
+AWS_REGION = os.environ.get('AWS_REGION', 'us-east-1').strip()
+ANYMAIL_PROVIDER = 'ses'
+
+# Backend de email: SES únicamente
+EMAIL_BACKEND = 'anymail.backends.amazon_ses.EmailBackend'
+
+# Configuración Anymail para SES. Las credenciales provienen de AWS SSO/IAM (boto3).
+ANYMAIL = {
+    'AMAZON_SES_CLIENT_PARAMS': {
+        'region_name': AWS_REGION,
+    }
+}

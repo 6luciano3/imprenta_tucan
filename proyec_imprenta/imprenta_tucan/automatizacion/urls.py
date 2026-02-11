@@ -14,6 +14,7 @@ urlpatterns = [
     path('propuestas/<int:oferta_id>/rechazar/', views.rechazar_oferta, name='rechazar_oferta'),
     path('propuestas/<int:oferta_id>/eliminar/', views.eliminar_oferta, name='eliminar_oferta'),
     path('propuestas/generar/', views.generar_propuestas, name='generar_propuestas'),
+    path('propuestas/nueva/', views.nueva_oferta_manual, name='nueva_oferta_manual'),
     # Ofertas para cliente
     path('mis-ofertas/', views.mis_ofertas_cliente, name='mis_ofertas_cliente'),
     path('mis-ofertas/<int:oferta_id>/confirmar/', views.confirmar_oferta_cliente, name='confirmar_oferta_cliente'),
