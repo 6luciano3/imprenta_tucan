@@ -17,23 +17,53 @@
             <th class="px-2 py-1">Cantidad Proyectada</th>
             <th class="px-2 py-1">Proveedor Sugerido</th>
             <th class="px-2 py-1">Estado</th>
+            <th class="px-2 py-1">Alerta</th>
             <th class="px-2 py-1">Acciones</th>
         </tr>
     </thead>
     <tbody>
-        {% for p in proyecciones %}
-        <tr>
-            <td class="px-2 py-1">{{ p.insumo.nombre }}</td>
-            <td class="px-2 py-1">{{ p.periodo }}</td>
-            <td class="px-2 py-1">{{ p.cantidad_proyectada }}</td>
-            <td class="px-2 py-1">{% if p.proveedor_sugerido %}{{ p.proveedor_sugerido.nombre }}{% else %}-{% endif %}</td>
-            <td class="px-2 py-1">{{ p.estado }}</td>
-            <td class="px-2 py-1">
-                <a href="{% url 'validar_proyeccion' p.id %}" class="text-blue-600 hover:underline">Validar</a>
-            </td>
-        </tr>
+                {% for p in proyecciones %}
+                <tr>
+                        <td class="px-2 py-1">{{ p.insumo.nombre }}</td>
+                        <td class="px-2 py-1">
+                            {% if p.periodo|length == 10 and p.periodo.4 == '-' and p.periodo.7 == '-' %}
+                                {{ p.periodo|slice:'8:10' }}/{{ p.periodo|slice:'5:7' }}/{{ p.periodo|slice:'0:4' }}
+                            {% else %}
+                                {{ p.periodo }}
+                            {% endif %}
+                        </td>
+                        <td class="px-2 py-1">{{ p.cantidad_proyectada }}</td>
+                        <td class="px-2 py-1">{% if p.proveedor_sugerido %}{{ p.proveedor_sugerido.nombre }}{% else %}-{% endif %}</td>
+                        <td class="px-2 py-1">{{ p.estado }}</td>
+                        <td class="px-2 py-1">
+                                {% if p.insumo.stock <= 0 %}
+                                    <button onclick="openModal('modal-alerta-{{ p.id }}')" class="bg-red-200 text-red-900 px-2 py-1 rounded">Faltante</button>
+                                {% elif p.insumo.stock <= 50 %}
+                                    <button onclick="openModal('modal-alerta-{{ p.id }}')" class="bg-yellow-100 text-yellow-900 px-2 py-1 rounded">Crítico</button>
+                                {% else %}
+                                    <span class="text-green-700">OK</span>
+                                {% endif %}
+
+                                <!-- Modal -->
+                                <div id="modal-alerta-{{ p.id }}" class="fixed z-50 inset-0 hidden bg-black bg-opacity-40 flex items-center justify-center">
+                                    <div class="bg-white rounded-lg shadow-lg p-6 max-w-sm w-full relative">
+                                        <button onclick="closeModal('modal-alerta-{{ p.id }}')" class="absolute top-2 right-2 text-gray-500 hover:text-gray-800">&times;</button>
+                                        <h2 class="text-lg font-bold mb-2">Alerta de Insumo</h2>
+                                        {% if p.insumo.stock <= 0 %}
+                                            <div class="text-red-700 mb-2">El insumo <b>{{ p.insumo.nombre }}</b> está agotado (stock = 0).</div>
+                                        {% elif p.insumo.stock <= 50 %}
+                                            <div class="text-yellow-800 mb-2">El insumo <b>{{ p.insumo.nombre }}</b> tiene stock crítico ({{ p.insumo.stock }} unidades).</div>
+                                        {% endif %}
+                                        <div class="text-xs text-gray-500">Última actualización: {{ p.insumo.updated_at|date:'d/m/Y H:i' }}</div>
+                                    </div>
+                                </div>
+                        </td>
+                        <td class="px-2 py-1">
+                                <a href="{% url 'validar_proyeccion' p.id %}" class="text-blue-600 hover:underline">Validar</a>
+                        </td>
+                </tr>
         {% empty %}
-        <tr><td colspan="6" class="text-center py-4">No hay proyecciones generadas.</td></tr>
+        <tr><td colspan="7" class="text-center py-4">No hay proyecciones generadas.</td></tr>
         {% endfor %}
     </tbody>
 </table>
@@ -67,4 +97,12 @@
 </div>
 {% endif %}
 
+<script>
+function openModal(id) {
+    document.getElementById(id).classList.remove('hidden');
+}
+function closeModal(id) {
+    document.getElementById(id).classList.add('hidden');
+}
+</script>
 {% endblock %}

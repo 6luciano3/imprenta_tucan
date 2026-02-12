@@ -165,6 +165,10 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'automatizacion.tasks.tarea_automatizacion_presupuestos_ponderada',
         'schedule': 30 * 60,
     },
+    'proyecciones-insumos-diario': {
+        'task': 'insumos.tasks.generar_proyecciones_insumos',
+        'schedule': 24 * 60 * 60,  # cada 24 horas
+    },
 }
 
 from .celery import app as celery_app
