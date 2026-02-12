@@ -55,12 +55,11 @@
             <span class="material-symbols-outlined text-sm">visibility</span>
           </a>
           <button type="button"
-                  class="text-indigo-600 hover:text-indigo-800 flex items-center gap-1 btn-ver-insumos"
+                  class="text-indigo-600 hover:text-indigo-800 flex items-center btn-ver-insumos"
                   data-producto-id="{{ producto.idProducto }}"
                   data-producto-nombre="{{ producto.nombreProducto }}"
                   title="Ver detalle de insumos">
             <span class="material-symbols-outlined text-sm">list_alt</span>
-            <span class="hidden md:inline">Ver detalle de insumos</span>
           </button>
           {% if can_productos_editar %}
           <a href="{% url 'modificar_producto' producto.idProducto %}"
