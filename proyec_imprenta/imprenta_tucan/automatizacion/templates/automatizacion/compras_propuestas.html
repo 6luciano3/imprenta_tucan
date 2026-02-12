@@ -38,14 +38,14 @@
       <tbody>
         {% for p in propuestas %}
         <tr class="border-t hover:bg-slate-50">
-          <td class="px-4 py-2">{{ p.creada|date:'d/m/Y' }}</td>
+          <td class="px-4 py-2">{% if p.creada %}{{ p.creada|date:'d/m/Y' }}{% else %}<span class="text-slate-400">—</span>{% endif %}</td>
           <td class="px-4 py-2">{{ p.insumo }}</td>
-          <td class="px-4 py-2">{{ p.cantidad_requerida }}</td>
-          <td class="px-4 py-2">{{ p.proveedor_recomendado }}</td>
+          <td class="px-4 py-2">{% if p.cantidad_requerida %}{{ p.cantidad_requerida }}{% else %}<span class="text-slate-400">—</span>{% endif %}</td>
+          <td class="px-4 py-2">{% if p.proveedor_recomendado %}{{ p.proveedor_recomendado }}{% else %}<span class="text-slate-400">—</span>{% endif %}</td>
           <td class="px-4 py-2">
             <span class="inline-flex items-center gap-1">
               <span class="material-symbols-outlined text-sky-600 text-base">flag</span>
-              {{ p.estado }}
+              {{ p.estado|default:'sin propuesta' }}
             </span>
           </td>
           <td class="px-4 py-2">
@@ -62,35 +62,46 @@
             {% if p.consulta_stock %}
               {{ p.consulta_stock.estado }}
             {% else %}
-              <span class="text-slate-400">pendiente</span>
+              <span class="text-slate-400">—</span>
             {% endif %}
           </td>
           <td class="px-4 py-2 w-40 text-center">
             <div class="flex flex-nowrap gap-1 items-center justify-center">
-              <button type="button" class="p-0.5 rounded hover:bg-slate-100 text-sky-600" title="Ver detalles" onclick="openPropuestaModal('{{ p.id }}')">
-                <span class="material-symbols-outlined text-sm">info</span>
-              </button>
-              <!-- Aceptar propuesta -->
-              <form method="post" action="{% url 'aceptar_compra_propuesta' p.id %}">
-                {% csrf_token %}
-                <button type="submit" class="p-0.5 rounded hover:bg-slate-100 text-emerald-600" title="Aceptar propuesta">
-                  <span class="material-symbols-outlined text-sm">check_circle</span>
+              {% if p.creada %}
+                <button type="button" class="p-0.5 rounded hover:bg-slate-100 text-sky-600" title="Ver detalles" onclick="openPropuestaModal('{{ p.id }}')">
+                  <span class="material-symbols-outlined text-sm">info</span>
                 </button>
-              </form>
-              <!-- Rechazar propuesta -->
-              <form method="post" action="{% url 'rechazar_compra_propuesta' p.id %}">
-                {% csrf_token %}
-                <button type="submit" class="p-0.5 rounded hover:bg-slate-100 text-rose-600" title="Rechazar propuesta">
-                  <span class="material-symbols-outlined text-sm">close</span>
-                </button>
-              </form>
-              <!-- Proveedor alternativo -->
-              <a href="{% url 'recalcular_alternativo_propuesta' p.id %}" class="p-0.5 rounded hover:bg-slate-100 text-amber-600" title="Proveedor alternativo">
-                <span class="material-symbols-outlined text-sm">swap_horizontal_circle</span>
-              </a>
+                <!-- Aceptar propuesta -->
+                <form method="post" action="{% url 'aceptar_compra_propuesta' p.id %}">
+                  {% csrf_token %}
+                  <button type="submit" class="p-0.5 rounded hover:bg-slate-100 text-emerald-600" title="Aceptar propuesta">
+                    <span class="material-symbols-outlined text-sm">check_circle</span>
+                  </button>
+                </form>
+                <!-- Rechazar propuesta -->
+                <form method="post" action="{% url 'rechazar_compra_propuesta' p.id %}">
+                  {% csrf_token %}
+                  <button type="submit" class="p-0.5 rounded hover:bg-slate-100 text-rose-600" title="Rechazar propuesta">
+                    <span class="material-symbols-outlined text-sm">close</span>
+                  </button>
+                </form>
+                <!-- Proveedor alternativo -->
+                <a href="{% url 'recalcular_alternativo_propuesta' p.id %}" class="p-0.5 rounded hover:bg-slate-100 text-amber-600" title="Proveedor alternativo">
+                  <span class="material-symbols-outlined text-sm">swap_horizontal_circle</span>
+                </a>
+              {% else %}
+                <form method="post" action="{% url 'crear_propuesta_para_insumo' %}" style="display:inline;">
+                  {% csrf_token %}
+                  <input type="hidden" name="insumo_id" value="{{ p.insumo.pk }}">
+                  <button type="submit" class="p-0.5 rounded hover:bg-slate-100 text-emerald-600" title="Crear propuesta">
+                    <span class="material-symbols-outlined text-sm">add_circle</span> Crear propuesta
+                  </button>
+                </form>
+              {% endif %}
             </div>
           </td>
         </tr>
+        {% if p.creada %}
         <div id="modal-propuesta-{{ p.id }}" class="fixed inset-0 bg-black/40 z-50 hidden">
           <div class="bg-white rounded-xl shadow-xl w-full max-w-lg mx-auto mt-24 p-4">
             <div class="flex items-center justify-between">
@@ -128,6 +139,7 @@
             </div>
           </div>
         </div>
+        {% endif %}
         {% empty %}
         <tr>
           <td colspan="8" class="px-4 py-6 text-center text-slate-500">No hay propuestas generadas aún.</td>

@@ -1,3 +1,31 @@
+from django.views.decorators.http import require_POST
+from django.contrib.auth.decorators import login_required
+
+# ...existing code...
+
+@login_required
+@require_POST
+def crear_propuesta_para_insumo(request):
+    from automatizacion.models import CompraPropuesta
+    from insumos.models import Insumo
+    insumo_id = request.POST.get('insumo_id')
+    if not insumo_id:
+        messages.error(request, 'Falta el ID de insumo.')
+        return redirect('compras_propuestas')
+    try:
+        insumo = Insumo.objects.get(pk=insumo_id)
+    except Insumo.DoesNotExist:
+        messages.error(request, 'Insumo no encontrado.')
+        return redirect('compras_propuestas')
+    # Crear propuesta mínima (ajustar lógica según negocio)
+    propuesta = CompraPropuesta.objects.create(
+        insumo=insumo,
+        cantidad_requerida=1,
+        motivo_trigger='faltante_stock',
+        estado='pendiente',
+    )
+    messages.success(request, f'Propuesta creada para {insumo.nombre}. Completa los datos desde la edición.')
+    return redirect('compras_propuestas')
 # Endpoints públicos para aceptar/rechazar desde email
 from .models import OfertaPropuesta, AccionCliente
 from django.utils import timezone
@@ -711,16 +739,66 @@ from django.views.decorators.http import require_POST
 @login_required
 def compras_propuestas_admin(request):
     from automatizacion.models import CompraPropuesta
+    from insumos.models import Insumo
     try:
         from configuracion.services import get_page_size
         page_size = get_page_size()
     except Exception:
         page_size = 10
-    qs = CompraPropuesta.objects.select_related('insumo', 'proveedor_recomendado', 'borrador_oc', 'consulta_stock') \
+
+    # Get all Tintas and Papeles (with grammage in name or category)
+    tintas = list(Insumo.objects.filter(categoria__icontains='tinta', activo=True))
+    papeles = list(Insumo.objects.filter(categoria__icontains='papel', activo=True))
+    # Optionally, filter papeles with grammage in name (e.g., contains 'gr')
+    # papeles = [p for p in papeles if 'gr' in p.nombre.lower() or 'gr' in p.categoria.lower()]
+
+    # Get all proposals (excluding instrumentos/calibradores)
+    propuestas_qs = CompraPropuesta.objects.select_related('insumo', 'proveedor_recomendado', 'borrador_oc', 'consulta_stock') \
         .exclude(insumo__categoria__icontains='instrumento') \
-        .exclude(insumo__categoria__icontains='calibrador') \
-        .order_by('-creada')
-    paginator = Paginator(qs, page_size)
+        .exclude(insumo__categoria__icontains='calibrador')
+
+    # Build a dict: insumo_id -> propuesta
+    propuestas_dict = {p.insumo.pk: p for p in propuestas_qs}
+
+    # Compose all insumos to show: union of (tintas + papeles) and ALL insumos de propuestas
+    all_insumos = {i.pk: i for i in tintas + papeles}
+    for p in propuestas_qs:
+        all_insumos[p.insumo.pk] = p.insumo
+
+    # Crear propuestas mínimas automáticamente para insumos sin propuesta
+    from automatizacion.models import CompraPropuesta
+    from django.db import transaction
+    from proveedores.models import Proveedor
+    nuevos = []
+    with transaction.atomic():
+        for insumo in all_insumos.values():
+            if insumo.pk not in propuestas_dict:
+                proveedor = None
+                # Asignar solo si el insumo tiene proveedor relacionado directamente
+                if hasattr(insumo, 'proveedor') and insumo.proveedor and getattr(insumo.proveedor, 'activo', True):
+                    proveedor = insumo.proveedor
+                propuesta = CompraPropuesta.objects.create(
+                    insumo=insumo,
+                    cantidad_requerida=1,
+                    motivo_trigger='faltante_stock',
+                    estado='pendiente',
+                    proveedor_recomendado=proveedor
+                )
+                nuevos.append(propuesta)
+                propuestas_dict[insumo.pk] = propuesta
+
+    # Volver a obtener todas las propuestas (incluyendo las recién creadas)
+    propuestas_qs = CompraPropuesta.objects.select_related('insumo', 'proveedor_recomendado', 'borrador_oc', 'consulta_stock') \
+        .exclude(insumo__categoria__icontains='instrumento') \
+        .exclude(insumo__categoria__icontains='calibrador')
+
+    # Build rows: solo propuestas reales
+    rows = list(propuestas_qs)
+    # Sort: propuestas por nombre de insumo
+    rows.sort(key=lambda x: str(x.insumo.nombre))
+
+    # Paginate
+    paginator = Paginator(rows, page_size)
     page = request.GET.get('page')
     propuestas = paginator.get_page(page)
     return render(request, 'automatizacion/compras_propuestas.html', {'propuestas': propuestas})
