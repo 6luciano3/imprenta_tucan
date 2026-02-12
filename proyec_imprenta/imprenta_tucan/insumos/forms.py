@@ -66,6 +66,40 @@ class BuscarInsumoForm(forms.Form):
     )
 
 
+class ConsumoRealInsumoForm(forms.ModelForm):
+    class Meta:
+        from .models import ConsumoRealInsumo
+        model = ConsumoRealInsumo
+        fields = ["insumo", "periodo", "cantidad_consumida", "comentario"]
+        widgets = {
+            "insumo": forms.Select(attrs={"class": "form-select", "required": True}),
+            "periodo": forms.TextInput(attrs={"class": "form-control", "required": True, "placeholder": "YYYY-MM"}),
+            "cantidad_consumida": forms.NumberInput(attrs={"class": "form-control", "required": True, "min": 1, "step": 1}),
+            "comentario": forms.Textarea(attrs={"class": "form-control", "rows": 2, "placeholder": "Comentario opcional"}),
+        }
+
+    def clean_cantidad_consumida(self):
+        cantidad = self.cleaned_data.get("cantidad_consumida")
+        if cantidad is None or cantidad <= 0:
+            raise forms.ValidationError("La cantidad consumida debe ser un número positivo.")
+        return cantidad
+
+    def clean_periodo(self):
+        periodo = self.cleaned_data.get("periodo", "").strip()
+        if not periodo:
+            raise forms.ValidationError("El periodo es obligatorio.")
+        # Validar formato YYYY-MM
+        import re
+        if not re.match(r"^\d{4}-\d{2}$", periodo):
+            raise forms.ValidationError("El periodo debe tener formato YYYY-MM.")
+        return periodo
+
+    def clean_insumo(self):
+        insumo = self.cleaned_data.get("insumo")
+        if not insumo:
+            raise forms.ValidationError("Debe seleccionar un insumo.")
+        return insumo
+
 class ModificarInsumoForm(forms.ModelForm):
     """Formulario para modificar insumos por Personal Administrativo.
 

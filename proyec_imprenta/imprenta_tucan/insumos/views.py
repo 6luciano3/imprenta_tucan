@@ -5,9 +5,26 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.db.models import Q
 
-from .forms import InsumoForm, AltaInsumoForm, BuscarInsumoForm, ModificarInsumoForm
+from .forms import InsumoForm, AltaInsumoForm, BuscarInsumoForm, ModificarInsumoForm, ConsumoRealInsumoForm
 from configuracion.permissions import require_perm
-from .models import Insumo, ProyeccionInsumo
+from .models import Insumo, ProyeccionInsumo, ConsumoRealInsumo
+# --- FUNCION PARA ENVIAR REPORTE DE PROYECCIONES ---
+@login_required
+def registrar_consumo_real(request):
+    """Registrar consumo real de insumo."""
+    if request.method == 'POST':
+        form = ConsumoRealInsumoForm(request.POST)
+        if form.is_valid():
+            consumo = form.save(commit=False)
+            consumo.usuario = request.user
+            consumo.save()
+            messages.success(request, 'Consumo real registrado correctamente.')
+            return redirect('lista_insumos')
+        else:
+            messages.error(request, 'Datos inválidos. Corrige los errores.')
+    else:
+        form = ConsumoRealInsumoForm()
+    return render(request, 'insumos/registrar_consumo_real.html', {'form': form})
 from usuarios.models import Usuario, Notificacion
 from roles.models import Rol
 from django.core.mail import send_mail

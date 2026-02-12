@@ -49,3 +49,32 @@ class ProyeccionInsumo(models.Model):
 
     def __str__(self):
         return f"{self.insumo} - {self.periodo}: {self.cantidad_proyectada}"
+
+    def comparar_consumo_real(self):
+        from .models import ConsumoRealInsumo
+        consumos = ConsumoRealInsumo.objects.filter(insumo=self.insumo, periodo=self.periodo)
+        if consumos.exists():
+            total_consumo = sum([c.cantidad_consumida for c in consumos])
+            error = total_consumo - self.cantidad_proyectada
+            return {
+                'proyectado': self.cantidad_proyectada,
+                'real': total_consumo,
+                'error': error
+            }
+        return None
+
+
+class ConsumoRealInsumo(models.Model):
+    insumo = models.ForeignKey(Insumo, on_delete=models.CASCADE)
+    periodo = models.CharField(max_length=20)  # Ej: '2025-12'
+    cantidad_consumida = models.PositiveIntegerField()
+    fecha_registro = models.DateTimeField(auto_now_add=True)
+    usuario = models.ForeignKey(Usuario, on_delete=models.SET_NULL, null=True, blank=True)
+    comentario = models.TextField(blank=True)
+
+    class Meta:
+        verbose_name = 'Consumo Real de Insumo'
+        verbose_name_plural = 'Consumos Reales de Insumos'
+
+    def __str__(self):
+        return f"{self.insumo} - {self.periodo}: {self.cantidad_consumida}"
