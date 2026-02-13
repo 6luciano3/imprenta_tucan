@@ -18,160 +18,152 @@
         </div>
     </a>
     {% endif %}
-    <!-- Pedidos -->
-    <a href="{% url 'lista_pedidos' %}" class="group bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition">
-        <div class="flex items-center gap-4">
-            <div class="h-12 w-12 rounded-full bg-indigo-50 text-indigo-700 grid place-items-center">
-                <span class="material-symbols-outlined">shopping_cart</span>
-            </div>
-            <div>
-                <p class="text-sm text-gray-500">Pedidos</p>
-                <p class="text-lg font-bold group-hover:text-indigo-700">Ver pedidos</p>
-            </div>
-        </div>
-    </a>
-    <!-- Clientes -->
-    <a href="{% url 'lista_clientes' %}" class="group bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition">
-        <div class="flex items-center gap-4">
-            <div class="h-12 w-12 rounded-full bg-pink-50 text-pink-700 grid place-items-center">
-                <span class="material-symbols-outlined">group</span>
-            </div>
-            <div>
-                <p class="text-sm text-gray-500">Clientes</p>
-                <p class="text-lg font-bold group-hover:text-pink-700">Ver clientes</p>
-            </div>
-        </div>
-    </a>
-    <!-- Proveedores -->
-    <a href="{% url 'lista_proveedores' %}" class="group bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition">
-        <div class="flex items-center gap-4">
-            <div class="h-12 w-12 rounded-full bg-lime-50 text-lime-700 grid place-items-center">
-                <span class="material-symbols-outlined">store</span>
-            </div>
-            <div>
-                <p class="text-sm text-gray-500">Proveedores</p>
-                <p class="text-lg font-bold group-hover:text-lime-700">Ver proveedores</p>
-            </div>
-        </div>
-    </a>
-    <!-- Insumos -->
-    <a href="{% url 'lista_insumos' %}" class="group bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition">
-        <div class="flex items-center gap-4">
-            <div class="h-12 w-12 rounded-full bg-teal-50 text-teal-700 grid place-items-center">
-                <span class="material-symbols-outlined">inventory_2</span>
-            </div>
-            <div>
-                <p class="text-sm text-gray-500">Insumos</p>
-                <p class="text-lg font-bold group-hover:text-teal-700">Ver insumos</p>
-            </div>
-        </div>
-    </a>
-</section>
-
-<h3 class="mt-8 mb-2 text-sm font-semibold text-gray-600">Analítica</h3>
-<section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-    <!-- Proyección de Insumos -->
-    <a href="{% url 'lista_proyecciones' %}" class="group bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition">
-        <div class="flex items-center gap-4">
-            <div class="h-12 w-12 rounded-full bg-blue-50 text-blue-700 grid place-items-center">
-                <span class="material-symbols-outlined">trending_up</span>
-            </div>
-            <div>
-                <p class="text-sm text-gray-500">Proyección de Insumos</p>
-                <p class="text-lg font-bold group-hover:text-blue-700">Ver proyección</p>
-            </div>
-        </div>
-    </a>
-    <!-- Estadísticas -->
-    <a href="{% url 'estadisticas:dashboard' %}" class="group bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition">
-        <div class="flex items-center gap-4">
-            <div class="h-12 w-12 rounded-full bg-sky-50 text-sky-700 grid place-items-center">
-                <span class="material-symbols-outlined">insights</span>
-            </div>
-            <div>
-                <p class="text-sm text-gray-500">Estadísticas</p>
-                <p class="text-lg font-bold group-hover:text-sky-700">Dashboard de métricas</p>
-            </div>
-        </div>
-    </a>
-    <!-- Presupuestos -->
-    <a href="{% url 'presupuestos:lista' %}" class="group bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition">
-        <div class="flex items-center gap-4">
-            <div class="h-12 w-12 rounded-full bg-orange-50 text-orange-700 grid place-items-center">
-                <span class="material-symbols-outlined">request_quote</span>
-            </div>
-            <div>
-                <p class="text-sm text-gray-500">Presupuestos</p>
-                <p class="text-lg font-bold group-hover:text-orange-700">Ver lista</p>
-            </div>
-        </div>
-    </a>
-</section>
-
-<h3 class="mt-8 mb-2 text-sm font-semibold text-gray-600">Administración</h3>
-<section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-    <!-- Usuarios -->
-    <a href="{% url 'lista_usuarios' %}" class="group bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition">
-        <div class="flex items-center gap-4">
-            <div class="h-12 w-12 rounded-full bg-purple-50 text-purple-700 grid place-items-center">
-                <span class="material-symbols-outlined">person</span>
-            </div>
-            <div>
-                <p class="text-sm text-gray-500">Usuarios</p>
-                <p class="text-lg font-bold group-hover:text-purple-700">Ver usuarios</p>
-            </div>
-        </div>
-    </a>
-    <!-- Permisos -->
-    <a href="{% url 'lista_permisos' %}" class="group bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition">
-        <div class="flex items-center gap-4">
-            <div class="h-12 w-12 rounded-full bg-red-50 text-red-700 grid place-items-center">
-                <span class="material-symbols-outlined">lock</span>
-            </div>
-            <div>
-                <p class="text-sm text-gray-500">Permisos</p>
-                <p class="text-lg font-bold group-hover:text-red-700">Ver permisos</p>
-            </div>
-        </div>
-    </a>
-    <!-- Auditoría -->
-    <a href="{% url 'lista_auditoria' %}" class="group bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition">
-        <div class="flex items-center gap-4">
-            <div class="h-12 w-12 rounded-full bg-purple-50 text-purple-700 grid place-items-center">
-                <span class="material-symbols-outlined">fact_check</span>
-            </div>
-            <div>
-                <p class="text-sm text-gray-500">Auditoría</p>
-                <p class="text-lg font-bold group-hover:text-purple-700">Ver registros</p>
-            </div>
-        </div>
-    </a>
-    <!-- Configuración -->
-    <a href="/configuracion/" class="group bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition">
-        <div class="flex items-center gap-4">
-            <div class="h-12 w-12 rounded-full bg-cyan-50 text-cyan-700 grid place-items-center">
-                <span class="material-symbols-outlined">settings</span>
-            </div>
-            <div>
-                <p class="text-sm text-gray-500">Configuración</p>
-                <p class="text-lg font-bold group-hover:text-cyan-700">Preferencias</p>
-            </div>
-        </div>
-    </a>
-</section>
-{% endblock %}
-
-{% block notificaciones %}
-<section class="mt-8">
-    <h2 class="text-xl font-bold mb-4">Notificaciones</h2>
-    {% for n in notificaciones %}
-        <div class="bg-blue-50 border-l-4 border-blue-700 p-4 mb-2">
-            <strong>Notificación:</strong> {{ n.mensaje }} <span class="text-xs text-gray-500">{{ n.fecha }}</span>
-        </div>
-    {% empty %}
-        <div class="text-gray-400">No tienes notificaciones nuevas.</div>
-    {% endfor %}
-</section>
+                    <!-- Pedidos -->
+                    <a href="{% url 'lista_pedidos' %}" class="group bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition">
+                        <div class="flex items-center gap-4">
+                            <div class="h-12 w-12 rounded-full bg-indigo-50 text-indigo-700 grid place-items-center">
+                                <span class="material-symbols-outlined">shopping_cart</span>
+                            </div>
+                            <div>
+                                <p class="text-sm text-gray-500">Pedidos</p>
+                                <p class="text-lg font-bold group-hover:text-indigo-700">Ver pedidos</p>
+                            </div>
+                        </div>
+                    </a>
+                    <!-- Clientes -->
+                    <a href="{% url 'lista_clientes' %}" class="group bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition">
+                        <div class="flex items-center gap-4">
+                            <div class="h-12 w-12 rounded-full bg-pink-50 text-pink-700 grid place-items-center">
+                                <span class="material-symbols-outlined">group</span>
+                            </div>
+                            <div>
+                                <p class="text-sm text-gray-500">Clientes</p>
+                                <p class="text-lg font-bold group-hover:text-pink-700">Ver clientes</p>
+                            </div>
+                        </div>
+                    </a>
+                    <!-- Proveedores -->
+                    <a href="{% url 'lista_proveedores' %}" class="group bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition">
+                        <div class="flex items-center gap-4">
+                            <div class="h-12 w-12 rounded-full bg-lime-50 text-lime-700 grid place-items-center">
+                                <span class="material-symbols-outlined">store</span>
+                            </div>
+                            <div>
+                                <p class="text-sm text-gray-500">Proveedores</p>
+                                <p class="text-lg font-bold group-hover:text-lime-700">Ver proveedores</p>
+                            </div>
+                        </div>
+                    </a>
+                    <!-- Insumos -->
+                    <a href="{% url 'lista_insumos' %}" class="group bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition">
+                        <div class="flex items-center gap-4">
+                            <div class="h-12 w-12 rounded-full bg-teal-50 text-teal-700 grid place-items-center">
+                                <span class="material-symbols-outlined">inventory_2</span>
+                            </div>
+                            <div>
+                                <p class="text-sm text-gray-500">Insumos</p>
+                                <p class="text-lg font-bold group-hover:text-teal-700">Ver insumos</p>
+                            </div>
+                        </div>
+                    </a>
+                    <!-- Pruebas Unitarias -->
+                    <a href="/dashboard/tests/" class="group bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition">
+                        <div class="flex items-center gap-4">
+                            <div class="h-12 w-12 rounded-full bg-yellow-50 text-yellow-700 grid place-items-center">
+                                <span class="material-symbols-outlined">science</span>
+                            </div>
+                            <div>
+                                <p class="text-sm text-gray-500">Pruebas</p>
+                                <p class="text-lg font-bold group-hover:text-yellow-700">Pruebas Unitarias</p>
+                                <p class="text-xs text-gray-400 group-hover:text-gray-600">Ver resultados de tests</p>
+                            </div>
+                        </div>
+                    </a>
+                    <!-- Proyección de Insumos -->
+                    <a href="{% url 'lista_proyecciones' %}" class="group bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition">
+                        <div class="flex items-center gap-4">
+                            <div class="h-12 w-12 rounded-full bg-blue-50 text-blue-700 grid place-items-center">
+                                <span class="material-symbols-outlined">trending_up</span>
+                            </div>
+                            <div>
+                                <p class="text-sm text-gray-500">Proyección de Insumos</p>
+                                <p class="text-lg font-bold group-hover:text-blue-700">Ver proyección</p>
+                            </div>
+                        </div>
+                    </a>
+                    <!-- Estadísticas -->
+                    <a href="{% url 'estadisticas:dashboard' %}" class="group bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition">
+                        <div class="flex items-center gap-4">
+                            <div class="h-12 w-12 rounded-full bg-sky-50 text-sky-700 grid place-items-center">
+                                <span class="material-symbols-outlined">insights</span>
+                            </div>
+                            <div>
+                                <p class="text-sm text-gray-500">Estadísticas</p>
+                                <p class="text-lg font-bold group-hover:text-sky-700">Dashboard de métricas</p>
+                            </div>
+                        </div>
+                    </a>
+                    <!-- Presupuestos -->
+                    <a href="{% url 'presupuestos:lista' %}" class="group bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition">
+                        <div class="flex items-center gap-4">
+                            <div class="h-12 w-12 rounded-full bg-orange-50 text-orange-700 grid place-items-center">
+                                <span class="material-symbols-outlined">request_quote</span>
+                            </div>
+                            <div>
+                                <p class="text-sm text-gray-500">Presupuestos</p>
+                                <p class="text-lg font-bold group-hover:text-orange-700">Ver lista</p>
+                            </div>
+                        </div>
+                    </a>
+                    <!-- Usuarios -->
+                    <a href="{% url 'lista_usuarios' %}" class="group bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition">
+                        <div class="flex items-center gap-4">
+                            <div class="h-12 w-12 rounded-full bg-purple-50 text-purple-700 grid place-items-center">
+                                <span class="material-symbols-outlined">person</span>
+                            </div>
+                            <div>
+                                <p class="text-sm text-gray-500">Usuarios</p>
+                                <p class="text-lg font-bold group-hover:text-purple-700">Ver usuarios</p>
+                            </div>
+                        </div>
+                    </a>
+                    <!-- Permisos -->
+                    <a href="{% url 'lista_permisos' %}" class="group bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition">
+                        <div class="flex items-center gap-4">
+                            <div class="h-12 w-12 rounded-full bg-red-50 text-red-700 grid place-items-center">
+                                <span class="material-symbols-outlined">lock</span>
+                            </div>
+                            <div>
+                                <p class="text-sm text-gray-500">Permisos</p>
+                                <p class="text-lg font-bold group-hover:text-red-700">Ver permisos</p>
+                            </div>
+                        </div>
+                    </a>
+                    <!-- Auditoría -->
+                    <a href="{% url 'lista_auditoria' %}" class="group bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition">
+                        <div class="flex items-center gap-4">
+                            <div class="h-12 w-12 rounded-full bg-purple-50 text-purple-700 grid place-items-center">
+                                <span class="material-symbols-outlined">fact_check</span>
+                            </div>
+                            <div>
+                                <p class="text-sm text-gray-500">Auditoría</p>
+                                <p class="text-lg font-bold group-hover:text-purple-700">Ver registros</p>
+                            </div>
+                        </div>
+                    </a>
+                    <!-- Configuración -->
+                    <a href="/configuracion/" class="group bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition">
+                        <div class="flex items-center gap-4">
+                            <div class="h-12 w-12 rounded-full bg-cyan-50 text-cyan-700 grid place-items-center">
+                                <span class="material-symbols-outlined">settings</span>
+                            </div>
+                            <div>
+                                <p class="text-sm text-gray-500">Configuración</p>
+                                <p class="text-lg font-bold group-hover:text-cyan-700">Preferencias</p>
+                            </div>
+                        </div>
+                    </a>
+                </section>
 {% endblock %}
 
 {% block scripts %}{% endblock %}

@@ -1,3 +1,4 @@
+
 from django.contrib.messages import constants as messages
 from pathlib import Path
 import os
@@ -6,6 +7,32 @@ from dotenv import load_dotenv
 # Cargar variables de entorno desde .env
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR.parent.parent / '.env')
+
+
+# =====================
+
+# CRITICAL PATH/EMAIL/STATIC/MEDIA VARIABLES (must be defined before use)
+# =====================
+# BASE_DIR already defined above
+STATIC_URL = '/static/'
+STATICFILES_DIRS = [str(BASE_DIR / 'static')]
+STATIC_ROOT = str(BASE_DIR / 'staticfiles')
+MEDIA_URL = '/media/'
+MEDIA_ROOT = str(BASE_DIR / 'media')
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'no-reply@imprenta.local')
+EMAIL_FILE_PATH = os.environ.get('EMAIL_FILE_PATH', str(BASE_DIR / 'sent_emails'))
+AWS_REGION = os.environ.get('AWS_REGION', 'us-east-1').strip()
+
+
+# Debug prints
+print("[DEBUG settings.py] BASE_DIR:", BASE_DIR)
+print("[DEBUG settings.py] STATICFILES_DIRS:", STATICFILES_DIRS)
+print("[DEBUG settings.py] STATIC_ROOT:", STATIC_ROOT)
+print("[DEBUG settings.py] MEDIA_ROOT:", MEDIA_ROOT)
+print("[DEBUG settings.py] EMAIL_FILE_PATH:", EMAIL_FILE_PATH)
+print("[DEBUG settings.py] DEFAULT_FROM_EMAIL:", DEFAULT_FROM_EMAIL)
+print("[DEBUG settings.py] AWS_REGION:", AWS_REGION)
+
 
 
 # Seguridad y entorno
@@ -39,6 +66,7 @@ INSTALLED_APPS = [
     'configuracion',
     'geo',
     'automatizacion',
+    'dashboard',
     'rest_framework',
     'anymail',
 ]
@@ -66,7 +94,7 @@ WSGI_APPLICATION = 'impre_tucan.wsgi.application'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [BASE_DIR / 'templates'],
+        'DIRS': [str(BASE_DIR / 'templates')],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -80,13 +108,16 @@ TEMPLATES = [
     },
 ]
 
-# Base de datos
+# Prints de depuración después del cierre del bloque TEMPLATES
+print("[DEBUG settings.py] TEMPLATES:", TEMPLATES)
+
 DATABASES = {
     'default': {
         'ENGINE': os.environ.get('DB_ENGINE', 'django.db.backends.sqlite3'),
-        'NAME': os.environ.get('DB_NAME', BASE_DIR / 'db.sqlite3'),
+        'NAME': str(BASE_DIR / 'db.sqlite3'),
     }
 }
+print("[DEBUG settings.py] DATABASES:", DATABASES)
 
 # Internacionalización
 LANGUAGE_CODE = 'es'
@@ -95,14 +126,7 @@ USE_I18N = True
 USE_L10N = True
 USE_TZ = True
 
-# Archivos estáticos
-STATIC_URL = '/static/'
-STATICFILES_DIRS = [BASE_DIR / 'static']
-STATIC_ROOT = BASE_DIR / 'staticfiles'
 
-# Archivos media
-MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / 'media'
 
 # Seguridad para producción
 SESSION_COOKIE_SECURE = not DEBUG
@@ -174,15 +198,9 @@ CELERY_BEAT_SCHEDULE = {
 from .celery import app as celery_app
 __all__ = ('celery_app',)
 
-# Email
-# FORZAR SES como backend único de envío.
-# Ignoramos variables de entorno que intenten cambiar el backend.
-DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'no-reply@imprenta.local')
-EMAIL_FILE_PATH = os.environ.get('EMAIL_FILE_PATH', str(BASE_DIR / 'sent_emails'))
 
 # Anymail (SES exclusivo) vía API/SSO/IAM
 # Se fuerza el uso de Amazon SES sin permitir SendGrid/Mailgun.
-AWS_REGION = os.environ.get('AWS_REGION', 'us-east-1').strip()
 ANYMAIL_PROVIDER = 'ses'
 
 # Backend de email: SES únicamente
@@ -193,7 +211,7 @@ EMAIL_PORT = 587
 EMAIL_USE_TLS = True
 EMAIL_HOST_USER = '6luciano10@gmail.com'
 EMAIL_HOST_PASSWORD = 'hpmybzczlzuksshb'  # Contraseña de aplicación de Google para envío real
-DEFAULT_FROM_EMAIL = '6luciano10@gmail.com'
+
 
 # Configuración Anymail para SES. Las credenciales provienen de AWS SSO/IAM (boto3).
 ANYMAIL = {
