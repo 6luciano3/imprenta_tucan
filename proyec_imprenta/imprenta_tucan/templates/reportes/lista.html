@@ -1,20 +1,49 @@
-{% extends 'base.html' %}
+{% extends 'layouts/list_base.html' %}
+{# Oculta el botón Nuevo para reportes/stock #}
+{% block new_button %}{% endblock %}
 {% block title %}{{ title }}{% endblock %}
 
-{% block content %}
-<div class="p-6">
-  <div class="flex items-center justify-between mb-4">
-    <h1 class="text-2xl font-bold">{{ title }}</h1>
-    <div class="flex gap-2">
-      {% if preview_url %}
-      <a href="{{ preview_url }}" class="px-3 py-2 bg-purple-600 text-white rounded">Vista previa</a>
+{% block list_title_text %}{{ title }}{% endblock %}
+{% block list_icon %}<span class="material-symbols-outlined text-3xl">inventory_2</span>{% endblock %}
+{% block list_actions_right %}
+  {% if preview_url %}
+    {% with q=query|default_if_none:'' order=order_by|default_if_none:'' dir=direction|default_if_none:'' %}
+      {% firstof q order dir as any_filter %}
+      {% if any_filter %}
+        <a href="{{ preview_url }}?q={{ q|urlencode }}&order_by={{ order|urlencode }}&direction={{ dir|urlencode }}" class="flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-lg shadow hover:bg-purple-700">Vista previa</a>
+      {% else %}
+        <a href="{{ preview_url }}" class="flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-lg shadow hover:bg-purple-700">Vista previa</a>
       {% endif %}
-      <a href="?format=pdf" class="px-3 py-2 bg-red-600 text-white rounded">PDF</a>
-      <a href="?format=csv" class="px-3 py-2 bg-gray-700 text-white rounded">CSV</a>
-      <a href="?format=xlsx" class="px-3 py-2 bg-green-600 text-white rounded">Excel</a>
-      <a href="?format=json" class="px-3 py-2 bg-blue-600 text-white rounded">JSON</a>
-    </div>
-  </div>
+    {% endwith %}
+  {% endif %}
+  <a href="?format=pdf" class="flex items-center gap-2 bg-red-600 text-white px-4 py-2 rounded-lg shadow hover:bg-red-700">PDF</a>
+  <a href="?format=csv" class="flex items-center gap-2 bg-gray-700 text-white px-4 py-2 rounded-lg shadow hover:bg-gray-800">CSV</a>
+  <a href="?format=xlsx" class="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg shadow hover:bg-green-700">Excel</a>
+  <a href="?format=json" class="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg shadow hover:bg-blue-700">JSON</a>
+{% endblock %}
+{% block search_placeholder %}Nombre, código o categoría...{% endblock %}
+{% block clear_url %}?{% endblock %}
+{% block order_fields_options %}
+  {% if title == 'Stock disponible' %}
+    <option value="codigo" {% if order_by == 'codigo' %}selected{% endif %}>Código</option>
+    <option value="nombre" {% if order_by == 'nombre' %}selected{% endif %}>Nombre</option>
+    <option value="categoria" {% if order_by == 'categoria' %}selected{% endif %}>Categoría</option>
+    <option value="stock" {% if order_by == 'stock' %}selected{% endif %}>Stock</option>
+  {% elif title == 'Proveedores activos' %}
+    <option value="nombre" {% if order_by == 'nombre' %}selected{% endif %}>Nombre</option>
+    <option value="cuit" {% if order_by == 'cuit' %}selected{% endif %}>CUIT</option>
+    <option value="rubro" {% if order_by == 'rubro' %}selected{% endif %}>Rubro</option>
+    <option value="email" {% if order_by == 'email' %}selected{% endif %}>Email</option>
+    <option value="telefono" {% if order_by == 'telefono' %}selected{% endif %}>Teléfono</option>
+  {% elif title == 'Clientes frecuentes' %}
+    <option value="cliente" {% if order_by == 'cliente' %}selected{% endif %}>Cliente</option>
+    <option value="email" {% if order_by == 'email' %}selected{% endif %}>Email</option>
+    <option value="cnt" {% if order_by == 'cnt' %}selected{% endif %}>Pedidos</option>
+    <option value="puntaje_estrategico" {% if order_by == 'puntaje_estrategico' %}selected{% endif %}>Puntaje estratégico</option>
+  {% endif %}
+{% endblock %}
+
+{% block list_content %}
   <div class="bg-white shadow rounded-xl overflow-hidden">
     <div class="overflow-x-auto">
     <table class="min-w-full border border-gray-300 bg-white">
@@ -58,5 +87,48 @@
       {% include 'layouts/pagination.html' with page_obj=page_obj %}
     {% endif %}
   </div>
-</div>
 {% endblock %}
+  <div class="bg-white shadow rounded-xl overflow-hidden">
+    <div class="overflow-x-auto">
+    <table class="min-w-full border border-gray-300 bg-white">
+      <thead>
+        <tr class="bg-gray-100">
+          {% for h in headers %}
+          <th class="px-3 py-2 text-left border-b">{{ h }}</th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% if rows_page %}
+        {% for row in rows_page %}
+        <tr class="hover:bg-gray-50">
+          {% for col in row %}
+          <td class="px-3 py-2 border-b">{{ col }}</td>
+          {% endfor %}
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="{{ headers|length }}" class="px-3 py-4 text-center text-gray-500">No hay datos.</td>
+        </tr>
+        {% endfor %}
+        {% else %}
+        {% for row in rows %}
+        <tr class="hover:bg-gray-50">
+          {% for col in row %}
+          <td class="px-3 py-2 border-b">{{ col }}</td>
+          {% endfor %}
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="{{ headers|length }}" class="px-3 py-4 text-center text-gray-500">No hay datos.</td>
+        </tr>
+        {% endfor %}
+        {% endif %}
+      </tbody>
+    </table>
+    </div>
+    {% if page_obj %}
+      {% include 'layouts/pagination.html' with page_obj=page_obj %}
+    {% endif %}
+  </div>
+

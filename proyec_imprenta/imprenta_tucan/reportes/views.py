@@ -12,11 +12,13 @@ from django.urls import reverse
 from django.templatetags.static import static
 from django.contrib.staticfiles import finders
 
+
 from insumos.models import Insumo
 from proveedores.models import Proveedor
 from clientes.models import Cliente
 from pedidos.models import Pedido
 from configuracion.services import get_page_size
+from django.db.models import Q
 
 
 try:
@@ -244,7 +246,22 @@ def _export_dispatch(request, fmt: str, title: str, headers: list[str], rows: li
 
 def reporte_stock(request):
     fmt = _get_format(request)
-    qs = Insumo.objects.filter(activo=True).order_by('nombre')
+    # Búsqueda y orden
+    query = request.GET.get('q', '') or request.GET.get('criterio', '')
+    order_by = request.GET.get('order_by', 'nombre')
+    direction = request.GET.get('direction', 'asc')
+    valid_order_fields = ['codigo', 'nombre', 'categoria', 'stock']
+    if order_by not in valid_order_fields:
+        order_by = 'nombre'
+    qs = Insumo.objects.filter(activo=True)
+    if query:
+        qs = qs.filter(
+            Q(nombre__icontains=query) |
+              Q(categoria__icontains=query) |
+              Q(codigo__icontains=query)
+        )
+    order_field = f'-{order_by}' if direction == 'desc' else order_by
+    qs = qs.order_by(order_field)
     headers = ['Código', 'Nombre', 'Categoría', 'Stock', 'Proveedor']
 
     # HTML: paginar con estilo del sistema
@@ -259,6 +276,9 @@ def reporte_stock(request):
             'rows_page': rows_page,
             'page_obj': page_obj,
             'preview_url': reverse('reporte_stock_preview'),
+            'query': query,
+            'order_by': order_by,
+            'direction': direction,
         })
 
     # Otros formatos: dataset completo
@@ -278,7 +298,23 @@ def reporte_stock(request):
 
 def reporte_proveedores_activos(request):
     fmt = _get_format(request)
-    qs = Proveedor.objects.filter(activo=True).order_by('nombre')
+    query = request.GET.get('q', '') or request.GET.get('criterio', '')
+    order_by = request.GET.get('order_by', 'nombre')
+    direction = request.GET.get('direction', 'asc')
+    valid_order_fields = ['nombre', 'cuit', 'rubro', 'email', 'telefono']
+    if order_by not in valid_order_fields:
+        order_by = 'nombre'
+    qs = Proveedor.objects.filter(activo=True)
+    if query:
+        qs = qs.filter(
+            Q(nombre__icontains=query) |
+              Q(cuit__icontains=query) |
+              Q(rubro__icontains=query) |
+              Q(email__icontains=query) |
+              Q(telefono__icontains=query)
+        )
+    order_field = f'-{order_by}' if direction == 'desc' else order_by
+    qs = qs.order_by(order_field)
     headers = ['Nombre', 'CUIT', 'Rubro', 'Email', 'Teléfono']
     if fmt == 'html':
         paginator = Paginator(qs, get_page_size())
@@ -291,6 +327,9 @@ def reporte_proveedores_activos(request):
             'rows_page': rows_page,
             'page_obj': page_obj,
             'preview_url': reverse('reporte_proveedores_activos_preview'),
+            'query': query,
+            'order_by': order_by,
+            'direction': direction,
         })
 
     rows = [[p.nombre, p.cuit, (p.rubro_fk.nombre if p.rubro_fk else p.rubro), p.email, p.telefono] for p in qs]
@@ -311,6 +350,9 @@ def reporte_clientes_frecuentes(request):
     from django.db.models import Count
 
     fmt = _get_format(request)
+    query = request.GET.get('q', '') or request.GET.get('criterio', '')
+    order_by = request.GET.get('order_by', 'cnt')
+    direction = request.GET.get('direction', 'desc')
     top = int(request.GET.get('top', '20') or 20)
     freq = (
         Pedido.objects.values('cliente')
@@ -319,6 +361,29 @@ def reporte_clientes_frecuentes(request):
     )
     cliente_ids = [f['cliente'] for f in freq]
     clientes_map = {c.id: c for c in Cliente.objects.filter(id__in=cliente_ids, estado='Activo')}
+
+    # Filtrar por búsqueda
+    if query:
+        clientes_map = {k: v for k, v in clientes_map.items() if query.lower() in (f"{v.nombre} {v.apellido} {v.email}".lower())}
+        freq = [f for f in freq if f['cliente'] in clientes_map]
+
+    # Ordenar por campo
+    valid_order_fields = ['cliente', 'email', 'cnt', 'puntaje_estrategico']
+    if order_by not in valid_order_fields:
+        order_by = 'cnt'
+    reverse_sort = direction == 'desc'
+    def get_sort_key(f):
+        c = clientes_map.get(f['cliente'])
+        if not c:
+            return ''
+        if order_by == 'cliente':
+            return f"{c.nombre} {c.apellido}"
+        if order_by == 'email':
+            return c.email
+        if order_by == 'puntaje_estrategico':
+            return c.puntaje_estrategico
+        return f['cnt']
+    freq = sorted(freq, key=get_sort_key, reverse=reverse_sort)
 
     headers = ['Cliente', 'Email', 'Pedidos', 'Puntaje estratégico']
 
@@ -338,6 +403,9 @@ def reporte_clientes_frecuentes(request):
             'rows_page': rows_page,
             'page_obj': page_obj,
             'preview_url': reverse('reporte_clientes_frecuentes_preview'),
+            'query': query,
+            'order_by': order_by,
+            'direction': direction,
         })
 
     rows, records = [], []
@@ -382,24 +450,55 @@ def _preview_context(title: str, headers: list[str], rows: list[list]):
 
 
 def preview_stock(request):
-    qs = Insumo.objects.filter(activo=True).order_by('nombre')
+    query = request.GET.get('q', '') or request.GET.get('criterio', '')
+    order_by = request.GET.get('order_by', 'nombre')
+    direction = request.GET.get('direction', 'asc')
+    valid_order_fields = ['codigo', 'nombre', 'categoria', 'stock']
+    if order_by not in valid_order_fields:
+        order_by = 'nombre'
+    qs = Insumo.objects.filter(activo=True)
+    if query:
+        qs = qs.filter(
+            Q(nombre__icontains=query) |
+              Q(categoria__icontains=query) |
+              Q(codigo__icontains=query)
+        )
+    order_field = f'-{order_by}' if direction == 'desc' else order_by
+    qs = qs.order_by(order_field)
     headers = ['Código', 'Nombre', 'Categoría', 'Stock', 'Proveedor']
     rows = [[i.codigo, i.nombre, i.categoria, i.stock, (i.proveedor.nombre if i.proveedor else '-') ] for i in qs]
 
-    # Contexto base (sin paginación)
     ctx = _preview_context('Stock disponible', headers, rows)
     paper = (request.GET.get('paper') or 'A4').upper()
     orientation = (request.GET.get('orientation') or 'portrait').lower()
     ctx['paper'] = paper
     ctx['orientation'] = orientation
-    ctx['simple_preview'] = True  # ocultar controles de tamaño/orientación y etiqueta "Vista previa"
-    # Solicitud: eliminar pie de página en esta vista previa (todas las orientaciones)
+    ctx['simple_preview'] = True
     ctx['hide_footer'] = True
+    ctx['query'] = query
+    ctx['order_by'] = order_by
+    ctx['direction'] = direction
     return render(request, 'reportes/preview.html', ctx)
 
 
 def preview_proveedores_activos(request):
-    qs = Proveedor.objects.filter(activo=True).order_by('nombre')
+    query = request.GET.get('q', '') or request.GET.get('criterio', '')
+    order_by = request.GET.get('order_by', 'nombre')
+    direction = request.GET.get('direction', 'asc')
+    valid_order_fields = ['nombre', 'cuit', 'rubro', 'email', 'telefono']
+    if order_by not in valid_order_fields:
+        order_by = 'nombre'
+    qs = Proveedor.objects.filter(activo=True)
+    if query:
+        qs = qs.filter(
+            Q(nombre__icontains=query) |
+              Q(cuit__icontains=query) |
+              Q(rubro__icontains=query) |
+              Q(email__icontains=query) |
+              Q(telefono__icontains=query)
+        )
+    order_field = f'-{order_by}' if direction == 'desc' else order_by
+    qs = qs.order_by(order_field)
     headers = ['Nombre', 'CUIT', 'Rubro', 'Email', 'Teléfono']
     rows = [[p.nombre, p.cuit, (p.rubro_fk.nombre if p.rubro_fk else p.rubro), p.email, p.telefono] for p in qs]
     ctx = _preview_context('Proveedores activos', headers, rows)
@@ -408,14 +507,19 @@ def preview_proveedores_activos(request):
     ctx['paper'] = paper
     ctx['orientation'] = orientation
     ctx['simple_preview'] = True
-    # Solicitud: eliminar pie de página en esta vista previa
     ctx['hide_footer'] = True
+    ctx['query'] = query
+    ctx['order_by'] = order_by
+    ctx['direction'] = direction
     return render(request, 'reportes/preview.html', ctx)
 
 
 def preview_clientes_frecuentes(request):
     from django.db.models import Count
 
+    query = request.GET.get('q', '') or request.GET.get('criterio', '')
+    order_by = request.GET.get('order_by', 'cnt')
+    direction = request.GET.get('direction', 'desc')
     top = int(request.GET.get('top', '20') or 20)
     freq = (
         Pedido.objects.values('cliente')
@@ -424,6 +528,29 @@ def preview_clientes_frecuentes(request):
     )
     cliente_ids = [f['cliente'] for f in freq]
     clientes_map = {c.id: c for c in Cliente.objects.filter(id__in=cliente_ids, estado='Activo')}
+
+    # Filtrar por búsqueda
+    if query:
+        clientes_map = {k: v for k, v in clientes_map.items() if query.lower() in (f"{v.nombre} {v.apellido} {v.email}".lower())}
+        freq = [f for f in freq if f['cliente'] in clientes_map]
+
+    # Ordenar por campo
+    valid_order_fields = ['cliente', 'email', 'cnt', 'puntaje_estrategico']
+    if order_by not in valid_order_fields:
+        order_by = 'cnt'
+    reverse_sort = direction == 'desc'
+    def get_sort_key(f):
+        c = clientes_map.get(f['cliente'])
+        if not c:
+            return ''
+        if order_by == 'cliente':
+            return f"{c.nombre} {c.apellido}"
+        if order_by == 'email':
+            return c.email
+        if order_by == 'puntaje_estrategico':
+            return c.puntaje_estrategico
+        return f['cnt']
+    freq = sorted(freq, key=get_sort_key, reverse=reverse_sort)
 
     headers = ['Cliente', 'Email', 'Pedidos', 'Puntaje estratégico']
     rows = []
