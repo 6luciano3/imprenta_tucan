@@ -85,35 +85,22 @@
         <a href="{% url 'lista_auditoria' %}" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-light {% if request.resolver_match.url_name == 'lista_auditoria' %}bg-primary text-white{% endif %}">
           <span class="material-symbols-outlined">fact_check</span> Auditoría
         </a>
-        <a href="{% url 'configuracion_home' %}" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-light {% if request.resolver_match.url_name == 'configuracion_home' %}bg-primary text-white{% endif %}">
-          <span class="material-symbols-outlined">settings</span> Configuración
-        </a>
-        <a href="{% url 'presupuestos:lista' %}" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-light {% if request.resolver_match.url_name == 'lista' %}bg-primary text-white{% endif %}">
-          <span class="material-symbols-outlined">request_quote</span> Presupuestos
-        </a>
-        <a href="{% url 'dashboard' %}" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-light {% if request.resolver_match.url_name == 'dashboard' %}bg-primary text-white{% endif %}">
-          <span class="material-symbols-outlined">dashboard</span> Dashboard
-        </a>
-        {% if show_clientes %}
-        <a href="{% url 'lista_clientes' %}" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-light {% if request.resolver_match.url_name == 'lista_clientes' %}bg-primary text-white{% endif %}">
-          <span class="material-symbols-outlined">group</span> Clientes
-        </a>
-        {% endif %}
-        {% if show_proveedores %}
-        <a href="{% url 'lista_proveedores' %}" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-light {% if request.resolver_match.url_name == 'lista_proveedores' %}bg-primary text-white{% endif %}">
-          <span class="material-symbols-outlined">business</span> Proveedores
-        </a>
-        {% endif %}
         {% if show_usuarios %}
         <a href="{% url 'lista_usuarios' %}" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-light {% if request.resolver_match.url_name == 'lista_usuarios' %}bg-primary text-white{% endif %}">
           <span class="material-symbols-outlined">badge</span> Usuarios
         </a>
         {% endif %}
-        {% if show_productos %}
-        <a href="{% url 'lista_productos' %}" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-light {% if request.resolver_match.url_name == 'lista_productos' %}bg-primary text-white{% endif %}">
-          <span class="material-symbols-outlined">inventory_2</span> Productos
+        {% if show_clientes %}
+        <a href="{% url 'lista_clientes' %}" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-light {% if request.resolver_match.url_name == 'lista_clientes' %}bg-primary text-white{% endif %}">
+          <span class="material-symbols-outlined">group</span> Clientes
         </a>
         {% endif %}
+        <a href="{% url 'configuracion_home' %}" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-light {% if request.resolver_match.url_name == 'configuracion_home' %}bg-primary text-white{% endif %}">
+          <span class="material-symbols-outlined">settings</span> Configuración
+        </a>
+        <a href="{% url 'dashboard' %}" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-light {% if request.resolver_match.url_name == 'dashboard' %}bg-primary text-white{% endif %}">
+          <span class="material-symbols-outlined">dashboard</span> Dashboard
+        </a>
         {% if show_insumos %}
         <a href="{% url 'lista_insumos' %}" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-light {% if request.resolver_match.url_name == 'lista_insumos' %}bg-primary text-white{% endif %}">
           <span class="material-symbols-outlined">construction</span> Insumos
@@ -122,6 +109,22 @@
         {% if show_pedidos %}
         <a href="{% url 'lista_pedidos' %}" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-light {% if request.resolver_match.url_name == 'lista_pedidos' %}bg-primary text-white{% endif %}">
           <span class="material-symbols-outlined">receipt_long</span> Pedidos
+        </a>
+        {% endif %}
+        <a href="/dashboard/tests/" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-light {% if request.path == '/dashboard/tests/' %}bg-primary text-white{% endif %}">
+          <span class="material-symbols-outlined">science</span> Pruebas Unitarias
+        </a>
+        {% if show_productos %}
+        <a href="{% url 'lista_productos' %}" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-light {% if request.resolver_match.url_name == 'lista_productos' %}bg-primary text-white{% endif %}">
+          <span class="material-symbols-outlined">inventory_2</span> Productos
+        </a>
+        {% endif %}
+        <a href="{% url 'presupuestos:lista' %}" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-light {% if request.resolver_match.url_name == 'lista' %}bg-primary text-white{% endif %}">
+          <span class="material-symbols-outlined">request_quote</span> Presupuestos
+        </a>
+        {% if show_proveedores %}
+        <a href="{% url 'lista_proveedores' %}" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-light {% if request.resolver_match.url_name == 'lista_proveedores' %}bg-primary text-white{% endif %}">
+          <span class="material-symbols-outlined">business</span> Proveedores
         </a>
         {% endif %}
         {% if show_roles %}

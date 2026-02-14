@@ -36,6 +36,26 @@
     </style>
 </head>
 <body class="bg-background text-gray-800 font-sans min-h-screen">
+    <!-- MENÚ LATERAL FIJO -->
+    <aside class="hidden md:block fixed top-0 left-0 h-full w-56 bg-white border-r border-gray-200 shadow-sm z-40">
+        <div class="flex flex-col h-full">
+            <div class="flex items-center gap-2 h-16 px-4 border-b border-gray-100">
+                <span class="material-symbols-outlined text-blue-700">print_add</span>
+                <span class="font-black text-lg">Imprenta Tucán</span>
+            </div>
+            <nav class="flex-1 flex flex-col gap-1 p-4">
+                <a href="{% url 'lista_clientes' %}" class="flex items-center gap-2 px-3 py-2 rounded-lg text-gray-700 hover:bg-blue-50 hover:text-blue-700"><span class="material-symbols-outlined">group</span>Clientes</a>
+                <a href="{% url 'lista_usuarios' %}" class="flex items-center gap-2 px-3 py-2 rounded-lg text-gray-700 hover:bg-blue-50 hover:text-blue-700"><span class="material-symbols-outlined">badge</span>Usuarios</a>
+                <a href="{% url 'lista_productos' %}" class="flex items-center gap-2 px-3 py-2 rounded-lg text-gray-700 hover:bg-blue-50 hover:text-blue-700"><span class="material-symbols-outlined">inventory_2</span>Productos</a>
+                <a href="{% url 'lista_roles' %}" class="flex items-center gap-2 px-3 py-2 rounded-lg text-gray-700 hover:bg-blue-50 hover:text-blue-700"><span class="material-symbols-outlined">shield_person</span>Roles</a>
+                <a href="{% url 'lista_permisos' %}" class="flex items-center gap-2 px-3 py-2 rounded-lg text-gray-700 hover:bg-blue-50 hover:text-blue-700"><span class="material-symbols-outlined">lock</span>Permisos</a>
+                <a href="/insumos/lista_proyecciones/" class="flex items-center gap-2 px-3 py-2 rounded-lg text-blue-700 hover:bg-blue-100"><span class="material-symbols-outlined">trending_up</span>Proyecciones</a>
+                <a href="{% url 'ranking_clientes' %}" class="flex items-center gap-2 px-3 py-2 rounded-lg text-indigo-700 hover:bg-indigo-100"><span class="material-symbols-outlined">bar_chart_4_bars</span>Ranking</a>
+                <a href="/dashboard/tests/" class="flex items-center gap-2 px-3 py-2 rounded-lg text-yellow-700 hover:bg-yellow-100 font-semibold"><span class="material-symbols-outlined">science</span>Pruebas Unitarias</a>
+            </nav>
+        </div>
+    </aside>
+    <div class="md:ml-56">
     <!-- TOP NAVBAR -->
     <header class="sticky top-0 z-30 bg-white/90 backdrop-blur border-b border-gray-200">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
@@ -58,6 +78,10 @@
                 <!-- Enlace directo al Ranking de Clientes -->
                 <a href="{% url 'ranking_clientes' %}" class="text-sm text-indigo-700 hover:text-indigo-900 flex items-center gap-1">
                     <span class="material-symbols-outlined text-sm">bar_chart_4_bars</span>Ranking
+                </a>
+                <!-- Pruebas Unitarias -->
+                <a href="/dashboard/tests/" class="text-sm text-yellow-700 hover:text-yellow-900 flex items-center gap-1">
+                    <span class="material-symbols-outlined text-sm">science</span>Pruebas
                 </a>
             </nav>
             <div class="flex items-center gap-3">
