@@ -1,5 +1,7 @@
+
 # Test settings override to ease migrations in CI/tests
 from .settings import *  # noqa
+from .settings import DATABASES
 
 # Disable migrations for specific apps that cause issues with SQLite JSON1
 MIGRATION_MODULES = {
