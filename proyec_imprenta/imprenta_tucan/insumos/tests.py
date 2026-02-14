@@ -1,6 +1,6 @@
 from django.test import TestCase, Client
 from django.urls import reverse
-from .models import Insumo
+from insumos.models import Insumo
 
 class InsumoListaViewTest(TestCase):
     def setUp(self):
