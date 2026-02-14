@@ -1,5 +1,29 @@
 {% extends "base.html" %}
 {% block content %}
-  <h1>Resultados de los tests</h1>
-  <pre>{{ output }}</pre>
+<div class="max-w-3xl mx-auto mt-8 p-6 bg-white rounded-xl shadow-md border border-gray-200">
+  <h1 class="text-2xl font-bold mb-4 text-teal-700 flex items-center gap-2">
+    <span class="material-symbols-outlined align-middle">science</span>
+    Resultados de los tests
+  </h1>
+  <div class="mb-4 text-gray-600">
+    <p>Esta sección muestra el resultado de la ejecución automática de los tests del sistema.</p>
+  </div>
+  <div class="bg-gray-900 text-green-200 rounded-lg p-4 overflow-x-auto text-sm font-mono border border-gray-700">
+    {% if output %}
+      {% for line in output.splitlines %}
+        {% if 'FAILED' in line or 'ERROR' in line or 'Traceback' in line %}
+          <span class="text-red-400 font-semibold">{{ line }}</span><br>
+        {% elif 'OK' in line or 'Ran' in line or 'System check identified no issues' in line %}
+          <span class="text-green-400 font-semibold">{{ line }}</span><br>
+        {% elif 'Found' in line and 'test' in line %}
+          <span class="text-yellow-300 font-semibold">{{ line }}</span><br>
+        {% else %}
+          {{ line }}<br>
+        {% endif %}
+      {% endfor %}
+    {% else %}
+      <span class="text-gray-400">No hay resultados para mostrar.</span>
+    {% endif %}
+  </div>
+</div>
 {% endblock %}
