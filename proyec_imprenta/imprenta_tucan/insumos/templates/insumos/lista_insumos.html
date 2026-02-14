@@ -59,17 +59,17 @@
 						<td class="py-3 px-5 hidden md:table-cell">{{ insumo.precio|default:"-" }}</td>
 												<td class="py-3 px-5 text-center">
 													<div class="flex items-center justify-center gap-3">
-														<a href="{% url 'detalle_insumo' insumo.pk %}" class="text-blue-600 hover:text-blue-800 flex items-center gap-1" title="Ver detalles">
+														<a href="{% url 'detalle_insumo' insumo.idInsumo %}" class="text-blue-600 hover:text-blue-800 flex items-center gap-1" title="Ver detalles">
 															<span class="material-symbols-outlined text-sm">visibility</span>
 														</a>
 														{% if can_insumos_editar %}
-														<a href="{% url 'modificar_insumo' insumo.pk %}" class="text-yellow-600 hover:text-yellow-800 flex items-center gap-1" title="Editar">
+														<a href="{% url 'modificar_insumo' insumo.idInsumo %}" class="text-yellow-600 hover:text-yellow-800 flex items-center gap-1" title="Editar">
 															<span class="material-symbols-outlined text-sm">edit</span>
 														</a>
 														{% endif %}
 														{% if can_insumos_activar %}
 														  {% if insumo.activo %}
-														  <form method="POST" action="{% url 'activar_insumo' insumo.pk %}" class="inline">
+														  <form method="POST" action="{% url 'activar_insumo' insumo.idInsumo %}" class="inline">
 															  {% csrf_token %}
 															  <button type="submit" 
 																  class="text-orange-600 hover:text-orange-800 flex items-center gap-1"
@@ -78,7 +78,7 @@
 															  </button>
 														  </form>
 														  {% else %}
-														  <form method="POST" action="{% url 'activar_insumo' insumo.pk %}" class="inline">
+														  <form method="POST" action="{% url 'activar_insumo' insumo.idInsumo %}" class="inline">
 															  {% csrf_token %}
 															  <button type="submit" 
 																  class="text-green-600 hover:text-green-800 flex items-center gap-1"
@@ -89,7 +89,7 @@
 														  {% endif %}
 														{% endif %}
 														{% if can_insumos_eliminar %}
-														<a href="#" onclick="return confirmarEliminacionInsumo({{ insumo.pk }}, '{{ insumo.nombre|escapejs }}')" class="text-red-600 hover:text-red-800 flex items-center gap-1" title="Eliminar">
+														<a href="#" onclick="return confirmarEliminacionInsumo({{ insumo.idInsumo }}, '{{ insumo.nombre|escapejs }}')" class="text-red-600 hover:text-red-800 flex items-center gap-1" title="Eliminar">
 															<span class="material-symbols-outlined text-sm">delete</span>
 														</a>
 														{% endif %}

@@ -3,6 +3,7 @@ from django.core.cache import cache
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 from django.db import models, transaction
+from insumos.models import Insumo
 # --- Poblar unidades de medida automáticamente si la tabla está vacía ---
 from django.db.models.signals import post_migrate
 from django.dispatch import receiver
@@ -33,7 +34,7 @@ def populate_unidades(sender, **kwargs):
 class RecetaProducto(models.Model):
     producto = models.ForeignKey('productos.Producto', on_delete=models.CASCADE, related_name='recetas')
     # La fórmula ahora está en Producto, no aquí
-    insumos = models.ManyToManyField('insumos.Insumo', related_name='recetas')
+    insumos = models.ManyToManyField(Insumo)
     descripcion = models.TextField(blank=True)
     activo = models.BooleanField(default=True)
     creado_en = models.DateTimeField(auto_now_add=True)
@@ -277,7 +278,7 @@ class ListaConfig(models.Model):
 
 
 class Formula(models.Model):
-    insumo = models.ForeignKey('insumos.Insumo', on_delete=models.CASCADE, related_name='formulas')
+    insumo = models.ForeignKey('insumos.Insumo', on_delete=models.CASCADE, related_name='formulas', to_field='idInsumo')
     codigo = models.CharField(max_length=100, unique=True)
     nombre = models.CharField(max_length=200)
     descripcion = models.TextField(blank=True)

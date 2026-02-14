@@ -6,6 +6,7 @@ from usuarios.models import Usuario
 class Insumo(models.Model):
     idInsumo = models.AutoField(primary_key=True)
     nombre = models.CharField(max_length=100)
+    descripcion = models.TextField(blank=True)
     codigo = models.CharField(max_length=20, unique=True)
     proveedor = models.ForeignKey('proveedores.Proveedor', on_delete=models.CASCADE,
                                   related_name='insumos', null=True, blank=True)
@@ -24,7 +25,7 @@ class Insumo(models.Model):
 
 
 class ProyeccionInsumo(models.Model):
-    insumo = models.ForeignKey(Insumo, on_delete=models.CASCADE)
+    insumo = models.ForeignKey(Insumo, on_delete=models.CASCADE, to_field='idInsumo')
     periodo = models.CharField(max_length=20)  # Ej: '2025-12'
     cantidad_proyectada = models.PositiveIntegerField()
     proveedor_sugerido = models.ForeignKey(Proveedor, on_delete=models.SET_NULL, null=True, blank=True)
@@ -65,7 +66,7 @@ class ProyeccionInsumo(models.Model):
 
 
 class ConsumoRealInsumo(models.Model):
-    insumo = models.ForeignKey(Insumo, on_delete=models.CASCADE)
+    insumo = models.ForeignKey(Insumo, on_delete=models.CASCADE, to_field='idInsumo')
     periodo = models.CharField(max_length=20)  # Ej: '2025-12'
     cantidad_consumida = models.PositiveIntegerField()
     fecha_registro = models.DateTimeField(auto_now_add=True)

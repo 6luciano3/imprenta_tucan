@@ -28,7 +28,7 @@ class ScoreProveedor(models.Model):
 
 class OrdenSugerida(models.Model):
     pedido = models.ForeignKey('pedidos.Pedido', on_delete=models.CASCADE, related_name='ordenes_sugeridas')
-    insumo = models.ForeignKey('insumos.Insumo', on_delete=models.CASCADE)
+    insumo = models.ForeignKey('insumos.Insumo', on_delete=models.CASCADE, to_field='idInsumo')
     cantidad = models.PositiveIntegerField()
     generada = models.DateTimeField(auto_now_add=True)
     confirmada = models.BooleanField(default=False)

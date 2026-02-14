@@ -13,7 +13,7 @@ def crear_propuesta_para_insumo(request):
         messages.error(request, 'Falta el ID de insumo.')
         return redirect('compras_propuestas')
     try:
-        insumo = Insumo.objects.get(pk=insumo_id)
+        insumo = Insumo.objects.get(idInsumo=insumo_id)
     except Insumo.DoesNotExist:
         messages.error(request, 'Insumo no encontrado.')
         return redirect('compras_propuestas')

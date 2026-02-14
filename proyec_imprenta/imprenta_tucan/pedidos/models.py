@@ -72,7 +72,7 @@ class Pedido(models.Model):
 
 
 class OrdenCompra(models.Model):
-    insumo = models.ForeignKey('insumos.Insumo', on_delete=models.CASCADE)
+    insumo = models.ForeignKey('insumos.Insumo', on_delete=models.CASCADE, to_field='idInsumo')
     cantidad = models.PositiveIntegerField()
     proveedor = models.ForeignKey('proveedores.Proveedor', on_delete=models.CASCADE)
     fecha_creacion = models.DateTimeField(auto_now_add=True)

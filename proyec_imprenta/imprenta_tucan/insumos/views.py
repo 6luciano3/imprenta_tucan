@@ -127,7 +127,7 @@ def alta_insumo(request):
 
 @require_perm('Insumos', 'Editar', redirect_to='lista_insumos')
 def editar_insumo(request, pk: int):
-    insumo = get_object_or_404(Insumo, pk=pk)
+    insumo = get_object_or_404(Insumo, idInsumo=pk)
     if request.method == 'POST':
         form = InsumoForm(request.POST, instance=insumo)
         if form.is_valid():
@@ -145,7 +145,7 @@ def editar_insumo(request, pk: int):
 
 @require_perm('Insumos', 'Ver', redirect_to='lista_insumos')
 def detalle_insumo(request, pk: int):
-    insumo = get_object_or_404(Insumo, pk=pk)
+    insumo = get_object_or_404(Insumo, idInsumo=pk)
     return render(request, 'insumos/detalle_insumo.html', {
         'insumo': insumo,
     })
@@ -165,7 +165,7 @@ def modificarInsumo(idInsumo: int) -> Insumo:
 
     Este nombre sigue el diagrama provisto.
     """
-    return get_object_or_404(Insumo, pk=idInsumo)
+    return get_object_or_404(Insumo, idInsumo=idInsumo)
 
 
 def modificarDatos(insumo: Insumo, form: ModificarInsumoForm) -> Insumo:
@@ -183,7 +183,7 @@ def modificarDatos(insumo: Insumo, form: ModificarInsumoForm) -> Insumo:
 
 def bajaInsumo(idInsumo: int) -> Insumo:
     """Recupera el insumo a dar de baja o devuelve 404."""
-    return get_object_or_404(Insumo, pk=idInsumo)
+    return get_object_or_404(Insumo, idInsumo=idInsumo)
 
 
 def cambiarEstado(insumo: Insumo, estado: str) -> None:
