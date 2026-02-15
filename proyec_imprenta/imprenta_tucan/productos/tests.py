@@ -1,15 +1,18 @@
 from django.test import TestCase, Client
 from django.urls import reverse
 from .models import Producto, CategoriaProducto, TipoProducto, UnidadMedida
+from usuarios.models import Usuario
 
 class ProductoListaViewTest(TestCase):
     def setUp(self):
+        self.user = Usuario.objects.create_user(email="testuser@test.com", password="testpass", nombre="Test", apellido="User", telefono="1234")
+        self.client = Client()
+        self.client.force_login(self.user)
         categoria = CategoriaProducto.objects.create(nombreCategoria="Papelería")
         tipo = TipoProducto.objects.create(nombreTipoProducto="Resma")
         unidad = UnidadMedida.objects.create(nombreUnidad="Paquete")
         Producto.objects.create(nombreProducto="Resma A4", descripcion="Papel A4", precioUnitario=100, categoriaProducto=categoria, tipoProducto=tipo, unidadMedida=unidad)
         Producto.objects.create(nombreProducto="Resma Oficio", descripcion="Papel Oficio", precioUnitario=120, categoriaProducto=categoria, tipoProducto=tipo, unidadMedida=unidad)
-        self.client = Client()
 
     def test_lista_productos_status(self):
         response = self.client.get(reverse('lista_productos'))

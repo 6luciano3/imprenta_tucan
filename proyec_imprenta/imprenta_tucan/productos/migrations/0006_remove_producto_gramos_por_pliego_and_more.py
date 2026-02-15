@@ -36,7 +36,12 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='producto',
             name='formula',
-            field=models.ForeignKey(default=django.utils.timezone.now, help_text='Fórmula para calcular los insumos de este producto', on_delete=django.db.models.deletion.PROTECT, related_name='productos', to='configuracion.formula'),
-            preserve_default=False,
+            field=models.ForeignKey(
+                null=True,
+                help_text='Fórmula para calcular los insumos de este producto',
+                on_delete=django.db.models.deletion.PROTECT,
+                related_name='productos',
+                to='configuracion.formula'
+            ),
         ),
     ]

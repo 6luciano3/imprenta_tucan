@@ -1,12 +1,16 @@
+
 from django.test import TestCase, Client
 from django.urls import reverse
 from insumos.models import Insumo
+from usuarios.models import Usuario
 
 class InsumoListaViewTest(TestCase):
     def setUp(self):
-        Insumo.objects.create(nombre="Papel A4", descripcion="Resma de papel tamaño A4", stock=100)
-        Insumo.objects.create(nombre="Tinta Negra", descripcion="Cartucho de tinta negra", stock=50)
+        self.user = Usuario.objects.create_user(email="testuser@test.com", password="testpass", nombre="Test", apellido="User", telefono="1234")
         self.client = Client()
+        self.client.force_login(self.user)
+        Insumo.objects.create(nombre="Papel A4", descripcion="Resma de papel tamaño A4", stock=100, codigo="A4-001")
+        Insumo.objects.create(nombre="Tinta Negra", descripcion="Cartucho de tinta negra", stock=50, codigo="TN-001")
 
     def test_lista_insumos_status(self):
         response = self.client.get(reverse('lista_insumos'))

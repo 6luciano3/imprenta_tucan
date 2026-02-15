@@ -1,12 +1,15 @@
 from django.test import TestCase, Client
 from django.urls import reverse
 from .models import Proveedor
+from usuarios.models import Usuario
 
 class ProveedorListaViewTest(TestCase):
     def setUp(self):
-        Proveedor.objects.create(nombre="Proveedor A", email="a@proveedor.com", telefono="1111", direccion="Calle 1")
-        Proveedor.objects.create(nombre="Proveedor B", email="b@proveedor.com", telefono="2222", direccion="Calle 2")
+        self.user = Usuario.objects.create_user(email="testuser@test.com", password="testpass", nombre="Test", apellido="User", telefono="1234")
         self.client = Client()
+        self.client.force_login(self.user)
+        Proveedor.objects.create(nombre="Proveedor A", email="a@proveedor.com", telefono="1111", direccion="Calle 1", cuit="20-11111111-1")
+        Proveedor.objects.create(nombre="Proveedor B", email="b@proveedor.com", telefono="2222", direccion="Calle 2", cuit="20-22222222-2")
 
     def test_lista_proveedores_status(self):
         response = self.client.get(reverse('lista_proveedores'))

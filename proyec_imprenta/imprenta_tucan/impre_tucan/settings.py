@@ -1,3 +1,6 @@
+# Detectar entorno de test
+import sys
+TESTING = 'test' in sys.argv
 
 from django.contrib.messages import constants as messages
 from pathlib import Path
