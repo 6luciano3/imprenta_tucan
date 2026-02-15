@@ -166,21 +166,32 @@ def dashboard_tests(request):
     percent_failed = int((count_failed / count_total) * 100) if count_total else 0
     percent_skipped = 100 - percent_passed - percent_failed if count_total else 0
 
+    # Agrupar tests por clase para el template nuevo
+    clases_dict = {}
+    for t in test_cases:
+        # Extraer solo el nombre de la clase (sin módulo)
+        class_full = t.get('class', '')
+        class_name = class_full.split('.')[-2] if '.' in class_full else class_full
+        if class_name not in clases_dict:
+            clases_dict[class_name] = []
+        # Simular duración y estado
+        clases_dict[class_name].append({
+            'nombre': t['name'],
+            'estado': 'ok' if t['status'] == 'ok' else ('fail' if t['status'] in ('FAIL', 'ERROR') else 'error'),
+            'duracion': '—',
+            'detalle': t.get('detail', ''),
+        })
+    clases = [{'nombre': k, 'tests': v} for k, v in clases_dict.items()]
+    resumen = {
+        'total': count_total,
+        'ok': count_passed,
+        'fail': count_failed,
+        'error': 0,  # Si tienes parsing de errores, cámbialo aquí
+        'duracion': total_time,
+    }
     context = {
-        'output': filtered_output,
-        'total_tests': total_tests,
-        'passed_tests': passed_tests,
-        'failed_tests': failed_tests,
-        'total_time': total_time,
-        'all_passed': all_passed,
-        'percent_passed': percent_passed,
-        'percent_failed': percent_failed,
-        'percent_skipped': percent_skipped,
-        'steps': pipeline_steps,
-        'test_cases': test_cases,
-        'count_passed': count_passed,
-        'count_failed': count_failed,
-        'count_skipped': count_skipped,
-        'count_total': count_total,
+        'resumen': resumen,
+        'clases': clases,
+        'running': False,
     }
     return render(request, 'dashboard/tests_result.html', context)
