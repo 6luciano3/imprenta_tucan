@@ -114,10 +114,12 @@ TEMPLATES = [
 # Prints de depuración después del cierre del bloque TEMPLATES
 print("[DEBUG settings.py] TEMPLATES:", TEMPLATES)
 
+db_name_env = os.environ.get('DB_NAME')
+db_name = db_name_env if db_name_env else str(BASE_DIR / 'db.sqlite3')
 DATABASES = {
     'default': {
         'ENGINE': os.environ.get('DB_ENGINE', 'django.db.backends.sqlite3'),
-        'NAME': str(BASE_DIR / 'db.sqlite3'),
+        'NAME': db_name,
     }
 }
 print("[DEBUG settings.py] DATABASES:", DATABASES)

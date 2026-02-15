@@ -23,7 +23,7 @@ def dashboard_tests(request):
             f.write('import runpy; runpy.run_path(' + repr(str(pathlib.Path(manage_py))) + ', run_name="__main__")\n')
             temp_script = f.name
         result = subprocess.run(
-            [python_exec, temp_script, 'test'],
+            [python_exec, temp_script, 'test', 'dashboard', '--verbosity=2'],
             capture_output=True,
             text=True,
             cwd=project_dir,
