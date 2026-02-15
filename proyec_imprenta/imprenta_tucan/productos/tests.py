@@ -11,8 +11,13 @@ class ProductoListaViewTest(TestCase):
         categoria = CategoriaProducto.objects.create(nombreCategoria="Papelería")
         tipo = TipoProducto.objects.create(nombreTipoProducto="Resma")
         unidad = UnidadMedida.objects.create(nombreUnidad="Paquete")
-        Producto.objects.create(nombreProducto="Resma A4", descripcion="Papel A4", precioUnitario=100, categoriaProducto=categoria, tipoProducto=tipo, unidadMedida=unidad)
-        Producto.objects.create(nombreProducto="Resma Oficio", descripcion="Papel Oficio", precioUnitario=120, categoriaProducto=categoria, tipoProducto=tipo, unidadMedida=unidad)
+        # Crear un insumo para la fórmula
+        from insumos.models import Insumo
+        insumo = Insumo.objects.create(nombre="Papel base", descripcion="Papel para fórmula", codigo="PB-001", stock=100)
+        from configuracion.models import Formula
+        formula = Formula.objects.create(insumo=insumo, codigo="F-001", nombre="Fórmula Test", descripcion="desc", expresion="x+y", variables_json=[], version=1, activo=True)
+        Producto.objects.create(nombreProducto="Resma A4", descripcion="Papel A4", precioUnitario=100, categoriaProducto=categoria, tipoProducto=tipo, unidadMedida=unidad, formula=formula)
+        Producto.objects.create(nombreProducto="Resma Oficio", descripcion="Papel Oficio", precioUnitario=120, categoriaProducto=categoria, tipoProducto=tipo, unidadMedida=unidad, formula=formula)
 
     def test_lista_productos_status(self):
         response = self.client.get(reverse('lista_productos'))
