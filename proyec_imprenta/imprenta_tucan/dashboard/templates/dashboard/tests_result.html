@@ -40,8 +40,8 @@
                                     <th style="width: 48px;">Estado</th>
                                     <th>Nombre</th>
                                     <th>Descripción</th>
-                                    <th class="text-end" style="width: 90px;">Tiempo</th>
-                                    <th style="width: 90px;">Detalle</th>
+                                    <th class="text-end pe-4" style="width: 110px;">Tiempo</th>
+                                    <th style="width: 120px;">Detalle</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -58,7 +58,13 @@
                                     </td>
                                     <td class="fw-semibold">{{ test.nombre }}</td>
                                     <td class="text-secondary small">{{ test.descripcion|default:"—" }}</td>
-                                    <td class="text-end text-muted" style="font-variant-numeric: tabular-nums;">{{ test.tiempo }} ms</td>
+                                    <td class="text-end text-muted pe-4" style="font-variant-numeric: tabular-nums;">
+                                        {% if test.duracion and test.duracion != '—' %}
+                                            {{ test.duracion }} ms
+                                        {% else %}
+                                            —
+                                        {% endif %}
+                                    </td>
                                     <td>
                                         {% if test.estado == 'FAILED' or test.estado == 'ERROR' %}
                                             <button class="btn btn-link btn-sm text-danger p-0" type="button" data-bs-toggle="collapse" data-bs-target="#detalle-{{ clase.nombre|slugify }}-{{ test.nombre|slugify }}" aria-expanded="false" aria-controls="detalle-{{ clase.nombre|slugify }}-{{ test.nombre|slugify }}">

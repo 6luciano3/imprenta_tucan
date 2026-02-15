@@ -23,7 +23,7 @@ def dashboard_tests(request):
             f.write('import runpy; runpy.run_path(' + repr(str(pathlib.Path(manage_py))) + ', run_name="__main__")\n')
             temp_script = f.name
         result = subprocess.run(
-            [python_exec, temp_script, 'test', 'dashboard', '--verbosity=2'],
+            [python_exec, temp_script, 'test', 'clientes', '--verbosity=2'],
             capture_output=True,
             text=True,
             cwd=project_dir,
@@ -130,7 +130,8 @@ def dashboard_tests(request):
     pipeline_steps[4]['detail'] = destroy_db_line or ''
     pipeline_steps[4]['status'] = 'complete' if destroy_db_line else 'pending'
 
-    # --- PARSEAR TESTS INDIVIDUALES ---
+
+    # --- PARSEAR TESTS INDIVIDUALES Y TIEMPOS ---
     # Buscar bloques de tests individuales: "test_xxx (app.tests.TestClass) ... ok|FAIL"
     test_case_pattern = re.compile(r"^(test\w+.*?) \((.*?)\)\s+\.\.\.\s+(ok|FAIL|ERROR|SKIP)", re.MULTILINE)
     test_cases = []
@@ -145,7 +146,6 @@ def dashboard_tests(request):
         })
 
     # Buscar detalles de fallos (si existen)
-    # Django suele imprimir: "FAIL: test_xxx (app.tests.TestClass)" seguido de traceback
     fail_details = {}
     fail_block_pattern = re.compile(r"^(FAIL|ERROR): (test\w+.*?) \((.*?)\)\n(-+)(.*?)\n=+", re.DOTALL | re.MULTILINE)
     for m in fail_block_pattern.finditer(filtered_output + '\n====='):
@@ -157,6 +157,36 @@ def dashboard_tests(request):
         key = f"{tc['name']}|{tc['class']}"
         tc['detail'] = fail_details.get(key, '')
 
+    # --- EXTRAER TIEMPOS INDIVIDUALES DE PYTEST ---
+    # Buscar bloque de duraciones: "slowest durations" y parsear líneas tipo:
+    # 3.55s call     proyec_imprenta/imprenta_tucan/clientes/tests.py::ClienteListaViewTest::test_busqueda_por_nombre
+    durations = {}
+    in_durations = False
+    for line in filtered_lines:
+        if 'slowest durations' in line:
+            in_durations = True
+            continue
+        if in_durations:
+            if line.strip() == '' or line.startswith('='):
+                break
+            m = re.match(r"([\d\.]+)s (call|setup|teardown)\s+(.+?)(::(\w+))?$", line.strip())
+            if m:
+                seconds = float(m.group(1))
+                path_and_test = m.group(3)
+                # Buscar coincidencia tipo .../tests.py::Clase::test_metodo
+                if '::' in path_and_test:
+                    parts = path_and_test.split('::')
+                    if len(parts) == 3:
+                        _, class_name, method_name = parts
+                        key = (class_name, method_name)
+                        durations[key] = int(seconds * 1000)
+    # Mapear tiempos a test_cases usando clase y método
+    for tc in test_cases:
+        # tc['class'] es tipo app.tests.Clase
+        class_name = tc['class'].split('.')[-1]
+        method = tc['name']
+        tc['duration'] = durations.get((class_name, method), None)
+
     # Contar por estado para barra proporcional
     count_passed = sum(1 for t in test_cases if t['status'] == 'ok')
     count_failed = sum(1 for t in test_cases if t['status'] in ('FAIL', 'ERROR'))
@@ -166,7 +196,20 @@ def dashboard_tests(request):
     percent_failed = int((count_failed / count_total) * 100) if count_total else 0
     percent_skipped = 100 - percent_passed - percent_failed if count_total else 0
 
-    # Agrupar tests por clase para el template nuevo
+    # Extraer docstrings de los métodos de test
+    import inspect
+    import importlib
+    test_docstrings = {}
+    try:
+        clientes_tests = importlib.import_module('proyec_imprenta.imprenta_tucan.clientes.tests')
+        for name, obj in inspect.getmembers(clientes_tests, inspect.isclass):
+            if name.endswith('Test'):
+                for meth_name, meth in inspect.getmembers(obj, inspect.isfunction):
+                    if meth_name.startswith('test_'):
+                        test_docstrings[(name, meth_name)] = inspect.getdoc(meth)
+    except Exception:
+        pass
+
     clases_dict = {}
     for t in test_cases:
         # Extraer solo el nombre de la clase (sin módulo)
@@ -174,11 +217,15 @@ def dashboard_tests(request):
         class_name = class_full.split('.')[-2] if '.' in class_full else class_full
         if class_name not in clases_dict:
             clases_dict[class_name] = []
-        # Simular duración y estado
+        # Estado para template: PASSED, FAILED, ERROR
+        estado = 'PASSED' if t['status'] == 'ok' else ('FAILED' if t['status'] == 'FAIL' else ('ERROR' if t['status'] == 'ERROR' else ''))
+        # Buscar docstring
+        desc = test_docstrings.get((class_name, t['name']))
         clases_dict[class_name].append({
             'nombre': t['name'],
-            'estado': 'ok' if t['status'] == 'ok' else ('fail' if t['status'] in ('FAIL', 'ERROR') else 'error'),
-            'duracion': '—',
+            'estado': estado,
+            'descripcion': desc,
+            'duracion': t.get('duration', '—'),
             'detalle': t.get('detail', ''),
         })
     clases = [{'nombre': k, 'tests': v} for k, v in clases_dict.items()]
