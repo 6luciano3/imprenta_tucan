@@ -116,6 +116,12 @@ print("[DEBUG settings.py] TEMPLATES:", TEMPLATES)
 
 db_name_env = os.environ.get('DB_NAME')
 db_name = db_name_env if db_name_env else str(BASE_DIR / 'db.sqlite3')
+# Depuración de base de datos
+db_name_env = os.environ.get('DB_NAME')
+db_name = db_name_env if db_name_env else str(BASE_DIR / 'db.sqlite3')
+print('[DEBUG settings.py] db_name_env:', db_name_env)
+print('[DEBUG settings.py] db_name:', db_name)
+print('[DEBUG settings.py] BASE_DIR:', BASE_DIR)
 DATABASES = {
     'default': {
         'ENGINE': os.environ.get('DB_ENGINE', 'django.db.backends.sqlite3'),

@@ -30,3 +30,7 @@ class ClienteListaViewTest(TestCase):
         self.assertEqual(clientes[0].nombre, "Ana")
         self.assertEqual(clientes[1].nombre, "Juan")
         self.assertEqual(clientes[2].nombre, "Pedro")
+
+class ClienteBasicTest(TestCase):
+    def test_cliente_suma(self):
+        self.assertEqual(2 + 2, 4)
