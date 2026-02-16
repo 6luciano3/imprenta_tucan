@@ -39,5 +39,10 @@
         "Usuario",
         "usuarios"
     ],
-    "CodeGPT.apiKey": "DeepSeek"
+    "CodeGPT.apiKey": "DeepSeek",
+    "python.testing.pytestArgs": [
+        "imprenta_tuc"
+    ],
+    "python.testing.unittestEnabled": false,
+    "python.testing.pytestEnabled": true
 }
