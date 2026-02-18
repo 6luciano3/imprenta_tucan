@@ -125,9 +125,18 @@ class ModificarInsumoForm(forms.ModelForm):
         for t in terms:
             q |= Q(rubro__icontains=t)
         qs = Proveedor.objects.filter(activo=True)
-        if q:
-            qs = qs.filter(q)
-        self.fields["proveedor"].queryset = qs.order_by("nombre")
+        filtered_qs = qs.filter(q) if q else qs
+        if filtered_qs.exists():
+            self.fields["proveedor"].queryset = filtered_qs.order_by("nombre")
+        else:
+            # Si no hay proveedores filtrados, mostrar todos los activos
+            self.fields["proveedor"].queryset = qs.order_by("nombre")
+            # Seleccionar por defecto 'Distibuidora Técnica Offset' si existe
+            try:
+                offset = qs.get(nombre__iexact="Distibuidora Técnica Offset")
+                self.initial["proveedor"] = offset.pk
+            except Proveedor.DoesNotExist:
+                pass
 
     def clean_cantidad(self):
         cantidad = self.cleaned_data.get("cantidad")

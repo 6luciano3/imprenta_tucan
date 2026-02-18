@@ -15,8 +15,14 @@ def calcular_consumo_producto(producto, cantidad: int) -> dict:
     if not producto or not cantidad:
         return req
     # 1) Receta estática
-    for r in ProductoInsumo.objects.filter(producto=producto).only("insumo_id", "cantidad_por_unidad"):
-        req[r.insumo_id] += Decimal(r.cantidad_por_unidad) * Decimal(cantidad)
+    from insumos.models import Insumo
+    for r in ProductoInsumo.objects.filter(producto=producto).select_related('insumo').only("insumo_id", "cantidad_por_unidad", "insumo__nombre"):
+        nombre_insumo = (r.insumo.nombre or '').lower()
+        # Si es una plancha, solo sumar una vez la cantidad por trabajo
+        if 'plancha' in nombre_insumo:
+            req[r.insumo_id] += Decimal(r.cantidad_por_unidad)
+        else:
+            req[r.insumo_id] += Decimal(r.cantidad_por_unidad) * Decimal(cantidad)
 
     # 2) Fórmulas de imprenta (opcionales)
     # Papel
