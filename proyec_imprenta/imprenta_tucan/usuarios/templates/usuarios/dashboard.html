@@ -36,65 +36,9 @@
     </style>
 </head>
 <body class="bg-background text-gray-800 font-sans min-h-screen">
-    <!-- MENÚ LATERAL FIJO -->
-    <aside class="hidden md:block fixed top-0 left-0 h-full w-56 bg-white border-r border-gray-200 shadow-sm z-40">
-        <div class="flex flex-col h-full">
-            <div class="flex items-center gap-2 h-16 px-4 border-b border-gray-100">
-                <span class="material-symbols-outlined text-blue-700">print_add</span>
-                <span class="font-black text-lg">Imprenta Tucán</span>
-            </div>
-            <nav class="flex-1 flex flex-col gap-1 p-4">
-                <a href="{% url 'lista_clientes' %}" class="flex items-center gap-2 px-3 py-2 rounded-lg text-gray-700 hover:bg-blue-50 hover:text-blue-700"><span class="material-symbols-outlined">group</span>Clientes</a>
-                <a href="{% url 'lista_usuarios' %}" class="flex items-center gap-2 px-3 py-2 rounded-lg text-gray-700 hover:bg-blue-50 hover:text-blue-700"><span class="material-symbols-outlined">badge</span>Usuarios</a>
-                <a href="{% url 'lista_productos' %}" class="flex items-center gap-2 px-3 py-2 rounded-lg text-gray-700 hover:bg-blue-50 hover:text-blue-700"><span class="material-symbols-outlined">inventory_2</span>Productos</a>
-                <a href="{% url 'lista_roles' %}" class="flex items-center gap-2 px-3 py-2 rounded-lg text-gray-700 hover:bg-blue-50 hover:text-blue-700"><span class="material-symbols-outlined">shield_person</span>Roles</a>
-                <a href="{% url 'lista_permisos' %}" class="flex items-center gap-2 px-3 py-2 rounded-lg text-gray-700 hover:bg-blue-50 hover:text-blue-700"><span class="material-symbols-outlined">lock</span>Permisos</a>
-                <a href="/insumos/lista_proyecciones/" class="flex items-center gap-2 px-3 py-2 rounded-lg text-blue-700 hover:bg-blue-100"><span class="material-symbols-outlined">trending_up</span>Proyecciones</a>
-                <a href="{% url 'ranking_clientes' %}" class="flex items-center gap-2 px-3 py-2 rounded-lg text-indigo-700 hover:bg-indigo-100"><span class="material-symbols-outlined">bar_chart_4_bars</span>Ranking</a>
-                <a href="/dashboard/tests/" class="flex items-center gap-2 px-3 py-2 rounded-lg text-yellow-700 hover:bg-yellow-100 font-semibold"><span class="material-symbols-outlined">science</span>Pruebas Unitarias</a>
-            </nav>
-        </div>
-    </aside>
+    <!-- MENÚ LATERAL ELIMINADO -->
     <div class="md:ml-56">
-    <!-- TOP NAVBAR -->
-    <header class="sticky top-0 z-30 bg-white/90 backdrop-blur border-b border-gray-200">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-            <div class="flex items-center gap-3">
-                <span class="material-symbols-outlined text-blue-700">print_add</span>
-                <span class="font-black">Imprenta Tucán</span>
-                <span class="text-gray-300">|</span>
-                <span class="text-gray-600">Dashboard</span>
-            </div>
-            <nav class="hidden md:flex items-center gap-4">
-                <a href="{% url 'lista_clientes' %}" class="text-sm text-gray-600 hover:text-gray-900 flex items-center gap-1"><span class="material-symbols-outlined text-sm">group</span>Clientes</a>
-                <a href="{% url 'lista_usuarios' %}" class="text-sm text-gray-600 hover:text-gray-900 flex items-center gap-1"><span class="material-symbols-outlined text-sm">badge</span>Usuarios</a>
-                <a href="{% url 'lista_productos' %}" class="text-sm text-gray-600 hover:text-gray-900 flex items-center gap-1"><span class="material-symbols-outlined text-sm">inventory_2</span>Productos</a>
-                <a href="{% url 'lista_roles' %}" class="text-sm text-gray-600 hover:text-gray-900 flex items-center gap-1"><span class="material-symbols-outlined text-sm">shield_person</span>Roles</a>
-                <a href="{% url 'lista_permisos' %}" class="text-sm text-gray-600 hover:text-gray-900 flex items-center gap-1"><span class="material-symbols-outlined text-sm">lock</span>Permisos</a>
-                <!-- Enlace a Proyecciones de Insumos -->
-                <a href="/insumos/lista_proyecciones/" class="text-sm text-blue-700 hover:text-blue-900 flex items-center gap-1">
-                    <span class="material-symbols-outlined text-sm">trending_up</span>Proyecciones
-                </a>
-                <!-- Enlace directo al Ranking de Clientes -->
-                <a href="{% url 'ranking_clientes' %}" class="text-sm text-indigo-700 hover:text-indigo-900 flex items-center gap-1">
-                    <span class="material-symbols-outlined text-sm">bar_chart_4_bars</span>Ranking
-                </a>
-                <!-- Pruebas Unitarias -->
-                <a href="/dashboard/tests/" class="text-sm text-yellow-700 hover:text-yellow-900 flex items-center gap-1">
-                    <span class="material-symbols-outlined text-sm">science</span>Pruebas
-                </a>
-            </nav>
-            <div class="flex items-center gap-3">
-                <span class="hidden sm:block text-sm text-gray-600">{{ user.email }}</span>
-                <form method="POST" action="{% url 'logout' %}">
-                    {% csrf_token %}
-                    <button type="submit" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-red-50 text-red-700 hover:bg-red-100 text-sm">
-                        <span class="material-symbols-outlined text-sm">logout</span>Salir
-                    </button>
-                </form>
-            </div>
-        </div>
-    </header>
+    <!-- TOP NAVBAR ELIMINADO -->
     <!-- MAIN -->
     <div class="flex">
         <main class="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -105,33 +49,23 @@
         
         <!-- STATS CARDS -->
         <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-            <a href="{% url 'lista_productos' %}" class="group bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition">
-                <div class="flex items-center gap-4">
-                    <div class="h-12 w-12 rounded-full bg-yellow-50 text-yellow-700 grid place-items-center">
-                        <span class="material-symbols-outlined">inventory_2</span>
-                    </div>
-                    <div>
-                        <p class="text-sm text-gray-500">Productos</p>
-                        <p class="text-2xl font-bold group-hover:text-yellow-700">{{ total_productos }}</p>
-                    </div>
-                </div>
-            </a>
-            <a href="{% url 'lista_roles' %}" class="group bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition">
-                <div class="flex items-center gap-4">
-                    <div class="h-12 w-12 rounded-full bg-gray-100 text-gray-700 grid place-items-center">
-                        <span class="material-symbols-outlined">shield_person</span>
-                    </div>
-                    <div>
-                        <p class="text-sm text-gray-500">Roles</p>
-                        <p class="text-2xl font-bold">{{ total_roles }}</p>
-                    </div>
-                </div>
-            </a>
             <!-- Tarjeta de Proyecciones removida para evitar duplicaciones -->
         </section>
         <!-- Paneles principales (Operaciones, Analítica, Administración) -->
         <h3 class="mt-8 mb-2 text-sm font-semibold text-gray-600">Operaciones</h3>
         <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            <a href="{% url 'lista_productos' %}" class="group bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition">
+                <div class="flex items-center gap-4">
+                    <div class="h-12 w-12 rounded-full bg-yellow-50 text-black grid place-items-center group-hover:bg-yellow-100 transition">
+                        <span class="material-symbols-outlined text-2xl">inventory_2</span>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-500">Productos</p>
+                        <p class="text-lg font-bold text-gray-700 group-hover:text-yellow-700 transition">Ver Productos</p>
+                        <p class="text-2xl font-bold group-hover:text-yellow-600 transition">{{ total_productos }}</p>
+                    </div>
+                </div>
+            </a>
             <a href="{% url 'ofertas_propuestas' %}" class="group bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition">
                 <div class="flex items-center gap-4">
                     <div class="h-12 w-12 rounded-full bg-green-50 text-green-700 grid place-items-center">
@@ -251,6 +185,18 @@
 
         <h3 class="mt-8 mb-2 text-sm font-semibold text-gray-600">Administración</h3>
         <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            <a href="{% url 'lista_roles' %}" class="group bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition">
+                <div class="flex items-center gap-4">
+                    <div class="h-12 w-12 rounded-full bg-gray-100 text-gray-700 grid place-items-center">
+                        <span class="material-symbols-outlined">shield_person</span>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-500">Roles</p>
+                        <p class="text-lg font-bold text-gray-700 group-hover:text-gray-700 transition">Ver Roles</p>
+                        <p class="text-2xl font-bold group-hover:text-gray-600 transition">{{ total_roles }}</p>
+                    </div>
+                </div>
+            </a>
             <a href="{% url 'lista_usuarios' %}" class="group bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition">
                 <div class="flex items-center gap-4">
                     <div class="h-12 w-12 rounded-full bg-purple-50 text-purple-700 grid place-items-center">
@@ -297,83 +243,29 @@
             </a>
         </section>
         {% block notificaciones %}{% endblock %}
-        <!-- RECENT SECTION -->
-        <section class="mt-10 grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <!-- Últimos registros -->
-            <div class="lg:col-span-2 bg-white rounded-xl border border-gray-200 shadow-sm">
-                <div class="p-5 border-b border-gray-200 flex items-center justify-between">
-                    <h2 class="text-lg font-semibold flex items-center gap-2">
-                        <span class="material-symbols-outlined text-blue-600">history</span>
-                        Últimos registros
-                    </h2>
-            {% block extra_panels %}
-
-            {% endblock %}
-                </div>
-                <div class="overflow-x-auto">
-                    <table class="min-w-full text-sm">
-                        <thead class="bg-gray-50 text-gray-600 uppercase text-xs">
-                            <tr>
-                                <th class="py-3 px-4 text-left">Módulo</th>
-                                <th class="py-3 px-4 text-left">Descripción</th>
-                                <th class="py-3 px-4 text-left">Fecha</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-gray-100">
-                            <tr>
-                                <td class="py-3 px-4">Usuario</td>
-                                <td class="py-3 px-4 text-gray-600">Se creó un nuevo usuario.</td>
-                                <td class="py-3 px-4">{{ ultima_fecha_usuarios|default:"-" }}</td>
-                            </tr>
-                            <tr>
-                                <td class="py-3 px-4">Cliente</td>
-                                <td class="py-3 px-4 text-gray-600">Nuevo cliente registrado.</td>
-                                <td class="py-3 px-4">{{ ultima_fecha_clientes|default:"-" }}</td>
-                            </tr>
-                            <tr>
-                                <td class="py-3 px-4">Producto</td>
-                                <td class="py-3 px-4 text-gray-600">Nuevo producto agregado.</td>
-                                <td class="py-3 px-4">{{ ultima_fecha_productos|default:"-" }}</td>
-                            </tr>
-                            <tr>
-                                <td class="py-3 px-4">Rol</td>
-                                <td class="py-3 px-4 text-gray-600">Actualización de roles.</td>
-                                <td class="py-3 px-4">{{ ultima_fecha_roles|default:"-" }}</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-            <!-- Acciones rápidas -->
-            <div class="bg-white rounded-xl border border-gray-200 shadow-sm">
-                <div class="p-5 border-b border-gray-200">
-                    <h2 class="text-lg font-semibold flex items-center gap-2">
-                        <span class="material-symbols-outlined text-green-600">bolt</span>
-                        Acciones rápidas
-                    </h2>
-                </div>
-                <div class="p-5 grid grid-cols-2 gap-3">
-                    <a href="{% url 'lista_usuarios' %}" class="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100">
-                        <span class="material-symbols-outlined text-base">badge</span> Usuarios
-                    </a>
-                    <a href="{% url 'lista_clientes' %}" class="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100">
-                        <span class="material-symbols-outlined text-base">group</span> Clientes
-                    </a>
-                    <a href="{% url 'lista_productos' %}" class="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-yellow-50 text-yellow-700 hover:bg-yellow-100">
-                        <span class="material-symbols-outlined text-base">inventory_2</span> Productos
-                    </a>
-                    <a href="{% url 'lista_roles' %}" class="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200">
-                        <span class="material-symbols-outlined text-base">shield_person</span> Roles
-                    </a>
-                    <a href="{% url 'lista_permisos' %}" class="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 col-span-2">
-                        <span class="material-symbols-outlined text-base">lock</span> Permisos
-                    </a>
-                    <!-- Acceso rápido a Proyecciones removido para evitar duplicaciones -->
-                </div>
-            </div>
+        <!-- RECENT SECTION ELIMINADO: Últimos registros -->
+            <!-- Acciones rápidas ELIMINADAS -->
         </section>
         </main>
     </div>
+        <!-- FOOTER UNIFICADO -->
+        <footer class="bg-white border-t border-gray-200">
+            <div class="container mx-auto px-4 py-3 md:py-4 flex flex-col md:flex-row items-center justify-between gap-2 text-sm md:text-base">
+                <div class="flex items-center gap-2 text-gray-600">
+                    <span class="material-symbols-outlined text-blue-600">local_printshop</span>
+                    <span class="font-semibold">Imprenta Tucán</span>
+                    <span class="hidden md:inline">·</span>
+                    <span class="text-gray-400">Panel Administrativo</span>
+                    <span class="hidden md:inline">·</span>
+                    <span class="text-gray-400">&copy; {{ now|default:None|date:'Y' }}</span>
+                </div>
+                <div class="flex items-center gap-4">
+                    <span class="text-gray-500">Versión v2026.02</span>
+                    <a href="mailto:info@imprenta.com.ar" class="text-blue-600 hover:text-blue-800">Contacto</a>
+                    <a href="{% url 'privacidad' %}" class="text-blue-600 hover:text-blue-800">Política de Privacidad</a>
+                </div>
+            </div>
+        </footer>
 {% block scripts %}{% endblock %}
 </body>
 </html>
