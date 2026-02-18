@@ -71,6 +71,15 @@ class Pedido(models.Model):
             pass
 
 
+class OrdenProduccion(models.Model):
+    pedido = models.OneToOneField('Pedido', on_delete=models.CASCADE, related_name='orden_produccion')
+    estado = models.CharField(max_length=20, default='pendiente')
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"OrdenProduccion {self.id} - Pedido {self.pedido.id} ({self.estado})"
+
+
 class OrdenCompra(models.Model):
     insumo = models.ForeignKey('insumos.Insumo', on_delete=models.CASCADE, to_field='idInsumo')
     cantidad = models.PositiveIntegerField()

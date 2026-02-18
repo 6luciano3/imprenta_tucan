@@ -33,7 +33,6 @@ urlpatterns = [
     path('reportes/', include('reportes.urls')),
 
     # Página principal
-    path('dashboard/', dashboard, name='dashboard'),
     path('dashboard/', include('dashboard.urls')),
     path('privacidad/', privacidad, name='privacidad'),
     # Endpoints API Inteligente

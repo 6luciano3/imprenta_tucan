@@ -98,7 +98,23 @@
             {{ resumen.total_tests }} tests · {{ resumen.total_assertions }} afirmaciones · {{ resumen.total_time }}s
         </div>
         <div>
-            <a href="" class="btn btn-outline-primary btn-sm me-2"><i class="bi bi-arrow-repeat"></i> Ejecutar nuevamente</a>
+            <form id="run-tests-form" method="post" style="display:inline;">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-outline-primary btn-sm me-2"><i class="bi bi-arrow-repeat"></i> Ejecutar nuevamente</button>
+            </form>
+            <script>
+                document.getElementById('run-tests-form').addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    fetch('', {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                        }
+                    }).then(function() {
+                        setTimeout(function() { location.reload(); }, 3500);
+                    });
+                });
+            </script>
             <a href="/dashboard/" class="btn btn-outline-secondary btn-sm"><i class="bi bi-x-lg"></i> Cerrar</a>
         </div>
     </div>

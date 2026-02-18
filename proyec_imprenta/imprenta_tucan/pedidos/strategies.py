@@ -9,12 +9,12 @@ class EstrategiaCalculoConsumo(ABC):
 
 class CalculoFolleto(EstrategiaCalculoConsumo):
     def consumo_por_insumo(self, pedido):
-        receta = pedido.producto.receta
+        receta = pedido.producto.receta.all()
         resultado = []
         for r in receta:
-            insumo_id = r['insumo_id']
-            cantidad_por_unidad = r['cantidad_por_unidad']
-            total = cantidad_por_unidad * pedido.tiraje
+            insumo_id = r.insumo.idInsumo if hasattr(r.insumo, 'idInsumo') else r.insumo.id
+            cantidad_por_unidad = r.cantidad_por_unidad
+            total = cantidad_por_unidad * getattr(pedido, 'tiraje', getattr(pedido, 'cantidad', 1))
             resultado.append((insumo_id, total))
         return resultado
 

@@ -1,6 +1,8 @@
 import pytest
 from insumos.models import Insumo
 from productos.models import Producto
+from configuracion.models import Formula
+from clientes.models import Cliente
 from pedidos.models import Pedido, EstadoPedido
 
 
@@ -16,12 +18,23 @@ def test_crear_pedido_y_cambiar_estado_descuenta_stock():
         precio=10,
         activo=True
     )
-    # Crear producto con receta
+    # Crear formula dummy
+    formula = Formula.objects.create(
+        insumo=insumo,
+        codigo="F001",
+        nombre="Formula Test",
+        expresion="x*2",
+        variables_json=[{"nombre": "x", "valor": 1}]
+    )
+    # Crear producto con receta y formula (obligatorio)
     producto = Producto.objects.create(
         nombreProducto="Tarjeta",
         precioUnitario=50,
-        activo=True
+        activo=True,
+        formula=formula
     )
+    # Crear cliente dummy
+    cliente = Cliente.objects.create(nombre="Test", apellido="Test", email="test@stock.com", telefono="123456")
     # Relacionar receta
     from productos.models import ProductoInsumo
     ProductoInsumo.objects.create(
@@ -34,7 +47,7 @@ def test_crear_pedido_y_cambiar_estado_descuenta_stock():
     estado_proceso = EstadoPedido.objects.create(nombre="proceso")
     # Crear pedido
     pedido = Pedido.objects.create(
-        cliente_id=1,  # Asume cliente con id=1 existe
+        cliente=cliente,
         producto=producto,
         cantidad=10,
         monto_total=500,

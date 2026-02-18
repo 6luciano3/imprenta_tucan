@@ -87,8 +87,12 @@ def require_perm(modulo: str, accion: Optional[str] = None, redirect_to: Optiona
                 # Chequear acción (con sinónimos) en alguna lista de acciones
                 synonyms = _expand_action_synonyms(accion)
 
+                import json
                 def _match(p):
-                    acciones = set(p.acciones or [])
+                    try:
+                        acciones = set(json.loads(p.acciones or '[]'))
+                    except Exception:
+                        acciones = set()
                     return bool(acciones & synonyms)
                 if not any(_match(p) for p in permisos_qs):
                     messages.error(request, f'No tiene permiso para realizar la acción "{accion}" en {modulo}.')

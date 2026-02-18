@@ -28,6 +28,12 @@ class UnidadMedida(models.Model):
 
 class Producto(models.Model):
     @property
+    def tipo(self):
+        """Compatibilidad para estrategias: retorna el nombre del tipo de producto en minúsculas o 'folleto' por defecto."""
+        if self.tipoProducto and hasattr(self.tipoProducto, 'nombreTipoProducto'):
+            return self.tipoProducto.nombreTipoProducto.lower()
+        return 'folleto'
+    @property
     def papel_insumo(self):
         # Devuelve el insumo de papel asociado, si existe (dummy)
         return getattr(self, '_papel_insumo', None) or "-"

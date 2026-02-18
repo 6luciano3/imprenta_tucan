@@ -5,7 +5,14 @@ from usuarios.models import Usuario
 
 class ProductoListaViewTest(TestCase):
     def setUp(self):
-        self.user = Usuario.objects.create_user(email="testuser@test.com", password="testpass", nombre="Test", apellido="User", telefono="1234")
+        from roles.models import Rol
+        from permisos.models import Permiso
+        # Crear permiso activo para Productos con acción Listar
+        import json
+        permiso = Permiso.objects.create(nombre="Permiso Productos", descripcion="Permite listar productos", modulo="Productos", acciones=json.dumps(["Listar"]), estado="Activo")
+        rol = Rol.objects.create(nombreRol="Rol Test", estado="Activo")
+        rol.permisos.add(permiso)
+        self.user = Usuario.objects.create_user(email="testuser@test.com", password="testpass", nombre="Test", apellido="User", telefono="1234", rol=rol)
         self.client = Client()
         self.client.force_login(self.user)
         categoria = CategoriaProducto.objects.create(nombreCategoria="Papelería")

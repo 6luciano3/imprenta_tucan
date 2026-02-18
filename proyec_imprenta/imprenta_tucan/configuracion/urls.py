@@ -1,6 +1,7 @@
 # Línea eliminada: estaba fuera de lugar y ya está incluida correctamente abajo
 from django.urls import path
 from . import views
+from .views_api import formula_validate_api
 
 urlpatterns = [
     path('', views.configuracion_home, name='configuracion_home'),
@@ -13,7 +14,7 @@ urlpatterns = [
     path('formulas/<int:pk>/editar/', views.editar_formula, name='editar_formula'),
     path('formulas/<int:pk>/desactivar/', views.desactivar_formula, name='desactivar_formula'),
     path('formulas/<int:pk>/activar/', views.activar_formula, name='activar_formula'),
-    path('api/configuracion/formula/validate/', views.validar_formula, name='validar_formula'),
+    path('api/configuracion/formula/validate/', formula_validate_api, name='validar_formula'),
     path('recetas/', views.receta_producto_list, name='receta_producto_list'),
     path('recetas/nueva/', views.receta_producto_create, name='receta_producto_create'),
     path('recetas/<int:pk>/editar/', views.receta_producto_update, name='receta_producto_update'),

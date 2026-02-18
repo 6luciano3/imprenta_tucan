@@ -9,6 +9,7 @@ from clientes.models import Cliente
 from insumos.models import Insumo
 from pedidos.models import Pedido, EstadoPedido
 from productos.models import Producto, UnidadMedida, ProductoInsumo
+from configuracion.models import Formula
 
 
 class AltaPedidoTests(TestCase):
@@ -28,6 +29,8 @@ class AltaPedidoTests(TestCase):
 
         self.um = UnidadMedida.objects.create(nombreUnidad="Unidad", abreviatura="u")
 
+        # EstadoPedido necesario para los pedidos
+        self.estado = EstadoPedido.objects.create(nombre="Pendiente")
         # Insumo único para simplificar recetas
         self.insumo = Insumo.objects.create(
             nombre="Papel A4",
@@ -40,6 +43,14 @@ class AltaPedidoTests(TestCase):
             activo=True,
         )
 
+        # Fórmula dummy para productos
+        self.formula = Formula.objects.create(
+            insumo=self.insumo,
+            codigo="F001",
+            nombre="Formula Test",
+            expresion="x*2",
+            variables_json=[{"nombre": "x", "valor": 1}]
+        )
         # Productos
         self.p1 = Producto.objects.create(
             nombreProducto="Tarjeta",
@@ -47,6 +58,7 @@ class AltaPedidoTests(TestCase):
             precioUnitario=Decimal("100.00"),
             unidadMedida=self.um,
             activo=True,
+            formula=self.formula
         )
         self.p2 = Producto.objects.create(
             nombreProducto="Folleto",
@@ -54,6 +66,7 @@ class AltaPedidoTests(TestCase):
             precioUnitario=Decimal("50.00"),
             unidadMedida=self.um,
             activo=True,
+            formula=self.formula
         )
 
         # Recetas: cantidad_por_unidad
