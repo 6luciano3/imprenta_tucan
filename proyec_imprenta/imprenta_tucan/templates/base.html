@@ -111,9 +111,6 @@
           <span class="material-symbols-outlined">receipt_long</span> Pedidos
         </a>
         {% endif %}
-        <a href="/dashboard/tests/" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-light {% if request.path == '/dashboard/tests/' %}bg-primary text-white{% endif %}">
-          <span class="material-symbols-outlined">science</span> Pruebas Unitarias
-        </a>
         {% if show_productos %}
         <a href="{% url 'lista_productos' %}" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-light {% if request.resolver_match.url_name == 'lista_productos' %}bg-primary text-white{% endif %}">
           <span class="material-symbols-outlined">inventory_2</span> Productos
