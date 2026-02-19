@@ -4,6 +4,11 @@ from usuarios.models import Usuario
 
 
 class Insumo(models.Model):
+    @property
+    def cantidad_a_reponer(self):
+        minimo = self.stock_minimo_sugerido
+        actual = self.stock or 0
+        return max(0, minimo - actual)
     idInsumo = models.AutoField(primary_key=True)
     nombre = models.CharField(max_length=100)
     descripcion = models.TextField(blank=True)
@@ -16,6 +21,28 @@ class Insumo(models.Model):
     stock = models.IntegerField(default=0)
     precio = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     activo = models.BooleanField(default=True)
+
+    @property
+    def consumo_promedio_mensual(self):
+        # Si hay registros de consumo real, calcular el promedio del último año
+        from insumos.models import ConsumoRealInsumo
+        import datetime
+        hoy = datetime.date.today()
+        hace_un_ano = hoy - datetime.timedelta(days=365)
+        consumos = ConsumoRealInsumo.objects.filter(insumo=self, fecha__gte=hace_un_ano)
+        total = sum(c.cantidad for c in consumos)
+        meses = 12
+        return total / meses if total > 0 else 0
+
+    @property
+    def stock_minimo_sugerido(self):
+        # Días de reposición: parámetro fijo (ejemplo: 15 días)
+        dias_reposicion = 15
+        consumo_mensual = self.consumo_promedio_mensual
+        if consumo_mensual == 0:
+            return 0
+        # Stock mínimo = consumo promedio mensual * (días de reposición / 30)
+        return round(consumo_mensual * dias_reposicion / 30)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
