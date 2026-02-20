@@ -1,3 +1,44 @@
+from django.views.decorators.csrf import csrf_exempt
+@csrf_exempt
+def aceptar_oferta_token(request, token):
+    oferta = get_object_or_404(OfertaPropuesta, token_email=token)
+    if request.method == 'POST' and oferta.estado != 'aceptada':
+        oferta.estado = 'aceptada'
+        oferta.fecha_validacion = timezone.now()
+        oferta.save()
+        AccionCliente.objects.create(
+            cliente=oferta.cliente,
+            oferta=oferta,
+            tipo='aceptar',
+            canal='email',
+            detalle='Cliente aceptó la oferta desde el email',
+        )
+        return render(request, 'automatizacion/oferta_individual.html', {'oferta': oferta, 'accion_realizada': 'aceptada'})
+    return render(request, 'automatizacion/oferta_individual.html', {'oferta': oferta})
+
+@csrf_exempt
+def rechazar_oferta_token(request, token):
+    oferta = get_object_or_404(OfertaPropuesta, token_email=token)
+    if request.method == 'POST' and oferta.estado != 'rechazada':
+        oferta.estado = 'rechazada'
+        oferta.fecha_validacion = timezone.now()
+        oferta.save()
+        AccionCliente.objects.create(
+            cliente=oferta.cliente,
+            oferta=oferta,
+            tipo='rechazar',
+            canal='email',
+            detalle='Cliente rechazó la oferta desde el email',
+        )
+        return render(request, 'automatizacion/oferta_individual.html', {'oferta': oferta, 'accion_realizada': 'rechazada'})
+    return render(request, 'automatizacion/oferta_individual.html', {'oferta': oferta})
+from django.views.decorators.csrf import csrf_exempt
+
+# Vista pública para mostrar solo una oferta por token
+@csrf_exempt
+def ver_oferta_token(request, token):
+    oferta = get_object_or_404(OfertaPropuesta, token_email=token)
+    return render(request, 'automatizacion/oferta_individual.html', {'oferta': oferta})
 from django.views.decorators.http import require_POST
 from django.contrib.auth.decorators import login_required
 

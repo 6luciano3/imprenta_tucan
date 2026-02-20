@@ -20,7 +20,7 @@ def enviar_oferta_email(oferta, request=None):
     token = oferta.token_email or ''
     link_aceptar = f"{url_base}/automatizacion/oferta/{token}/aceptar/"
     link_rechazar = f"{url_base}/automatizacion/oferta/{token}/rechazar/"
-    link_ver = f"{url_base}/automatizacion/mis-ofertas/"
+    link_ver = f"{url_base}/automatizacion/oferta/{token}/"
     # Tracking pixel
     tracking_pixel = f'<img src="{url_base}/automatizacion/acciones/callback/?cliente_id={cliente_id}&oferta_id={oferta_id}&tipo=leido&canal=email" width="1" height="1" style="display:none;" alt="" />'
     # Email HTML

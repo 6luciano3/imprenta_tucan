@@ -21,6 +21,7 @@ urlpatterns = [
     path('mis-ofertas/<int:oferta_id>/confirmar/', views.confirmar_oferta_cliente, name='confirmar_oferta_cliente'),
     path('mis-ofertas/<int:oferta_id>/rechazar/', views.rechazar_oferta_cliente, name='rechazar_oferta_cliente'),
     # Endpoints públicos para email
+    path('oferta/<str:token>/', views.ver_oferta_token, name='ver_oferta_token'),
     path('oferta/<str:token>/aceptar/', views.aceptar_oferta_token, name='aceptar_oferta_token'),
     path('oferta/<str:token>/rechazar/', views.rechazar_oferta_token, name='rechazar_oferta_token'),
     path('demo/', views.generar_demo, name='automatizacion_demo'),
