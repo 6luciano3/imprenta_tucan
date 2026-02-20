@@ -20,33 +20,61 @@ function closeFormulaModal() {
     recetaId = null;
     document.getElementById('formula-modal').classList.add('hidden');
 }
-document.addEventListener('DOMContentLoaded', function() {
+function attachFormulaListeners() {
     document.querySelectorAll('.btn-edit-formula').forEach(btn => {
-        btn.addEventListener('click', function() {
+        // Evita listeners duplicados
+        btn.removeEventListener('click', btn._editFormulaHandler || (()=>{}));
+        btn._editFormulaHandler = function() {
             openFormulaModal(this.dataset.id, this.dataset.formula);
-        });
+        };
+        btn.addEventListener('click', btn._editFormulaHandler);
     });
-    document.getElementById('formula-save-btn').addEventListener('click', function() {
-        const formulaId = document.getElementById('formula-select').value;
-        if (!recetaId || !formulaId) return;
-        fetch(`/configuracion/recetas/${recetaId}/editar_formula/`, {
-            method: 'POST',
-            headers: {
-                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
-                'Content-Type': 'application/x-www-form-urlencoded',
-            },
-            body: `formula_id=${formulaId}`
-        })
-        .then(r => r.json())
-        .then(data => {
-            if (data.ok) {
-                document.getElementById(`formula-label-${recetaId}`).innerText = data.formula;
-                closeFormulaModal();
-            } else {
-                alert(data.error || 'Error al actualizar fórmula');
-            }
+    var saveBtn = document.getElementById('formula-save-btn');
+    if (saveBtn && !saveBtn._formulaSaveHandler) {
+        saveBtn._formulaSaveHandler = function() {
+            const formulaId = document.getElementById('formula-select').value;
+            if (!recetaId || !formulaId) return;
+            fetch(`/configuracion/recetas/${recetaId}/editar_formula/`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `formula_id=${formulaId}`
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.ok) {
+                    document.getElementById(`formula-label-${recetaId}`).innerText = data.formula;
+                    closeFormulaModal();
+                } else {
+                    alert(data.error || 'Error al actualizar fórmula');
+                }
+            });
+        };
+        saveBtn.addEventListener('click', saveBtn._formulaSaveHandler);
+    }
+    var cancelBtn = document.getElementById('formula-cancel-btn');
+    if (cancelBtn && !cancelBtn._formulaCancelHandler) {
+        cancelBtn._formulaCancelHandler = closeFormulaModal;
+        cancelBtn.addEventListener('click', cancelBtn._formulaCancelHandler);
+    }
+}
+
+// Intenta adjuntar listeners al cargar y cada vez que se muestra el modal
+document.addEventListener('DOMContentLoaded', function() {
+    attachFormulaListeners();
+    // Si el modal se vuelve visible, re-adjunta listeners por si el DOM cambió
+    const modal = document.getElementById('formula-modal');
+    if (modal) {
+        const observer = new MutationObserver(function(mutations) {
+            mutations.forEach(function(m) {
+                if (modal.classList.contains('hidden') === false) {
+                    setTimeout(attachFormulaListeners, 50);
+                }
+            });
         });
-    });
-    document.getElementById('formula-cancel-btn').addEventListener('click', closeFormulaModal);
+        observer.observe(modal, { attributes: true, attributeFilter: ['class'] });
+    }
 });
 </script>

@@ -10,11 +10,44 @@ def calcular_consumo_producto(producto, cantidad: int) -> dict:
     Retorna dict {insumo_id: Decimal(cantidad_requerida)}.
     """
     from productos.models import ProductoInsumo
-
+    from configuracion.models import Formula
+    from configuracion.utils.safe_eval import safe_eval
     req = defaultdict(Decimal)
     if not producto or not cantidad:
         return req
-    # 1) Receta estática
+
+    # Si el producto tiene fórmula asociada, usarla
+    if hasattr(producto, 'formula') and producto.formula:
+        formula = producto.formula
+        # Obtener insumo asociado a la fórmula
+        insumo = getattr(formula, 'insumo', None)
+        if insumo:
+            # Preparar variables para la fórmula
+            variables = {}
+            # Variables estándar: cantidad, producto, etc.
+            variables['cantidad'] = cantidad
+            # Agregar variables del producto si existen
+            # (ejemplo: tirada, ancho_cm, alto_cm, cobertura, desperdicio, etc.)
+            for var in (formula.variables_json or {}):
+                # Buscar en el producto o usar 0 si no existe
+                valor = getattr(producto, var, None)
+                if valor is None:
+                    # Permitir buscar en un dict de parámetros si existe
+                    if hasattr(producto, 'parametros') and var in producto.parametros:
+                        valor = producto.parametros[var]
+                    else:
+                        valor = 0
+                variables[var] = valor
+            # Evaluar la expresión de la fórmula
+            try:
+                resultado = safe_eval(formula.expresion, variables)
+                req[insumo.idInsumo] += Decimal(resultado)
+            except Exception as e:
+                # Si falla la fórmula, fallback a receta estática
+                pass
+            return dict(req)
+
+    # Fallback: receta estática
     from insumos.models import Insumo
     for r in ProductoInsumo.objects.filter(producto=producto).select_related('insumo').only("insumo_id", "cantidad_por_unidad", "insumo__nombre"):
         nombre_insumo = (r.insumo.nombre or '').lower()
@@ -24,8 +57,7 @@ def calcular_consumo_producto(producto, cantidad: int) -> dict:
         else:
             req[r.insumo_id] += Decimal(r.cantidad_por_unidad) * Decimal(cantidad)
 
-    # 2) Fórmulas de imprenta (opcionales)
-    # Papel
+    # Lógica adicional de papel y tinta (legacy, si no hay fórmula)
     try:
         up = int(producto.unidades_por_pliego or 0)
         mp = Decimal(producto.merma_papel or 0)
@@ -38,12 +70,10 @@ def calcular_consumo_producto(producto, cantidad: int) -> dict:
     except Exception:
         pass
 
-    # Tinta
     try:
         gp = Decimal(producto.gramos_por_pliego or 0)
         mt = Decimal(producto.merma_tinta or 0)
         if gp > 0 and producto.tinta_insumo_id:
-            # Si ya calculamos pliegos_necesarios arriba úsalo, si no, sin merma de papel
             if 'pliegos_necesarios' in locals():
                 pliegos_for_ink = pliegos_necesarios
             else:
