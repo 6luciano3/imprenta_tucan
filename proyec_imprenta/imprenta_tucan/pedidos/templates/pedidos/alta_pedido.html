@@ -20,61 +20,7 @@
 
 {% block content %}
 <div class="container py-4">
-  <!-- Calculadora de consumo de insumos -->
-  <div class="card shadow-sm mb-4">
-    <div class="card-body">
-      <h2 class="h5 fw-bold mb-3">📐 Calculadora de consumo de insumos</h2>
-      <div class="row g-3 align-items-end">
-        <div class="col-md-5">
-          <label class="form-label">Producto</label>
-          <select id="calc-producto" class="form-select">
-            <option value="">Seleccione un producto…</option>
-            {% for p in productos_calculadora %}
-              <option value="{{ p.idProducto }}" data-um="{{ p.unidadMedida__abreviatura|default:'' }}" data-umnom="{{ p.unidadMedida__nombreUnidad|default:'' }}">{{ p.nombreProducto }}</option>
-            {% endfor %}
-          </select>
-          <div id="calc-um" class="form-text"></div>
-        </div>
-        <div class="col-md-3">
-          <label class="form-label">Cantidad</label>
-          <input id="calc-cantidad" type="number" min="1" step="1" value="1" class="form-control" />
-        </div>
-        <div class="col-md-2 d-grid">
-          <button id="calc-btn" type="button" class="btn btn-primary">
-            Calcular
-          </button>
-          <button id="calc-clear" type="button" class="btn btn-outline-secondary mt-2">
-            Limpiar
-          </button>
-          <button id="calc-detail" type="button" class="btn btn-outline-info mt-2">
-            Detalle
-          </button>
-        </div>
-        <div class="col-md-2 d-grid">
-          <button id="calc-add-line" type="button" class="btn btn-outline-success" disabled>
-            + Agregar al pedido
-          </button>
-          <div class="form-text mt-1">Unitario: $<span id="calc-unitario-monto">0.00</span></div>
-        </div>
-      </div>
-      <div id="calc-alert" class="alert mt-3 d-none" role="alert"></div>
-      <div id="calc-resultado" class="mt-3 d-none table-responsive">
-        <table class="table table-bordered align-middle">
-          <thead class="table-light">
-            <tr>
-              <th>Código</th>
-              <th>Insumo</th>
-              <th>Requerido</th>
-              <th>Stock</th>
-              <th>Faltan</th>
-            </tr>
-          </thead>
-          <tbody id="calc-tbody"></tbody>
-        </table>
-      </div>
-      <span id="calc-url-template" data-url="{% url 'calcular_consumo_producto' 0 0 %}" class="d-none"></span>
-    </div>
-  </div>
+  <!-- ... Calculadora de consumo de insumos movida debajo del formulario ... -->
   <!-- Modal Detalle de Consumo -->
   <div class="modal fade" id="calcDetalleModal" tabindex="-1" aria-labelledby="calcDetalleLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
@@ -194,6 +140,61 @@
           <button type="submit" class="btn btn-primary" id="btnSubmit">Registrar Pedido</button>
         </div>
       </form>
+    </div>
+  </div>
+  <!-- Calculadora de consumo de insumos (debajo de la tabla de pedido) -->
+  <div class="card shadow-sm mt-4 mb-4">
+    <div class="card-body">
+      <h2 class="h5 fw-bold mb-3">📐 Calculadora de consumo de insumos</h2>
+      <div class="row g-3 align-items-end">
+        <div class="col-md-5">
+          <label class="form-label">Producto</label>
+          <select id="calc-producto" class="form-select">
+            <option value="">Seleccione un producto…</option>
+            {% for p in productos_calculadora %}
+              <option value="{{ p.idProducto }}" data-um="{{ p.unidadMedida__abreviatura|default:'' }}" data-umnom="{{ p.unidadMedida__nombreUnidad|default:'' }}">{{ p.nombreProducto }}</option>
+            {% endfor %}
+          </select>
+          <div id="calc-um" class="form-text"></div>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Cantidad</label>
+          <input id="calc-cantidad" type="number" min="1" step="1" value="1" class="form-control" />
+        </div>
+        <div class="col-md-2 d-grid">
+          <button id="calc-btn" type="button" class="btn btn-primary">
+            Calcular
+          </button>
+          <button id="calc-clear" type="button" class="btn btn-outline-secondary mt-2">
+            Limpiar
+          </button>
+          <button id="calc-detail" type="button" class="btn btn-outline-info mt-2">
+            Detalle
+          </button>
+        </div>
+        <div class="col-md-2 d-grid">
+          <button id="calc-add-line" type="button" class="btn btn-outline-success" disabled>
+            + Agregar al pedido
+          </button>
+          <div class="form-text mt-1">Unitario: $<span id="calc-unitario-monto">0.00</span></div>
+        </div>
+      </div>
+      <div id="calc-alert" class="alert mt-3 d-none" role="alert"></div>
+      <div id="calc-resultado" class="mt-3 d-none table-responsive">
+        <table class="table table-bordered align-middle">
+          <thead class="table-light">
+            <tr>
+              <th>Código</th>
+              <th>Insumo</th>
+              <th>Requerido</th>
+              <th>Stock</th>
+              <th>Faltan</th>
+            </tr>
+          </thead>
+          <tbody id="calc-tbody"></tbody>
+        </table>
+      </div>
+      <span id="calc-url-template" data-url="{% url 'calcular_consumo_producto' 0 0 %}" class="d-none"></span>
     </div>
   </div>
 </div>
