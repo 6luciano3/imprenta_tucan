@@ -15,5 +15,7 @@ urlpatterns = [
     path('<int:pk>/editar/', views.editar_insumo, name='editar_insumo'),
     path('lista_proyecciones/', views.lista_proyecciones, name='lista_proyecciones'),
     path('validar_proyeccion/<int:pk>/', views.validar_proyeccion, name='validar_proyeccion'),
+    path('rechazar_proyeccion/<int:pk>/', views.rechazar_proyeccion, name='rechazar_proyeccion'),
+    path('eliminar_proyeccion/<int:pk>/', views.eliminar_proyeccion, name='eliminar_proyeccion'),
     path('registrar_consumo_real/', views.registrar_consumo_real, name='registrar_consumo_real'),
 ]

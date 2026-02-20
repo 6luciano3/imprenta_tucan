@@ -5,6 +5,27 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.db.models import Q
 
+@login_required
+def rechazar_proyeccion(request, pk):
+    proyeccion = get_object_or_404(ProyeccionInsumo, pk=pk)
+    proyeccion.estado = 'rechazada'
+    proyeccion.save(update_fields=['estado'])
+    messages.success(request, 'Proyección rechazada correctamente.')
+    return redirect('lista_proyecciones')
+
+@login_required
+def eliminar_proyeccion(request, pk):
+    proyeccion = get_object_or_404(ProyeccionInsumo, pk=pk)
+    proyeccion.delete()
+    messages.success(request, 'Proyección eliminada correctamente.')
+    return redirect('lista_proyecciones')
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required, user_passes_test
+from django.core.paginator import Paginator
+from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
+from django.db.models import Q
+
 from .forms import InsumoForm, AltaInsumoForm, BuscarInsumoForm, ModificarInsumoForm, ConsumoRealInsumoForm
 from configuracion.permissions import require_perm
 from .models import Insumo, ProyeccionInsumo, ConsumoRealInsumo
@@ -347,11 +368,17 @@ def lista_proyecciones(request):
     if not proyecciones_qs.exists():
         proveedores_ids = _filtro_industria_grafica_queryset()
         proveedores = list(Proveedor.objects.filter(id__in=proveedores_ids)) if proveedores_ids else list(Proveedor.objects.filter(activo=True))
+        from insumos.models import predecir_demanda_media_movil
         for insumo in Insumo.objects.filter(activo=True):
-            # Heurística simple: reponer hasta un objetivo de 500 unidades
-            objetivo = 500
-            faltante = max(0, objetivo - (insumo.stock or 0))
-            cantidad_proyectada = faltante if faltante > 0 else 100  # mínimo sugerido
+            prediccion = predecir_demanda_media_movil(insumo, periodo_actual, meses=3)
+            if prediccion is not None and prediccion > 0:
+                cantidad_proyectada = max(0, prediccion - (insumo.stock or 0))
+                if cantidad_proyectada == 0:
+                    cantidad_proyectada = 50  # mínimo sugerido si no hay faltante
+            else:
+                objetivo = 500
+                faltante = max(0, objetivo - (insumo.stock or 0))
+                cantidad_proyectada = faltante if faltante > 0 else 100
             proveedor_sugerido = insumo.proveedor or (proveedores[0] if proveedores else None)
             ProyeccionInsumo.objects.update_or_create(
                 insumo=insumo,
@@ -363,7 +390,15 @@ def lista_proyecciones(request):
                 }
             )
         proyecciones_qs = ProyeccionInsumo.objects.filter(periodo=periodo_actual)
-    paginator = Paginator(proyecciones_qs.order_by('insumo__nombre'), get_page_size())
+
+    # Obtener predicción para cada proyección (solo para mostrar en la tabla)
+    from insumos.models import predecir_demanda_media_movil
+    proyecciones = []
+    for p in proyecciones_qs.order_by('insumo__nombre'):
+        prediccion = predecir_demanda_media_movil(p.insumo, p.periodo, meses=3)
+        p.prediccion_media_movil = prediccion
+        proyecciones.append(p)
+    paginator = Paginator(proyecciones, get_page_size())
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
     return render(request, 'insumos/lista_proyecciones.html', {'proyecciones': page_obj})

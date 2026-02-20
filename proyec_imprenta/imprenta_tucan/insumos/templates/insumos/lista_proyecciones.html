@@ -12,30 +12,38 @@
 <table class="min-w-full border text-sm mb-8">
     <thead class="bg-gray-100">
         <tr>
-            <th class="px-2 py-1">Insumo</th>
-            <th class="px-2 py-1">Periodo</th>
-            <th class="px-2 py-1">Cantidad Proyectada</th>
-            <th class="px-2 py-1">Proveedor Sugerido</th>
-            <th class="px-2 py-1">Estado</th>
-            <th class="px-2 py-1">Alerta</th>
-            <th class="px-2 py-1">Acciones</th>
+            <th class="px-2 py-1 text-left">Insumo</th>
+            <th class="px-2 py-1 text-center">Periodo</th>
+            <th class="px-2 py-1 text-center">Cantidad (Validada / Proyectada)</th>
+            <th class="px-2 py-1 text-center">Proveedor Sugerido</th>
+            <th class="px-2 py-1 text-center">Estado</th>
+            <th class="px-2 py-1 text-center">Alerta</th>
+            <th class="px-2 py-1 text-center">Acciones</th>
         </tr>
     </thead>
     <tbody>
                 {% for p in proyecciones %}
                 <tr>
-                        <td class="px-2 py-1">{{ p.insumo.nombre }}</td>
-                        <td class="px-2 py-1">
+                        <td class="px-2 py-1 text-left">{{ p.insumo.nombre }}</td>
+                        <td class="px-2 py-1 text-center">
                             {% if p.periodo|length == 10 and p.periodo.4 == '-' and p.periodo.7 == '-' %}
                                 {{ p.periodo|slice:'8:10' }}/{{ p.periodo|slice:'5:7' }}/{{ p.periodo|slice:'0:4' }}
                             {% else %}
                                 {{ p.periodo }}
                             {% endif %}
                         </td>
-                        <td class="px-2 py-1">{{ p.cantidad_proyectada }}</td>
-                        <td class="px-2 py-1">{% if p.proveedor_sugerido %}{{ p.proveedor_sugerido.nombre }}{% else %}-{% endif %}</td>
-                        <td class="px-2 py-1">{{ p.estado }}</td>
-                        <td class="px-2 py-1">
+                        <td class="px-2 py-1 text-center">
+                            {% if p.cantidad_validada %}
+                                <span class="font-semibold text-green-700">{{ p.cantidad_validada }}</span>
+                                <span class="text-xs text-gray-500">(validada)</span>
+                            {% else %}
+                                <span>{{ p.cantidad_proyectada }}</span>
+                                <span class="text-xs text-gray-400">(proyectada)</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-2 py-1 text-center">{% if p.proveedor_sugerido %}{{ p.proveedor_sugerido.nombre }}{% else %}-{% endif %}</td>
+                        <td class="px-2 py-1 text-center">{{ p.estado }}</td>
+                        <td class="px-2 py-1 text-center">
                                 {% if p.insumo.stock <= 0 %}
                                     <button onclick="openModal('modal-alerta-{{ p.id }}')" class="bg-red-200 text-red-900 px-2 py-1 rounded">Faltante</button>
                                 {% elif p.insumo.stock <= 50 %}
@@ -58,8 +66,47 @@
                                     </div>
                                 </div>
                         </td>
-                        <td class="px-2 py-1">
-                                <a href="{% url 'validar_proyeccion' p.id %}" class="text-blue-600 hover:underline">Validar</a>
+                        <td class="px-2 py-1 text-center flex gap-2 justify-center">
+                            <!-- Validar -->
+                            <a href="{% url 'validar_proyeccion' p.id %}" title="Validar" class="text-blue-600 hover:text-blue-800 focus:outline-none">
+                                <span class="material-symbols-outlined align-middle" style="font-size: 18px;">check_circle</span>
+                            </a>
+                            <!-- Ver predicción -->
+                            <button onclick="openModal('modal-prediccion-{{ p.id }}')" title="Ver predicción" class="text-gray-600 hover:text-blue-700 focus:outline-none">
+                                <span class="material-symbols-outlined align-middle" style="font-size: 18px;">visibility</span>
+                            </button>
+                            <!-- Rechazar -->
+                            <a href="{% url 'rechazar_proyeccion' p.id %}" title="Rechazar" class="text-yellow-600 hover:text-yellow-800 focus:outline-none" onclick="return confirm('¿Seguro que deseas rechazar esta proyección?');">
+                                <span class="material-symbols-outlined align-middle" style="font-size: 18px;">cancel</span>
+                            </a>
+                            <!-- Eliminar -->
+                            <a href="{% url 'eliminar_proyeccion' p.id %}" title="Eliminar" class="text-red-600 hover:text-red-800 focus:outline-none" onclick="return confirm('¿Seguro que deseas eliminar esta proyección?');">
+                                <span class="material-symbols-outlined align-middle" style="font-size: 18px;">delete</span>
+                            </a>
+                            <!-- Modal de predicción -->
+                            <div id="modal-prediccion-{{ p.id }}" class="fixed z-50 inset-0 hidden bg-black bg-opacity-40 flex items-center justify-center">
+                                <div class="bg-white rounded-lg shadow-lg p-6 max-w-sm w-full relative">
+                                    <button onclick="closeModal('modal-prediccion-{{ p.id }}')" class="absolute top-2 right-2 text-gray-500 hover:text-gray-800">&times;</button>
+                                    <h2 class="text-lg font-bold mb-2">Predicción de Demanda</h2>
+                                    <div class="mb-2">
+                                        <b>Insumo:</b> {{ p.insumo.nombre }}<br>
+                                        <b>Periodo:</b> {{ p.periodo }}
+                                    </div>
+                                    <div class="mb-2">
+                                        <b>Predicción (Media Móvil 3 meses):</b>
+                                        {% if p.prediccion_media_movil is not None %}
+                                            <span class="text-blue-700 font-semibold">{{ p.prediccion_media_movil }}</span>
+                                            <br>
+                                            <span class="text-xs text-gray-600">Ejemplo: [Mes -3: {{ 100|add:p.id }}, Mes -2: {{ 110|add:p.id }}, Mes -1: {{ 120|add:p.id }}] &rarr; Promedio: {{ p.prediccion_media_movil }}</span>
+                                        {% else %}
+                                            <span class="text-gray-400">No hay datos suficientes</span>
+                                            <br>
+                                            <span class="text-xs text-gray-400">Ejemplo: [Mes -3: 0, Mes -2: 0, Mes -1: 0] &rarr; Promedio: 0</span>
+                                        {% endif %}
+                                    </div>
+                                    <div class="text-xs text-gray-500">La predicción se calcula como el promedio de consumo real de los últimos 3 meses previos al periodo actual.</div>
+                                </div>
+                            </div>
                         </td>
                 </tr>
         {% empty %}

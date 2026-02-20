@@ -1,3 +1,23 @@
+import datetime
+
+def predecir_demanda_media_movil(insumo, periodo_actual, meses=3):
+    """Predice la demanda del insumo usando media móvil de los últimos N meses previos al periodo_actual (YYYY-MM)."""
+    from insumos.models import ConsumoRealInsumo
+    # Calcular los N meses previos
+    año, mes = map(int, periodo_actual.split('-'))
+    periodos = []
+    for i in range(1, meses+1):
+        m = mes - i
+        y = año
+        if m <= 0:
+            m += 12
+            y -= 1
+        periodos.append(f"{y:04d}-{m:02d}")
+    consumos = ConsumoRealInsumo.objects.filter(insumo=insumo, periodo__in=periodos)
+    if consumos.exists():
+        total = sum(c.cantidad_consumida for c in consumos)
+        return round(total / meses)
+    return None
 from django.db import models
 from proveedores.models import Proveedor
 from usuarios.models import Usuario
