@@ -118,35 +118,5 @@
   <div class="combo-summary combo-discount"><strong>Descuento Combo (10%):</strong> -$18.050</div>
   <div class="combo-total"><strong>Total Final:</strong> $162.450</div>
 </div>
-{% for combo in combos %}
-<div class="combo-container">
-  <div class="combo-title">{{ combo.nombre }}</div>
-  <div class="combo-desc">{{ combo.descripcion }}</div>
-  <table class="combo-table">
-    <thead>
-      <tr>
-        <th>Producto</th>
-        <th>Cantidad</th>
-        <th>Precio Unitario</th>
-        <th>Subtotal</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for item in combo.productos %}
-        <tr>
-          <td class="producto">{{ item.nombre }}</td>
-          <td>{{ item.cantidad }}</td>
-          <td>${{ item.precio_unitario|floatformat:2 }}</td>
-          <td>${{ item.subtotal|floatformat:2 }}</td>
-        </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  <div class="combo-summary"><strong>Subtotal:</strong> ${{ combo.subtotal|floatformat:2 }}</div>
-  <div class="combo-summary combo-discount"><strong>Descuento Combo ({{ combo.descuento }}%):</strong> -${{ combo.descuento_valor|floatformat:2 }}</div>
-  <div class="combo-total"><strong>Total Final:</strong> ${{ combo.total_final|floatformat:2 }}</div>
-</div>
-{% empty %}
-<p style="color:#d32f2f;font-size:1.1rem;">No hay combos de oferta disponibles.</p>
-{% endfor %}
+<!-- Solo se muestra la tarjeta fija Combo Emprendedor -->
 {% endblock %}

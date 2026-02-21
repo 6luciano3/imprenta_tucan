@@ -135,10 +135,13 @@
                                title="Rechazar">
                                 <span class="material-symbols-outlined text-sm">cancel</span>
                             </a>
-                                     <button type="button"
-                                         class="text-gray-600 hover:text-gray-800 flex items-center gap-1 delete-offer-btn"
-                                         data-oferta-id="{{ o.id }}" data-oferta-title="{{ o.titulo }}" data-oferta-cliente="{{ o.cliente.nombre }} {{ o.cliente.apellido }}" title="Eliminar">
+                            <button type="button"
+                                class="text-gray-600 hover:text-gray-800 flex items-center gap-1 delete-offer-btn"
+                                data-oferta-id="{{ o.id }}" data-oferta-title="{{ o.titulo }}" data-oferta-cliente="{{ o.cliente.nombre }} {{ o.cliente.apellido }}" title="Eliminar">
                                 <span class="material-symbols-outlined text-sm">delete</span>
+                            </button>
+                            <button type="button" class="text-blue-600 hover:text-blue-800 flex items-center gap-1 ver-combos-btn" title="Ver combos de oferta" onclick="openCombosModal()">
+                                <span class="material-symbols-outlined text-sm">visibility</span>
                             </button>
                         </div>
                     </td>
@@ -200,6 +203,23 @@
                                 </div>
                         </div>
                 </div>
+                <!-- Modal combos-oferta -->
+                <div id="combosModal" class="fixed inset-0 bg-black/40 hidden items-center justify-center z-50">
+    <div class="bg-white rounded-xl shadow-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div class="p-5 border-b border-gray-200 flex justify-between items-center">
+            <h3 class="text-lg font-semibold flex items-center gap-2">
+                <span class="material-symbols-outlined text-blue-600">loyalty</span>
+                Combos de Oferta
+            </h3>
+            <button type="button" class="text-gray-500 hover:text-gray-700" onclick="closeCombosModal()">
+                <span class="material-symbols-outlined">close</span>
+            </button>
+        </div>
+        <div class="p-5" id="combosModalContent">
+            <div class="text-center text-gray-500 py-10">Cargando combos de oferta...</div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
@@ -239,5 +259,31 @@
             if (e.target === modal) closeModal();
         });
     })();
+
+    // Modal combos-oferta
+    function openCombosModal() {
+        const combosModal = document.getElementById('combosModal');
+        const combosContent = document.getElementById('combosModalContent');
+        combosModal.classList.remove('hidden');
+        combosModal.classList.add('flex');
+        combosContent.innerHTML = '<div class="text-center text-gray-500 py-10">Cargando combos de oferta...</div>';
+        fetch('/automatizacion/combos-oferta/?popup=1')
+            .then(resp => resp.text())
+            .then(html => {
+                combosContent.innerHTML = html;
+            })
+            .catch(() => {
+                combosContent.innerHTML = '<div class="text-center text-red-500 py-10">Error al cargar combos de oferta.</div>';
+            });
+    }
+    function closeCombosModal() {
+        const combosModal = document.getElementById('combosModal');
+        combosModal.classList.add('hidden');
+        combosModal.classList.remove('flex');
+    }
+    // Optional: close modal on overlay click
+    document.getElementById('combosModal').addEventListener('click', function(e) {
+        if (e.target === this) closeCombosModal();
+    });
 </script>
 {% endblock %}

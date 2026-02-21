@@ -70,6 +70,8 @@ def crear_propuesta_para_insumo(request):
 # Endpoints públicos para aceptar/rechazar desde email
 from .models import OfertaPropuesta, AccionCliente
 from django.utils import timezone
+from django.http import JsonResponse
+from django.views.decorators.http import require_POST
 
 def aceptar_oferta_token(request, token):
     oferta = get_object_or_404(OfertaPropuesta, token_email=token)
@@ -100,6 +102,22 @@ def rechazar_oferta_token(request, token):
             detalle='Cliente rechazó la oferta desde el email',
         )
     return redirect('/automatizacion/propuestas/')
+
+@require_POST
+def actualizar_titulo_oferta(request):
+    """Endpoint AJAX para actualizar el título de una oferta."""
+    oferta_id = request.POST.get('oferta_id')
+    nuevo_titulo = request.POST.get('nuevo_titulo')
+    if not oferta_id or not nuevo_titulo:
+        return JsonResponse({'ok': False, 'error': 'Datos faltantes'})
+    try:
+        oferta = OfertaPropuesta.objects.get(pk=oferta_id)
+        oferta.titulo = nuevo_titulo
+        oferta.save()
+        return JsonResponse({'ok': True, 'titulo': nuevo_titulo})
+    except Exception as e:
+        return JsonResponse({'ok': False, 'error': str(e)})
+
 from django.core.mail import send_mail
 from django.template.loader import render_to_string
 from django.conf import settings
@@ -109,7 +127,7 @@ from django.http import HttpResponse
 # --- Tracking pixel para registrar "leído" ---
 @csrf_exempt
 def pixel_leido(request):
-    """Vista para tracking pixel: registra acción 'leido' al cargar la imagen."""
+    """Vista para tracking pixel: registra acción 'leído' al cargar la imagen."""
     cliente_id = request.GET.get('cliente_id')
     oferta_id = request.GET.get('oferta_id')
     tipo = request.GET.get('tipo', 'leido')
