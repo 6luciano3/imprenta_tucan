@@ -1,9 +1,11 @@
 from django.urls import path
 from . import views
+from . import views_combos
 
 urlpatterns = [
     path('', views.panel, name='automatizacion_panel'),
     path('ordenes/', views.lista_ordenes, name='automatizacion_ordenes'),
+    path('combos-oferta/', views_combos.lista_combos_oferta, name='combos_oferta'),
     path('ofertas/', views.lista_ofertas, name='automatizacion_ofertas'),
     path('ranking/', views.lista_ranking_clientes, name='ranking_clientes'),
     # Gestión de ofertas propuestas (admin)

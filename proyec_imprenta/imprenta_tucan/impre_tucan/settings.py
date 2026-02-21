@@ -180,9 +180,9 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'automatizacion.tasks.tarea_anticipacion_compras',
         'schedule': 2 * 60 * 60,
     },
-    'ranking-clientes-cada-hora': {
+    'ranking-clientes-diario': {
         'task': 'automatizacion.tasks.tarea_ranking_clientes',
-        'schedule': 60 * 60,
+        'schedule': 24 * 60 * 60,
     },
     'scores-proveedores-cada-6-horas': {
         'task': 'automatizacion.tasks.tarea_recalcular_scores_proveedores',

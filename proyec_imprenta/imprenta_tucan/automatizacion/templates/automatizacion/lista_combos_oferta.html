@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+  .combo-container {
+    background: #f9fafc;
+    border-radius: 16px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+    margin-bottom: 40px;
+    padding: 32px 24px;
+    transition: box-shadow 0.2s;
+  }
+  .combo-container:hover {
+    box-shadow: 0 4px 16px rgba(0,0,0,0.13);
+  }
+  .combo-title {
+    color: #1a237e;
+    font-size: 2rem;
+    font-weight: 700;
+    margin-bottom: 8px;
+    letter-spacing: 0.5px;
+  }
+  .combo-desc {
+    color: #37474f;
+    font-size: 12px;
+    margin-bottom: 18px;
+  }
+  .combo-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 18px;
+    font-size: 12px;
+  }
+  .combo-table th {
+    background: #e3f2fd;
+    color: #1976d2;
+    font-weight: 600;
+    padding: 10px 8px;
+    border-bottom: 2px solid #90caf9;
+    font-size: 12px;
+  }
+  .combo-table td {
+    padding: 8px 6px;
+    border-bottom: 1px solid #e0e0e0;
+    text-align: center;
+    font-size: 12px;
+  }
+  .combo-table td.producto {
+    text-align: left;
+  }
+  .combo-summary {
+    font-size: 12px;
+    color: #263238;
+    margin-bottom: 4px;
+    text-align: right;
+  }
+  .combo-total {
+    font-size: 12px;
+    color: #388e3c;
+    font-weight: 700;
+    margin-top: 8px;
+    text-align: right;
+  }
+  .combo-discount {
+    color: #d32f2f;
+    font-weight: 600;
+    text-align: right;
+    font-size: 12px;
+  }
+</style>
+
+<div style="margin-bottom: 24px;">
+  <h2 style="color:#1976d2;font-size:2.2rem;font-weight:800;margin-bottom:8px;">Combos con Descuento <span style="font-size:1.2rem;color:#388e3c;">– Imprenta Tucán</span></h2>
+  <p style="color:#37474f;font-size:12px;">Hola,<br>
+  En Imprenta Tucán lanzamos combos especiales con descuentos de hasta el <strong style="color:#d32f2f;">10%</strong>.</p>
+</div>
+
+<div class="combo-container">
+  <div class="combo-title">Combo Emprendedor</div>
+  <div class="combo-desc">Oferta especial para emprendedores: productos impresos y servicios esenciales.</div>
+  <table class="combo-table">
+    <thead>
+      <tr>
+        <th>Producto</th>
+        <th>Cantidad</th>
+        <th>Precio Unitario</th>
+        <th>Subtotal</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="producto">Tarjetas personales full color</td>
+        <td>500</td>
+        <td>$45</td>
+        <td>$22.500</td>
+      </tr>
+      <tr>
+        <td class="producto">Volantes A5 color frente</td>
+        <td>1000</td>
+        <td>$35</td>
+        <td>$35.000</td>
+      </tr>
+      <tr>
+        <td class="producto">Banner 80x200 con estructura</td>
+        <td>1</td>
+        <td>$95.000</td>
+        <td>$95.000</td>
+      </tr>
+      <tr>
+        <td class="producto">Sello automático</td>
+        <td>1</td>
+        <td>$28.000</td>
+        <td>$28.000</td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="combo-summary"><strong>Subtotal:</strong> $180.500</div>
+  <div class="combo-summary combo-discount"><strong>Descuento Combo (10%):</strong> -$18.050</div>
+  <div class="combo-total"><strong>Total Final:</strong> $162.450</div>
+</div>
+{% for combo in combos %}
+<div class="combo-container">
+  <div class="combo-title">{{ combo.nombre }}</div>
+  <div class="combo-desc">{{ combo.descripcion }}</div>
+  <table class="combo-table">
+    <thead>
+      <tr>
+        <th>Producto</th>
+        <th>Cantidad</th>
+        <th>Precio Unitario</th>
+        <th>Subtotal</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in combo.productos %}
+        <tr>
+          <td class="producto">{{ item.nombre }}</td>
+          <td>{{ item.cantidad }}</td>
+          <td>${{ item.precio_unitario|floatformat:2 }}</td>
+          <td>${{ item.subtotal|floatformat:2 }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <div class="combo-summary"><strong>Subtotal:</strong> ${{ combo.subtotal|floatformat:2 }}</div>
+  <div class="combo-summary combo-discount"><strong>Descuento Combo ({{ combo.descuento }}%):</strong> -${{ combo.descuento_valor|floatformat:2 }}</div>
+  <div class="combo-total"><strong>Total Final:</strong> ${{ combo.total_final|floatformat:2 }}</div>
+</div>
+{% empty %}
+<p style="color:#d32f2f;font-size:1.1rem;">No hay combos de oferta disponibles.</p>
+{% endfor %}
+{% endblock %}
