@@ -23,8 +23,9 @@ def enviar_oferta_email(oferta, request=None):
     link_ver = f"{url_base}/automatizacion/oferta/{token}/"
     # Tracking pixel
     tracking_pixel = f'<img src="{url_base}/automatizacion/acciones/callback/?cliente_id={cliente_id}&oferta_id={oferta_id}&tipo=leido&canal=email" width="1" height="1" style="display:none;" alt="" />'
-    # Email HTML personalizado para Combo Emprendedor
-    if oferta.titulo.strip().lower() == 'combo emprendedor':
+    # Email HTML personalizado para Combo Emprendedor (coincidencia flexible)
+    titulo_normalizado = oferta.titulo.strip().lower()
+    if 'combo' in titulo_normalizado and 'emprendedor' in titulo_normalizado:
         html_body = f'''
         <div style="margin-bottom: 24px;">
             <h2 style="color:#1976d2;font-size:2.2rem;font-weight:800;margin-bottom:8px;">Combos con Descuento <span style="font-size:1.2rem;color:#388e3c;">– Imprenta Tucán</span></h2>

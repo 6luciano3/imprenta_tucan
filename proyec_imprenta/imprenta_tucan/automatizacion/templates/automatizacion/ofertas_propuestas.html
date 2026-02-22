@@ -42,9 +42,9 @@
             </thead>
             <tbody>
             {% for o in ofertas %}
-                <tr class="border-b hover:bg-gray-50">
+                <tr class="border-b hover:bg-gray-50" data-oferta-id="{{ o.id }}">
                     <td class="py-3 px-5 font-medium">{{ o.cliente.nombre }} {{ o.cliente.apellido }}</td>
-                    <td class="py-3 px-5">{{ o.titulo }}</td>
+                    <td class="py-3 px-5" data-titulo>{{ o.titulo }}</td>
                     <td class="py-3 px-5 text-gray-600">{{ o.descripcion }}</td>
                     <td class="py-3 px-5">{{ o.get_tipo_display }}</td>
                     <td class="py-3 px-5">{{ o.get_estado_display }}</td>
@@ -230,12 +230,49 @@
         const cancelBtn = document.getElementById('cancelDeleteBtn');
         const prefix = '/automatizacion/propuestas/';
 
+
         function openModal(ofertaId, title, cliente) {
             deleteForm.action = prefix + ofertaId + '/eliminar/';
-            document.getElementById('modalTitulo').innerText = title || '';
+            const modalTitulo = document.getElementById('modalTitulo');
+            modalTitulo.innerText = title || '';
             document.getElementById('modalCliente').innerText = cliente || '';
             modal.classList.remove('hidden');
             modal.classList.add('flex');
+
+            // Permitir edición directa del título en el modal
+            modalTitulo.contentEditable = true;
+            modalTitulo.addEventListener('blur', function syncTitulo() {
+                const nuevoTitulo = modalTitulo.innerText.trim();
+                console.log('[DEBUG] Evento blur modalTitulo ejecutado:', { ofertaId, nuevoTitulo });
+                if (nuevoTitulo && ofertaId) {
+                    fetch('/automatizacion/actualizar_titulo_oferta/', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded',
+                            'X-CSRFToken': (document.querySelector('input[name="csrfmiddlewaretoken"]')||{}).value
+                        },
+                        body: `oferta_id=${encodeURIComponent(ofertaId)}&nuevo_titulo=${encodeURIComponent(nuevoTitulo)}`
+                    })
+                    .then(resp => resp.json())
+                    .then(data => {
+                        console.log('[DEBUG] Respuesta fetch actualizar_titulo_oferta:', data);
+                        if (!data.ok) {
+                            alert('No se pudo actualizar el título: ' + (data.error || 'Error desconocido'));
+                        } else {
+                            // Actualizar la columna Título en la tabla
+                            const tituloCell = document.querySelector(`tr[data-oferta-id="${ofertaId}"] td[data-titulo]`);
+                            if (tituloCell) {
+                                tituloCell.innerText = nuevoTitulo;
+                                console.log('[DEBUG] Título actualizado en la tabla:', tituloCell);
+                            } else {
+                                console.warn('[DEBUG] No se encontró la celda de título para actualizar en la tabla.', ofertaId);
+                            }
+                        }
+                    });
+                }
+                // Remover el listener para evitar duplicados
+                modalTitulo.removeEventListener('blur', syncTitulo);
+            });
         }
 
         function closeModal() {
