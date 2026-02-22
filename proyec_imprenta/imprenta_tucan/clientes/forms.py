@@ -6,7 +6,27 @@ from configuracion.services import get_param
 from geo.models import Ciudad
 
 
+
 class ClienteForm(forms.ModelForm):
+    RAZON_SOCIAL_CHOICES = [
+        ("S.A.", "S.A."),
+        ("S.R.L.", "S.R.L."),
+        ("S.A.S.", "S.A.S."),
+        ("S.Coop.", "S.Coop."),
+        ("Asociación Civil", "Asociación Civil"),
+        ("Monotributista", "Monotributista"),
+    ]
+
+
+    razon_social = forms.ChoiceField(
+        choices=RAZON_SOCIAL_CHOICES,
+        label="Razón Social",
+        initial="Monotributista",
+        widget=forms.Select(attrs={
+            'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500',
+        })
+    )
+
     class Meta:
         model = Cliente
         fields = ['nombre', 'apellido', 'razon_social', 'email', 'telefono', 'celular',
@@ -21,10 +41,6 @@ class ClienteForm(forms.ModelForm):
                 'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500',
                 'placeholder': 'Ingrese el apellido',
                 'maxlength': '50'
-            }),
-            'razon_social': forms.TextInput(attrs={
-                'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500',
-                'placeholder': 'Empresa o razón social'
             }),
             'email': forms.EmailInput(attrs={
                 'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500',

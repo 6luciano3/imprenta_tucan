@@ -235,12 +235,16 @@ def lista_ranking_clientes(request):
     for rc in ranking:
         rh = historicos.get(rc.cliente_id)
         metricas = rh.metricas if rh else {}
-        # Clasificación estratégica por umbral configurable
-        try:
-            umbral_estrategico = float(Parametro.get('RANKING_SCORE_ESTRATEGICO_UMBRAL', 90))
-        except Exception:
-            umbral_estrategico = 90.0
-        clasificacion = 'Estratégico' if float(rc.score or 0) >= umbral_estrategico else 'Estándar'
+        score = float(rc.score or 0)
+        # Clasificación múltiple
+        if score >= 90:
+            clasificacion = 'Premium'
+        elif score >= 60:
+            clasificacion = 'Estratégico'
+        elif score >= 30:
+            clasificacion = 'Estándar'
+        else:
+            clasificacion = 'Nuevo'
         items.append({
             'cliente': rc.cliente,
             'score': rc.score,

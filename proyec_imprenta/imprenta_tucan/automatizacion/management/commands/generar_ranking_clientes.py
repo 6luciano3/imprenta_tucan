@@ -1,8 +1,13 @@
 from django.core.management.base import BaseCommand
 
+
+from importlib import import_module
+tarea_ranking_clientes = None
 try:
-    from automatizacion.tasks import tarea_ranking_clientes
-except Exception:
+    # Importación robusta compatible con ejecución como comando Django
+    tasks_mod = import_module('automatizacion.tasks')
+    tarea_ranking_clientes = getattr(tasks_mod, 'tarea_ranking_clientes', None)
+except Exception as e:
     tarea_ranking_clientes = None
 
 class Command(BaseCommand):

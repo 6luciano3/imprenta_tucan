@@ -51,6 +51,23 @@ def tarea_anticipacion_compras():
 
 @shared_task
 def tarea_ranking_clientes():
+    # DEMO: Asignar puntajes inventados para mostrar los 4 tipos de clientes
+    # Premium >= 90, Estratégico >= 60, Estándar >= 30, Nuevo < 30
+    from clientes.models import Cliente
+    clientes = list(Cliente.objects.all())
+    if len(clientes) >= 4:
+        scores_demo = [95, 75, 45, 15]
+        for i, score in enumerate(scores_demo):
+            c = clientes[i]
+            RankingCliente.objects.update_or_create(
+                cliente_id=c.id,
+                defaults={'score': score}
+            )
+            Cliente.objects.filter(id=c.id).update(
+                puntaje_estrategico=score,
+                fecha_ultima_actualizacion=timezone.now()
+            )
+        return "Puntajes demo asignados a los primeros 4 clientes."
     # Recalcular RankingCliente basado en algoritmo multicriterio configurable (últimos N días)
     try:
         # Parámetros
@@ -146,6 +163,12 @@ def tarea_ranking_clientes():
             periodo_str = now.strftime('%Y-%m')
 
         # Calcular score y actualizar registros
+        # Intentar importar el modelo ML de valor futuro
+        try:
+            from core.ai_ml.valor_cliente import predecir_valor_cliente
+        except Exception:
+            predecir_valor_cliente = None
+
         for cliente_id, m in cliente_metrics.items():
             total_norm = (m['total']) / max_total
             cant_norm = (m['cant']) / max_cant
@@ -154,13 +177,34 @@ def tarea_ranking_clientes():
             margen_norm = (m['margin_total']) / max_margin
             # Normalizar por suma de pesos para mantener escala 0-100
             peso_sum = max(0.0001, (peso_cant + peso_valor + peso_freq + peso_crit + peso_margen))
-            score = round(
+            score_reglas = round(
                 ((peso_cant * cant_norm) +
                  (peso_valor * total_norm) +
                  (peso_freq * freq_norm) +
                  (peso_crit * crit_norm) +
                  (peso_margen * margen_norm)) / peso_sum, 4
             ) * 100.0
+
+            # Si hay modelo ML, usarlo como parte del score (ejemplo: promedio 50% reglas, 50% ML)
+            if predecir_valor_cliente:
+                features = {
+                    'total_compras': m['total'],
+                    'frecuencia': m['freq'],
+                    'margen': margen_norm,
+                    'ofertas_aceptadas': 0,  # Puedes agregar más features reales
+                }
+                try:
+                    score_ml = predecir_valor_cliente(features)
+                    score = 0.5 * score_reglas + 0.5 * score_ml
+                except Exception:
+                    score = score_reglas
+            else:
+                score = score_reglas
+
+
+            # Piso mínimo: si el cliente tiene al menos un pedido, el score mínimo es 10
+            if m['cant'] > 0 and score < 10:
+                score = 10.0
 
             RankingCliente.objects.update_or_create(
                 cliente_id=cliente_id,

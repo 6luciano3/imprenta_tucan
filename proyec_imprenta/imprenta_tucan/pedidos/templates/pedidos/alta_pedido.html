@@ -73,6 +73,10 @@
           <div class="col-md-5">
             <label class="form-label">Cliente</label>
             {{ header_form.cliente }}
+            <div class="mt-2">
+              <label class="form-label">Razón Social</label>
+              <input type="text" id="razonSocialCliente" class="form-control" readonly>
+            </div>
           </div>
           <div class="col-md-3">
             <label class="form-label">Fecha de Pedido</label>
@@ -456,6 +460,27 @@
     }
   })();
   </script>
+    <script>
+        // Autocompletar razón social del cliente seleccionado
+        document.addEventListener('DOMContentLoaded', function() {
+          const clienteSelect = document.getElementById('id_cliente');
+          const razonSocialInput = document.getElementById('razonSocialCliente');
+          // Mapa de id cliente a razón social
+          const clienteRazonSocial = {
+            {% for c in header_form.cliente.field.queryset %}
+              '{{ c.pk }}': '{{ c.razon_social|default:""|escapejs }}',
+            {% endfor %}
+          };
+          function updateRazonSocial() {
+            const val = clienteSelect.value;
+            razonSocialInput.value = clienteRazonSocial[val] || '';
+          }
+          if (clienteSelect && razonSocialInput) {
+            clienteSelect.addEventListener('change', updateRazonSocial);
+            updateRazonSocial();
+          }
+        });
+    </script>
   <script>
     (function() {
       const precios = window.__precios || {};
