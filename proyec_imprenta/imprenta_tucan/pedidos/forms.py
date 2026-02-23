@@ -11,7 +11,13 @@ class AltaPedidoHeaderForm(forms.Form):
         queryset=Cliente.objects.all(),
         label="Cliente",
         widget=forms.Select(attrs={"class": "form-select"}),
+        to_field_name=None,
     )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Mostrar solo nombre y apellido en el select
+        self.fields['cliente'].label_from_instance = lambda obj: f"{obj.nombre} {obj.apellido}"
     fecha_entrega = forms.DateField(
         label="Fecha de Entrega",
         widget=forms.DateInput(attrs={"type": "date", "class": "form-control", "required": True}),

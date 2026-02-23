@@ -201,6 +201,10 @@ def alta_pedido(request):
 
     # Fecha de pedido mostrada en la UI, auto = hoy
     fecha_pedido_hoy = timezone.now().date()
+    # Calcular el próximo número de pedido (id + 1)
+    from .models import Pedido
+    ultimo_pedido = Pedido.objects.order_by('-id').first()
+    proximo_numero_pedido = (ultimo_pedido.id + 1) if ultimo_pedido else 1
     # Productos para calculadora en Alta (con unidad de medida)
     productos_calculadora = list(
         Producto.objects.filter(activo=True)
@@ -208,11 +212,36 @@ def alta_pedido(request):
         .values('idProducto', 'nombreProducto', 'unidadMedida__abreviatura', 'unidadMedida__nombreUnidad')
     )
     precios = {p.pk: float(p.precio) for p in Producto.objects.all()}
+
+    # Exponer todos los datos de clientes para JS (id, nombre, apellido, razon_social, email, telefono, celular)
+    from clientes.models import Cliente
+    clientes_data = []
+    for c in Cliente.objects.all():
+        # Si el modelo tiene un campo CUIT, inclúyelo. Si no, deja vacío.
+        cuit = getattr(c, 'cuit', '')
+        clientes_data.append({
+            "id": c.id,
+            "nombre": c.nombre,
+            "apellido": c.apellido,
+            "razon_social": c.razon_social or "",
+            "cuit": cuit or "",
+            "email": c.email,
+            "telefono": c.telefono,
+            "celular": c.celular or "",
+        })
+
     return render(
         request,
         "pedidos/alta_pedido.html",
-        {"header_form": header_form, "formset": formset, "fecha_pedido_hoy": fecha_pedido_hoy,
-            "precios": precios, "productos_calculadora": productos_calculadora},
+        {
+            "header_form": header_form,
+            "formset": formset,
+            "fecha_pedido_hoy": fecha_pedido_hoy,
+            "precios": precios,
+            "productos_calculadora": productos_calculadora,
+            "proximo_numero_pedido": proximo_numero_pedido,
+            "clientes_data": clientes_data,
+        },
     )
 
 

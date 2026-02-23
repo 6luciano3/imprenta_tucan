@@ -55,8 +55,11 @@
   </div>
 
   <div class="d-flex justify-content-between align-items-center mb-4">
-    <h1 class="h3 fw-bold mb-0">📝 Registrar nuevo pedido</h1>
-    <a href="{% url 'lista_pedidos' %}" class="btn btn-secondary">Volver</a>
+    <div>
+      <h1 class="fw-bold mb-1" style="font-size: 2rem; letter-spacing: -1px;">Registrar nuevo pedido</h1>
+      <div class="text-muted" style="font-size: 1.05rem;">Complete los datos para crear un pedido de cliente</div>
+    </div>
+    <a href="{% url 'lista_pedidos' %}" class="btn btn-outline-secondary btn-lg px-4 py-2 shadow-sm">Volver</a>
   </div>
 
   <!-- Toast/alert de acción rápida (cliente) -->
@@ -69,27 +72,51 @@
         {% csrf_token %}
 
         <!-- Cabecera -->
-        <div class="row g-3 mb-3">
-          <div class="col-md-5">
-            <label class="form-label">Cliente</label>
-            {{ header_form.cliente }}
-            <div class="mt-2">
-              <label class="form-label">Razón Social</label>
-              <input type="text" id="razonSocialCliente" class="form-control" readonly>
+        <div class="row g-4 mb-3">
+          <div class="col-lg-7">
+            <div class="row g-3">
+              <div class="col-md-4">
+                <label class="form-label">N° de Pedido</label>
+                <input type="text" class="form-control" value="{{ proximo_numero_pedido }}" readonly>
+              </div>
+              <div class="col-md-8">
+                <label class="form-label">Cliente</label>
+                {{ header_form.cliente }}
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">Razón Social</label>
+                <input type="text" id="razonSocialCliente" class="form-control" readonly>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">CUIT</label>
+                <input type="text" id="cuitCliente" class="form-control" readonly>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">Email</label>
+                <input type="text" id="emailCliente" class="form-control" readonly>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">Teléfono</label>
+                <input type="text" id="telefonoCliente" class="form-control" readonly>
+              </div>
             </div>
           </div>
-          <div class="col-md-3">
-            <label class="form-label">Fecha de Pedido</label>
-            <input type="date" class="form-control" value="{{ fecha_pedido_hoy|date:'Y-m-d' }}" disabled>
-          </div>
-          <div class="col-md-3">
-            <label class="form-label">Fecha de Entrega</label>
-            {{ header_form.fecha_entrega }}
-          </div>
-          <div class="col-md-1 d-flex align-items-end">
-            <div class="form-check">
-              {{ header_form.aplicar_iva }}
-              <label class="form-check-label ms-1" for="id_aplicar_iva">IVA 21%</label>
+          <div class="col-lg-5">
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label class="form-label">Fecha de Pedido</label>
+                <input type="date" id="fechaPedido" name="fecha_pedido" class="form-control" value="{{ fecha_pedido_hoy|date:'Y-m-d' }}">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">Fecha de Entrega</label>
+                {{ header_form.fecha_entrega }}
+              </div>
+              <div class="col-md-12 d-flex align-items-end mt-2">
+                <div class="form-check">
+                  {{ header_form.aplicar_iva }}
+                  <label class="form-check-label ms-1" for="id_aplicar_iva">IVA 21%</label>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -128,8 +155,7 @@
 
         <div class="d-flex justify-content-between align-items-center mt-2 gap-2">
           <div class="d-flex gap-2">
-            <!-- Botón '+ Agregar producto' removido a pedido del usuario -->
-            <button type="button" id="btnAddSame" class="btn btn-outline-secondary d-none">+ Agregar misma línea</button>
+            <button type="button" id="btnAdd" class="btn btn-outline-primary">+ Agregar producto</button>
           </div>
           <div>
             <label class="form-label me-2 mb-0">Subtotal</label>
@@ -146,62 +172,12 @@
       </form>
     </div>
   </div>
-  <!-- Calculadora de consumo de insumos (debajo de la tabla de pedido) -->
-  <div class="card shadow-sm mt-4 mb-4">
-    <div class="card-body">
-      <h2 class="h5 fw-bold mb-3">📐 Calculadora de consumo de insumos</h2>
-      <div class="row g-3 align-items-end">
-        <div class="col-md-5">
-          <label class="form-label">Producto</label>
-          <select id="calc-producto" class="form-select">
-            <option value="">Seleccione un producto…</option>
-            {% for p in productos_calculadora %}
-              <option value="{{ p.idProducto }}" data-um="{{ p.unidadMedida__abreviatura|default:'' }}" data-umnom="{{ p.unidadMedida__nombreUnidad|default:'' }}">{{ p.nombreProducto }}</option>
-            {% endfor %}
-          </select>
-          <div id="calc-um" class="form-text"></div>
-        </div>
-        <div class="col-md-3">
-          <label class="form-label">Cantidad</label>
-          <input id="calc-cantidad" type="number" min="1" step="1" value="1" class="form-control" />
-        </div>
-        <div class="col-md-2 d-grid">
-          <button id="calc-btn" type="button" class="btn btn-primary">
-            Calcular
-          </button>
-          <button id="calc-clear" type="button" class="btn btn-outline-secondary mt-2">
-            Limpiar
-          </button>
-          <button id="calc-detail" type="button" class="btn btn-outline-info mt-2">
-            Detalle
-          </button>
-        </div>
-        <div class="col-md-2 d-grid">
-          <button id="calc-add-line" type="button" class="btn btn-outline-success" disabled>
-            + Agregar al pedido
-          </button>
-          <div class="form-text mt-1">Unitario: $<span id="calc-unitario-monto">0.00</span></div>
-        </div>
-      </div>
-      <div id="calc-alert" class="alert mt-3 d-none" role="alert"></div>
-      <div id="calc-resultado" class="mt-3 d-none table-responsive">
-        <table class="table table-bordered align-middle">
-          <thead class="table-light">
-            <tr>
-              <th>Código</th>
-              <th>Insumo</th>
-              <th>Requerido</th>
-              <th>Stock</th>
-              <th>Faltan</th>
-            </tr>
-          </thead>
-          <tbody id="calc-tbody"></tbody>
-        </table>
-      </div>
-      <span id="calc-url-template" data-url="{% url 'calcular_consumo_producto' 0 0 %}" class="d-none"></span>
-    </div>
-  </div>
 </div>
+
+<!-- Exponer datos de clientes para JS -->
+<script>
+  window.clientesData = {{ clientes_data|safe }};
+</script>
 
 <!-- Fila plantilla para agregar dinámicamente -->
 <template id="filaTemplate">
@@ -461,23 +437,31 @@
   })();
   </script>
     <script>
-        // Autocompletar razón social del cliente seleccionado
+        // Autocompletar datos del cliente seleccionado
         document.addEventListener('DOMContentLoaded', function() {
           const clienteSelect = document.getElementById('id_cliente');
           const razonSocialInput = document.getElementById('razonSocialCliente');
-          // Mapa de id cliente a razón social
-          const clienteRazonSocial = {
-            {% for c in header_form.cliente.field.queryset %}
-              '{{ c.pk }}': '{{ c.razon_social|default:""|escapejs }}',
-            {% endfor %}
-          };
-          function updateRazonSocial() {
-            const val = clienteSelect.value;
-            razonSocialInput.value = clienteRazonSocial[val] || '';
+          const cuitInput = document.getElementById('cuitCliente');
+          const emailInput = document.getElementById('emailCliente');
+          const telefonoInput = document.getElementById('telefonoCliente');
+          // Usar window.clientesData expuesto por el backend
+          const clientesData = window.clientesData || [];
+          // Crear un mapa de id a datos
+          const clienteMap = {};
+          for (const c of clientesData) {
+            clienteMap[String(c.id)] = c;
           }
-          if (clienteSelect && razonSocialInput) {
-            clienteSelect.addEventListener('change', updateRazonSocial);
-            updateRazonSocial();
+          function updateClienteFields() {
+            const val = clienteSelect.value;
+            const c = clienteMap[val] || {};
+            if (razonSocialInput) razonSocialInput.value = c.razon_social || '';
+            if (cuitInput) cuitInput.value = c.cuit || '';
+            if (emailInput) emailInput.value = c.email || '';
+            if (telefonoInput) telefonoInput.value = c.telefono || '';
+          }
+          if (clienteSelect) {
+            clienteSelect.addEventListener('change', updateClienteFields);
+            updateClienteFields();
           }
         });
     </script>
@@ -707,4 +691,6 @@
       updateUnitPrice();
     })();
   </script>
+  <!-- Script para autollenar Fecha de Entrega -->
+  <script src="/static/pedidos/alta_pedido_fecha.js"></script>
 {% endblock %}

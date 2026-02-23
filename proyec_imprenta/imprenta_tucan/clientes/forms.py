@@ -27,9 +27,18 @@ class ClienteForm(forms.ModelForm):
         })
     )
 
+    cuit = forms.CharField(
+        label="CUIT",
+        required=False,
+        widget=forms.TextInput(attrs={
+            'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500',
+            'placeholder': '20-12345678-9',
+            'maxlength': '15'
+        })
+    )
     class Meta:
         model = Cliente
-        fields = ['nombre', 'apellido', 'razon_social', 'email', 'telefono', 'celular',
+        fields = ['nombre', 'apellido', 'razon_social', 'cuit', 'email', 'telefono', 'celular',
                   'direccion', 'ciudad', 'provincia', 'pais', 'estado']
         widgets = {
             'nombre': forms.TextInput(attrs={
