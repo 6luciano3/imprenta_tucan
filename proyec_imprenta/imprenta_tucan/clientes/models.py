@@ -5,7 +5,7 @@ class Cliente(models.Model):
     nombre = models.CharField(max_length=100)
     apellido = models.CharField(max_length=100)
     razon_social = models.CharField(max_length=150, blank=True, null=True, db_column='razónSocial')
-    cuit = models.CharField(max_length=15, blank=True, null=True)
+    cuit = models.CharField(max_length=11, blank=False, null=False, unique=True, verbose_name="CUIT", default="00000000000")
     direccion = models.CharField(max_length=200, db_column='dirección')
     ciudad = models.CharField(max_length=100, default='Posadas')
     provincia = models.CharField(max_length=100, default='Misiones')

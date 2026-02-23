@@ -29,13 +29,28 @@ class ClienteForm(forms.ModelForm):
 
     cuit = forms.CharField(
         label="CUIT",
-        required=False,
+        required=True,
+        min_length=11,
+        max_length=11,
         widget=forms.TextInput(attrs={
             'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500',
-            'placeholder': '20-12345678-9',
-            'maxlength': '15'
+            'placeholder': 'Ingrese 11 dígitos',
+            'maxlength': '11',
+            'pattern': '\d{11}'
         })
     )
+
+    def clean_cuit(self):
+        cuit = self.cleaned_data.get('cuit')
+        if not cuit:
+            raise ValidationError("El CUIT es obligatorio.")
+        if not cuit.isdigit():
+            raise ValidationError("El CUIT debe contener solo números.")
+        if len(cuit) != 11:
+            raise ValidationError("El CUIT debe tener exactamente 11 dígitos.")
+        if Cliente.objects.filter(cuit=cuit).exclude(pk=self.instance.pk).exists():
+            raise ValidationError("Ya existe un cliente con este CUIT.")
+        return cuit
     class Meta:
         model = Cliente
         fields = ['nombre', 'apellido', 'razon_social', 'cuit', 'email', 'telefono', 'celular',
