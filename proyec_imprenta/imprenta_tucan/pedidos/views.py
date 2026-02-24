@@ -202,7 +202,6 @@ def alta_pedido(request):
     # Fecha de pedido mostrada en la UI, auto = hoy
     fecha_pedido_hoy = timezone.now().date()
     # Calcular el próximo número de pedido (id + 1)
-    from .models import Pedido
     ultimo_pedido = Pedido.objects.order_by('-id').first()
     proximo_numero_pedido = (ultimo_pedido.id + 1) if ultimo_pedido else 1
     # Productos para calculadora en Alta (con unidad de medida)

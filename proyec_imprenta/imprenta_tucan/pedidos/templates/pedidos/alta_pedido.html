@@ -177,7 +177,45 @@
 
         <div class="d-flex justify-content-end gap-2 mt-4">
           <button type="reset" class="btn btn-outline-secondary" id="btnReset">Limpiar</button>
-          <button type="submit" class="btn btn-primary" id="btnSubmit">Registrar Pedido</button>
+          <button type="button" class="btn btn-primary" id="btnSubmit">Registrar Pedido</button>
+        </div>
+
+        <!-- Modal de confirmación de pedido -->
+        <div class="modal fade" id="confirmPedidoModal" tabindex="-1" aria-labelledby="confirmPedidoLabel" aria-hidden="true">
+          <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h5 class="modal-title" id="confirmPedidoLabel">Confirmar Pedido</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+              </div>
+              <div class="modal-body">
+                <div id="pedidoResumenCliente"></div>
+                <div class="table-responsive mt-3">
+                  <table class="table table-bordered">
+                    <thead>
+                      <tr>
+                        <th>Producto</th>
+                        <th>Cantidad</th>
+                        <th>Especificaciones</th>
+                        <th>Unitario</th>
+                        <th>Importe</th>
+                      </tr>
+                    </thead>
+                    <tbody id="pedidoResumenProductos"></tbody>
+                  </table>
+                </div>
+                <div class="mt-2">
+                  <strong>Subtotal:</strong> <span id="pedidoResumenSubtotal"></span>
+                  &nbsp;|&nbsp;
+                  <strong>Monto Total:</strong> <span id="pedidoResumenTotal"></span>
+                </div>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="confirmPedidoBtn">Confirmar y enviar</button>
+              </div>
+            </div>
+          </div>
         </div>
       </form>
     </div>
@@ -212,7 +250,7 @@
 
 <script>
   (function() {
-  const precios = {{ precios|default:'{}'|safe }};
+    const precios = {{ precios|default:'{}'|safe }};
     const tabla = document.getElementById('tablaLineas');
     const tbody = tabla.querySelector('tbody');
     const btnAdd = document.getElementById('btnAdd');
@@ -222,12 +260,76 @@
     const descuentoSelect = document.getElementById('id_descuento');
     const template = document.getElementById('filaTemplate');
     const btnAddSame = document.getElementById('btnAddSame');
-
     const mgmtTotal = document.querySelector('[name="lineas-TOTAL_FORMS"]');
     const mgmtInitial = document.querySelector('[name="lineas-INITIAL_FORMS"]');
-  const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
-  const stockAlert = document.getElementById('stockAlert');
-  const btnSubmit = document.getElementById('btnSubmit');
+    const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
+    const stockAlert = document.getElementById('stockAlert');
+    const btnSubmit = document.getElementById('btnSubmit');
+    const confirmPedidoModal = document.getElementById('confirmPedidoModal');
+    const pedidoResumenCliente = document.getElementById('pedidoResumenCliente');
+    const pedidoResumenProductos = document.getElementById('pedidoResumenProductos');
+    const pedidoResumenSubtotal = document.getElementById('pedidoResumenSubtotal');
+    const pedidoResumenTotal = document.getElementById('pedidoResumenTotal');
+    const confirmPedidoBtn = document.getElementById('confirmPedidoBtn');
+
+    // Interceptar el submit para mostrar el modal
+    btnSubmit?.addEventListener('click', function(e) {
+      e.preventDefault();
+      // Mostrar resumen del cliente
+      const clienteSelect = document.getElementById('id_cliente');
+      const clienteId = clienteSelect?.value;
+      const cliente = (window.clientesData || []).find(c => String(c.id) === String(clienteId)) || {};
+      pedidoResumenCliente.innerHTML = `
+        <div><strong>Cliente:</strong> ${cliente.nombre || ''} ${cliente.apellido || ''}</div>
+        <div><strong>Razón Social:</strong> ${cliente.razon_social || ''}</div>
+        <div><strong>CUIT:</strong> ${cliente.cuit || ''}</div>
+        <div><strong>Email:</strong> ${cliente.email || ''}</div>
+        <div><strong>Teléfono:</strong> ${cliente.telefono || ''}</div>
+        <div><strong>Tipo de Cliente:</strong> ${cliente.tipo_cliente || ''}</div>
+      `;
+      // Mostrar resumen de productos
+      pedidoResumenProductos.innerHTML = '';
+      let sum = 0;
+      tbody.querySelectorAll('tr.linea:not(.tr-hidden)').forEach(tr => {
+        const select = tr.querySelector('select');
+        const cantidadInput = tr.querySelector('.cantidad-input, input[name$="-cantidad"]');
+        const especificacionesInput = tr.querySelector('input[name$="-especificaciones"], textarea[name$="-especificaciones"]');
+        const unitarioInput = tr.querySelector('.unitario');
+        const totalInput = tr.querySelector('.linea-total');
+        const prodId = parseInt(select?.value || '0', 10);
+        const prodNombre = select?.selectedOptions[0]?.text || '';
+        const cantidad = cantidadInput?.value || '';
+        const especificaciones = especificacionesInput?.value || '';
+        const unitario = unitarioInput?.value || '0.00';
+        const total = totalInput?.value || '0.00';
+        sum += parseFloat(total);
+        pedidoResumenProductos.innerHTML += `
+          <tr>
+            <td>${prodNombre}</td>
+            <td>${cantidad}</td>
+            <td>${especificaciones}</td>
+            <td class="text-end">${unitario}</td>
+            <td class="text-end">${total}</td>
+          </tr>
+        `;
+      });
+      // Calcular subtotal y total con descuento e IVA
+      let descuento = parseFloat(descuentoSelect?.value || '0');
+      let subtotalConDescuento = sum * (1 - descuento / 100);
+      let aplicarIVA = ivaCheckbox?.checked;
+      let total = aplicarIVA ? subtotalConDescuento * 1.21 : subtotalConDescuento;
+      pedidoResumenSubtotal.textContent = sum.toFixed(2);
+      pedidoResumenTotal.textContent = total.toFixed(2);
+      // Mostrar el modal
+      const modal = new bootstrap.Modal(confirmPedidoModal);
+      modal.show();
+      // Confirmar y enviar
+      confirmPedidoBtn.onclick = function() {
+        modal.hide();
+        // Enviar el formulario
+        btnSubmit.closest('form').submit();
+      };
+    });
 
     function toNumber(val) {
       const n = parseFloat(val);
@@ -399,7 +501,7 @@
     function clearStockAlert() {
       stockAlert.classList.add('d-none');
       stockAlert.textContent = '';
-      btnSubmit.disabled = false;
+      // btnSubmit.disabled = false; // Ya no se deshabilita
     }
 
     async function checkStock() {
@@ -431,12 +533,12 @@
         const detalle = (data.faltantes || []).map(f => `${f.codigo} - ${f.nombre}: faltan ${Number(f.faltan).toFixed(2)}`).join(', ');
         stockAlert.textContent = detalle || 'No hay insumos suficientes para las cantidades seleccionadas.';
         stockAlert.classList.remove('d-none');
-        btnSubmit.disabled = true;
+        // btnSubmit.disabled = true; // Ya no se deshabilita
       } catch (e) {
         // En caso de error en AJAX, no bloquear envío pero mostrar advertencia genérica
         stockAlert.textContent = 'No se pudo verificar el stock en este momento.';
         stockAlert.classList.remove('d-none');
-        btnSubmit.disabled = false;
+        // btnSubmit.disabled = false; // Ya no se deshabilita
       }
     }
 
