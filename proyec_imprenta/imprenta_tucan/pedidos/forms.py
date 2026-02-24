@@ -23,9 +23,23 @@ class AltaPedidoHeaderForm(forms.Form):
         widget=forms.DateInput(attrs={"type": "date", "class": "form-control", "required": True}),
     )
     aplicar_iva = forms.BooleanField(
-        label="Aplicar IVA 21%",
+        label="IVA 21%",
         required=False,
         widget=forms.CheckboxInput(attrs={"class": "form-check-input"}),
+    )
+
+    DESCUENTO_CHOICES = [
+        ("0", "Sin descuento"),
+        ("20", "Descuento 20%"),
+        ("15", "Descuento 15%"),
+        ("10", "Descuento 10%"),
+    ]
+    descuento = forms.ChoiceField(
+        label="Descuento",
+        choices=DESCUENTO_CHOICES,
+        required=False,
+        widget=forms.Select(attrs={"class": "form-select"}),
+        initial="0"
     )
 
 
