@@ -8,6 +8,21 @@ from geo.models import Ciudad
 
 
 class ClienteForm(forms.ModelForm):
+    tipo_cliente = forms.ChoiceField(
+        label="Tipo de Cliente",
+        choices=[
+            ("premium", "Premium"),
+            ("estrategico", "Estratégico"),
+            ("estandar", "Estándar"),
+            ("nuevo", "Nuevo"),
+        ],
+        initial="nuevo",
+        required=True,
+        widget=forms.Select(attrs={
+            'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500',
+        })
+    )
+
     RAZON_SOCIAL_CHOICES = [
         ("S.A.", "S.A."),
         ("S.R.L.", "S.R.L."),
@@ -52,8 +67,8 @@ class ClienteForm(forms.ModelForm):
         return cuit
     class Meta:
         model = Cliente
-        fields = ['nombre', 'apellido', 'razon_social', 'cuit', 'email', 'telefono', 'celular',
-                  'direccion', 'ciudad', 'provincia', 'pais', 'estado']
+        fields = ['nombre', 'apellido', 'razon_social', 'tipo_cliente', 'cuit', 'email', 'telefono', 'celular',
+              'direccion', 'ciudad', 'provincia', 'pais', 'estado']
         widgets = {
             'nombre': forms.TextInput(attrs={
                 'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500',

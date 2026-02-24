@@ -2,7 +2,20 @@ from django.db import models
 
 
 class Cliente(models.Model):
+    TIPO_CLIENTE_CHOICES = [
+        ("premium", "Premium"),
+        ("estrategico", "Estratégico"),
+        ("estandar", "Estándar"),
+        ("nuevo", "Nuevo"),
+    ]
+
     nombre = models.CharField(max_length=100)
+    tipo_cliente = models.CharField(
+        max_length=15,
+        choices=TIPO_CLIENTE_CHOICES,
+        default="nuevo",
+        verbose_name="Tipo de Cliente"
+    )
     apellido = models.CharField(max_length=100)
     razon_social = models.CharField(max_length=150, blank=True, null=True, db_column='razónSocial')
     cuit = models.CharField(max_length=11, blank=False, null=False, unique=True, verbose_name="CUIT", default="00000000000")

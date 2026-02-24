@@ -3,13 +3,10 @@
 import os
 import sys
 import subprocess
-from dotenv import load_dotenv
 
 def main():
     # Cargar variables de entorno desde .env si existe
-    dotenv_path = os.path.join(os.path.dirname(__file__), '.env')
-    if os.path.exists(dotenv_path):
-        load_dotenv(dotenv_path)
+    # (Eliminado uso de dotenv para evitar errores si no está instalado)
     print("=" * 50)
     print("    INICIANDO SERVIDOR IMPRENTA TUCAN")
     print("=" * 50)

@@ -228,6 +228,7 @@ def alta_pedido(request):
             "email": c.email,
             "telefono": c.telefono,
             "celular": c.celular or "",
+            "tipo_cliente": getattr(c, 'tipo_cliente', '') or '',
         })
 
     return render(

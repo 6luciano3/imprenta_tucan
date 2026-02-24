@@ -84,6 +84,10 @@
                 {{ header_form.cliente }}
               </div>
               <div class="col-md-6">
+                              <div class="col-md-6">
+                                <label class="form-label">Tipo de Cliente</label>
+                                <input type="text" id="tipoCliente" class="form-control" readonly>
+                              </div>
                 <label class="form-label">Razón Social</label>
                 <input type="text" id="razonSocialCliente" class="form-control" readonly>
               </div>
@@ -426,15 +430,15 @@
         }
         if (cantidadInput) {
           cantidadInput.value = String(c);
+                <div class="mt-2">
+                  <label class="form-label">Tipo de Cliente</label>
+                  <input type="text" id="tipoCliente" class="form-control" readonly>
+                </div>
           cantidadInput.dispatchEvent(new Event('input'));
-        }
-        recalcSubtotal();
-        scheduleCheckStock();
-      } catch (e) {
-        console.error('No se pudo agregar la línea desde la calculadora:', e);
-      }
-    }
-  })();
+              <div class="col-md-6">
+                <label class="form-label">Razón Social</label>
+                <input type="text" id="razonSocialCliente" class="form-control" readonly>
+              </div>
   </script>
     <script>
         // Autocompletar datos del cliente seleccionado
@@ -458,6 +462,15 @@
             if (cuitInput) cuitInput.value = c.cuit || '';
             if (emailInput) emailInput.value = c.email || '';
             if (telefonoInput) telefonoInput.value = c.telefono || '';
+            const tipoClienteInput = document.getElementById('tipoCliente');
+            if (tipoClienteInput) {
+              let tipo = c.tipo_cliente || '';
+              if (tipo === 'premium') tipo = 'Premium';
+              else if (tipo === 'estrategico') tipo = 'Estratégico';
+              else if (tipo === 'estandar') tipo = 'Estándar';
+              else if (tipo === 'nuevo') tipo = 'Nuevo';
+              tipoClienteInput.value = tipo;
+            }
           }
           if (clienteSelect) {
             clienteSelect.addEventListener('change', updateClienteFields);
