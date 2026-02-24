@@ -38,6 +38,12 @@
               </label>
               {{ form.nombre|add_class:"w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" }}
               {% if form.nombre.errors %}
+                {% for error in form.nombre.errors %}
+                  <p class="mt-1 text-sm text-red-600 flex items-center gap-1">
+                    <span class="material-symbols-outlined text-sm">error</span>{{ error }}
+                  </p>
+                {% endfor %}
+              {% endif %}
             </div>
             <!-- CUIT -->
             <div>
@@ -46,9 +52,7 @@
               </label>
               {{ form.cuit|add_class:"w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" }}
               {% if form.cuit.errors %}
-                <p class="mt-2 text-sm text-error">{{ form.cuit.errors.0 }}</p>
-              {% endif %}
-                {% for error in form.nombre.errors %}
+                {% for error in form.cuit.errors %}
                   <p class="mt-1 text-sm text-red-600 flex items-center gap-1">
                     <span class="material-symbols-outlined text-sm">error</span>{{ error }}
                   </p>

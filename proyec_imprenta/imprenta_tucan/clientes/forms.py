@@ -17,7 +17,6 @@ class ClienteForm(forms.ModelForm):
         ("Monotributista", "Monotributista"),
     ]
 
-
     razon_social = forms.ChoiceField(
         choices=RAZON_SOCIAL_CHOICES,
         label="Razón Social",
