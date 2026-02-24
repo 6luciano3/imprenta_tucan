@@ -219,8 +219,9 @@
     const subtotalInput = document.getElementById('subtotal');
     const totalInput = document.getElementById('montoTotal');
     const ivaCheckbox = document.querySelector('input[name="aplicar_iva"]');
-  const template = document.getElementById('filaTemplate');
-  const btnAddSame = document.getElementById('btnAddSame');
+    const descuentoSelect = document.getElementById('id_descuento');
+    const template = document.getElementById('filaTemplate');
+    const btnAddSame = document.getElementById('btnAddSame');
 
     const mgmtTotal = document.querySelector('[name="lineas-TOTAL_FORMS"]');
     const mgmtInitial = document.querySelector('[name="lineas-INITIAL_FORMS"]');
@@ -247,6 +248,7 @@
       if (totalInput) totalInput.value = format(precio * cantidad);
     }
 
+
     function recalcSubtotal() {
       let sum = 0;
       tbody.querySelectorAll('tr.linea:not(.tr-hidden)').forEach(tr => {
@@ -259,8 +261,13 @@
 
     function recalcGrandTotal() {
       const subtotal = toNumber(subtotalInput.value);
+      let descuento = 0;
+      if (descuentoSelect) {
+        descuento = parseFloat(descuentoSelect.value) || 0;
+      }
+      const subtotalConDescuento = subtotal * (1 - descuento / 100);
       const aplicar = ivaCheckbox?.checked;
-      const total = aplicar ? subtotal * 1.21 : subtotal;
+      const total = aplicar ? subtotalConDescuento * 1.21 : subtotalConDescuento;
       totalInput.value = format(total);
     }
 
@@ -362,7 +369,9 @@
       scheduleCheckStock();
     });
 
+
     ivaCheckbox?.addEventListener('change', recalcGrandTotal);
+    descuentoSelect?.addEventListener('change', recalcGrandTotal);
 
     document.getElementById('btnReset')?.addEventListener('click', () => {
       // Reset visible totals
