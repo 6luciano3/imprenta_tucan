@@ -243,8 +243,8 @@
       const prodId = parseInt(select?.value || '0', 10);
       const precio = precios[prodId] || 0;
       const cantidad = parseInt(cantidadInput?.value || '0', 10) || 0;
-      unitarioInput.value = format(precio);
-      totalInput.value = format(precio * cantidad);
+      if (unitarioInput) unitarioInput.value = format(precio);
+      if (totalInput) totalInput.value = format(precio * cantidad);
     }
 
     function recalcSubtotal() {
@@ -269,7 +269,19 @@
       const cantidadInput = tr.querySelector('.cantidad-input, input[name$="-cantidad"]');
       const btnRemove = tr.querySelector('.btn-remove');
       const delInput = tr.querySelector('input[name$="-DELETE"]');
-      select?.addEventListener('change', () => { recalcRow(tr); recalcSubtotal(); scheduleCheckStock(); });
+      // Forzar actualización del campo unitario al seleccionar producto
+      select?.addEventListener('change', () => {
+        recalcRow(tr);
+        // Forzar actualización directa del campo unitario
+        const unitarioInput = tr.querySelector('.unitario');
+        const prodId = parseInt(select?.value || '0', 10);
+        const precio = precios[prodId] || 0;
+        if (unitarioInput) unitarioInput.value = format(precio);
+        // Log para depuración
+        console.log('Producto seleccionado:', prodId, 'Precio:', precio, 'Unitario:', unitarioInput?.value);
+        recalcSubtotal();
+        scheduleCheckStock();
+      });
       cantidadInput?.addEventListener('input', () => { recalcRow(tr); recalcSubtotal(); scheduleCheckStock(); });
       btnRemove?.addEventListener('click', () => {
         if (delInput) {
@@ -283,8 +295,16 @@
       recalcRow(tr);
     }
 
-    // Enlazar filas existentes
-    tbody.querySelectorAll('tr.linea').forEach(bindRowEvents);
+    // Enlazar filas existentes y forzar actualización de unitario
+    tbody.querySelectorAll('tr.linea').forEach(tr => {
+      bindRowEvents(tr);
+      // Forzar actualización directa del campo unitario
+      const select = tr.querySelector('select');
+      const unitarioInput = tr.querySelector('.unitario');
+      const prodId = parseInt(select?.value || '0', 10);
+      const precio = precios[prodId] || 0;
+      if (unitarioInput) unitarioInput.value = format(precio);
+    });
     recalcSubtotal();
 
     btnAdd?.addEventListener('click', () => {
@@ -436,28 +456,49 @@
         }
         if (cantidadInput) {
           cantidadInput.value = String(c);
-                <div class="mt-2">
-                  <label class="form-label">Tipo de Cliente</label>
-                  <input type="text" id="tipoCliente" class="form-control" readonly>
-                </div>
           cantidadInput.dispatchEvent(new Event('input'));
-              <div class="col-md-6">
-                <label class="form-label">Razón Social</label>
-                <input type="text" id="razonSocialCliente" class="form-control" readonly>
-              </div>
-  </script>
-    <script>
-        // Autocompletar datos del cliente seleccionado
-        document.addEventListener('DOMContentLoaded', function() {
-          const clienteSelect = document.getElementById('id_cliente');
-          const razonSocialInput = document.getElementById('razonSocialCliente');
-          const cuitInput = document.getElementById('cuitCliente');
-          const emailInput = document.getElementById('emailCliente');
-          const telefonoInput = document.getElementById('telefonoCliente');
-          // Usar window.clientesData expuesto por el backend
-          const clientesData = window.clientesData || [];
-          // Crear un mapa de id a datos
-          const clienteMap = {};
+        }
+        recalcSubtotal();
+        scheduleCheckStock();
+      } catch (e) {
+        console.error('Error al agregar línea:', e);
+      }
+    };
+
+    // Cerrar el IIFE correctamente
+  })();
+</script>
+
+<script>
+  // Autocompletar datos del cliente seleccionado
+  document.addEventListener('DOMContentLoaded', function() {
+    const clienteSelect = document.getElementById('id_cliente');
+    const razonSocialInput = document.getElementById('razonSocialCliente');
+    const cuitInput = document.getElementById('cuitCliente');
+    const emailInput = document.getElementById('emailCliente');
+    const telefonoInput = document.getElementById('telefonoCliente');
+    // Usar window.clientesData expuesto por el backend
+    const clientesData = window.clientesData || [];
+    // Crear un mapa de id a datos
+    const clienteMap = {};
+    for (const c of clientesData) {
+      clienteMap[String(c.id)] = c;
+    }
+    function updateClienteFields() {
+      const id = clienteSelect.value;
+      const datos = clienteMap[id] || {};
+      razonSocialInput.value = datos.razon_social || '';
+      cuitInput.value = datos.cuit || '';
+      emailInput.value = datos.email || '';
+      telefonoInput.value = datos.telefono || '';
+      document.getElementById('tipoCliente').value = datos.tipo_cliente || '';
+    }
+    if (clienteSelect) {
+      clienteSelect.addEventListener('change', updateClienteFields);
+      updateClienteFields();
+    }
+  });
+</script>
           for (const c of clientesData) {
             clienteMap[String(c.id)] = c;
           }
