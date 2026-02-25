@@ -37,38 +37,76 @@
             <label class="form-label">Cliente</label>
             <input type="text" class="form-control" value="{{ pedido.cliente }}" disabled>
           </div>
-          <div class="col-md-6">
-            <label class="form-label">Producto</label>
-            {{ form.producto }}
-          </div>
-
-        <div class="col-md-4">
+          <div class="col-md-4">
             <label class="form-label">Fecha de Pedido</label>
             <input type="date" class="form-control" value="{{ pedido.fecha_pedido|date:'Y-m-d' }}" disabled>
           </div>
           <div class="col-md-4">
             <label class="form-label">Fecha de Entrega</label>
-            {{ form.fecha_entrega }}
+            <input type="date" name="fecha_entrega" value="{{ fecha_entrega }}" class="form-control" required id="id_fecha_entrega">
           </div>
-          <div class="col-md-4">
-            <label class="form-label">Cantidad</label>
-            {{ form.cantidad }}
-          </div>
-
           <div class="col-md-4">
             <label class="form-label">Estado</label>
             {{ form.estado }}
           </div>
-
-          <div class="col-12">
-            <label class="form-label">Especificaciones</label>
-            {{ form.especificaciones }}
+          <div class="col-md-4 d-flex align-items-end mt-2 gap-3">
+            <div class="form-check">
+              <input type="checkbox" name="aplicar_iva" class="form-check-input" id="id_aplicar_iva" {% if aplicar_iva_actual %}checked{% endif %}>
+              <label class="form-check-label ms-1" for="id_aplicar_iva">IVA 21%</label>
+            </div>
+            <div class="flex-grow-1">
+              <label class="form-label" for="id_descuento">Descuento</label>
+              <select name="descuento" class="form-select" id="id_descuento">
+                <option value="0" {% if descuento_actual == 0 %}selected{% endif %}>Sin descuento</option>
+                <option value="20" {% if descuento_actual == 20 %}selected{% endif %}>Descuento 20%</option>
+                <option value="15" {% if descuento_actual == 15 %}selected{% endif %}>Descuento 15%</option>
+                <option value="10" {% if descuento_actual == 10 %}selected{% endif %}>Descuento 10%</option>
+              </select>
+            </div>
           </div>
+        </div>
 
-          <div class="col-md-4">
-            <label class="form-label">Monto Total</label>
-            <input id="montoTotal" class="form-control" type="text" value="{{ pedido.monto_total }}" readonly>
-            <div class="form-text">Se calcula automáticamente: precio del producto x cantidad.</div>
+        <!-- Líneas -->
+        {{ formset.management_form }}
+        <div class="table-responsive mt-4">
+          <table class="table table-bordered align-middle" id="tablaLineas">
+            <thead class="table-light">
+              <tr>
+                <th class="w-240">Producto</th>
+                <th class="w-120">Cant.</th>
+                <th>Especificaciones</th>
+                <th class="w-120 text-end">Unitario</th>
+                <th class="w-120 text-end">Importe</th>
+                <th class="w-120">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for form in formset.forms %}
+              <tr class="linea" data-index="{{ forloop.counter0 }}">
+                <td>{{ form.producto }}</td>
+                <td>{{ form.cantidad }}</td>
+                <td>{{ form.especificaciones }}</td>
+                <td class="text-end"><input type="text" class="form-control text-end unitario" value="0.00" readonly></td>
+                <td class="text-end"><input type="text" class="form-control text-end linea-total" value="0.00" readonly></td>
+                <td class="remove-line">
+                  <button type="button" class="btn btn-outline-danger btn-sm btn-remove">Quitar</button>
+                  {% if form.DELETE %}{{ form.DELETE }}{% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <div class="d-flex justify-content-between align-items-center mt-2 gap-2">
+          <div class="d-flex gap-2">
+            <button type="button" id="btnAdd" class="btn btn-outline-primary">+ Agregar producto</button>
+          </div>
+          <div>
+            <label class="form-label me-2 mb-0">Subtotal</label>
+            <input id="subtotal" class="form-control d-inline-block subtotal-box text-end" type="text" value="0.00" readonly style="width: 160px;">
+            <label class="form-label ms-3 me-2 mb-0">Monto Total</label>
+            <input id="montoTotal" class="form-control d-inline-block subtotal-box text-end" type="text" value="0.00" readonly style="width: 160px;">
           </div>
         </div>
 
@@ -82,64 +120,167 @@
 </div>
 
 <script>
-  // Cálculo de monto total en el cliente usando mapa de precios inyectado
-  (function() {
+(function() {
   const precios = {{ precios|default:'{}'|safe }};
-    const cantidadInput = document.querySelector('input[name="cantidad"]');
-    const productoSelect = document.querySelector('select[name="producto"]');
-    const monto = document.getElementById('montoTotal');
-    const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
-    const stockAlert = document.getElementById('stockAlert');
-    const btnSubmit = document.getElementById('btnSubmit');
+  const tbody = document.querySelector('#tablaLineas tbody');
+  const btnAdd = document.getElementById('btnAdd');
+  const subtotalInput = document.getElementById('subtotal');
+  const montoInput = document.getElementById('montoTotal');
+  const mgmtTotal = document.querySelector('[name$="-TOTAL_FORMS"]');
+  const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
+  const stockAlert = document.getElementById('stockAlert');
+  const btnSubmit = document.getElementById('btnSubmit');
 
-    function recalc() {
-      const cant = parseInt(cantidadInput?.value || '0', 10) || 0;
-      const productoId = parseInt(productoSelect?.value || '0', 10);
-      const precio = precios[productoId] || 0;
-      const total = (precio * cant).toFixed(2);
-      monto.value = isFinite(total) ? total : '0.00';
+  function format(n) { return (Math.round(n * 100) / 100).toFixed(2); }
+  function toNumber(v) { const n = parseFloat(v); return isFinite(n) ? n : 0; }
+
+  function recalcRow(tr) {
+    const select = tr.querySelector('select');
+    const cantInput = tr.querySelector('.cantidad-input');
+    const unitInput = tr.querySelector('.unitario');
+    const lineaTotal = tr.querySelector('.linea-total');
+    const prodId = parseInt(select?.value || '0', 10);
+    const precio = precios[prodId] || 0;
+    const cant = parseInt(cantInput?.value || '0', 10) || 0;
+    if (unitInput) unitInput.value = format(precio);
+    if (lineaTotal) lineaTotal.value = format(precio * cant);
+  }
+
+  const ivaCheckbox = document.getElementById('id_aplicar_iva');
+  const descuentoSelect = document.getElementById('id_descuento');
+
+  function recalcGrandTotal() {
+    const subtotal = toNumber(subtotalInput.value);
+    const descuento = parseFloat(descuentoSelect?.value || '0') || 0;
+    const subtotalConDesc = subtotal * (1 - descuento / 100);
+    const aplicarIva = ivaCheckbox?.checked;
+    const total = aplicarIva ? subtotalConDesc * 1.21 : subtotalConDesc;
+    montoInput.value = format(total);
+  }
+
+  // Reemplazar recalcSubtotal para que llame a recalcGrandTotal
+  function recalcSubtotal() {
+    let sum = 0;
+    tbody.querySelectorAll('tr.linea:not(.tr-hidden)').forEach(tr => {
+      const del = tr.querySelector('input[name$="-DELETE"]');
+      if (del?.checked) return;
+      sum += toNumber(tr.querySelector('.linea-total')?.value || '0');
+    });
+    subtotalInput.value = format(sum);
+    recalcGrandTotal();
+  }
+
+  ivaCheckbox?.addEventListener('change', recalcGrandTotal);
+  descuentoSelect?.addEventListener('change', recalcGrandTotal);
+
+  function bindRowEvents(tr) {
+    const select = tr.querySelector('select');
+    const cantInput = tr.querySelector('.cantidad-input');
+    const btnRemove = tr.querySelector('.btn-remove');
+    const delInput = tr.querySelector('input[name$="-DELETE"]');
+
+    select?.addEventListener('change', () => { recalcRow(tr); recalcSubtotal(); scheduleCheckStock(); });
+    cantInput?.addEventListener('input', () => { recalcRow(tr); recalcSubtotal(); scheduleCheckStock(); });
+    btnRemove?.addEventListener('click', () => {
+      if (delInput) delInput.checked = true;
+      tr.classList.add('tr-hidden');
+      recalcSubtotal();
+      scheduleCheckStock();
+    });
+    recalcRow(tr);
+  }
+
+  // Inicializar todas las filas existentes
+  tbody.querySelectorAll('tr.linea').forEach(tr => bindRowEvents(tr));
+  recalcSubtotal();
+
+  // Agregar nueva fila desde template
+  btnAdd?.addEventListener('click', () => {
+    const prefix = mgmtTotal?.name?.replace('-TOTAL_FORMS', '') || 'linea';
+    const idx = parseInt(mgmtTotal?.value || '0', 10);
+    // Clonar la última fila y limpiarla
+    const filaTemplate = document.getElementById('filaTemplate');
+    let html;
+    if (filaTemplate) {
+      html = filaTemplate.innerHTML.replaceAll('__prefix__', idx);
+    } else {
+      // Si no hay template, clonar primera fila y resetearla
+      const firstRow = tbody.querySelector('tr.linea');
+      if (!firstRow) return;
+      const clone = firstRow.cloneNode(true);
+      clone.dataset.index = idx;
+      clone.querySelectorAll('input').forEach(i => { i.value = ''; if (i.type === 'checkbox') i.checked = false; });
+      clone.querySelectorAll('select').forEach(s => s.value = '');
+      // Actualizar names
+      clone.querySelectorAll('[name]').forEach(el => {
+        el.name = el.name.replace(/\d+/, idx);
+        el.id = (el.id || '').replace(/\d+/, idx);
+      });
+      tbody.appendChild(clone);
+      mgmtTotal.value = String(idx + 1);
+      bindRowEvents(clone);
+      recalcSubtotal();
+      return;
     }
+    const temp = document.createElement('tbody');
+    temp.innerHTML = html.trim();
+    const tr = temp.querySelector('tr');
+    tbody.appendChild(tr);
+    mgmtTotal.value = String(idx + 1);
+    bindRowEvents(tr);
+    recalcSubtotal();
+  });
 
-    function clearStockAlert() {
-      stockAlert.classList.add('d-none');
-      stockAlert.textContent = '';
+  // Verificación de stock AJAX para múltiples líneas
+  let debounceTimer;
+  function scheduleCheckStock() {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(checkStock, 400);
+  }
+
+  function clearStockAlert() {
+    stockAlert.classList.add('d-none');
+    stockAlert.textContent = '';
+    btnSubmit.disabled = false;
+  }
+
+  async function checkStock() {
+    const lineas = [];
+    tbody.querySelectorAll('tr.linea').forEach(tr => {
+      if (tr.classList.contains('tr-hidden')) return;
+      const del = tr.querySelector('input[name$="-DELETE"]');
+      if (del?.checked) return;
+      const select = tr.querySelector('select');
+      const cantInput = tr.querySelector('.cantidad-input');
+      const pid = parseInt(select?.value || '0', 10);
+      const cant = parseInt(cantInput?.value || '0', 10) || 0;
+      if (pid && cant > 0) lineas.push({ producto: pid, cantidad: cant });
+    });
+
+    if (lineas.length === 0) { clearStockAlert(); return; }
+
+    try {
+      const resp = await fetch('{% url "verificar_stock" %}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+        body: JSON.stringify({ lineas })
+      });
+      if (!resp.ok) throw new Error('Error');
+      const data = await resp.json();
+      if (data.ok) { clearStockAlert(); return; }
+      const detalle = (data.faltantes || [])
+        .map(f => `${f.codigo} - ${f.nombre}: faltan ${Number(f.faltan).toFixed(2)}`).join(', ');
+      stockAlert.textContent = detalle || 'No hay insumos suficientes.';
+      stockAlert.classList.remove('d-none');
+      btnSubmit.disabled = false; // no bloquear, solo advertir
+    } catch (e) {
+      stockAlert.textContent = 'No se pudo verificar el stock.';
+      stockAlert.classList.remove('d-none');
       btnSubmit.disabled = false;
     }
+  }
 
-    let debounceTimer;
-    function scheduleCheckStock() {
-      clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(checkStock, 400);
-    }
-
-    async function checkStock() {
-      const cant = parseInt(cantidadInput?.value || '0', 10) || 0;
-      const productoId = parseInt(productoSelect?.value || '0', 10);
-      if (!productoId || cant <= 0) { clearStockAlert(); return; }
-      try {
-        const resp = await fetch('{% url "verificar_stock_modificar" pedido.id %}', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
-          body: JSON.stringify({ producto: productoId, cantidad: cant })
-        });
-        if (!resp.ok) throw new Error('Error en verificación');
-        const data = await resp.json();
-        if (data.ok) { clearStockAlert(); return; }
-        const detalle = (data.faltantes || []).map(f => `${f.codigo} - ${f.nombre}: faltan ${Number(f.faltan).toFixed(2)}`).join(', ');
-        stockAlert.textContent = detalle || 'No hay insumos suficientes para la modificación.';
-        stockAlert.classList.remove('d-none');
-        btnSubmit.disabled = true;
-      } catch (e) {
-        stockAlert.textContent = 'No se pudo verificar el stock en este momento.';
-        stockAlert.classList.remove('d-none');
-        btnSubmit.disabled = false;
-      }
-    }
-
-    cantidadInput?.addEventListener('input', () => { recalc(); scheduleCheckStock(); });
-    productoSelect?.addEventListener('change', () => { recalc(); scheduleCheckStock(); });
-    recalc();
-    scheduleCheckStock();
-  })();
+  scheduleCheckStock();
+})();
 </script>
 {% endblock %}

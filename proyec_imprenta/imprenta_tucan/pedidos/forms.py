@@ -81,11 +81,6 @@ class ModificarPedidoForm(forms.Form):
     Campos editables: producto, fecha_entrega, cantidad, especificaciones.
     El monto total se calcula automáticamente del lado del cliente y del servidor.
     """
-    producto = forms.ModelChoiceField(
-        queryset=Producto.objects.all(),
-        label="Producto",
-        widget=forms.Select(attrs={"class": "form-select"}),
-    )
     estado = forms.ModelChoiceField(
         queryset=EstadoPedido.objects.all().order_by("nombre"),
         label="Estado",
@@ -95,13 +90,21 @@ class ModificarPedidoForm(forms.Form):
         label="Fecha de Entrega",
         widget=forms.DateInput(attrs={"type": "date", "class": "form-control", "required": True}),
     )
-    cantidad = forms.IntegerField(
-        label="Cantidad",
-        min_value=1,
-        widget=forms.NumberInput(attrs={"class": "form-control", "min": "1", "required": True}),
-    )
-    especificaciones = forms.CharField(
-        label="Especificaciones",
+    aplicar_iva = forms.BooleanField(
+        label="IVA 21%",
         required=False,
-        widget=forms.Textarea(attrs={"class": "form-control", "rows": 3, "placeholder": "Opcional"}),
+        widget=forms.CheckboxInput(attrs={"class": "form-check-input"}),
+    )
+    DESCUENTO_CHOICES = [
+        ("0", "Sin descuento"),
+        ("20", "Descuento 20%"),
+        ("15", "Descuento 15%"),
+        ("10", "Descuento 10%"),
+    ]
+    descuento = forms.ChoiceField(
+        label="Descuento",
+        choices=DESCUENTO_CHOICES,
+        required=False,
+        widget=forms.Select(attrs={"class": "form-select"}),
+        initial="0"
     )

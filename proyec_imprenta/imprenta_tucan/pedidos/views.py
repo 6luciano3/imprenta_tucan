@@ -426,21 +426,24 @@ def modificar_pedido(request, idPedido: int):
     from .models import LineaPedido
 
     pedido = get_object_or_404(Pedido.objects.select_related("cliente", "estado"), pk=idPedido)
+    lineas_actuales = list(pedido.lineas.select_related('producto').all())
 
     if request.method == "POST":
+        formset = LineaPedidoFormSet(request.POST, prefix="linea")
         form = ModificarPedidoForm(request.POST)
-        if form.is_valid():
-            producto  = form.cleaned_data["producto"]
-            estado    = form.cleaned_data["estado"]
-            fecha_entrega   = form.cleaned_data["fecha_entrega"]
-            cantidad  = form.cleaned_data["cantidad"]
-            especificaciones = form.cleaned_data["especificaciones"]
+        if form.is_valid() and formset.is_valid():
+            estado = form.cleaned_data["estado"]
+            if form.is_valid() and formset.is_valid():
+                estado = form.cleaned_data["estado"]
+                fecha_entrega = form.cleaned_data["fecha_entrega"]
+                aplicar_iva = form.cleaned_data.get("aplicar_iva", False)
+                descuento = form.cleaned_data.get("descuento", "0")
+            new_lineas = []
+            for f in formset.cleaned_data:
+                if f and not f.get('DELETE', False):
+                    new_lineas.append((f["producto"], f["cantidad"]))
 
-            # Líneas actuales para calcular ajuste neto de insumos
-            lineas_actuales = list(pedido.lineas.select_related('producto').all())
             old_lineas = [(l.producto, l.cantidad) for l in lineas_actuales]
-            new_lineas = [(producto, cantidad)]
-
             ok, faltantes = verificar_insumos_para_ajuste(old_lineas, new_lineas)
             if not ok:
                 if faltantes:
@@ -460,23 +463,30 @@ def modificar_pedido(request, idPedido: int):
                     messages.error(request, "No hay insumos suficientes.")
                 precios = {p.pk: float(p.precio) for p in Producto.objects.all()}
                 return render(request, "pedidos/modificar_pedido.html",
-                              {"form": form, "pedido": pedido, "precios": precios})
+                              {"form": form, "formset": formset, "pedido": pedido, "precios": precios})
 
-            monto_total = (producto.precio or 0) * cantidad
+            # Calcular monto_total
+            from decimal import Decimal
+            monto_total = Decimal("0")
+            for f in formset.cleaned_data:
+                if f and not f.get('DELETE', False):
+                    producto = f["producto"]
+                    cantidad = f["cantidad"]
+                    monto_total += (producto.precio or Decimal("0")) * cantidad
 
             with transaction.atomic():
                 ajustar_insumos_por_diferencia(old_lineas, new_lineas)
-
-                # Reemplazar líneas del pedido con la nueva única línea
+                # Reemplazar líneas del pedido
                 pedido.lineas.all().delete()
-                LineaPedido.objects.create(
-                    pedido=pedido,
-                    producto=producto,
-                    cantidad=cantidad,
-                    especificaciones=especificaciones,
-                    precio_unitario=producto.precio or Decimal("0"),
-                )
-
+                for f in formset.cleaned_data:
+                    if f and not f.get('DELETE', False):
+                        LineaPedido.objects.create(
+                            pedido=pedido,
+                            producto=f["producto"],
+                            cantidad=f["cantidad"],
+                            especificaciones=f.get("especificaciones", ""),
+                            precio_unitario=f["producto"].precio or Decimal("0"),
+                        )
                 pedido.estado = estado
                 pedido.fecha_entrega = fecha_entrega
                 pedido.monto_total = monto_total
@@ -487,19 +497,36 @@ def modificar_pedido(request, idPedido: int):
         else:
             messages.error(request, "Revisá los datos del formulario")
     else:
-        # Precargar con datos de la primera línea si existe
-        primera_linea = pedido.lineas.select_related('producto').first()
+        # Precargar con datos actuales
+        initial_lineas = [
+            {
+                "producto": l.producto,
+                "cantidad": l.cantidad,
+                "especificaciones": l.especificaciones,
+            }
+            for l in lineas_actuales
+        ]
+        formset = LineaPedidoFormSet(initial=initial_lineas, prefix="linea")
+        # Fecha de entrega: 10 días después de fecha_pedido si no está seteada
+        from datetime import timedelta
+        fecha_entrega_default = pedido.fecha_entrega or (pedido.fecha_pedido + timedelta(days=10))
         form = ModificarPedidoForm(initial={
-            "producto":         primera_linea.producto       if primera_linea else None,
-            "estado":           pedido.estado,
-            "fecha_entrega":    pedido.fecha_entrega,
-            "cantidad":         primera_linea.cantidad       if primera_linea else None,
-            "especificaciones": primera_linea.especificaciones if primera_linea else "",
+            "estado": pedido.estado,
+            "fecha_entrega": fecha_entrega_default,
         })
 
     precios = {p.pk: float(p.precio) for p in Producto.objects.all()}
-    return render(request, "pedidos/modificar_pedido.html",
-                  {"form": form, "pedido": pedido, "precios": precios})
+    return render(request, "pedidos/modificar_pedido.html", {
+        "form": form,
+        "formset": formset,
+        "pedido": pedido,
+        "precios": precios,
+        "estados": EstadoPedido.objects.all(),
+        "productos": Producto.objects.filter(activo=True).order_by('nombreProducto'),
+        "fecha_entrega": pedido.fecha_entrega.strftime('%Y-%m-%d') if pedido.fecha_entrega else '',
+        "descuento_actual": int(pedido.descuento) if hasattr(pedido, 'descuento') else 0,
+        "aplicar_iva_actual": pedido.aplicar_iva if hasattr(pedido, 'aplicar_iva') else False,
+    })
 
 
 def eliminar_pedido(request, idPedido: int):
