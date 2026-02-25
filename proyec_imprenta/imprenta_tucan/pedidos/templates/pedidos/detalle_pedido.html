@@ -1,124 +1,63 @@
 {% extends 'base.html' %}
+{% include 'pedidos/_pedido_resumen_modal.html' %}
 {% block title %}Detalle del Pedido{% endblock %}
 
 {% block content %}
-<div class="px-4 md:px-10 lg:px-20 xl:px-40 py-5">
+<div class="container py-5">
   <div class="max-w-3xl mx-auto">
-    <div class="flex justify-between items-center mb-6">
-      <h1 class="text-3xl font-black text-[#111418] dark:text-white">Detalle del Pedido</h1>
-      <a href="{% url 'dashboard' %}" class="flex items-center gap-2 bg-gray-500 text-white px-4 py-2 rounded-lg shadow hover:bg-gray-600">
-        <span class="material-symbols-outlined">arrow_back</span>
-        Volver
-      </a>
-    </div>
     <div class="bg-white rounded-xl shadow p-6">
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-gray-700">
-        <div>
-          <p class="font-semibold">N° de Pedido:</p>
-          <p class="mb-4">{{ pedido.id }}</p>
-        </div>
-        <div>
-          <p class="font-semibold">Cliente:</p>
-          <p class="mb-4">{{ pedido.cliente }}</p>
-        </div>
-        <div>
-          <p class="font-semibold">Producto:</p>
-          <p class="mb-4">{{ pedido.producto.nombreProducto }}</p>
-        </div>
-        <div>
-          <p class="font-semibold">Fecha de Pedido:</p>
-          <p class="mb-4">{{ pedido.fecha_pedido|date:"d/m/Y" }}</p>
-        </div>
-        <div>
-          <p class="font-semibold">Fecha de Entrega:</p>
-          <p class="mb-4">{{ pedido.fecha_entrega|date:"d/m/Y" }}</p>
-        </div>
-        <div>
-          <p class="font-semibold">Cantidad:</p>
-          <p class="mb-4">{{ pedido.cantidad }}</p>
-        </div>
-        <div>
-          <p class="font-semibold">Especificaciones:</p>
-          <p class="mb-4">{{ pedido.especificaciones|default:"-" }}</p>
-        </div>
-        <div>
-          <p class="font-semibold">Estado:</p>
-          <p class="mb-4">{{ pedido.estado.nombre }}</p>
-        </div>
-        <div>
-          <p class="font-semibold">Monto Total:</p>
-          <p class="mb-4">${{ pedido.monto_total }}</p>
-        </div>
+      <h1 class="text-3xl font-black text-[#111418] dark:text-white mb-6">Resumen del Pedido</h1>
+      <div class="mb-4">
+        <div><strong>Cliente:</strong> {{ pedido.cliente.nombre }} {{ pedido.cliente.apellido }}</div>
+        <div><strong>Razón Social:</strong> {{ pedido.cliente.razon_social }}</div>
+        <div><strong>CUIT:</strong> {{ pedido.cliente.cuit }}</div>
+        <div><strong>Email:</strong> {{ pedido.cliente.email }}</div>
+        <div><strong>Teléfono:</strong> {{ pedido.cliente.telefono }}</div>
+        <div><strong>Tipo de Cliente:</strong> {{ pedido.cliente.tipo_cliente }}</div>
       </div>
-    </div>
-
-    <div class="bg-white rounded-xl shadow p-6 mt-6">
-      <h2 class="text-xl font-bold mb-4">Insumos requeridos</h2>
-      {% if insumos_requeridos and insumos_requeridos|length > 0 %}
-      <div class="overflow-x-auto">
-        <table class="min-w-full">
-          <thead>
-            <tr class="text-left border-b">
-              <th class="py-2 px-2">Código</th>
-              <th class="py-2 px-2">Nombre</th>
-              <th class="py-2 px-2 text-right">Requerido</th>
-              <th class="py-2 px-2 text-right">Stock</th>
-              <th class="py-2 px-2 text-right">Faltan</th>
+      <div class="overflow-x-auto mt-3">
+        <table class="min-w-full table table-bordered align-middle" style="min-width:900px;">
+          <thead class="bg-gray-100">
+            <tr>
+              <th class="px-4 py-2 text-left whitespace-nowrap">Producto</th>
+              <th class="px-4 py-2 text-center whitespace-nowrap">Cantidad</th>
+              <th class="px-4 py-2 text-left whitespace-nowrap">Especificaciones</th>
+              <th class="px-4 py-2 text-end whitespace-nowrap">Unitario</th>
+              <th class="px-4 py-2 text-end whitespace-nowrap">Importe</th>
             </tr>
           </thead>
           <tbody>
-            {% for it in insumos_requeridos %}
-            <tr class="border-b">
-              <td class="py-2 px-2">{{ it.codigo }}</td>
-              <td class="py-2 px-2">{{ it.nombre }}</td>
-              <td class="py-2 px-2 text-right">{{ it.requerido|floatformat:2 }}</td>
-              <td class="py-2 px-2 text-right">{{ it.stock|floatformat:2 }}</td>
-              <td class="py-2 px-2 text-right {% if it.faltan > 0 %}text-red-600 font-semibold{% endif %}">{{ it.faltan|floatformat:2 }}</td>
-            </tr>
-            {% if it.faltan > 0 %}
+            {% for linea in lineas %}
             <tr>
-              <td colspan="5">
-                <form class="feedback-form bg-yellow-50 border border-yellow-200 rounded p-4 my-4" data-insumo-id="{{ it.id }}">
-                  <div class="font-semibold mb-2">Feedback sobre recomendación de proveedor para <span class="text-blue-900">{{ it.nombre }}</span>:</div>
-                  <div class="flex flex-col md:flex-row gap-2 mb-2">
-                    <label>Decisión:
-                      <select name="decision" class="border rounded px-2 py-1">
-                        <option value="aceptar">Aceptar</option>
-                        <option value="modificar">Modificar</option>
-                        <option value="rechazar">Rechazar</option>
-                      </select>
-                    </label>
-                    <label>Proveedor recomendado:
-                      <input type="number" name="proveedor_recomendado_id" class="border rounded px-2 py-1" placeholder="ID proveedor recomendado" required readonly>
-                    </label>
-                    <label>Proveedor elegido:
-                      <input type="number" name="proveedor_final_id" class="border rounded px-2 py-1" placeholder="ID proveedor elegido" required>
-                    </label>
-                  </div>
-                  <label class="block mb-2">Comentario:
-                    <input type="text" name="comentario" class="border rounded px-2 py-1 w-full" placeholder="Motivo o comentario opcional">
-                  </label>
-                  <div class="flex flex-wrap gap-2 mb-2">
-                    <label>Peso precio: <input type="number" step="0.01" name="feedback_precio" class="border rounded px-2 py-1 w-16" value="0"></label>
-                    <label>Peso cumplimiento: <input type="number" step="0.01" name="feedback_cumplimiento" class="border rounded px-2 py-1 w-16" value="0"></label>
-                    <label>Peso incidencias: <input type="number" step="0.01" name="feedback_incidencias" class="border rounded px-2 py-1 w-16" value="0"></label>
-                    <label>Peso disponibilidad: <input type="number" step="0.01" name="feedback_disponibilidad" class="border rounded px-2 py-1 w-16" value="0"></label>
-                  </div>
-                  <input type="hidden" name="pedido_id" value="{{ pedido.id }}">
-                  <input type="hidden" name="insumo_id" value="{{ it.id }}">
-                  <button type="submit" class="bg-yellow-400 hover:bg-yellow-500 text-gray-900 font-semibold px-4 py-2 rounded shadow opacity-50 cursor-not-allowed" disabled>Enviar feedback</button>
-                  <span class="feedback-msg ml-4 text-green-700 font-semibold"></span>
-                </form>
-              </td>
+              <td class="px-4 py-2 whitespace-nowrap">{{ linea.producto.nombreProducto }}</td>
+              <td class="px-4 py-2 text-center whitespace-nowrap">{{ linea.cantidad }}</td>
+              <td class="px-4 py-2 whitespace-nowrap">{{ linea.especificaciones|default:"-" }}</td>
+              <td class="px-4 py-2 text-end whitespace-nowrap">{{ linea.precio_unitario|floatformat:2 }}</td>
+              <td class="px-4 py-2 text-end whitespace-nowrap">{{ linea.importe|floatformat:2 }}</td>
             </tr>
-            {% endif %}
             {% endfor %}
           </tbody>
         </table>
       </div>
-      {% else %}
-        <p class="text-gray-600">No hay receta definida para este producto o no requiere insumos.</p>
-      {% endif %}
+      <div class="mt-2">
+        <strong>Subtotal:</strong> {{ subtotal|floatformat:'2' }}
+        {% if descuento and descuento > 0 %}
+          <span>(descuento {{ descuento }}%)</span>
+        {% endif %}
+        <br>
+        <strong>Subtotal con descuento:</strong> {{ subtotal_con_descuento|floatformat:'2' }}
+        <br>
+        <strong>Monto Total:</strong> {{ monto_total|floatformat:'2' }}
+        {% if aplicar_iva %}
+          <span>(con IVA 21%)</span>
+        {% endif %}
+      </div>
+      <div class="flex justify-end mt-6">
+        <a href="{% url 'dashboard' %}" class="btn btn-secondary">Cerrar</a>
+      </div>
+    </div>
+  </div>
+</div>
     </div>
   </div>
 </div>

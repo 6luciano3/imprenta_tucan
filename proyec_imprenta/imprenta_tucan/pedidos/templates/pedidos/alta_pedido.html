@@ -180,43 +180,8 @@
           <button type="button" class="btn btn-primary" id="btnSubmit">Registrar Pedido</button>
         </div>
 
-        <!-- Modal de confirmación de pedido -->
-        <div class="modal fade" id="confirmPedidoModal" tabindex="-1" aria-labelledby="confirmPedidoLabel" aria-hidden="true">
-          <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-              <div class="modal-header">
-                <h5 class="modal-title" id="confirmPedidoLabel">Confirmar Pedido</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-              </div>
-              <div class="modal-body">
-                <div id="pedidoResumenCliente"></div>
-                <div class="table-responsive mt-3">
-                  <table class="table table-bordered">
-                    <thead>
-                      <tr>
-                        <th>Producto</th>
-                        <th>Cantidad</th>
-                        <th>Especificaciones</th>
-                        <th>Unitario</th>
-                        <th>Importe</th>
-                      </tr>
-                    </thead>
-                    <tbody id="pedidoResumenProductos"></tbody>
-                  </table>
-                </div>
-                <div class="mt-2">
-                  <strong>Subtotal:</strong> <span id="pedidoResumenSubtotal"></span>
-                  &nbsp;|&nbsp;
-                  <strong>Monto Total:</strong> <span id="pedidoResumenTotal"></span>
-                </div>
-              </div>
-              <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                <button type="button" class="btn btn-primary" id="confirmPedidoBtn">Confirmar y enviar</button>
-              </div>
-            </div>
-          </div>
-        </div>
+        {# Modal resumen de pedido reutilizable #}
+        {% include 'pedidos/_pedido_resumen_modal.html' %}
       </form>
     </div>
   </div>
@@ -318,17 +283,26 @@
       let subtotalConDescuento = sum * (1 - descuento / 100);
       let aplicarIVA = ivaCheckbox?.checked;
       let total = aplicarIVA ? subtotalConDescuento * 1.21 : subtotalConDescuento;
-      pedidoResumenSubtotal.textContent = sum.toFixed(2);
-      pedidoResumenTotal.textContent = total.toFixed(2);
+      const ivaTexto = aplicarIVA ? ' (con IVA 21%)' : '';
+      const descTexto = descuento > 0 ? ` (descuento ${descuento}%)` : '';
+      pedidoResumenSubtotal.textContent = `$${sum.toFixed(2)}${descTexto}`;
+      pedidoResumenTotal.textContent = `$${total.toFixed(2)}${ivaTexto}`;
       // Mostrar el modal
-      const modal = new bootstrap.Modal(confirmPedidoModal);
+      // Mostrar el modal reutilizable y habilitar el botón de confirmación
+      const resumenModal = document.getElementById('pedidoResumenModal');
+      const confirmBtn = document.getElementById('confirmPedidoBtn');
+      if (confirmBtn) {
+        confirmBtn.classList.remove('d-none');
+        // Limpiar handlers previos para evitar múltiples submits
+        confirmBtn.onclick = null;
+        confirmBtn.onclick = function() {
+          const modalInstance = bootstrap.Modal.getInstance(resumenModal);
+          if (modalInstance) modalInstance.hide();
+          btnSubmit.closest('form').submit();
+        };
+      }
+      const modal = new bootstrap.Modal(resumenModal);
       modal.show();
-      // Confirmar y enviar
-      confirmPedidoBtn.onclick = function() {
-        modal.hide();
-        // Enviar el formulario
-        btnSubmit.closest('form').submit();
-      };
     });
 
     function toNumber(val) {

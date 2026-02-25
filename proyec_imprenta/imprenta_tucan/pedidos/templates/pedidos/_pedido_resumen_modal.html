@@ -1,0 +1,37 @@
+{# Modal resumen de pedido reutilizable para alta y detalle #}
+<div class="modal fade" id="pedidoResumenModal" tabindex="-1" aria-labelledby="pedidoResumenLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="pedidoResumenLabel">Resumen del Pedido</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div id="pedidoResumenCliente"></div>
+        <div class="table-responsive mt-3">
+          <table class="table table-bordered">
+            <thead>
+              <tr>
+                <th>Producto</th>
+                <th>Cantidad</th>
+                <th>Especificaciones</th>
+                <th>Unitario</th>
+                <th>Importe</th>
+              </tr>
+            </thead>
+            <tbody id="pedidoResumenProductos"></tbody>
+          </table>
+        </div>
+        <div class="mt-2">
+          <strong>Subtotal:</strong> <span id="pedidoResumenSubtotal"></span>
+          &nbsp;|&nbsp;
+          <strong>Monto Total:</strong> <span id="pedidoResumenTotal"></span>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+        <button type="button" class="btn btn-primary d-none" id="confirmPedidoBtn">Confirmar y enviar</button>
+      </div>
+    </div>
+  </div>
+</div>

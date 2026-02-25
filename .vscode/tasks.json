@@ -144,6 +144,28 @@
 				"migrate",
 				"clientes"
 			]
+		},
+		{
+			"label": "🛠️ Migrar pedidos",
+			"type": "shell",
+			"command": "python",
+			"args": [
+				"proyec_imprenta/imprenta_tucan/manage.py",
+				"makemigrations",
+				"pedidos"
+			],
+			"group": "build"
+		},
+		{
+			"label": "🛠️ Migrar pedidos",
+			"type": "shell",
+			"command": "python",
+			"args": [
+				"proyec_imprenta/imprenta_tucan/manage.py",
+				"makemigrations",
+				"pedidos"
+			],
+			"group": "build"
 		}
 	]
 }

@@ -18,6 +18,7 @@ from .forms import (
     ModificarPedidoForm,
 )
 from .models import Pedido, EstadoPedido
+from .models import LineaPedido
 from .utils import (
     verificar_insumos_disponibles,
     verificar_insumos_para_lineas,
@@ -38,13 +39,13 @@ def lista_pedidos(request):
     direction = request.GET.get("direction", "desc")
 
     valid_order_fields = [
-        "id", "cliente__nombre", "cliente__apellido", "producto__nombreProducto",
+        "id", "cliente__nombre", "cliente__apellido",
         "fecha_pedido", "fecha_entrega", "estado__nombre", "monto_total"
     ]
     if order_by not in valid_order_fields:
         order_by = "id"
 
-    qs = Pedido.objects.select_related("cliente", "producto", "estado")
+    qs = Pedido.objects.select_related("cliente", "estado")
 
     if query:
         if query.isdigit():
@@ -52,14 +53,12 @@ def lista_pedidos(request):
                            Q(cliente__nombre__icontains=query) |
                            Q(cliente__apellido__icontains=query) |
                            Q(cliente__razon_social__icontains=query) |
-                           Q(producto__nombreProducto__icontains=query) |
                            Q(estado__nombre__icontains=query))
         else:
             qs = qs.filter(
                 Q(cliente__nombre__icontains=query) |
                 Q(cliente__apellido__icontains=query) |
                 Q(cliente__razon_social__icontains=query) |
-                Q(producto__nombreProducto__icontains=query) |
                 Q(estado__nombre__icontains=query)
             )
 
@@ -142,39 +141,53 @@ def alta_pedido(request):
                     except Exception:
                         info = {}
                     detalle = ", ".join([
-                        f"{info.get(iid, ('-', f'Insumo {iid}'))[0]} - {info.get(iid, ('-', f'Insumo {iid}'))[1]}: faltan {falt:.2f}"
+                        f"{info.get(iid, ('-', f'Insumo {iid}'))[0]} - "
+                        f"{info.get(iid, ('-', f'Insumo {iid}'))[1]}: faltan {falt:.2f}"
                         for iid, falt in faltantes.items()
                     ])
                     messages.warning(request, f"No hay insumos suficientes: {detalle}. El pedido se guardó igualmente.")
                 else:
                     messages.warning(request, "No hay insumos suficientes para las cantidades solicitadas. El pedido se guardó igualmente.")
 
+            # Calcular subtotal antes de crear el pedido
             subtotal = Decimal("0")
+            for producto, cantidad, especificaciones in lineas:
+                line_total = (producto.precio or Decimal("0")) * cantidad
+                subtotal += line_total
+
+            descuento = Decimal(header_form.cleaned_data.get("descuento", 0))
+            subtotal_con_descuento = subtotal * (1 - descuento / 100)
+            total_con_iva = subtotal_con_descuento * iva_multiplier
+
             # Descontar stock y crear pedidos en una transacción
             with transaction.atomic():
                 descontar_insumos_para_lineas([(p, c) for (p, c, _e) in lineas])
+                # Crear el pedido cabecera
+                pedido = Pedido.objects.create(
+                    cliente=cliente,
+                    fecha_entrega=fecha_entrega,
+                    estado=estado_pendiente,
+                    monto_total=total_con_iva,
+                    descuento=float(descuento),
+                    aplicar_iva=aplicar_iva,
+                )
+                # Crear cada línea del pedido
                 for producto, cantidad, especificaciones in lineas:
-                    line_total = (producto.precio or Decimal("0")) * cantidad
-                    subtotal += line_total
-                    monto_total = line_total * iva_multiplier
-                    Pedido.objects.create(
-                        cliente=cliente,
+                    LineaPedido.objects.create(
+                        pedido=pedido,
                         producto=producto,
-                        fecha_entrega=fecha_entrega,
                         cantidad=cantidad,
                         especificaciones=especificaciones,
-                        monto_total=monto_total,
-                        estado=estado_pendiente,
+                        precio_unitario=producto.precio or Decimal("0")
                     )
 
-            total_con_iva = subtotal * iva_multiplier
             cant_lineas = len([f for f in formset if not f.cleaned_data.get('DELETE')
                               and f.cleaned_data.get('producto') and f.cleaned_data.get('cantidad')])
             if aplicar_iva:
                 messages.success(
-                    request, f"Se registraron {cant_lineas} productos. Subtotal: ${subtotal:.2f} | Total c/IVA (21%): ${total_con_iva:.2f}")
+                    request, f"Se registraron {cant_lineas} productos. Subtotal: ${subtotal:.2f} | Descuento: {descuento}% | Total c/IVA (21%): ${total_con_iva:.2f}")
             else:
-                messages.success(request, f"Se registraron {cant_lineas} productos. Subtotal: ${subtotal:.2f}")
+                messages.success(request, f"Se registraron {cant_lineas} productos. Subtotal: ${subtotal:.2f} | Descuento: {descuento}% | Total: ${subtotal_con_descuento:.2f}")
             return redirect("lista_pedidos")
         else:
             messages.error(request, "Revisá los datos del formulario")
@@ -305,7 +318,7 @@ def verificar_stock_modificar(request, idPedido: int):
     except Exception:
         return JsonResponse({"ok": False, "error": "JSON inválido"}, status=400)
 
-    pedido = get_object_or_404(Pedido.objects.select_related("producto"), pk=idPedido)
+    pedido = get_object_or_404(Pedido.objects.select_related("cliente", "estado", "orden_produccion"), pk=idPedido)
     producto_id = body.get("producto")
     cantidad = int(body.get("cantidad") or 0)
 
@@ -318,7 +331,8 @@ def verificar_stock_modificar(request, idPedido: int):
     except Producto.DoesNotExist:
         return JsonResponse({"ok": False, "error": "Producto inválido"}, status=400)
 
-    old_lineas = [(pedido.producto, pedido.cantidad)]
+    lineas_actuales = list(pedido.lineas.select_related('producto').all())
+    old_lineas = [(l.producto, l.cantidad) for l in lineas_actuales]
     new_lineas = [(prod, cantidad)]
     ok, faltantes = verificar_insumos_para_ajuste(old_lineas, new_lineas)
     if ok:
@@ -346,7 +360,7 @@ def buscar_pedido(request):
             cliente = form.cleaned_data["cliente"]
             cliente_context = cliente
             pedidos = (
-                Pedido.objects.select_related("producto", "estado")
+                Pedido.objects.select_related("cliente", "estado", "orden_produccion")
                 .filter(cliente=cliente)
                 .order_by("-id")
             )
@@ -362,35 +376,40 @@ def buscar_pedido(request):
 def detalle_pedido(request, pk: int):
     from django.shortcuts import get_object_or_404
 
-    pedido = get_object_or_404(Pedido.objects.select_related("cliente", "producto", "estado"), pk=pk)
-    # Calcular insumos requeridos según receta (si existe)
-    insumos_requeridos = []
-    try:
-        from productos.models import ProductoInsumo
-        receta = list(
-            ProductoInsumo.objects.filter(producto=pedido.producto).select_related("insumo")
-        )
-        for r in receta:
-            requerido = float(r.cantidad_por_unidad) * float(pedido.cantidad or 0)
-            stock = float(getattr(r.insumo, "stock", 0))
-            faltan = max(0.0, requerido - stock)
-            insumos_requeridos.append(
-                {
-                    "id": getattr(r.insumo, "idInsumo", None),
-                    "codigo": getattr(r.insumo, "codigo", "-"),
-                    "nombre": getattr(r.insumo, "nombre", "Insumo"),
-                    "requerido": requerido,
-                    "stock": stock,
-                    "faltan": faltan,
-                }
-            )
-    except Exception:
-        pass
-
+    pedido = get_object_or_404(Pedido.objects.select_related("cliente", "estado", "orden_produccion"), pk=pk)
+    lineas_qs = pedido.lineas.select_related("producto").all()
+    from decimal import Decimal
+    lineas = []
+    subtotal = Decimal("0")
+    for l in lineas_qs:
+        importe = l.precio_unitario * l.cantidad if l.precio_unitario is not None and l.cantidad is not None else Decimal("0")
+        subtotal += importe
+        lineas.append({
+            "producto": l.producto,
+            "cantidad": l.cantidad,
+            "especificaciones": l.especificaciones,
+            "precio_unitario": l.precio_unitario,
+            "importe": importe,
+        })
+    # Obtener descuento e IVA
+    descuento = Decimal(str(getattr(pedido, 'descuento', 0)))
+    aplicar_iva = getattr(pedido, 'aplicar_iva', False)
+    subtotal_con_descuento = subtotal * (Decimal("1") - descuento / Decimal("100")) if descuento else subtotal
+    iva_multiplier = Decimal("1.21") if aplicar_iva else Decimal("1")
+    monto_total = subtotal_con_descuento * iva_multiplier
     return render(
         request,
         "pedidos/detalle_pedido.html",
-        {"pedido": pedido, "insumos_requeridos": insumos_requeridos},
+        {
+            "pedido": pedido,
+            "lineas": lineas,
+            "subtotal": subtotal,
+            "descuento": descuento,
+            "subtotal_con_descuento": subtotal_con_descuento,
+            "aplicar_iva": aplicar_iva,
+            "iva_monto": (subtotal_con_descuento * Decimal("0.21")) if aplicar_iva else Decimal("0"),
+            "monto_total": monto_total,
+        },
     )
 
 
@@ -404,21 +423,24 @@ def modificar_pedido(request, idPedido: int):
     - Muestra mensajes de éxito o error.
     """
     from django.shortcuts import get_object_or_404
+    from .models import LineaPedido
 
-    pedido = get_object_or_404(Pedido.objects.select_related("cliente", "producto", "estado"), pk=idPedido)
+    pedido = get_object_or_404(Pedido.objects.select_related("cliente", "estado"), pk=idPedido)
 
     if request.method == "POST":
         form = ModificarPedidoForm(request.POST)
         if form.is_valid():
-            producto = form.cleaned_data["producto"]
-            estado = form.cleaned_data["estado"]
-            fecha_entrega = form.cleaned_data["fecha_entrega"]
-            cantidad = form.cleaned_data["cantidad"]
+            producto  = form.cleaned_data["producto"]
+            estado    = form.cleaned_data["estado"]
+            fecha_entrega   = form.cleaned_data["fecha_entrega"]
+            cantidad  = form.cleaned_data["cantidad"]
             especificaciones = form.cleaned_data["especificaciones"]
 
-            # Validación de insumos considerando el ajuste neto respecto al pedido anterior
-            old_lineas = [(pedido.producto, pedido.cantidad)]
+            # Líneas actuales para calcular ajuste neto de insumos
+            lineas_actuales = list(pedido.lineas.select_related('producto').all())
+            old_lineas = [(l.producto, l.cantidad) for l in lineas_actuales]
             new_lineas = [(producto, cantidad)]
+
             ok, faltantes = verificar_insumos_para_ajuste(old_lineas, new_lineas)
             if not ok:
                 if faltantes:
@@ -429,33 +451,34 @@ def modificar_pedido(request, idPedido: int):
                     except Exception:
                         info = {}
                     detalle = ", ".join([
-                        f"{info.get(iid, ('-', f'Insumo {iid}'))
-                           [0]} - {info.get(iid, ('-', f'Insumo {iid}'))[1]}: faltan {falt:.2f}"
+                        f"{info.get(iid, ('-',f'Insumo {iid}'))[0]} - "
+                        f"{info.get(iid, ('-',f'Insumo {iid}'))[1]}: faltan {falt:.2f}"
                         for iid, falt in faltantes.items()
                     ])
                     messages.error(request, f"No hay insumos suficientes: {detalle}")
                 else:
-                    messages.error(request, "No hay insumos suficientes para la cantidad solicitada.")
-                # Re-render con el mismo formulario y contexto
+                    messages.error(request, "No hay insumos suficientes.")
                 precios = {p.pk: float(p.precio) for p in Producto.objects.all()}
-                return render(
-                    request,
-                    "pedidos/modificar_pedido.html",
-                    {"form": form, "pedido": pedido, "precios": precios},
-                )
+                return render(request, "pedidos/modificar_pedido.html",
+                              {"form": form, "pedido": pedido, "precios": precios})
 
-            # Calcular monto total
             monto_total = (producto.precio or 0) * cantidad
 
-            # Ajustar stock por diferencia y persistir cambios de forma atómica
             with transaction.atomic():
                 ajustar_insumos_por_diferencia(old_lineas, new_lineas)
 
-                pedido.producto = producto
+                # Reemplazar líneas del pedido con la nueva única línea
+                pedido.lineas.all().delete()
+                LineaPedido.objects.create(
+                    pedido=pedido,
+                    producto=producto,
+                    cantidad=cantidad,
+                    especificaciones=especificaciones,
+                    precio_unitario=producto.precio or Decimal("0"),
+                )
+
                 pedido.estado = estado
                 pedido.fecha_entrega = fecha_entrega
-                pedido.cantidad = cantidad
-                pedido.especificaciones = especificaciones
                 pedido.monto_total = monto_total
                 pedido.save()
 
@@ -464,45 +487,44 @@ def modificar_pedido(request, idPedido: int):
         else:
             messages.error(request, "Revisá los datos del formulario")
     else:
-        form = ModificarPedidoForm(
-            initial={
-                "producto": pedido.producto,
-                "estado": pedido.estado,
-                "fecha_entrega": pedido.fecha_entrega,
-                "cantidad": pedido.cantidad,
-                "especificaciones": pedido.especificaciones,
-            }
-        )
+        # Precargar con datos de la primera línea si existe
+        primera_linea = pedido.lineas.select_related('producto').first()
+        form = ModificarPedidoForm(initial={
+            "producto":         primera_linea.producto       if primera_linea else None,
+            "estado":           pedido.estado,
+            "fecha_entrega":    pedido.fecha_entrega,
+            "cantidad":         primera_linea.cantidad       if primera_linea else None,
+            "especificaciones": primera_linea.especificaciones if primera_linea else "",
+        })
 
     precios = {p.pk: float(p.precio) for p in Producto.objects.all()}
-    return render(
-        request,
-        "pedidos/modificar_pedido.html",
-        {
-            "form": form,
-            "pedido": pedido,
-            "precios": precios,
-        },
-    )
+    return render(request, "pedidos/modificar_pedido.html",
+                  {"form": form, "pedido": pedido, "precios": precios})
 
 
 def eliminar_pedido(request, idPedido: int):
     """Eliminar Pedido con confirmación (POST). Visible para todos; el servidor valida permisos."""
     from django.shortcuts import get_object_or_404
 
-    pedido = get_object_or_404(Pedido.objects.select_related("producto"), pk=idPedido)
+    pedido = get_object_or_404(Pedido.objects.select_related("cliente", "estado", "orden_produccion"), pk=idPedido)
     if request.method == "POST":
         if not request.user.is_staff:
             messages.error(request, "No tenés permisos para eliminar pedidos.")
             return redirect("lista_pedidos")
         descripcion = f"Pedido {pedido.id} - {pedido.cliente}"
-        # Reponer stock por la diferencia (de estado actual a 'nada') si hay recetas
         from productos.models import ProductoInsumo
-        hay_receta = ProductoInsumo.objects.filter(producto=pedido.producto).exists()
+        # Obtener todas las líneas del pedido
+        lineas = list(pedido.lineas.select_related('producto').all())
+        # Verificar si alguna línea tiene receta definida
+        hay_receta = any(
+            ProductoInsumo.objects.filter(producto=linea.producto).exists()
+            for linea in lineas
+        )
         with transaction.atomic():
             if hay_receta:
-                # old_lineas: lo que consumió el pedido; new_lineas vacío => repone
-                ajustar_insumos_por_diferencia([(pedido.producto, pedido.cantidad)], [])
+                # Construir lista de tuplas (producto, cantidad) para reponer stock
+                old_lineas = [(linea.producto, linea.cantidad) for linea in lineas]
+                ajustar_insumos_por_diferencia(old_lineas, [])
             pedido.delete()
         messages.success(request, f"{descripcion} fue eliminado correctamente.")
         return redirect("lista_pedidos")

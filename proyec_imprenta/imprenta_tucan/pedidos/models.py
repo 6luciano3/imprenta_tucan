@@ -10,13 +10,13 @@ class EstadoPedido(models.Model):
 
 class Pedido(models.Model):
     cliente = models.ForeignKey('clientes.Cliente', on_delete=models.CASCADE)
-    producto = models.ForeignKey('productos.Producto', on_delete=models.CASCADE)
     fecha_pedido = models.DateField(auto_now_add=True)
     fecha_entrega = models.DateField()
-    cantidad = models.PositiveIntegerField()
-    especificaciones = models.TextField(blank=True, null=True)
     monto_total = models.DecimalField(max_digits=10, decimal_places=2)
     estado = models.ForeignKey(EstadoPedido, on_delete=models.CASCADE)
+    descuento = models.DecimalField(max_digits=5, decimal_places=2, default=0, help_text="Porcentaje de descuento aplicado al pedido")
+    aplicar_iva = models.BooleanField(default=False, help_text="Si se aplica IVA 21% al pedido")
+
 
     def __str__(self):
         return f"Pedido {self.id} - {self.cliente}"
@@ -24,12 +24,10 @@ class Pedido(models.Model):
     def save(self, *args, **kwargs):
         # Detectar cambio de estado a 'proceso' y descontar stock
         from .services import reservar_insumos_para_pedido
-        # Aplicar descuento automático si hay oferta aceptada para el cliente (próximo pedido)
         oferta_aceptada = None
         try:
             from automatizacion.models import OfertaPropuesta
             from decimal import Decimal
-            # Solo para nuevos pedidos
             if not self.pk:
                 oferta_aceptada = (
                     OfertaPropuesta.objects
@@ -48,7 +46,6 @@ class Pedido(models.Model):
             pass
         estado_proceso = None
         if not self.pk:
-            # Nuevo pedido, buscar el estado 'proceso' si existe
             from .models import EstadoPedido
             estado_proceso = EstadoPedido.objects.filter(nombre__iexact='proceso').first()
         else:
@@ -59,7 +56,6 @@ class Pedido(models.Model):
             if old_estado != 'proceso' and new_estado == 'proceso':
                 reservar_insumos_para_pedido(self)
         super().save(*args, **kwargs)
-        # Marcar oferta como aplicada luego de guardar (si corresponde)
         try:
             if oferta_aceptada:
                 oferta_aceptada.estado = 'aplicada'
@@ -69,6 +65,18 @@ class Pedido(models.Model):
                 oferta_aceptada.save()
         except Exception:
             pass
+
+
+# NUEVO: Soporte para múltiples productos por pedido
+class LineaPedido(models.Model):
+    pedido = models.ForeignKey(Pedido, on_delete=models.CASCADE, related_name='lineas')
+    producto = models.ForeignKey('productos.Producto', on_delete=models.CASCADE)
+    cantidad = models.PositiveIntegerField()
+    especificaciones = models.TextField(blank=True, null=True)
+    precio_unitario = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+
+    def __str__(self):
+        return f"{self.producto} x {self.cantidad} (Pedido {self.pedido_id})"
 
 
 class OrdenProduccion(models.Model):
