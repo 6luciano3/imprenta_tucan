@@ -318,7 +318,7 @@ def verificar_stock_modificar(request, idPedido: int):
     except Exception:
         return JsonResponse({"ok": False, "error": "JSON inválido"}, status=400)
 
-    pedido = get_object_or_404(Pedido.objects.select_related("cliente", "estado", "orden_produccion"), pk=idPedido)
+    pedido = get_object_or_404(Pedido.objects.select_related("cliente", "estado"), pk=idPedido)
     producto_id = body.get("producto")
     cantidad = int(body.get("cantidad") or 0)
 
@@ -360,7 +360,7 @@ def buscar_pedido(request):
             cliente = form.cleaned_data["cliente"]
             cliente_context = cliente
             pedidos = (
-                Pedido.objects.select_related("cliente", "estado", "orden_produccion")
+                Pedido.objects.select_related("cliente", "estado")
                 .filter(cliente=cliente)
                 .order_by("-id")
             )
@@ -376,7 +376,7 @@ def buscar_pedido(request):
 def detalle_pedido(request, pk: int):
     from django.shortcuts import get_object_or_404
 
-    pedido = get_object_or_404(Pedido.objects.select_related("cliente", "estado", "orden_produccion"), pk=pk)
+    pedido = get_object_or_404(Pedido.objects.select_related("cliente", "estado"), pk=pk)
     lineas_qs = pedido.lineas.select_related("producto").all()
     from decimal import Decimal
     lineas = []
@@ -533,7 +533,7 @@ def eliminar_pedido(request, idPedido: int):
     """Eliminar Pedido con confirmación (POST). Visible para todos; el servidor valida permisos."""
     from django.shortcuts import get_object_or_404
 
-    pedido = get_object_or_404(Pedido.objects.select_related("cliente", "estado", "orden_produccion"), pk=idPedido)
+    pedido = get_object_or_404(Pedido.objects.select_related("cliente", "estado"), pk=idPedido)
     if request.method == "POST":
         if not request.user.is_staff:
             messages.error(request, "No tenés permisos para eliminar pedidos.")
