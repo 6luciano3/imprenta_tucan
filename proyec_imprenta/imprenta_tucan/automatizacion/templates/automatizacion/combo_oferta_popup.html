@@ -1,0 +1,57 @@
+{% if not combos %}
+  <div class="flex flex-col items-center justify-center py-12 text-gray-400">
+    <span class="material-symbols-outlined text-5xl mb-3">loyalty</span>
+    <p class="text-sm">Este cliente no tiene combos generados aun.</p>
+  </div>
+{% else %}
+  {% for combo in combos %}
+  <div class="mb-8 last:mb-0">
+    <div class="flex items-start justify-between mb-3">
+      <div>
+        <h4 class="text-base font-bold text-gray-800">{{ combo.nombre }}</h4>
+        <p class="text-xs text-gray-500 mt-0.5">{{ combo.descripcion }}</p>
+      </div>
+      <span class="ml-3 shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold {% if combo.descuento >= 15 %}bg-green-100 text-green-700{% elif combo.descuento >= 10 %}bg-blue-100 text-blue-700{% else %}bg-gray-100 text-gray-600{% endif %}">
+        <span class="material-symbols-outlined text-xs">local_offer</span>
+        {{ combo.descuento }}% OFF
+      </span>
+    </div>
+    <div class="rounded-lg border border-gray-200 overflow-hidden mb-3">
+      <table class="w-full text-xs text-left">
+        <thead class="bg-blue-600 text-white">
+          <tr>
+            <th class="py-2 px-3 font-semibold">Producto</th>
+            <th class="py-2 px-3 font-semibold text-center">Cant.</th>
+            <th class="py-2 px-3 font-semibold text-right">P. Unit.</th>
+            <th class="py-2 px-3 font-semibold text-right">Subtotal</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in combo.items %}
+          <tr class="border-t border-gray-100 hover:bg-gray-50">
+            <td class="py-2 px-3 text-gray-700">{{ item.nombre }}</td>
+            <td class="py-2 px-3 text-center text-gray-600">{{ item.cantidad }}</td>
+            <td class="py-2 px-3 text-right text-gray-600">${{ item.precio_unitario|floatformat:0 }}</td>
+            <td class="py-2 px-3 text-right font-medium text-gray-800">${{ item.subtotal|floatformat:0 }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="bg-gray-50 rounded-lg px-4 py-3 space-y-1 text-xs">
+      <div class="flex justify-between text-gray-600"><span>Subtotal</span><span>${{ combo.subtotal|floatformat:0 }}</span></div>
+      <div class="flex justify-between text-red-600 font-semibold"><span>Descuento ({{ combo.descuento }}%)</span><span>-${{ combo.descuento_valor|floatformat:0 }}</span></div>
+      <div class="flex justify-between text-green-700 font-bold text-sm border-t border-gray-200 pt-1 mt-1"><span>Total Final</span><span>${{ combo.total_final|floatformat:0 }}</span></div>
+    </div>
+    <div class="mt-2 flex items-center gap-2 flex-wrap">
+      <span class="text-xs text-gray-500">Estado:</span>
+      {% if combo.aceptada %}<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-green-100 text-green-700 text-xs">Aceptado</span>
+      {% elif combo.rechazada %}<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-red-100 text-red-700 text-xs">Rechazado</span>
+      {% elif combo.enviada %}<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-blue-100 text-blue-700 text-xs">Enviado</span>
+      {% else %}<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-yellow-100 text-yellow-700 text-xs">Pendiente</span>{% endif %}
+      {% if combo.fecha_fin %}<span class="text-xs text-gray-400 ml-auto">Valido hasta {{ combo.fecha_fin|date:"d/m/Y" }}</span>{% endif %}
+    </div>
+  </div>
+  {% if not forloop.last %}<hr class="border-gray-200 my-6">{% endif %}
+  {% endfor %}
+{% endif %}

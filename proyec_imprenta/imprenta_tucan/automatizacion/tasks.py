@@ -263,131 +263,63 @@ def tarea_recalcular_scores_proveedores():
 
 @shared_task
 def tarea_generar_ofertas():
-    # Generar ofertas automáticas basadas en reglas parametrizables (JSON)
     try:
+        from automatizacion.views_combos import generar_combo_para_cliente
         now = timezone.now()
         periodo_conf = Parametro.get('RANKING_PERIODICIDAD', 'mensual')
-        if periodo_conf == 'trimestral':
-            q = (now.month - 1) // 3 + 1
-            periodo_str = f"{now.year}-Q{q}"
-        else:
-            periodo_str = now.strftime('%Y-%m')
-
-        # Reglas parametrizables (JSON): lista de objetos con 'condiciones' y 'accion'
+        periodo_str = now.strftime('%Y-%m') if periodo_conf != 'trimestral' else f"{now.year}-Q{(now.month-1)//3+1}"
         default_rules = [
-            {
-                'nombre': 'Descuento por alto desempeño',
-                'condiciones': {'score_gte': 80},
-                'accion': {
-                    'tipo': 'descuento',
-                    'titulo': 'Descuento por alto desempeño',
-                    'descripcion': 'Descuento del 10% en el próximo pedido.',
-                    'parametros': {'descuento': 10}
-                }
-            },
-            {
-                'nombre': 'Fidelización por caída',
-                'condiciones': {'decline_periods_gte': 2, 'decline_delta_lte': -10},
-                'accion': {
-                    'tipo': 'fidelizacion',
-                    'titulo': 'Oferta de fidelización',
-                    'descripcion': 'Condiciones de pago mejoradas (30 días sin intereses).',
-                    'parametros': {'dias_sin_interes': 30}
-                }
-            },
-            {
-                'nombre': 'Prioridad por criticidad',
-                'condiciones': {'crit_norm_gte': 0.7},
-                'accion': {
-                    'tipo': 'prioridad_stock',
-                    'titulo': 'Beneficio por consumo crítico',
-                    'descripcion': 'Prioridad en stock para insumos críticos.',
-                    'parametros': {'prioridad': 'alta'}
-                }
-            },
-            {
-                'nombre': 'Promoción por buen margen',
-                'condiciones': {'margen_norm_gte': 0.6},
-                'accion': {
-                    'tipo': 'promocion',
-                    'titulo': 'Promoción especial',
-                    'descripcion': 'Bonificación en servicios complementarios en el próximo pedido.',
-                    'parametros': {'bonificacion': 'servicio_complementario'}
-                }
-            }
+            {'nombre':'Alto desempeno','condiciones':{'score_gte':80},'accion':{'tipo':'descuento','titulo_prefijo':'Combo Premium','descripcion':'Descuento exclusivo por ser cliente de alto valor.','parametros':{'descuento':15}}},
+            {'nombre':'Fidelizacion','condiciones':{'decline_periods_gte':2,'decline_delta_lte':-10},'accion':{'tipo':'fidelizacion','titulo_prefijo':'Combo Fidelizacion','descripcion':'Condiciones especiales para retomar compras.','parametros':{'dias_sin_interes':30}}},
+            {'nombre':'Criticidad','condiciones':{'crit_norm_gte':0.7},'accion':{'tipo':'prioridad_stock','titulo_prefijo':'Combo Stock Prioritario','descripcion':'Reserva garantizada en insumos criticos.','parametros':{'prioridad':'alta'}}},
+            {'nombre':'Buen margen','condiciones':{'margen_norm_gte':0.6},'accion':{'tipo':'promocion','titulo_prefijo':'Combo Especial','descripcion':'Bonificacion en servicios complementarios.','parametros':{'bonificacion':'servicio_complementario'}}},
+            {'nombre':'Estandar','condiciones':{},'accion':{'tipo':'promocion','titulo_prefijo':'Combo Personalizado','descripcion':'Oferta segun tu historial de compras.','parametros':{}}},
         ]
-
         reglas = Parametro.get('OFERTAS_REGLAS_JSON', default_rules)
-
         generadas = 0
-        # Cache de históricos por cliente
         historicos_cliente = {}
-
         for rc in RankingCliente.objects.select_related('cliente').all():
             cliente = rc.cliente
-            # Métricas del período actual
-            rh_actual = RankingHistorico.objects.filter(cliente=cliente, periodo=periodo_str).first()
-            metricas = (rh_actual.metricas if rh_actual else {})
+            rh = RankingHistorico.objects.filter(cliente=cliente, periodo=periodo_str).first()
+            metricas = rh.metricas if rh else {}
             crit_norm = float(metricas.get('crit_norm', 0) or 0)
             margen_norm = float(metricas.get('margen_norm', 0) or 0)
-
-            # Métricas de caída consecutiva
             if cliente.id not in historicos_cliente:
-                historicos_cliente[cliente.id] = list(
-                    RankingHistorico.objects.filter(cliente=cliente).order_by('-generado')[:5]
-                )
+                historicos_cliente[cliente.id] = list(RankingHistorico.objects.filter(cliente=cliente).order_by('-generado')[:5])
             historicos = historicos_cliente[cliente.id]
-            decline_periods = 0
-            decline_delta = 0.0
+            decline_periods, decline_delta = 0, 0.0
             for i in range(1, len(historicos)):
                 delta = float(historicos[i-1].score) - float(historicos[i].score)
-                if delta < 0:
-                    # si el score actual es menor, cuenta caída
-                    decline_periods += 1
+                if delta < 0: decline_periods += 1
                 decline_delta = min(decline_delta, delta)
-
-            # Evaluar reglas
+            try:
+                combo = generar_combo_para_cliente(cliente)
+            except Exception:
+                combo = None
             for regla in reglas:
                 cond = regla.get('condiciones', {})
                 ok = True
-                if 'score_gte' in cond:
-                    ok = ok and (float(rc.score) >= float(cond['score_gte']))
-                if 'crit_norm_gte' in cond:
-                    ok = ok and (crit_norm >= float(cond['crit_norm_gte']))
-                if 'margen_norm_gte' in cond:
-                    ok = ok and (margen_norm >= float(cond['margen_norm_gte']))
-                if 'decline_periods_gte' in cond:
-                    ok = ok and (decline_periods >= int(cond['decline_periods_gte']))
-                if 'decline_delta_lte' in cond:
-                    ok = ok and (decline_delta <= float(cond['decline_delta_lte']))
-
-                if not ok:
-                    continue
-
+                if 'score_gte' in cond: ok = ok and float(rc.score) >= float(cond['score_gte'])
+                if 'crit_norm_gte' in cond: ok = ok and crit_norm >= float(cond['crit_norm_gte'])
+                if 'margen_norm_gte' in cond: ok = ok and margen_norm >= float(cond['margen_norm_gte'])
+                if 'decline_periods_gte' in cond: ok = ok and decline_periods >= int(cond['decline_periods_gte'])
+                if 'decline_delta_lte' in cond: ok = ok and decline_delta <= float(cond['decline_delta_lte'])
+                if not ok: continue
                 accion = regla.get('accion', {})
                 tipo = accion.get('tipo', 'promocion')
-                titulo = accion.get('titulo', 'Oferta personalizada')
-                descripcion = accion.get('descripcion', '')
-                params = accion.get('parametros', {})
-
-                OfertaPropuesta.objects.get_or_create(
-                    cliente=cliente,
-                    titulo=titulo,
-                    defaults={
-                        'descripcion': descripcion,
-                        'tipo': tipo,
-                        'estado': 'pendiente',
-                        'periodo': periodo_str,
-                        'score_al_generar': rc.score,
-                        'parametros': params,
-                    }
+                titulo_prefijo = accion.get('titulo_prefijo', 'Oferta personalizada')
+                titulo = f"{titulo_prefijo} - {combo.nombre}" if combo else titulo_prefijo
+                if OfertaPropuesta.objects.filter(cliente=cliente, tipo=tipo, periodo=periodo_str).exists(): continue
+                OfertaPropuesta.objects.create(
+                    cliente=cliente, titulo=titulo, descripcion=accion.get('descripcion',''),
+                    tipo=tipo, estado='pendiente', periodo=periodo_str,
+                    score_al_generar=rc.score, parametros=accion.get('parametros',{}),
                 )
                 generadas += 1
-
+                break
         return f"generar_ofertas: {generadas} propuestas generadas ({periodo_str})"
     except Exception as e:
         return f"generar_ofertas: error {e}"
-
 
 @shared_task
 def tarea_alertas_retraso():

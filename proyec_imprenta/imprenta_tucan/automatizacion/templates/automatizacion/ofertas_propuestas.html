@@ -140,7 +140,7 @@
                                 data-oferta-id="{{ o.id }}" data-oferta-title="{{ o.titulo }}" data-oferta-cliente="{{ o.cliente.nombre }} {{ o.cliente.apellido }}" title="Eliminar">
                                 <span class="material-symbols-outlined text-sm">delete</span>
                             </button>
-                            <button type="button" class="text-blue-600 hover:text-blue-800 flex items-center gap-1 ver-combos-btn" title="Ver combos de oferta" onclick="openCombosModal()">
+                            <button type="button" class="text-blue-600 hover:text-blue-800 flex items-center gap-1 ver-combos-btn" title="Ver combos de oferta" onclick="openCombosModal('{{ o.cliente.id }}')">
                                 <span class="material-symbols-outlined text-sm">visibility</span>
                             </button>
                         </div>
@@ -298,21 +298,24 @@
     })();
 
     // Modal combos-oferta
-    function openCombosModal() {
+    function openCombosModal(clienteId) {
         const combosModal = document.getElementById('combosModal');
         const combosContent = document.getElementById('combosModalContent');
+        if (!clienteId) {
+            combosContent.innerHTML = '<div class="text-center text-red-500 py-10">No se pudo identificar el cliente.</div>';
+            combosModal.classList.remove('hidden');
+            combosModal.classList.add('flex');
+            return;
+        }
         combosModal.classList.remove('hidden');
         combosModal.classList.add('flex');
-        combosContent.innerHTML = '<div class="text-center text-gray-500 py-10">Cargando combos de oferta...</div>';
-        fetch('/automatizacion/combos-oferta/?popup=1')
-            .then(resp => resp.text())
-            .then(html => {
-                combosContent.innerHTML = html;
-            })
-            .catch(() => {
-                combosContent.innerHTML = '<div class="text-center text-red-500 py-10">Error al cargar combos de oferta.</div>';
-            });
+        combosContent.innerHTML = '<div class="flex items-center justify-center py-10 text-gray-400"><span class="text-sm">Generando combo...</span></div>';
+        fetch('/automatizacion/combos-oferta/?popup=1&cliente_id=' + clienteId)
+            .then(resp => { if (!resp.ok) throw new Error('HTTP ' + resp.status); return resp.text(); })
+            .then(html => { combosContent.innerHTML = html; })
+            .catch(err => { combosContent.innerHTML = '<div class="text-center text-red-500 py-10">Error: ' + err.message + '</div>'; });
     }
+    
     function closeCombosModal() {
         const combosModal = document.getElementById('combosModal');
         combosModal.classList.add('hidden');
