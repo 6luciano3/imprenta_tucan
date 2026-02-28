@@ -3,20 +3,25 @@ from django.shortcuts import render
 from django.http import HttpResponseBadRequest
 from django.utils import timezone
 from datetime import timedelta
-from .propuestas.models import ComboOferta, ComboOfertaProducto
+from automatizacion.propuestas.models import ComboOferta, ComboOfertaProducto
 from productos.models import Producto
 from clientes.models import Cliente
-from pedidos.models import Pedido
 
 def _productos_mas_pedidos(cliente, top_n=5, ventana_dias=180):
     desde = timezone.now().date() - timedelta(days=ventana_dias)
-    pedidos = Pedido.objects.filter(cliente=cliente, fecha_pedido__gte=desde).select_related('producto').order_by('-fecha_pedido')
+    from pedidos.models import LineaPedido
+    lineas = (
+        LineaPedido.objects
+        .filter(pedido__cliente=cliente, pedido__fecha_pedido__gte=desde)
+        .select_related('producto')
+    )
     frecuencia = {}
-    for p in pedidos:
-        if p.producto_id not in frecuencia:
-            frecuencia[p.producto_id] = {'producto': p.producto, 'veces': 0, 'cantidad_total': 0}
-        frecuencia[p.producto_id]['veces'] += 1
-        frecuencia[p.producto_id]['cantidad_total'] += int(p.cantidad or 1)
+    for linea in lineas:
+        pid = linea.producto_id
+        if pid not in frecuencia:
+            frecuencia[pid] = {'producto': linea.producto, 'veces': 0, 'cantidad_total': 0}
+        frecuencia[pid]['veces'] += 1
+        frecuencia[pid]['cantidad_total'] += int(linea.cantidad or 1)
     return sorted(frecuencia.values(), key=lambda x: x['veces'], reverse=True)[:top_n]
 
 def _determinar_descuento(cliente):
@@ -40,7 +45,7 @@ def _armar_nombre_combo(productos_top):
 def generar_combo_para_cliente(cliente):
     productos_top = _productos_mas_pedidos(cliente)
     if not productos_top:
-        top_global = list(Producto.objects.order_by('-id')[:4])
+        top_global = list(Producto.objects.order_by('-idProducto')[:4])
         if not top_global: return None
         productos_top = [{'producto': p, 'veces': 1, 'cantidad_total': 2} for p in top_global]
     combo_existente = ComboOferta.objects.filter(cliente=cliente, fecha_inicio__gte=timezone.now() - timedelta(days=30)).order_by('-fecha_inicio').first()
