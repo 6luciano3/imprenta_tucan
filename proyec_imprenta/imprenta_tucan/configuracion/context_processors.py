@@ -85,3 +85,20 @@ def module_visibility(request) -> Dict[str, bool]:
     })
 
     return flags
+
+
+def empresa_context(request) -> dict:
+    """Expone los datos de la empresa en todos los templates."""
+    try:
+        from configuracion.models import Parametro
+        return {
+            'empresa_razon_social': Parametro.get('EMPRESA_RAZON_SOCIAL', 'Imprenta Tucan'),
+            'empresa_cuit':         Parametro.get('EMPRESA_CUIT', ''),
+            'empresa_domicilio':    Parametro.get('EMPRESA_DOMICILIO', ''),
+            'empresa_telefono':     Parametro.get('EMPRESA_TELEFONO', ''),
+            'empresa_email':        Parametro.get('EMPRESA_EMAIL', ''),
+            'empresa_email_contacto': Parametro.get('EMPRESA_EMAIL_CONTACTO', ''),
+            'empresa_condicion_iva':Parametro.get('EMPRESA_CONDICION_IVA', ''),
+        }
+    except Exception:
+        return {}

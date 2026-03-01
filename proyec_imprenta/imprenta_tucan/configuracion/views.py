@@ -421,3 +421,41 @@ def editar_reglas_ofertas(request):
         'saved': saved,
     }
     return render(request, 'configuracion/ofertas_reglas.html', context)
+
+
+def empresa_config(request):
+    from .models import Parametro, GrupoParametro
+    CAMPOS = [
+        ('EMPRESA_RAZON_SOCIAL', 'Raz?n Social'),
+        ('EMPRESA_CUIT',         'CUIT'),
+        ('EMPRESA_DOMICILIO',    'Domicilio'),
+        ('EMPRESA_TELEFONO',     'Tel?fono'),
+        ('EMPRESA_EMAIL',        'Email interno'),
+        ('EMPRESA_EMAIL_CONTACTO', 'Email p?blico de contacto'),
+        ('EMPRESA_CONDICION_IVA','Condici?n ante IVA'),
+    ]
+    if request.method == 'POST':
+        grupo, _ = GrupoParametro.objects.get_or_create(
+            codigo='EMPRESA',
+            defaults={'nombre': 'Datos de la Empresa'}
+        )
+        for codigo, nombre in CAMPOS:
+            valor = request.POST.get(codigo, '').strip()
+            if valor:
+                obj, created = Parametro.objects.get_or_create(
+                    codigo=codigo,
+                    defaults={'valor': valor, 'nombre': nombre, 'tipo': 'str', 'grupo': grupo}
+                )
+                if not created:
+                    obj.valor = valor
+                    obj.save()
+        from django.contrib import messages
+        messages.success(request, 'Datos de la empresa actualizados correctamente.')
+        from django.shortcuts import redirect
+        return redirect('empresa_config')
+
+    datos = {codigo: Parametro.get(codigo, '') for codigo, _ in CAMPOS}
+    from django.shortcuts import render
+    return render(request, 'configuracion/empresa_config.html', {
+        'datos': datos, 'campos': CAMPOS
+    })

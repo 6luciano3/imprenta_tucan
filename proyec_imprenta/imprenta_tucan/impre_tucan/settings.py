@@ -106,6 +106,7 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
                 'configuracion.context_processors.module_visibility',
+                    'configuracion.context_processors.empresa_context',
             ],
         },
     },

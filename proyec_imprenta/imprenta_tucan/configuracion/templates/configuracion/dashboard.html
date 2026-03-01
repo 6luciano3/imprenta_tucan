@@ -27,4 +27,12 @@
     <p class="text-gray-600 mb-4">Gestiona las recetas que vinculan productos, fórmulas e insumos.</p>
     <a href="{% url 'receta_producto_list' %}" class="px-4 py-2 bg-primary text-white rounded hover:bg-primary-dark transition">Ir a Recetas</a>
   </div>
+  <div class="bg-white rounded-xl shadow p-6 flex flex-col items-start mt-6">
+    <div class="flex items-center gap-3 mb-2">
+      <span class="material-symbols-outlined text-primary text-3xl">business</span>
+      <span class="text-lg font-semibold">Datos de la Empresa</span>
+    </div>
+    <p class="text-gray-600 mb-4">Edit? raz?n social, CUIT, domicilio, tel?fono y email de la empresa.</p>
+    <a href="{% url 'empresa_config' %}" class="px-4 py-2 bg-primary text-white rounded hover:bg-primary-dark transition">Editar Empresa</a>
+  </div>
 {% endblock %}

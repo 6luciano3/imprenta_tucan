@@ -1,0 +1,11 @@
+# Umbrales de scoring por categoria de cliente
+SCORE_PREMIUM = 90
+SCORE_ESTRATEGICO = 60
+SCORE_ESTANDAR = 30
+
+DESCUENTO_PREMIUM = 15
+DESCUENTO_ESTRATEGICO = 10
+DESCUENTO_ESTANDAR = 7
+DESCUENTO_NUEVO = 5
+
+SCORE_MINIMO = 10  # score floor para evitar ceros

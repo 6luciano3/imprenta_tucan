@@ -4,6 +4,7 @@ from . import views
 from .views_api import formula_validate_api
 
 urlpatterns = [
+    path('empresa/', views.empresa_config, name='empresa_config'),
     path('', views.configuracion_home, name='configuracion_home'),
     path('ofertas/reglas/', views.editar_reglas_ofertas, name='editar_reglas_ofertas'),
     path('unidades/', views.unidad_list, name='unidad_list'),
