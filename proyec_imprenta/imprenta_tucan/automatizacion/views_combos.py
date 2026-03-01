@@ -18,6 +18,7 @@ def _productos_mas_pedidos(cliente, top_n=5, ventana_dias=180):
     frecuencia = {}
     for linea in lineas:
         pid = linea.producto_id
+        pid = linea.producto.idProducto
         if pid not in frecuencia:
             frecuencia[pid] = {'producto': linea.producto, 'veces': 0, 'cantidad_total': 0}
         frecuencia[pid]['veces'] += 1
@@ -45,7 +46,23 @@ def _armar_nombre_combo(productos_top):
 def generar_combo_para_cliente(cliente):
     productos_top = _productos_mas_pedidos(cliente)
     if not productos_top:
-        top_global = list(Producto.objects.order_by('-idProducto')[:4])
+        # Productos distintos segun categoria del cliente
+        from automatizacion.models import RankingCliente
+        rc = RankingCliente.objects.filter(cliente=cliente).first()
+        score = float(rc.score) if rc else 0
+
+        if score >= 90:
+            ids = [5, 7, 24, 37]   # Premium: Catalogo 40p, Revista 48p, Libro Tapa Dura, Poster
+        elif score >= 60:
+            ids = [8, 17, 39, 31]  # Estrategico: Carpeta Corp, Calendario, Manual, Caja Grande
+        elif score >= 30:
+            ids = [1, 12, 15, 27]  # Estandar: Folleto A4, Tarjeta Premium, Afiche A2, Cuaderno
+        else:
+            ids = [11, 2, 28, 19]  # Nuevo: Tarjeta Color, Folleto A5, Etiquetas, Bloc A5
+
+        top_global = list(Producto.objects.filter(idProducto__in=ids, activo=True))
+        if not top_global:
+            top_global = list(Producto.objects.filter(activo=True).order_by('-idProducto')[:4])
         if not top_global: return None
         productos_top = [{'producto': p, 'veces': 1, 'cantidad_total': 2} for p in top_global]
     combo_existente = ComboOferta.objects.filter(cliente=cliente, fecha_inicio__gte=timezone.now() - timedelta(days=30)).order_by('-fecha_inicio').first()
@@ -67,7 +84,7 @@ def _serializar_combo(combo):
     items = []
     subtotal = 0.0
     for cop in combo.comboofertaproducto_set.select_related('producto').all():
-        precio = float(cop.producto.precioUnitario or 0)
+        precio = float(cop.precio_unitario if hasattr(cop, 'precio_unitario') and cop.precio_unitario else cop.producto.precioUnitario or 0)
         cant = int(cop.cantidad or 1)
         sub = precio * cant
         subtotal += sub

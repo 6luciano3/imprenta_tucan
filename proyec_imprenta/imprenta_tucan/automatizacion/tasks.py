@@ -263,60 +263,106 @@ def tarea_recalcular_scores_proveedores():
 
 @shared_task
 def tarea_generar_ofertas():
+    """
+    Genera UNA OfertaPropuesta por cliente segun su categoria de score:
+      Premium    (score >= 90): 15% descuento
+      Estrategico(60 <= score < 90): 10% descuento
+      Estandar   (30 <= score < 60):  7% descuento
+      Nuevo      (score < 30):         5% descuento
+    """
     try:
         from automatizacion.views_combos import generar_combo_para_cliente
+
         now = timezone.now()
         periodo_conf = Parametro.get('RANKING_PERIODICIDAD', 'mensual')
         periodo_str = now.strftime('%Y-%m') if periodo_conf != 'trimestral' else f"{now.year}-Q{(now.month-1)//3+1}"
-        default_rules = [
-            {'nombre':'Alto desempeno','condiciones':{'score_gte':80},'accion':{'tipo':'descuento','titulo_prefijo':'Combo Premium','descripcion':'Descuento exclusivo por ser cliente de alto valor.','parametros':{'descuento':15}}},
-            {'nombre':'Fidelizacion','condiciones':{'decline_periods_gte':2,'decline_delta_lte':-10},'accion':{'tipo':'fidelizacion','titulo_prefijo':'Combo Fidelizacion','descripcion':'Condiciones especiales para retomar compras.','parametros':{'dias_sin_interes':30}}},
-            {'nombre':'Criticidad','condiciones':{'crit_norm_gte':0.7},'accion':{'tipo':'prioridad_stock','titulo_prefijo':'Combo Stock Prioritario','descripcion':'Reserva garantizada en insumos criticos.','parametros':{'prioridad':'alta'}}},
-            {'nombre':'Buen margen','condiciones':{'margen_norm_gte':0.6},'accion':{'tipo':'promocion','titulo_prefijo':'Combo Especial','descripcion':'Bonificacion en servicios complementarios.','parametros':{'bonificacion':'servicio_complementario'}}},
-            {'nombre':'Estandar','condiciones':{},'accion':{'tipo':'promocion','titulo_prefijo':'Combo Personalizado','descripcion':'Oferta segun tu historial de compras.','parametros':{}}},
+
+        CATEGORIAS = [
+            {
+                'nombre': 'Premium',
+                'score_min': 90,
+                'score_max': None,
+                'tipo': 'descuento',
+                'descuento': 15,
+                'titulo_prefijo': 'Combo Premium',
+                'descripcion': 'Descuento exclusivo del 15% por ser nuestro cliente de mayor valor.',
+            },
+            {
+                'nombre': 'Estrategico',
+                'score_min': 60,
+                'score_max': 90,
+                'tipo': 'descuento',
+                'descuento': 10,
+                'titulo_prefijo': 'Combo Estrategico',
+                'descripcion': 'Descuento especial del 10% por tu volumen y fidelidad.',
+            },
+            {
+                'nombre': 'Estandar',
+                'score_min': 30,
+                'score_max': 60,
+                'tipo': 'promocion',
+                'descuento': 7,
+                'titulo_prefijo': 'Combo Estandar',
+                'descripcion': 'Promocion del 7% en tu proximo pedido.',
+            },
+            {
+                'nombre': 'Nuevo',
+                'score_min': None,
+                'score_max': 30,
+                'tipo': 'promocion',
+                'descuento': 5,
+                'titulo_prefijo': 'Combo Bienvenida',
+                'descripcion': 'Descuento de bienvenida del 5% en tu primer combo.',
+            },
         ]
-        reglas = Parametro.get('OFERTAS_REGLAS_JSON', default_rules)
+
         generadas = 0
-        historicos_cliente = {}
+
         for rc in RankingCliente.objects.select_related('cliente').all():
             cliente = rc.cliente
-            rh = RankingHistorico.objects.filter(cliente=cliente, periodo=periodo_str).first()
-            metricas = rh.metricas if rh else {}
-            crit_norm = float(metricas.get('crit_norm', 0) or 0)
-            margen_norm = float(metricas.get('margen_norm', 0) or 0)
-            if cliente.id not in historicos_cliente:
-                historicos_cliente[cliente.id] = list(RankingHistorico.objects.filter(cliente=cliente).order_by('-generado')[:5])
-            historicos = historicos_cliente[cliente.id]
-            decline_periods, decline_delta = 0, 0.0
-            for i in range(1, len(historicos)):
-                delta = float(historicos[i-1].score) - float(historicos[i].score)
-                if delta < 0: decline_periods += 1
-                decline_delta = min(decline_delta, delta)
+            score = float(rc.score or 0)
+
+            # Determinar categoria
+            categoria = None
+            for cat in CATEGORIAS:
+                min_ok = cat['score_min'] is None or score >= cat['score_min']
+                max_ok = cat['score_max'] is None or score < cat['score_max']
+                if min_ok and max_ok:
+                    categoria = cat
+                    break
+
+            if not categoria:
+                continue
+
+            # Evitar duplicado para este cliente/periodo/tipo
+            ya_existe = OfertaPropuesta.objects.filter(
+                cliente=cliente,
+                tipo=categoria['tipo'],
+                periodo=periodo_str,
+            ).exists()
+            if ya_existe:
+                continue
+
+            # Generar combo personalizado
             try:
                 combo = generar_combo_para_cliente(cliente)
             except Exception:
                 combo = None
-            for regla in reglas:
-                cond = regla.get('condiciones', {})
-                ok = True
-                if 'score_gte' in cond: ok = ok and float(rc.score) >= float(cond['score_gte'])
-                if 'crit_norm_gte' in cond: ok = ok and crit_norm >= float(cond['crit_norm_gte'])
-                if 'margen_norm_gte' in cond: ok = ok and margen_norm >= float(cond['margen_norm_gte'])
-                if 'decline_periods_gte' in cond: ok = ok and decline_periods >= int(cond['decline_periods_gte'])
-                if 'decline_delta_lte' in cond: ok = ok and decline_delta <= float(cond['decline_delta_lte'])
-                if not ok: continue
-                accion = regla.get('accion', {})
-                tipo = accion.get('tipo', 'promocion')
-                titulo_prefijo = accion.get('titulo_prefijo', 'Oferta personalizada')
-                titulo = f"{titulo_prefijo} - {combo.nombre}" if combo else titulo_prefijo
-                if OfertaPropuesta.objects.filter(cliente=cliente, tipo=tipo, periodo=periodo_str).exists(): continue
-                OfertaPropuesta.objects.create(
-                    cliente=cliente, titulo=titulo, descripcion=accion.get('descripcion',''),
-                    tipo=tipo, estado='pendiente', periodo=periodo_str,
-                    score_al_generar=rc.score, parametros=accion.get('parametros',{}),
-                )
-                generadas += 1
-                break
+
+            titulo = f"{categoria['titulo_prefijo']} - {combo.nombre}" if combo else categoria['titulo_prefijo']
+
+            OfertaPropuesta.objects.create(
+                cliente=cliente,
+                titulo=titulo,
+                descripcion=categoria['descripcion'],
+                tipo=categoria['tipo'],
+                estado='pendiente',
+                periodo=periodo_str,
+                score_al_generar=rc.score,
+                parametros={'descuento': categoria['descuento'], 'categoria': categoria['nombre']},
+            )
+            generadas += 1
+
         return f"generar_ofertas: {generadas} propuestas generadas ({periodo_str})"
     except Exception as e:
         return f"generar_ofertas: error {e}"
