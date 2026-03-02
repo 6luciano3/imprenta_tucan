@@ -1,89 +1,198 @@
 {% extends 'base.html' %}
-{% block title %}Auditoría{% endblock %}
+{% block title %}Auditoría del Sistema{% endblock %}
 {% block content %}
-<h1 class="text-2xl font-bold mb-4">Registros de Auditoría</h1>
+<div class="mb-6 flex items-center justify-between">
+  <div>
+    <h1 class="text-2xl font-bold text-gray-800 flex items-center gap-2">
+      <span class="material-symbols-outlined text-blue-600">fact_check</span>
+      Auditoría del Sistema
+    </h1>
+    <p class="text-sm text-gray-500 mt-1">Trazabilidad completa de todas las operaciones realizadas.</p>
+  </div>
+  <div class="flex gap-2">
+    <a href="{% url 'exportar_auditoria_csv' %}?{{ export_params }}" class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold">
+      <span class="material-symbols-outlined text-base">download</span> CSV
+    </a>
+    <a href="{% url 'exportar_auditoria_xlsx' %}?{{ export_params }}" class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold">
+      <span class="material-symbols-outlined text-base">table_chart</span> Excel
+    </a>
+  </div>
+</div>
 
-<form method="get" class="mb-6 flex flex-wrap gap-4 items-end bg-gray-50 p-4 rounded-lg shadow">
+<!-- KPI Cards -->
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+  <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4 flex items-center gap-3">
+    <div class="p-2 bg-blue-100 rounded-lg"><span class="material-symbols-outlined text-blue-600">list_alt</span></div>
     <div>
-        <label for="app" class="block text-xs font-semibold mb-1">App</label>
-        <input type="text" name="app" id="app" value="{{ request.GET.app }}" class="border rounded px-2 py-1 text-sm" placeholder="App">
+      <p class="text-xs text-gray-500 uppercase tracking-wide">Total</p>
+      <p class="text-2xl font-bold text-gray-800">{{ stats.total }}</p>
+    </div>
+  </div>
+  <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4 flex items-center gap-3">
+    <div class="p-2 bg-green-100 rounded-lg"><span class="material-symbols-outlined text-green-600">add_circle</span></div>
+    <div>
+      <p class="text-xs text-gray-500 uppercase tracking-wide">Creaciones</p>
+      <p class="text-2xl font-bold text-green-700">{{ stats.creates }}</p>
+    </div>
+  </div>
+  <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4 flex items-center gap-3">
+    <div class="p-2 bg-blue-100 rounded-lg"><span class="material-symbols-outlined text-blue-600">edit</span></div>
+    <div>
+      <p class="text-xs text-gray-500 uppercase tracking-wide">Actualizaciones</p>
+      <p class="text-2xl font-bold text-blue-700">{{ stats.updates }}</p>
+    </div>
+  </div>
+  <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4 flex items-center gap-3">
+    <div class="p-2 bg-red-100 rounded-lg"><span class="material-symbols-outlined text-red-600">delete</span></div>
+    <div>
+      <p class="text-xs text-gray-500 uppercase tracking-wide">Eliminaciones</p>
+      <p class="text-2xl font-bold text-red-700">{{ stats.deletes }}</p>
+    </div>
+  </div>
+</div>
+
+<!-- Filtros -->
+<form method="get" class="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-6">
+  <div class="flex items-center gap-2 mb-3">
+    <span class="material-symbols-outlined text-gray-400 text-base">filter_list</span>
+    <span class="text-sm font-semibold text-gray-600">Filtros</span>
+  </div>
+  <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3">
+    <div>
+      <label class="block text-xs font-medium text-gray-500 mb-1">Buscar registro</label>
+      <input type="text" name="buscar" value="{{ request.GET.buscar }}" placeholder="Nombre del objeto…" class="w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm focus:ring-2 focus:ring-blue-300 focus:outline-none">
     </div>
     <div>
-        <label for="modelo" class="block text-xs font-semibold mb-1">Modelo</label>
-        <input type="text" name="modelo" id="modelo" value="{{ request.GET.modelo }}" class="border rounded px-2 py-1 text-sm" placeholder="Modelo">
+      <label class="block text-xs font-medium text-gray-500 mb-1">App</label>
+      <input type="text" name="app" value="{{ request.GET.app }}" placeholder="ej: pedidos" class="w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm focus:ring-2 focus:ring-blue-300 focus:outline-none">
     </div>
     <div>
-        <label for="evento" class="block text-xs font-semibold mb-1">Evento</label>
-        <select name="evento" id="evento" class="border rounded px-2 py-1 text-sm">
-            <option value="">Todos</option>
-            <option value="create" {% if request.GET.evento == 'create' %}selected{% endif %}>Crear</option>
-            <option value="update" {% if request.GET.evento == 'update' %}selected{% endif %}>Actualizar</option>
-            <option value="delete" {% if request.GET.evento == 'delete' %}selected{% endif %}>Eliminar</option>
-        </select>
+      <label class="block text-xs font-medium text-gray-500 mb-1">Modelo</label>
+      <input type="text" name="modelo" value="{{ request.GET.modelo }}" placeholder="ej: Pedido" class="w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm focus:ring-2 focus:ring-blue-300 focus:outline-none">
     </div>
     <div>
-        <label for="usuario" class="block text-xs font-semibold mb-1">Usuario</label>
-        <input type="text" name="usuario" id="usuario" value="{{ request.GET.usuario }}" class="border rounded px-2 py-1 text-sm" placeholder="Usuario">
+      <label class="block text-xs font-medium text-gray-500 mb-1">Evento</label>
+      <select name="evento" class="w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm focus:ring-2 focus:ring-blue-300 focus:outline-none">
+        <option value="">Todos</option>
+        <option value="create" {% if request.GET.evento == 'create' %}selected{% endif %}>Crear</option>
+        <option value="update" {% if request.GET.evento == 'update' %}selected{% endif %}>Actualizar</option>
+        <option value="delete" {% if request.GET.evento == 'delete' %}selected{% endif %}>Eliminar</option>
+      </select>
     </div>
     <div>
-        <label for="fecha_desde" class="block text-xs font-semibold mb-1">Desde</label>
-        <input type="date" name="fecha_desde" id="fecha_desde" value="{{ request.GET.fecha_desde }}" class="border rounded px-2 py-1 text-sm">
+      <label class="block text-xs font-medium text-gray-500 mb-1">Categoría</label>
+      <select name="categoria" class="w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm focus:ring-2 focus:ring-blue-300 focus:outline-none">
+        <option value="">Todas</option>
+        <option value="stock-movement" {% if request.GET.categoria == 'stock-movement' %}selected{% endif %}>Stock</option>
+        <option value="pedidos" {% if request.GET.categoria == 'pedidos' %}selected{% endif %}>Pedidos</option>
+        <option value="automatizacion" {% if request.GET.categoria == 'automatizacion' %}selected{% endif %}>Automatización</option>
+        <option value="insumos" {% if request.GET.categoria == 'insumos' %}selected{% endif %}>Insumos</option>
+        <option value="productos" {% if request.GET.categoria == 'productos' %}selected{% endif %}>Productos</option>
+        <option value="proveedores" {% if request.GET.categoria == 'proveedores' %}selected{% endif %}>Proveedores</option>
+        <option value="clientes" {% if request.GET.categoria == 'clientes' %}selected{% endif %}>Clientes</option>
+        <option value="usuarios" {% if request.GET.categoria == 'usuarios' %}selected{% endif %}>Usuarios</option>
+        <option value="presupuestos" {% if request.GET.categoria == 'presupuestos' %}selected{% endif %}>Presupuestos</option>
+      </select>
     </div>
     <div>
-        <label for="fecha_hasta" class="block text-xs font-semibold mb-1">Hasta</label>
-        <input type="date" name="fecha_hasta" id="fecha_hasta" value="{{ request.GET.fecha_hasta }}" class="border rounded px-2 py-1 text-sm">
+      <label class="block text-xs font-medium text-gray-500 mb-1">Usuario (email)</label>
+      <input type="text" name="usuario" value="{{ request.GET.usuario }}" placeholder="email…" class="w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm focus:ring-2 focus:ring-blue-300 focus:outline-none">
     </div>
     <div>
-        <label for="categoria" class="block text-xs font-semibold mb-1">Categoría</label>
-        <select name="categoria" id="categoria" class="border rounded px-2 py-1 text-sm">
-            <option value="">Todas</option>
-            <option value="stock-movement" {% if request.GET.categoria == 'stock-movement' %}selected{% endif %}>Movimientos de stock</option>
-            <option value="pedidos" {% if request.GET.categoria == 'pedidos' %}selected{% endif %}>Pedidos</option>
-            <option value="automatizacion" {% if request.GET.categoria == 'automatizacion' %}selected{% endif %}>Automatización</option>
-            <option value="insumos" {% if request.GET.categoria == 'insumos' %}selected{% endif %}>Insumos</option>
-            <option value="productos" {% if request.GET.categoria == 'productos' %}selected{% endif %}>Productos</option>
-            <option value="proveedores" {% if request.GET.categoria == 'proveedores' %}selected{% endif %}>Proveedores</option>
-            <option value="clientes" {% if request.GET.categoria == 'clientes' %}selected{% endif %}>Clientes</option>
-            <option value="usuarios" {% if request.GET.categoria == 'usuarios' %}selected{% endif %}>Usuarios</option>
-            <option value="presupuestos" {% if request.GET.categoria == 'presupuestos' %}selected{% endif %}>Presupuestos</option>
-        </select>
+      <label class="block text-xs font-medium text-gray-500 mb-1">Desde</label>
+      <input type="date" name="fecha_desde" value="{{ request.GET.fecha_desde }}" class="w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm focus:ring-2 focus:ring-blue-300 focus:outline-none">
     </div>
-    <div class="flex gap-2 items-end">
-        <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 rounded">Buscar</button>
-        <a href="{% url 'lista_auditoria' %}" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold px-4 py-2 rounded inline-block">Limpiar</a>
-        <a href="{% url 'exportar_auditoria_csv' %}?{{ export_params }}" class="bg-green-600 hover:bg-green-700 text-white font-semibold px-4 py-2 rounded inline-block">Exportar CSV</a>
-        <a href="{% url 'exportar_auditoria_xlsx' %}?{{ export_params }}" class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-2 rounded inline-block">Exportar Excel</a>
+    <div>
+      <label class="block text-xs font-medium text-gray-500 mb-1">Hasta</label>
+      <input type="date" name="fecha_hasta" value="{{ request.GET.fecha_hasta }}" class="w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm focus:ring-2 focus:ring-blue-300 focus:outline-none">
     </div>
+    <div>
+      <label class="block text-xs font-medium text-gray-500 mb-1">ID Objeto</label>
+      <input type="text" name="object_id" value="{{ request.GET.object_id }}" placeholder="ej: 42" class="w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm focus:ring-2 focus:ring-blue-300 focus:outline-none">
+    </div>
+    <div>
+      <label class="block text-xs font-medium text-gray-500 mb-1">IP</label>
+      <input type="text" name="ip" value="{{ request.GET.ip }}" placeholder="ej: 192.168" class="w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm focus:ring-2 focus:ring-blue-300 focus:outline-none">
+    </div>
+  </div>
+  <div class="flex gap-2 mt-3">
+    <button type="submit" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold">
+      <span class="material-symbols-outlined text-base">search</span> Buscar
+    </button>
+    <a href="{% url 'lista_auditoria' %}" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-semibold">
+      <span class="material-symbols-outlined text-base">close</span> Limpiar
+    </a>
+  </div>
 </form>
-<table class="min-w-full border text-sm">
-    <thead class="bg-gray-100">
-        <tr>
-            <th class="px-2 py-1">ID</th>
-            <th class="px-2 py-1">App</th>
-            <th class="px-2 py-1">Modelo/Registro</th>
-            <th class="px-2 py-1">Evento</th>
-            <th class="px-2 py-1">Usuario</th>
-            <th class="px-2 py-1">Fecha</th>
-            <th class="px-2 py-1">Acciones</th>
-        </tr>
+
+<!-- Tabla -->
+<div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+  <table class="w-full text-sm text-left">
+    <thead class="bg-gray-50 border-b border-gray-200">
+      <tr>
+        <th class="px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide">Fecha</th>
+        <th class="px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide">Evento</th>
+        <th class="px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide">App / Modelo</th>
+        <th class="px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide">Registro</th>
+        <th class="px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide">Usuario</th>
+        <th class="px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide">IP</th>
+        <th class="px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide">Método</th>
+        <th class="px-4 py-3"></th>
+      </tr>
     </thead>
-    <tbody>
-        {% for a in auditorias %}
-        <tr>
-            <td class="px-2 py-1">{{ a.id }}</td>
-            <td class="px-2 py-1">{{ a.app_label }}</td>
-            <td class="px-2 py-1">{{ a.model }} / {{ a.object_repr|truncatechars:30 }}</td>
-            <td class="px-2 py-1">{{ a.get_action_display }}</td>
-            <td class="px-2 py-1">{{ a.user|default_if_none:"" }}</td>
-            <td class="px-2 py-1">{{ a.timestamp|date:'d/m/Y H:i' }}</td>
-            <td class="px-2 py-1 flex gap-2">
-                <a href="{% url 'ver_auditoria' a.id %}" class="text-blue-600 hover:underline">Ver</a>
-            </td>
-        </tr>
-        {% empty %}
-        <tr><td colspan="6" class="text-center py-4">No hay registros de auditoría.</td></tr>
-        {% endfor %}
+    <tbody class="divide-y divide-gray-100">
+      {% for a in auditorias %}
+      <tr class="hover:bg-gray-50 transition-colors">
+        <td class="px-4 py-3 text-gray-500 whitespace-nowrap text-xs">{{ a.timestamp|date:'d/m/Y H:i:s' }}</td>
+        <td class="px-4 py-3">
+          {% if a.action == 'create' %}
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700">
+              <span class="material-symbols-outlined text-xs">add_circle</span> Crear
+            </span>
+          {% elif a.action == 'update' %}
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">
+              <span class="material-symbols-outlined text-xs">edit</span> Actualizar
+            </span>
+          {% elif a.action == 'delete' %}
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700">
+              <span class="material-symbols-outlined text-xs">delete</span> Eliminar
+            </span>
+          {% else %}
+            <span class="text-xs text-gray-500">{{ a.action }}</span>
+          {% endif %}
+        </td>
+        <td class="px-4 py-3">
+          <span class="text-gray-400 text-xs">{{ a.app_label }}</span>
+          <span class="text-gray-400 text-xs">/</span>
+          <span class="font-medium text-gray-700">{{ a.model }}</span>
+          <span class="ml-1 text-xs text-gray-400">#{{ a.object_id }}</span>
+        </td>
+        <td class="px-4 py-3 text-gray-700 max-w-xs truncate" title="{{ a.object_repr }}">{{ a.object_repr|truncatechars:45 }}</td>
+        <td class="px-4 py-3 text-gray-600 text-xs">{{ a.user.email|default:"—" }}</td>
+        <td class="px-4 py-3 text-gray-400 text-xs font-mono">{{ a.ip_address|default:"—" }}</td>
+        <td class="px-4 py-3">
+          {% if a.method %}
+          <span class="text-xs font-mono px-1.5 py-0.5 rounded bg-gray-100 text-gray-600">{{ a.method }}</span>
+          {% else %}—{% endif %}
+        </td>
+        <td class="px-4 py-3 text-right">
+          <a href="{% url 'ver_auditoria' a.id %}" class="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 text-xs font-medium">
+            <span class="material-symbols-outlined text-sm">open_in_new</span> Ver
+          </a>
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="8" class="px-4 py-12 text-center">
+          <span class="material-symbols-outlined text-5xl text-gray-300 block mb-2">search_off</span>
+          <p class="text-gray-400">No hay registros que coincidan con los filtros.</p>
+        </td>
+      </tr>
+      {% endfor %}
     </tbody>
-</table>
-{% include 'layouts/pagination.html' with page_obj=auditorias %}
+  </table>
+</div>
+<div class="mt-4">
+  {% include 'layouts/pagination.html' with page_obj=auditorias %}
+</div>
 {% endblock %}

@@ -1,21 +1,179 @@
 {% extends 'base.html' %}
-{% block title %}Detalle Auditoría{% endblock %}
+{% block title %}Detalle de Auditoría #{{ auditoria.id }}{% endblock %}
 {% block content %}
-<div class="max-w-lg mx-auto mt-10 bg-white p-8 rounded shadow">
-    <h2 class="text-xl font-bold mb-4">Detalle de Auditoría</h2>
-    <table class="min-w-full border text-sm mb-6">
-        <tr><th class="text-left pr-4">ID</th><td>{{ auditoria.id }}</td></tr>
-        <tr><th class="text-left pr-4">Modelo</th><td>{{ auditoria.model }}</td></tr>
-        <tr><th class="text-left pr-4">Registro</th><td>{{ auditoria.object_repr }}</td></tr>
-        <tr><th class="text-left pr-4">Evento</th><td>{{ auditoria.get_action_display }}</td></tr>
-        <tr><th class="text-left pr-4">Usuario</th><td>{{ auditoria.user }}</td></tr>
-        <tr><th class="text-left pr-4">Fecha</th><td>{{ auditoria.timestamp|date:'d/m/Y H:i' }}</td></tr>
-        <tr><th class="text-left pr-4">IP</th><td>{{ auditoria.ip_address }}</td></tr>
-        <tr><th class="text-left pr-4">Ruta</th><td>{{ auditoria.path }}</td></tr>
-        <tr><th class="text-left pr-4">Método</th><td>{{ auditoria.method }}</td></tr>
-        <tr><th class="text-left pr-4">Cambios</th><td><pre class="whitespace-pre-wrap">{{ auditoria.changes }}</pre></td></tr>
-        <tr><th class="text-left pr-4">Extra</th><td><pre class="whitespace-pre-wrap">{{ auditoria.extra }}</pre></td></tr>
-    </table>
-    <a href="{% url 'lista_auditoria' %}" class="text-blue-600 hover:underline">&larr; Volver a la lista</a>
+
+<!-- Header -->
+<div class="flex items-start justify-between mb-6">
+  <div>
+    <a href="{% url 'lista_auditoria' %}" class="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800 mb-2">
+      <span class="material-symbols-outlined text-base">arrow_back</span> Volver a la lista
+    </a>
+    <h1 class="text-2xl font-bold text-gray-800 flex items-center gap-2">
+      <span class="material-symbols-outlined text-blue-600">fact_check</span>
+      Registro de Auditoría <span class="text-gray-400">#{{ auditoria.id }}</span>
+    </h1>
+  </div>
+  <div class="flex items-center gap-2">
+    {% if prev_entry %}
+    <a href="{% url 'ver_auditoria' prev_entry.pk %}" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-gray-300 hover:bg-gray-50 text-sm text-gray-600">
+      <span class="material-symbols-outlined text-base">chevron_left</span> Anterior
+    </a>
+    {% endif %}
+    {% if next_entry %}
+    <a href="{% url 'ver_auditoria' next_entry.pk %}" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-gray-300 hover:bg-gray-50 text-sm text-gray-600">
+      Siguiente <span class="material-symbols-outlined text-base">chevron_right</span>
+    </a>
+    {% endif %}
+    {% if request.user.is_staff %}
+    <a href="{% url 'eliminar_auditoria' auditoria.id %}" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 text-sm border border-red-200">
+      <span class="material-symbols-outlined text-base">delete</span> Eliminar
+    </a>
+    {% endif %}
+  </div>
 </div>
+
+<!-- Evento badge + timestamp -->
+<div class="flex items-center gap-3 mb-6">
+  {% if auditoria.action == 'create' %}
+    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold bg-green-100 text-green-700">
+      <span class="material-symbols-outlined text-base">add_circle</span> Creación
+    </span>
+  {% elif auditoria.action == 'update' %}
+    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold bg-blue-100 text-blue-700">
+      <span class="material-symbols-outlined text-base">edit</span> Actualización
+    </span>
+  {% elif auditoria.action == 'delete' %}
+    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold bg-red-100 text-red-700">
+      <span class="material-symbols-outlined text-base">delete</span> Eliminación
+    </span>
+  {% endif %}
+  <span class="text-gray-500 text-sm">{{ auditoria.timestamp|date:'d/m/Y \a\s H:i:s' }}</span>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+  <!-- Info Card -->
+  <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+    <h3 class="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-4 flex items-center gap-1.5">
+      <span class="material-symbols-outlined text-base">info</span> Información
+    </h3>
+    <dl class="space-y-3 text-sm">
+      <div class="flex justify-between">
+        <dt class="text-gray-500">App</dt>
+        <dd class="font-medium text-gray-800">{{ auditoria.app_label }}</dd>
+      </div>
+      <div class="flex justify-between">
+        <dt class="text-gray-500">Modelo</dt>
+        <dd class="font-medium text-gray-800">{{ auditoria.model }}</dd>
+      </div>
+      <div class="flex justify-between">
+        <dt class="text-gray-500">ID Objeto</dt>
+        <dd class="font-mono text-gray-700 bg-gray-100 px-1.5 py-0.5 rounded text-xs">{{ auditoria.object_id }}</dd>
+      </div>
+      <div class="border-t pt-3">
+        <dt class="text-gray-500 mb-1">Representación</dt>
+        <dd class="text-gray-700 text-xs bg-gray-50 rounded p-2 break-words">{{ auditoria.object_repr }}</dd>
+      </div>
+    </dl>
+  </div>
+
+  <!-- Request Card -->
+  <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+    <h3 class="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-4 flex items-center gap-1.5">
+      <span class="material-symbols-outlined text-base">person</span> Origen del cambio
+    </h3>
+    <dl class="space-y-3 text-sm">
+      <div>
+        <dt class="text-gray-500 text-xs mb-0.5">Usuario</dt>
+        <dd class="font-medium text-gray-800">{{ auditoria.user.email|default:"— (sistema)" }}</dd>
+      </div>
+      <div>
+        <dt class="text-gray-500 text-xs mb-0.5">IP</dt>
+        <dd class="font-mono text-gray-700">{{ auditoria.ip_address|default:"—" }}</dd>
+      </div>
+      <div>
+        <dt class="text-gray-500 text-xs mb-0.5">Método HTTP</dt>
+        <dd>
+          {% if auditoria.method %}
+          <span class="font-mono px-1.5 py-0.5 rounded bg-gray-100 text-gray-700 text-xs">{{ auditoria.method }}</span>
+          {% else %}—{% endif %}
+        </dd>
+      </div>
+      <div>
+        <dt class="text-gray-500 text-xs mb-0.5">Ruta</dt>
+        <dd class="font-mono text-xs text-gray-600 break-all">{{ auditoria.path|default:"—" }}</dd>
+      </div>
+    </dl>
+  </div>
+
+  <!-- Extra Card -->
+  <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+    <h3 class="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-4 flex items-center gap-1.5">
+      <span class="material-symbols-outlined text-base">data_object</span> Extra
+    </h3>
+    {% if extra_parsed %}
+    <dl class="space-y-2 text-sm">
+      {% for key, val in extra_parsed.items %}
+      <div class="flex gap-2 flex-wrap">
+        <dt class="text-gray-500 text-xs shrink-0">{{ key }}</dt>
+        <dd class="font-mono text-xs text-gray-700 bg-gray-50 px-1.5 py-0.5 rounded break-all">{{ val }}</dd>
+      </div>
+      {% endfor %}
+    </dl>
+    {% else %}
+    <p class="text-gray-400 text-sm">—</p>
+    {% endif %}
+  </div>
+
+</div>
+
+<!-- Cambios -->
+{% if changes_parsed %}
+<div class="mt-6 bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+  <h3 class="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-4 flex items-center gap-1.5">
+    <span class="material-symbols-outlined text-base">compare_arrows</span> Cambios detectados
+    <span class="ml-1 text-xs font-normal text-gray-400">({{ changes_parsed|length }} campo{{ changes_parsed|length|pluralize:",s" }})</span>
+  </h3>
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="border-b border-gray-200">
+          <th class="text-left py-2 px-3 text-xs font-semibold text-gray-500 uppercase w-1/4">Campo</th>
+          <th class="text-left py-2 px-3 text-xs font-semibold text-red-500 uppercase w-5/12">Antes</th>
+          <th class="text-left py-2 px-3 text-xs font-semibold text-green-600 uppercase w-5/12">Después</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-100">
+        {% for field, diff in changes_parsed.items %}
+        <tr class="hover:bg-gray-50">
+          <td class="py-2.5 px-3 font-mono text-xs text-gray-500 font-medium">{{ field }}</td>
+          <td class="py-2.5 px-3">
+            {% if diff.before is not None %}
+            <span class="inline-block font-mono text-xs bg-red-50 text-red-700 px-2 py-1 rounded border border-red-100 break-all">{{ diff.before }}</span>
+            {% else %}
+            <span class="text-gray-300 text-xs italic">vacío</span>
+            {% endif %}
+          </td>
+          <td class="py-2.5 px-3">
+            {% if diff.after is not None %}
+            <span class="inline-block font-mono text-xs bg-green-50 text-green-700 px-2 py-1 rounded border border-green-100 break-all">{{ diff.after }}</span>
+            {% else %}
+            <span class="text-gray-300 text-xs italic">vacío</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% elif auditoria.changes %}
+<div class="mt-6 bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+  <h3 class="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-3 flex items-center gap-1.5">
+    <span class="material-symbols-outlined text-base">difference</span> Cambios (raw)
+  </h3>
+  <pre class="bg-gray-50 rounded-lg p-4 text-xs font-mono text-gray-700 overflow-x-auto whitespace-pre-wrap">{{ auditoria.changes }}</pre>
+</div>
+{% endif %}
+
 {% endblock %}
