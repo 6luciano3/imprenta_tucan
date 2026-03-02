@@ -76,3 +76,275 @@ def enviar_oferta_email(oferta, request=None):
         return True, None
     except Exception as e:
         return False, str(e)
+
+
+def enviar_email_orden_compra_proveedor(orden_compra):
+    """
+    Envía un email al proveedor notificándole que se le asignó una nueva orden de compra,
+    con botones para confirmar o rechazar directamente desde el email (sin login).
+    Retorna (True, None) si se envió correctamente, o (False, mensaje_error) si falló.
+    """
+    proveedor = orden_compra.proveedor
+    if not proveedor or not proveedor.email:
+        return False, 'El proveedor no tiene email configurado'
+
+    # Asegurar que la orden tiene token generado
+    if not orden_compra.token_proveedor:
+        import uuid
+        orden_compra.token_proveedor = uuid.uuid4().hex
+        orden_compra.save(update_fields=['token_proveedor'])
+
+    insumo = orden_compra.insumo
+    from_email = getattr(settings, 'EMAIL_HOST_USER', getattr(settings, 'DEFAULT_FROM_EMAIL', 'no-reply@imprenta.local'))
+    from configuracion.models import Parametro
+    url_base = Parametro.get('SITE_URL', 'http://localhost:8000').rstrip('/')
+
+    token = orden_compra.token_proveedor
+    link_confirmar = f'{url_base}/proveedores/orden/{token}/confirmar/'
+    link_rechazar  = f'{url_base}/proveedores/orden/{token}/rechazar/'
+
+    nombre_insumo = getattr(insumo, 'nombreInsumo', None) or getattr(insumo, 'nombre', str(insumo))
+    cantidad      = orden_compra.cantidad
+    estado        = orden_compra.get_estado_display() if hasattr(orden_compra, 'get_estado_display') else orden_compra.estado
+    comentario    = orden_compra.comentario or '—'
+    fecha         = orden_compra.fecha_creacion.strftime('%d/%m/%Y %H:%M') if orden_compra.fecha_creacion else '—'
+
+    html_body = f'''<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><title>Nueva Orden de Compra - Imprenta Tucan</title></head>
+<body style="margin:0;padding:0;background:#f0f4f8;font-family:Segoe UI,Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f0f4f8;padding:32px 0;">
+  <tr><td align="center">
+  <table width="600" cellpadding="0" cellspacing="0"
+         style="background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.09);max-width:600px;width:100%;">
+
+    <!-- Encabezado -->
+    <tr><td style="background:linear-gradient(135deg,#1a3a5c,#1565c0);padding:36px 40px 28px;">
+      <div style="font-size:13px;font-weight:600;color:rgba(255,255,255,.7);letter-spacing:1px;text-transform:uppercase;margin-bottom:10px;">Imprenta Tucan</div>
+      <div style="font-family:Georgia,serif;font-size:26px;font-weight:700;color:#fff;line-height:1.2;margin-bottom:8px;">Nueva Orden de Compra</div>
+      <div style="font-size:13px;color:rgba(255,255,255,.65);">Se le solicita confirmar o rechazar la siguiente orden</div>
+    </td></tr>
+
+    <!-- Cuerpo -->
+    <tr><td style="padding:32px 40px;">
+      <p style="font-size:14px;color:#37474f;margin:0 0 20px;">
+        Estimado/a <strong>{proveedor.nombre}</strong>,
+      </p>
+      <p style="font-size:13px;color:#546e7a;margin:0 0 24px;line-height:1.6;">
+        <strong>Imprenta Tucan</strong> generó una orden de compra asignada a su empresa.
+        Por favor confirme o rechace la solicitud usando los botones al final de este correo.
+      </p>
+
+      <!-- Tabla de detalle -->
+      <table width="100%" cellpadding="0" cellspacing="0"
+             style="border-collapse:collapse;font-size:13px;margin-bottom:28px;border-radius:8px;overflow:hidden;border:1px solid #e3eaf2;">
+        <thead>
+          <tr style="background:#1565c0;color:#fff;">
+            <th style="padding:10px 14px;text-align:left;">Campo</th>
+            <th style="padding:10px 14px;text-align:left;">Detalle</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="background:#f8fafc;">
+            <td style="padding:10px 14px;font-weight:600;color:#37474f;border-bottom:1px solid #e8edf2;">Orden N°</td>
+            <td style="padding:10px 14px;color:#1a237e;font-weight:700;border-bottom:1px solid #e8edf2;">#{orden_compra.id}</td>
+          </tr>
+          <tr>
+            <td style="padding:10px 14px;font-weight:600;color:#37474f;border-bottom:1px solid #e8edf2;">Insumo solicitado</td>
+            <td style="padding:10px 14px;color:#37474f;border-bottom:1px solid #e8edf2;">{nombre_insumo}</td>
+          </tr>
+          <tr style="background:#f8fafc;">
+            <td style="padding:10px 14px;font-weight:600;color:#37474f;border-bottom:1px solid #e8edf2;">Cantidad</td>
+            <td style="padding:10px 14px;color:#37474f;border-bottom:1px solid #e8edf2;">{cantidad:,} unidades</td>
+          </tr>
+          <tr>
+            <td style="padding:10px 14px;font-weight:600;color:#37474f;border-bottom:1px solid #e8edf2;">Estado</td>
+            <td style="padding:10px 14px;border-bottom:1px solid #e8edf2;">
+              <span style="background:#fff3cd;color:#856404;font-weight:600;padding:3px 10px;border-radius:20px;font-size:12px;">{estado}</span>
+            </td>
+          </tr>
+          <tr style="background:#f8fafc;">
+            <td style="padding:10px 14px;font-weight:600;color:#37474f;border-bottom:1px solid #e8edf2;">Fecha de solicitud</td>
+            <td style="padding:10px 14px;color:#37474f;border-bottom:1px solid #e8edf2;">{fecha}</td>
+          </tr>
+          <tr>
+            <td style="padding:10px 14px;font-weight:600;color:#37474f;">Observaciones</td>
+            <td style="padding:10px 14px;color:#546e7a;">{comentario}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- Botones de acción -->
+      <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:20px;">
+        <tr>
+          <td align="center">
+            <a href="{link_confirmar}"
+               style="display:inline-block;background:#22c55e;color:#fff;font-size:14px;font-weight:700;padding:14px 36px;border-radius:8px;text-decoration:none;margin-right:12px;">
+              ✓ Confirmar orden
+            </a>
+            <a href="{link_rechazar}"
+               style="display:inline-block;background:#ef4444;color:#fff;font-size:14px;font-weight:700;padding:14px 36px;border-radius:8px;text-decoration:none;">
+              ✗ Rechazar orden
+            </a>
+          </td>
+        </tr>
+      </table>
+
+      <p style="font-size:12px;color:#90a4ae;text-align:center;margin:0;">
+        Estos botones son de uso exclusivo para su empresa. No los comparta.
+      </p>
+    </td></tr>
+
+    <!-- Pie -->
+    <tr><td style="background:#f8fafc;border-top:1px solid #e8edf2;padding:20px 40px;text-align:center;">
+      <p style="font-size:11px;color:#90a4ae;margin:0;">
+        Imprenta Tucan &mdash; {from_email}
+      </p>
+    </td></tr>
+
+  </table>
+  </td></tr>
+</table>
+</body>
+</html>'''
+
+    texto_plano = (
+        f"Nueva Orden de Compra - Imprenta Tucan\n\n"
+        f"Estimado/a {proveedor.nombre},\n\n"
+        f"Orden N°: #{orden_compra.id}\n"
+        f"Insumo: {nombre_insumo}\n"
+        f"Cantidad: {cantidad} unidades\n"
+        f"Estado: {estado}\n"
+        f"Fecha: {fecha}\n"
+        f"Observaciones: {comentario}\n\n"
+        f"Para CONFIRMAR la orden visite:\n{link_confirmar}\n\n"
+        f"Para RECHAZAR la orden visite:\n{link_rechazar}\n\n"
+        f"Imprenta Tucan"
+    )
+
+    try:
+        send_mail(
+            subject=f'Nueva Orden de Compra #{orden_compra.id} — Imprenta Tucan',
+            message=texto_plano,
+            from_email=from_email,
+            recipient_list=[proveedor.email],
+            fail_silently=False,
+            html_message=html_body,
+        )
+        return True, None
+    except Exception as e:
+        return False, str(e)
+
+    html_body = f'''<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><title>Nueva Orden de Compra - Imprenta Tucan</title></head>
+<body style="margin:0;padding:0;background:#f0f4f8;font-family:Segoe UI,Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f0f4f8;padding:32px 0;">
+  <tr><td align="center">
+  <table width="600" cellpadding="0" cellspacing="0"
+         style="background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.09);max-width:600px;width:100%;">
+
+    <!-- Encabezado -->
+    <tr><td style="background:linear-gradient(135deg,#1a3a5c,#1565c0);padding:36px 40px 28px;">
+      <div style="font-size:13px;font-weight:600;color:rgba(255,255,255,.7);letter-spacing:1px;text-transform:uppercase;margin-bottom:10px;">Imprenta Tucan</div>
+      <div style="font-family:Georgia,serif;font-size:26px;font-weight:700;color:#fff;line-height:1.2;margin-bottom:8px;">Nueva Orden de Compra</div>
+      <div style="font-size:13px;color:rgba(255,255,255,.65);">Le informamos que se generó una nueva solicitud de insumos</div>
+    </td></tr>
+
+    <!-- Cuerpo -->
+    <tr><td style="padding:32px 40px;">
+      <p style="font-size:14px;color:#37474f;margin:0 0 20px;">
+        Estimado/a <strong>{proveedor.nombre}</strong>,
+      </p>
+      <p style="font-size:13px;color:#546e7a;margin:0 0 24px;line-height:1.6;">
+        <strong>Imprenta Tucan</strong> generó una orden de compra asignada a su empresa.
+        A continuación los detalles:
+      </p>
+
+      <!-- Tabla de detalle -->
+      <table width="100%" cellpadding="0" cellspacing="0"
+             style="border-collapse:collapse;font-size:13px;margin-bottom:28px;">
+        <thead>
+          <tr style="background:#1565c0;color:#fff;">
+            <th style="padding:10px 14px;text-align:left;border-radius:6px 0 0 0;">Campo</th>
+            <th style="padding:10px 14px;text-align:left;border-radius:0 6px 0 0;">Detalle</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="background:#f8fafc;">
+            <td style="padding:10px 14px;font-weight:600;color:#37474f;border-bottom:1px solid #e8edf2;">Orden N°</td>
+            <td style="padding:10px 14px;color:#1a237e;font-weight:700;border-bottom:1px solid #e8edf2;">#{orden_compra.id}</td>
+          </tr>
+          <tr>
+            <td style="padding:10px 14px;font-weight:600;color:#37474f;border-bottom:1px solid #e8edf2;">Insumo solicitado</td>
+            <td style="padding:10px 14px;color:#37474f;border-bottom:1px solid #e8edf2;">{nombre_insumo}</td>
+          </tr>
+          <tr style="background:#f8fafc;">
+            <td style="padding:10px 14px;font-weight:600;color:#37474f;border-bottom:1px solid #e8edf2;">Cantidad</td>
+            <td style="padding:10px 14px;color:#37474f;border-bottom:1px solid #e8edf2;">{cantidad:,} unidades</td>
+          </tr>
+          <tr>
+            <td style="padding:10px 14px;font-weight:600;color:#37474f;border-bottom:1px solid #e8edf2;">Estado</td>
+            <td style="padding:10px 14px;border-bottom:1px solid #e8edf2;">
+              <span style="background:#fff3cd;color:#856404;font-weight:600;padding:3px 10px;border-radius:20px;font-size:12px;">{estado}</span>
+            </td>
+          </tr>
+          <tr style="background:#f8fafc;">
+            <td style="padding:10px 14px;font-weight:600;color:#37474f;border-bottom:1px solid #e8edf2;">Fecha de solicitud</td>
+            <td style="padding:10px 14px;color:#37474f;border-bottom:1px solid #e8edf2;">{fecha}</td>
+          </tr>
+          <tr>
+            <td style="padding:10px 14px;font-weight:600;color:#37474f;">Observaciones</td>
+            <td style="padding:10px 14px;color:#546e7a;">{comentario}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p style="font-size:13px;color:#546e7a;line-height:1.6;margin:0 0 8px;">
+        Por favor, confirme la disponibilidad del insumo respondiendo a este correo o
+        contactando a nuestro equipo de compras.
+      </p>
+      <p style="font-size:13px;color:#546e7a;line-height:1.6;margin:0;">
+        Agradecemos su atención y quedamos a su disposición.
+      </p>
+    </td></tr>
+
+    <!-- Pie -->
+    <tr><td style="background:#f8fafc;border-top:1px solid #e8edf2;padding:20px 40px;text-align:center;">
+      <p style="font-size:11px;color:#90a4ae;margin:0;">
+        Imprenta Tucan &mdash; {from_email}
+      </p>
+    </td></tr>
+
+  </table>
+  </td></tr>
+</table>
+</body>
+</html>'''
+
+    texto_plano = (
+        f"Nueva Orden de Compra - Imprenta Tucan\n\n"
+        f"Estimado/a {proveedor.nombre},\n\n"
+        f"Se generó una orden de compra asignada a su empresa:\n"
+        f"  Orden N°:          #{orden_compra.id}\n"
+        f"  Insumo solicitado: {nombre_insumo}\n"
+        f"  Cantidad:          {cantidad} unidades\n"
+        f"  Estado:            {estado}\n"
+        f"  Fecha:             {fecha}\n"
+        f"  Observaciones:     {comentario}\n\n"
+        f"Por favor confirme la disponibilidad respondiendo a este correo.\n\n"
+        f"Imprenta Tucan"
+    )
+
+    try:
+        send_mail(
+            subject=f'Nueva Orden de Compra #{orden_compra.id} — Imprenta Tucan',
+            message=texto_plano,
+            from_email=from_email,
+            recipient_list=[proveedor.email],
+            fail_silently=False,
+            html_message=html_body,
+        )
+        return True, None
+    except Exception as e:
+        return False, str(e)

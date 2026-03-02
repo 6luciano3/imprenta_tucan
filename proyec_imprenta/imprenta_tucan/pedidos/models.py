@@ -99,6 +99,14 @@ class OrdenCompra(models.Model):
         ('rechazada', 'Rechazada'),
     ], default='sugerida')
     comentario = models.TextField(blank=True)
+    # Token único para que el proveedor confirme/rechace sin necesidad de login
+    token_proveedor = models.CharField(max_length=64, blank=True, unique=True, null=True)
+
+    def save(self, *args, **kwargs):
+        if not self.token_proveedor:
+            import uuid
+            self.token_proveedor = uuid.uuid4().hex
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"Orden de compra {self.id} - {self.insumo} ({self.cantidad})"

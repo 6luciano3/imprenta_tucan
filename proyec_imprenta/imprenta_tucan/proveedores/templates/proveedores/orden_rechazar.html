@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rechazar Orden de Compra — Imprenta Tucan</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #f0f4f8; font-family: 'Segoe UI', Arial, sans-serif; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
+    .card { background: #fff; border-radius: 16px; box-shadow: 0 4px 24px rgba(0,0,0,.1); max-width: 540px; width: 100%; overflow: hidden; }
+    .header { background: linear-gradient(135deg, #7f1d1d, #ef4444); padding: 32px 36px; }
+    .header-logo { font-size: 12px; font-weight: 600; color: rgba(255,255,255,.65); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 8px; }
+    .header-title { font-family: Georgia, serif; font-size: 24px; font-weight: 700; color: #fff; }
+    .body { padding: 32px 36px; }
+    .saludo { font-size: 15px; color: #37474f; margin-bottom: 20px; }
+    .table-detalle { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 24px; border-radius: 8px; overflow: hidden; border: 1px solid #e3eaf2; }
+    .table-detalle th { background: #ef4444; color: #fff; padding: 10px 14px; text-align: left; }
+    .table-detalle td { padding: 10px 14px; border-bottom: 1px solid #e8edf2; color: #37474f; }
+    .table-detalle tr:last-child td { border-bottom: none; }
+    .table-detalle tr:nth-child(even) td { background: #fef2f2; }
+    .form-group { margin-bottom: 20px; }
+    label { display: block; font-size: 13px; font-weight: 600; color: #37474f; margin-bottom: 6px; }
+    textarea { width: 100%; border: 1px solid #d1d5db; border-radius: 8px; padding: 10px 12px; font-size: 13px; color: #37474f; resize: vertical; min-height: 80px; font-family: inherit; }
+    textarea:focus { outline: none; border-color: #ef4444; box-shadow: 0 0 0 3px rgba(239,68,68,.1); }
+    .btn-rechazar { display: block; width: 100%; background: #ef4444; color: #fff; font-size: 15px; font-weight: 700; padding: 14px; border-radius: 8px; border: none; cursor: pointer; text-align: center; }
+    .btn-rechazar:hover { background: #dc2626; }
+    .alert-ya-respondida { background: #e8edf2; border-left: 4px solid #90a4ae; border-radius: 8px; padding: 16px 20px; font-size: 13px; color: #546e7a; }
+    .footer { background: #f8fafc; border-top: 1px solid #e8edf2; padding: 16px 36px; text-align: center; font-size: 11px; color: #90a4ae; }
+    .volver { text-align: center; margin-top: 14px; font-size: 12px; }
+    .volver a { color: #22c55e; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="header">
+      <div class="header-logo">Imprenta Tucan</div>
+      <div class="header-title">Rechazar Orden de Compra</div>
+    </div>
+    <div class="body">
+
+      {% if ya_respondida %}
+        <div class="alert-ya-respondida">
+          Esta orden ya fue <strong>{{ orden.get_estado_display }}</strong> anteriormente. No se puede modificar.
+        </div>
+      {% else %}
+        <p class="saludo">Está por rechazar la siguiente orden. Puede indicar el motivo para que nuestro equipo lo tenga en cuenta:</p>
+
+        <table class="table-detalle">
+          <thead>
+            <tr><th>Campo</th><th>Detalle</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><strong>Orden N°</strong></td><td>#{{ orden.id }}</td></tr>
+            <tr><td><strong>Insumo solicitado</strong></td><td>{{ orden.insumo }}</td></tr>
+            <tr><td><strong>Cantidad</strong></td><td>{{ orden.cantidad }} unidades</td></tr>
+          </tbody>
+        </table>
+
+        <form method="post">
+          {% csrf_token %}
+          <div class="form-group">
+            <label for="motivo">Motivo del rechazo (opcional)</label>
+            <textarea id="motivo" name="motivo" placeholder="Ej: No tenemos stock disponible en este momento..."></textarea>
+          </div>
+          <button type="submit" class="btn-rechazar">✗ Rechazar esta orden</button>
+        </form>
+
+        <p class="volver">
+          ¿Puede cumplir con la orden?
+          <a href="{% url 'orden_compra_confirmar' orden.token_proveedor %}">Confirmarla aquí</a>.
+        </p>
+      {% endif %}
+
+    </div>
+    <div class="footer">Imprenta Tucan — Este enlace es de uso exclusivo para proveedores</div>
+  </div>
+</body>
+</html>

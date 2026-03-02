@@ -42,21 +42,25 @@ class ProveedorInteligenteService:
 
     @staticmethod
     def _cumplimiento(proveedor):
-        # Proxy: proporción de órdenes confirmadas sobre el total
+        # Proxy: proporción de órdenes confirmadas sobre el total.
+        # Sin historial → valor neutro (0.5) para no inflar artificialmente el score.
         ordenes = OrdenCompra.objects.filter(proveedor=proveedor)
-        if not ordenes:
-            return 1
+        total = ordenes.count()
+        if total == 0:
+            return 0.5
         confirmadas = ordenes.filter(estado='confirmada').count()
-        return confirmadas / ordenes.count()
+        return confirmadas / total
 
     @staticmethod
     def _incidencias(proveedor):
-        # Proxy: proporción de órdenes rechazadas sobre el total
+        # Proxy: proporción de órdenes rechazadas sobre el total.
+        # Sin historial → valor neutro (0.5) para no inflar artificialmente el score.
         ordenes = OrdenCompra.objects.filter(proveedor=proveedor)
-        if not ordenes:
-            return 0
+        total = ordenes.count()
+        if total == 0:
+            return 0.5
         rechazadas = ordenes.filter(estado='rechazada').count()
-        return rechazadas / ordenes.count()
+        return rechazadas / total
 
     @staticmethod
     def _disponibilidad(proveedor, insumo):

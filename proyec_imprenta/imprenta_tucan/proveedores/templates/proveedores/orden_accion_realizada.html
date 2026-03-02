@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Respuesta registrada — Imprenta Tucan</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #f0f4f8; font-family: 'Segoe UI', Arial, sans-serif; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
+    .card { background: #fff; border-radius: 16px; box-shadow: 0 4px 24px rgba(0,0,0,.1); max-width: 480px; width: 100%; overflow: hidden; text-align: center; }
+    .header-confirmada { background: linear-gradient(135deg, #14532d, #22c55e); padding: 40px 36px 32px; }
+    .header-rechazada  { background: linear-gradient(135deg, #7f1d1d, #ef4444); padding: 40px 36px 32px; }
+    .icono { font-size: 56px; margin-bottom: 12px; }
+    .header-title { font-family: Georgia, serif; font-size: 26px; font-weight: 700; color: #fff; }
+    .header-sub { font-size: 13px; color: rgba(255,255,255,.75); margin-top: 6px; }
+    .body { padding: 32px 36px; }
+    .mensaje { font-size: 14px; color: #37474f; line-height: 1.7; margin-bottom: 20px; }
+    .detalle { background: #f8fafc; border-radius: 10px; border: 1px solid #e3eaf2; padding: 16px 20px; font-size: 13px; color: #546e7a; text-align: left; }
+    .detalle strong { color: #37474f; }
+    .footer { background: #f8fafc; border-top: 1px solid #e8edf2; padding: 16px 36px; text-align: center; font-size: 11px; color: #90a4ae; }
+  </style>
+</head>
+<body>
+  <div class="card">
+
+    {% if accion == 'confirmada' %}
+      <div class="header-confirmada">
+        <div class="icono">✓</div>
+        <div class="header-title">¡Orden Confirmada!</div>
+        <div class="header-sub">Su respuesta fue registrada correctamente</div>
+      </div>
+    {% else %}
+      <div class="header-rechazada">
+        <div class="icono">✗</div>
+        <div class="header-title">Orden Rechazada</div>
+        <div class="header-sub">Su respuesta fue registrada correctamente</div>
+      </div>
+    {% endif %}
+
+    <div class="body">
+      {% if accion == 'confirmada' %}
+        <p class="mensaje">
+          Gracias, <strong>{{ proveedor.nombre }}</strong>. Hemos registrado su confirmación para la <strong>Orden #{{ orden.id }}</strong>.
+          Nuestro equipo de compras fue notificado y se pondrá en contacto a la brevedad.
+        </p>
+      {% else %}
+        <p class="mensaje">
+          Gracias por avisarnos, <strong>{{ proveedor.nombre }}</strong>. Su rechazo de la <strong>Orden #{{ orden.id }}</strong> fue registrado.
+          Nuestro equipo buscará un proveedor alternativo.
+          {% if motivo %}
+            <br><br>
+            <em>Motivo indicado: "{{ motivo }}"</em>
+          {% endif %}
+        </p>
+      {% endif %}
+
+      <div class="detalle">
+        <strong>Resumen:</strong><br>
+        Orden N°: #{{ orden.id }}<br>
+        Insumo: {{ orden.insumo }}<br>
+        Cantidad: {{ orden.cantidad }} unidades<br>
+        Estado final: <strong>{{ orden.get_estado_display }}</strong>
+      </div>
+    </div>
+
+    <div class="footer">Imprenta Tucan — Puede cerrar esta ventana</div>
+  </div>
+</body>
+</html>

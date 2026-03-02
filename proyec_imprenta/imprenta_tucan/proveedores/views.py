@@ -289,3 +289,57 @@ def buscar_proveedor(request):
     if params:
         url = f"{url}?{params}"
     return redirect(url)
+
+
+# =============================
+# Respuesta del proveedor a Orden de Compra (vía token, sin login)
+# =============================
+
+def orden_compra_confirmar(request, token):
+    """El proveedor confirma la orden haciendo clic en el link del email."""
+    from pedidos.models import OrdenCompra
+    orden = get_object_or_404(OrdenCompra, token_proveedor=token)
+
+    ya_respondida = orden.estado in ('confirmada', 'rechazada')
+
+    if request.method == 'POST' and not ya_respondida:
+        orden.estado = 'confirmada'
+        orden.comentario = (orden.comentario + '\n' if orden.comentario else '') + 'Confirmada por el proveedor vía email.'
+        orden.save()
+        return render(request, 'proveedores/orden_accion_realizada.html', {
+            'orden': orden,
+            'accion': 'confirmada',
+            'proveedor': orden.proveedor,
+        })
+
+    return render(request, 'proveedores/orden_confirmar.html', {
+        'orden': orden,
+        'proveedor': orden.proveedor,
+        'ya_respondida': ya_respondida,
+    })
+
+
+def orden_compra_rechazar(request, token):
+    """El proveedor rechaza la orden haciendo clic en el link del email."""
+    from pedidos.models import OrdenCompra
+    orden = get_object_or_404(OrdenCompra, token_proveedor=token)
+
+    ya_respondida = orden.estado in ('confirmada', 'rechazada')
+
+    if request.method == 'POST' and not ya_respondida:
+        motivo = request.POST.get('motivo', '').strip()
+        orden.estado = 'rechazada'
+        orden.comentario = (orden.comentario + '\n' if orden.comentario else '') + f'Rechazada por el proveedor vía email. Motivo: {motivo or "Sin motivo"}'
+        orden.save()
+        return render(request, 'proveedores/orden_accion_realizada.html', {
+            'orden': orden,
+            'accion': 'rechazada',
+            'proveedor': orden.proveedor,
+            'motivo': motivo,
+        })
+
+    return render(request, 'proveedores/orden_rechazar.html', {
+        'orden': orden,
+        'proveedor': orden.proveedor,
+        'ya_respondida': ya_respondida,
+    })

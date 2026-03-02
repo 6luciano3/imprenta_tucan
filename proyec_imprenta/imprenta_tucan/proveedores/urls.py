@@ -14,6 +14,9 @@ urlpatterns = [
     path('eliminar/<int:id>/', views.eliminar_proveedor, name='eliminar_proveedor'),
     path('activar/<int:id>/', views.activar_proveedor, name='activar_proveedor'),
     path('seed/', views.seed_proveedores_ui, name='seed_proveedores_ui'),
+    # Respuesta del proveedor a órdenes de compra (sin login)
+    path('orden/<str:token>/confirmar/', views.orden_compra_confirmar, name='orden_compra_confirmar'),
+    path('orden/<str:token>/rechazar/', views.orden_compra_rechazar, name='orden_compra_rechazar'),
     # Rubros
     path('alta/rubros/', views.lista_rubros, name='lista_rubros'),
     path('alta/rubros/crear/', views.crear_rubro, name='crear_rubro'),

@@ -195,6 +195,7 @@ class RankingClienteViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
 class ScoreProveedorViewSet(viewsets.ModelViewSet):
     queryset = ScoreProveedor.objects.all()
     serializer_class = ScoreProveedorSerializer
+    http_method_names = ['get', 'head', 'options']  # Solo lectura
 
     def get_queryset(self):
         qs = ScoreProveedor.objects.select_related('proveedor').all()

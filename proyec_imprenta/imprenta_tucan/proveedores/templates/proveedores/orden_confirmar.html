@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Confirmar Orden de Compra — Imprenta Tucan</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #f0f4f8; font-family: 'Segoe UI', Arial, sans-serif; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
+    .card { background: #fff; border-radius: 16px; box-shadow: 0 4px 24px rgba(0,0,0,.1); max-width: 540px; width: 100%; overflow: hidden; }
+    .header { background: linear-gradient(135deg, #1a3a5c, #1565c0); padding: 32px 36px; }
+    .header-logo { font-size: 12px; font-weight: 600; color: rgba(255,255,255,.65); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 8px; }
+    .header-title { font-family: Georgia, serif; font-size: 24px; font-weight: 700; color: #fff; }
+    .body { padding: 32px 36px; }
+    .saludo { font-size: 15px; color: #37474f; margin-bottom: 20px; }
+    .table-detalle { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 28px; border-radius: 8px; overflow: hidden; border: 1px solid #e3eaf2; }
+    .table-detalle th { background: #1565c0; color: #fff; padding: 10px 14px; text-align: left; }
+    .table-detalle td { padding: 10px 14px; border-bottom: 1px solid #e8edf2; color: #37474f; }
+    .table-detalle tr:last-child td { border-bottom: none; }
+    .table-detalle tr:nth-child(even) td { background: #f8fafc; }
+    .badge-sugerida { background: #fff3cd; color: #856404; font-weight: 600; padding: 3px 10px; border-radius: 20px; font-size: 12px; }
+    .btn-confirmar { display: block; width: 100%; background: #22c55e; color: #fff; font-size: 15px; font-weight: 700; padding: 14px; border-radius: 8px; border: none; cursor: pointer; text-align: center; margin-top: 8px; }
+    .btn-confirmar:hover { background: #16a34a; }
+    .alert-ya-respondida { background: #e8edf2; border-left: 4px solid #90a4ae; border-radius: 8px; padding: 16px 20px; font-size: 13px; color: #546e7a; }
+    .footer { background: #f8fafc; border-top: 1px solid #e8edf2; padding: 16px 36px; text-align: center; font-size: 11px; color: #90a4ae; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="header">
+      <div class="header-logo">Imprenta Tucan</div>
+      <div class="header-title">Confirmar Orden de Compra</div>
+    </div>
+    <div class="body">
+
+      {% if ya_respondida %}
+        <div class="alert-ya-respondida">
+          Esta orden ya fue <strong>{{ orden.get_estado_display }}</strong> anteriormente. No se puede modificar.
+        </div>
+      {% else %}
+        <p class="saludo">Estimado/a <strong>{{ proveedor.nombre }}</strong>, por favor revise los detalles de la orden antes de confirmar:</p>
+
+        <table class="table-detalle">
+          <thead>
+            <tr><th>Campo</th><th>Detalle</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><strong>Orden N°</strong></td><td>#{{ orden.id }}</td></tr>
+            <tr><td><strong>Insumo solicitado</strong></td><td>{{ orden.insumo }}</td></tr>
+            <tr><td><strong>Cantidad</strong></td><td>{{ orden.cantidad }} unidades</td></tr>
+            <tr><td><strong>Estado actual</strong></td><td><span class="badge-sugerida">{{ orden.get_estado_display }}</span></td></tr>
+            <tr><td><strong>Fecha</strong></td><td>{{ orden.fecha_creacion|date:"d/m/Y H:i" }}</td></tr>
+            {% if orden.comentario %}<tr><td><strong>Observaciones</strong></td><td>{{ orden.comentario }}</td></tr>{% endif %}
+          </tbody>
+        </table>
+
+        <form method="post">
+          {% csrf_token %}
+          <button type="submit" class="btn-confirmar">✓ Confirmar disponibilidad del insumo</button>
+        </form>
+
+        <p style="text-align:center;margin-top:14px;font-size:12px;color:#90a4ae;">
+          Si no puede cumplir con esta orden,
+          <a href="{% url 'orden_compra_rechazar' orden.token_proveedor %}" style="color:#ef4444;">rechácela aquí</a>.
+        </p>
+      {% endif %}
+
+    </div>
+    <div class="footer">Imprenta Tucan — Este enlace es de uso exclusivo para proveedores</div>
+  </div>
+</body>
+</html>

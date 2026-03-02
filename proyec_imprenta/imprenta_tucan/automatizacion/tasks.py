@@ -464,6 +464,12 @@ def tarea_automatizacion_presupuestos_ponderada():
                         consulta_stock=consulta,
                     )
                     propuestas_creadas += 1
+                    # 6) Notificar al proveedor por email
+                    try:
+                        from automatizacion.services import enviar_email_orden_compra_proveedor
+                        enviar_email_orden_compra_proveedor(oc)
+                    except Exception:
+                        pass
 
         # 6) Revisar insumos bajo stock mínimo global
         stock_minimo = int(Parametro.get('STOCK_MINIMO_GLOBAL', 10))
@@ -523,6 +529,12 @@ def tarea_automatizacion_presupuestos_ponderada():
                     consulta_stock=consulta,
                 )
                 propuestas_creadas += 1
+                # Notificar al proveedor por email
+                try:
+                    from automatizacion.services import enviar_email_orden_compra_proveedor
+                    enviar_email_orden_compra_proveedor(oc)
+                except Exception:
+                    pass
 
         # 7) Auto-aceptación según parámetros si hay respuesta disponible y el proveedor cumple umbral
         auto_aprobar = bool(Parametro.get('AUTO_APROBAR_PROPUESTAS', False))
