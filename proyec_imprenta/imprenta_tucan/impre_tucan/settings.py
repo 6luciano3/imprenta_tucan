@@ -71,7 +71,7 @@ INSTALLED_APPS = [
     'automatizacion',
     'dashboard',
     'rest_framework',
-    'anymail',
+    # 'anymail',  # desactivado - usando Gmail SMTP directo
 ]
 
 # Modelo de usuario personalizado
@@ -221,7 +221,7 @@ EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
-EMAIL_HOST_USER = '6luciano10@gmail.com'
+EMAIL_HOST_USER     = os.environ.get('EMAIL_HOST_USER', '6luciano10@gmail.com')
 EMAIL_HOST_PASSWORD = 'hpmybzczlzuksshb'  # Contraseña de aplicación de Google para envío real
 
 
