@@ -31,17 +31,17 @@
           <tr class="border-t border-gray-100 hover:bg-gray-50">
             <td class="py-2 px-3 text-gray-700">{{ item.nombre }}</td>
             <td class="py-2 px-3 text-center text-gray-600">{{ item.cantidad }}</td>
-            <td class="py-2 px-3 text-right text-gray-600">${{ item.precio_unitario|floatformat:0 }}</td>
-            <td class="py-2 px-3 text-right font-medium text-gray-800">${{ item.subtotal|floatformat:0 }}</td>
+            <td class="py-2 px-3 text-right text-gray-600">${{ item.precio_unitario }}</td>
+            <td class="py-2 px-3 text-right font-medium text-gray-800">${{ item.subtotal }}</td>
           </tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
     <div class="bg-gray-50 rounded-lg px-4 py-3 space-y-1 text-xs">
-      <div class="flex justify-between text-gray-600"><span>Subtotal</span><span>${{ combo.subtotal|floatformat:0 }}</span></div>
-      <div class="flex justify-between text-red-600 font-semibold"><span>Descuento ({{ combo.descuento }}%)</span><span>-${{ combo.descuento_valor|floatformat:0 }}</span></div>
-      <div class="flex justify-between text-green-700 font-bold text-sm border-t border-gray-200 pt-1 mt-1"><span>Total Final</span><span>${{ combo.total_final|floatformat:0 }}</span></div>
+      <div class="flex justify-between text-gray-600"><span>Subtotal</span><span>${{ combo.subtotal }}</span></div>
+      <div class="flex justify-between text-red-600 font-semibold"><span>Descuento ({{ combo.descuento }}%)</span><span>-${{ combo.descuento_valor }}</span></div>
+      <div class="flex justify-between text-green-700 font-bold text-sm border-t border-gray-200 pt-1 mt-1"><span>Total Final</span><span>${{ combo.total_final }}</span></div>
     </div>
     <div class="mt-2 flex items-center gap-2 flex-wrap">
       <span class="text-xs text-gray-500">Estado:</span>

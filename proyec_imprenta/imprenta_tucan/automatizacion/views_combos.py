@@ -37,6 +37,29 @@ def _determinar_descuento(cliente):
     elif score >= 30: return 7
     else: return 5
 
+def _cantidad_fallback(producto):
+    """Cantidad realista por tipo de producto cuando no hay historial de pedidos."""
+    nombre = (producto.nombreProducto or '').lower()
+    if 'catálogo' in nombre or 'catalogo' in nombre:
+        return 1000
+    if 'revista' in nombre:
+        return 2000
+    if 'calendario' in nombre:
+        return 50
+    if any(k in nombre for k in ('caja', 'etiqueta')):
+        return 200
+    if 'libro' in nombre:
+        return 500
+    if 'manual' in nombre:
+        return 50
+    if 'carpeta' in nombre:
+        return 100
+    if 'tarjeta' in nombre:
+        return 500
+    if any(k in nombre for k in ('folleto', 'afiche', 'poster', 'póster')):
+        return 100
+    return 100  # default razonable
+
 def _armar_nombre_combo(productos_top):
     if not productos_top: return 'Combo Personalizado'
     nombres = [p['producto'].nombreProducto for p in productos_top[:2]]
@@ -64,7 +87,7 @@ def generar_combo_para_cliente(cliente):
         if not top_global:
             top_global = list(Producto.objects.filter(activo=True).order_by('-idProducto')[:4])
         if not top_global: return None
-        productos_top = [{'producto': p, 'veces': 1, 'cantidad_total': 2} for p in top_global]
+        productos_top = [{'producto': p, 'veces': 1, 'cantidad_total': _cantidad_fallback(p)} for p in top_global]
     combo_existente = ComboOferta.objects.filter(cliente=cliente, fecha_inicio__gte=timezone.now() - timedelta(days=30)).order_by('-fecha_inicio').first()
     if combo_existente: return combo_existente
     combo = ComboOferta.objects.create(
@@ -80,6 +103,10 @@ def generar_combo_para_cliente(cliente):
         ComboOfertaProducto.objects.create(combo=combo, producto=info['producto'], cantidad=cant)
     return combo
 
+def _fmt_num(n):
+    """Formatea un número con separador de miles (punto), sin decimales."""
+    return f'{int(round(n)):,}'.replace(',', '.')
+
 def _serializar_combo(combo):
     items = []
     subtotal = 0.0
@@ -88,13 +115,23 @@ def _serializar_combo(combo):
         cant = int(cop.cantidad or 1)
         sub = precio * cant
         subtotal += sub
-        items.append({'nombre': cop.producto.nombreProducto, 'cantidad': cant, 'precio_unitario': precio, 'subtotal': sub})
+        items.append({
+            'nombre': cop.producto.nombreProducto,
+            'cantidad': _fmt_num(cant),
+            'precio_unitario': _fmt_num(precio),
+            'subtotal': _fmt_num(sub),
+        })
     descuento = float(combo.descuento or 0)
     descuento_valor = subtotal * descuento / 100
-    return {'nombre': combo.nombre, 'descripcion': combo.descripcion, 'descuento': descuento,
-            'items': items, 'subtotal': subtotal, 'descuento_valor': descuento_valor,
-            'total_final': subtotal - descuento_valor, 'aceptada': combo.aceptada,
-            'rechazada': combo.rechazada, 'enviada': combo.enviada, 'fecha_fin': combo.fecha_fin}
+    return {
+        'nombre': combo.nombre, 'descripcion': combo.descripcion, 'descuento': descuento,
+        'items': items,
+        'subtotal': _fmt_num(subtotal),
+        'descuento_valor': _fmt_num(descuento_valor),
+        'total_final': _fmt_num(subtotal - descuento_valor),
+        'aceptada': combo.aceptada, 'rechazada': combo.rechazada,
+        'enviada': combo.enviada, 'fecha_fin': combo.fecha_fin,
+    }
 
 def lista_combos_oferta(request):
     is_popup = request.GET.get('popup') == '1'
