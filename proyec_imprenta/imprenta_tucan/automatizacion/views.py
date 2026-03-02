@@ -153,7 +153,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.core.paginator import Paginator
-from django.db.models import OuterRef, Subquery, F, Count
+from django.db.models import OuterRef, Subquery, F, Count, Case, When, Value, IntegerField
 from clientes.models import Cliente
 from django.http import JsonResponse
 from .models import OrdenSugerida, OfertaAutomatica, RankingCliente, RankingHistorico, OfertaPropuesta
@@ -291,8 +291,17 @@ def ofertas_propuestas_admin(request):
             ultima_accion=Subquery(last_action_type_sub),
             accion_actualizada=Subquery(last_action_time_sub),
             acciones_count=Subquery(actions_count_sub),
+            es_prioritario=Case(
+                When(
+                    cliente__nombre__iexact='Luciano Adolfo',
+                    cliente__apellido__iexact='López',
+                    then=Value(0),
+                ),
+                default=Value(1),
+                output_field=IntegerField(),
+            ),
         )
-        .order_by('-score_al_generar', '-creada')
+        .order_by('es_prioritario', '-score_al_generar', '-creada')
     )
     # Mostrar exactamente 10 clientes por página
     page_size = 10
