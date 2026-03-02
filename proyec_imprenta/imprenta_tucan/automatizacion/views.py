@@ -464,6 +464,7 @@ def mensaje_callback(request):
     if request.method != 'POST':
         return JsonResponse({'ok': False, 'error': 'Método inválido'}, status=405)
     try:
+        import json
         payload = json.loads(request.body.decode('utf-8'))
     except Exception:
         return JsonResponse({'ok': False, 'error': 'JSON inválido'}, status=400)

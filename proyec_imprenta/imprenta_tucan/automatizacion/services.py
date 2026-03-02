@@ -8,7 +8,7 @@ def _html_tabla_combo(combo):
         precio = float(cop.producto.precioUnitario or 0)
         cant = int(cop.cantidad or 1)
         sub = precio * cant
-        filas += f'<tr><td style="padding:9px 12px;border-bottom:1px solid #e8edf2;">{cop.producto.nombreProducto}</td><td style="padding:9px 12px;text-align:center;">{cant}</td><td style="padding:9px 12px;text-align:right;"></td><td style="padding:9px 12px;text-align:right;font-weight:600;"></td></tr>'
+        filas += (f'<tr>' + f'<td style="padding:9px 12px;border-bottom:1px solid #e8edf2;">{cop.producto.nombreProducto}</td>' + f'<td style="padding:9px 12px;text-align:center;">{cant}</td>' + f'<td style="padding:9px 12px;text-align:right;">{precio:,.0f}</td>' + f'<td style="padding:9px 12px;text-align:right;font-weight:600;">{sub:,.0f}</td></tr>')
     subtotal = sum(float(c.producto.precioUnitario or 0)*int(c.cantidad or 1) for c in combo.comboofertaproducto_set.select_related('producto').all())
     descuento = float(combo.descuento or 0)
     descuento_valor = subtotal * descuento / 100
@@ -18,7 +18,11 @@ def enviar_oferta_email(oferta, request=None):
     if not oferta.cliente or not oferta.cliente.email:
         return False, 'Cliente sin email definido'
     cliente = oferta.cliente
-    url_base = request.build_absolute_uri('/')[:-1] if request else ''
+    if request:
+        url_base = request.build_absolute_uri('/')[:-1]
+    else:
+        from configuracion.models import Parametro
+        url_base = Parametro.get('SITE_URL', 'http://localhost:8000').rstrip('/')
     token = oferta.token_email or ''
     link_aceptar  = f'{url_base}/automatizacion/oferta/{token}/aceptar/'
     link_rechazar = f'{url_base}/automatizacion/oferta/{token}/rechazar/'
@@ -36,9 +40,9 @@ def enviar_oferta_email(oferta, request=None):
                   f'<thead><tr style="background:#1565c0;color:#fff;"><th style="padding:10px 12px;text-align:left;">Producto</th><th style="padding:10px 12px;text-align:center;">Cant.</th><th style="padding:10px 12px;text-align:right;">P.Unit.</th><th style="padding:10px 12px;text-align:right;">Subtotal</th></tr></thead>'
                   f'<tbody>{filas}</tbody></table>'
                   f'<div style="margin-top:14px;font-size:12px;">'
-                  f'<div style="display:flex;justify-content:space-between;color:#546e7a;margin-bottom:4px;"><span>Subtotal</span><span></span></div>'
-                  f'<div style="display:flex;justify-content:space-between;color:#c62828;font-weight:600;margin-bottom:4px;"><span>Descuento ({descuento:.0f}%)</span><span>-</span></div>'
-                  f'<div style="display:flex;justify-content:space-between;color:#2e7d32;font-weight:700;font-size:14px;padding-top:6px;border-top:1px solid #e3eaf2;"><span>Total Final</span><span></span></div>'
+                   f'<div style="display:flex;justify-content:space-between;color:#546e7a;margin-bottom:4px;"><span>Subtotal</span><span>${subtotal:,.0f}</span></div>'
+                   f'<div style="display:flex;justify-content:space-between;color:#c62828;font-weight:600;margin-bottom:4px;"><span>Descuento ({descuento:.0f}%)</span><span>-${desc_valor:,.0f}</span></div>'
+                   f'<div style="display:flex;justify-content:space-between;color:#2e7d32;font-weight:700;font-size:14px;padding-top:6px;border-top:1px solid #e3eaf2;"><span>Total Final</span><span>${total:,.0f}</span></div>'
                   f'</div></div>')
     else:
         bloque = f'<div style="background:#f0f4ff;border-left:4px solid #1565c0;border-radius:8px;padding:20px;margin-bottom:24px;"><div style="font-size:14px;font-weight:700;color:#1a237e;margin-bottom:8px;">{oferta.titulo}</div><div style="font-size:12px;color:#37474f;">{oferta.descripcion}</div></div>'
@@ -62,12 +66,12 @@ def enviar_oferta_email(oferta, request=None):
   <p style="text-align:center;margin-top:16px;"><a href="{link_ver}" style="font-size:12px;color:#1565c0;text-decoration:none;">Ver detalle completo</a></p>
 </td></tr>
 <tr><td style="background:#f8fafc;border-top:1px solid #e8edf2;padding:20px 40px;text-align:center;">
-  <p style="font-size:11px;color:#90a4ae;margin:0;">Imprenta Tucan - info@imprenta.com.ar</p>
+  <p style="font-size:11px;color:#90a4ae;margin:0;">Imprenta Tucan - {getattr(settings, "EMAIL_HOST_USER", "info@imprenta.com.ar")}</p>
 </td></tr>
 </table></td></tr></table>{pixel}</body></html>'''
     try:
         send_mail(subject=f'Tu oferta personalizada - {oferta.titulo}', message='',
-                  from_email=getattr(settings,'DEFAULT_FROM_EMAIL','no-reply@imprenta.local'),
+                  from_email=getattr(settings,'EMAIL_HOST_USER', getattr(settings,'DEFAULT_FROM_EMAIL','no-reply@imprenta.local')),
                   recipient_list=[cliente.email], fail_silently=False, html_message=html_body)
         return True, None
     except Exception as e:
