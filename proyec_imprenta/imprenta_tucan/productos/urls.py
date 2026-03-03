@@ -29,4 +29,10 @@ urlpatterns = [
     path('detalle/<int:idProducto>/', views.detalle_producto, name='detalle_producto'),
     path('calcular-consumo/<int:producto_id>/<int:cantidad>/', views.calcular_consumo, name='calcular_consumo_producto'),
     path('receta-insumos/<int:producto_id>/', views.receta_insumos, name='receta_insumos_producto'),
+    
+    # Gestión de recetas (ProductoInsumo)
+    path('<int:idProducto>/receta/', views.gestionar_receta, name='gestionar_receta'),
+    path('<int:idProducto>/receta/agregar/', views.agregar_insumo_receta, name='agregar_insumo_receta'),
+    path('receta/editar/<int:pk>/', views.editar_insumo_receta, name='editar_insumo_receta'),
+    path('receta/eliminar/<int:pk>/', views.eliminar_insumo_receta, name='eliminar_insumo_receta'),
 ]

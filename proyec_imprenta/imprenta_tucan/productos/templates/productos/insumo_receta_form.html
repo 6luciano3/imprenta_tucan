@@ -1,0 +1,91 @@
+{% extends 'base.html' %}
+{% load widget_tweaks %}
+{% block title %}{% if modo == 'agregar' %}Agregar Insumo{% else %}Editar Cantidad{% endif %} - {{ producto.nombreProducto }}{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto">
+  <h1 class="text-3xl font-black mb-6 flex items-center gap-2">
+    <span class="material-symbols-outlined text-3xl">
+      {% if modo == 'agregar' %}add_circle{% else %}edit{% endif %}
+    </span>
+    {% if modo == 'agregar' %}Agregar Insumo a la Receta{% else %}Editar Cantidad{% endif %}
+  </h1>
+
+  <div class="bg-gray-100 rounded-lg p-4 mb-6">
+    <p class="text-sm text-gray-700">
+      <span class="font-semibold">Producto:</span> {{ producto.nombreProducto }}
+      <span class="text-gray-500 ml-2">(ID: {{ producto.idProducto }})</span>
+    </p>
+  </div>
+
+  <form method="post" class="bg-white p-8 rounded-xl shadow space-y-6">
+    {% csrf_token %}
+
+    {% if form.non_field_errors %}
+    <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+      <p class="text-red-800 text-sm">{{ form.non_field_errors }}</p>
+    </div>
+    {% endif %}
+
+    <!-- Campo Insumo -->
+    <div class="space-y-2">
+      <label class="flex flex-col">
+        <span class="font-semibold mb-1 flex items-center gap-2">
+          <span class="material-symbols-outlined text-lg">inventory</span>
+          {{ form.insumo.label }}
+          <span class="text-red-500">*</span>
+        </span>
+        {{ form.insumo }}
+        {% if form.insumo.errors %}
+        <span class="text-red-600 text-sm mt-1">{{ form.insumo.errors.0 }}</span>
+        {% endif %}
+        {% if modo == 'editar' %}
+        <span class="text-xs text-gray-500 mt-1">El insumo no puede cambiarse al editar. Para usar otro insumo, elimina esta entrada y crea una nueva.</span>
+        {% endif %}
+      </label>
+    </div>
+
+    <!-- Campo Cantidad por Unidad -->
+    <div class="space-y-2">
+      <label class="flex flex-col">
+        <span class="font-semibold mb-1 flex items-center gap-2">
+          <span class="material-symbols-outlined text-lg">scale</span>
+          {{ form.cantidad_por_unidad.label }}
+          <span class="text-red-500">*</span>
+        </span>
+        {{ form.cantidad_por_unidad }}
+        {% if form.cantidad_por_unidad.errors %}
+        <span class="text-red-600 text-sm mt-1">{{ form.cantidad_por_unidad.errors.0 }}</span>
+        {% endif %}
+        <span class="text-xs text-gray-500 mt-1">
+          Indica cuánto de este insumo se requiere para producir <strong>1 unidad</strong> del producto.
+        </span>
+      </label>
+    </div>
+
+    <!-- Ejemplo informativo -->
+    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+      <div class="flex items-start gap-3">
+        <span class="material-symbols-outlined text-blue-600">lightbulb</span>
+        <div class="text-sm text-blue-900">
+          <p class="font-semibold mb-1">Ejemplo:</p>
+          <p>Si para imprimir 1 folleto se necesitan 2 pliegos de papel, debes ingresar <strong>2</strong> en cantidad por unidad.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Botones -->
+    <div class="flex justify-end gap-4 pt-4">
+      <a href="{% url 'gestionar_receta' producto.idProducto %}"
+         class="px-6 py-2 bg-gray-300 rounded-lg hover:bg-gray-400 transition">
+        Cancelar
+      </a>
+      <button type="submit"
+              class="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition flex items-center gap-2">
+        <span class="material-symbols-outlined">save</span>
+        {% if modo == 'agregar' %}Agregar{% else %}Guardar Cambios{% endif %}
+      </button>
+    </div>
+  </form>
+</div>
+{% endblock %}

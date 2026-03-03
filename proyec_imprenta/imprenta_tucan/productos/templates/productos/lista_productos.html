@@ -61,6 +61,12 @@
                   title="Ver detalle de insumos">
             <span class="material-symbols-outlined text-sm">list_alt</span>
           </button>
+          {% if can_productos_ver %}
+          <a href="{% url 'gestionar_receta' producto.idProducto %}"
+             class="text-purple-600 hover:text-purple-800 flex items-center gap-1" title="Gestionar Receta (Insumos)">
+            <span class="material-symbols-outlined text-sm">recipe_long</span>
+          </a>
+          {% endif %}
           {% if can_productos_editar %}
           <a href="{% url 'modificar_producto' producto.idProducto %}"
              class="text-amber-600 hover:text-amber-800 flex items-center gap-1" title="Modificar">

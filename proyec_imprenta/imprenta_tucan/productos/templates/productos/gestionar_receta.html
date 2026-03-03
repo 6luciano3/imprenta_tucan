@@ -1,0 +1,153 @@
+{% extends 'base.html' %}
+{% block title %}Receta - {{ producto.nombreProducto }}{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto">
+  <!-- Encabezado -->
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <h1 class="text-3xl font-black flex items-center gap-2">
+        <span class="material-symbols-outlined text-3xl">recipe_long</span>
+        Receta del Producto
+      </h1>
+      <p class="text-gray-600 mt-1">
+        <span class="font-semibold">{{ producto.nombreProducto }}</span> - Gestión de insumos requeridos
+      </p>
+    </div>
+    <a href="{% url 'lista_productos' %}"
+       class="flex items-center gap-2 bg-gray-300 hover:bg-gray-400 text-gray-800 px-4 py-2 rounded-lg shadow transition">
+      <span class="material-symbols-outlined">arrow_back</span>
+      Volver a Productos
+    </a>
+  </div>
+
+  <!-- Detalles del producto -->
+  <div class="bg-white shadow rounded-xl p-6 mb-6">
+    <h2 class="text-xl font-bold mb-3 flex items-center gap-2">
+      <span class="material-symbols-outlined">info</span>
+      Información del Producto
+    </h2>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+      <div>
+        <span class="text-gray-600">ID:</span>
+        <span class="font-semibold ml-2">{{ producto.idProducto }}</span>
+      </div>
+      <div>
+        <span class="text-gray-600">Precio Unitario:</span>
+        <span class="font-semibold ml-2">${{ producto.precioUnitario }}</span>
+      </div>
+      <div>
+        <span class="text-gray-600">Categoría:</span>
+        <span class="font-semibold ml-2">{{ producto.categoriaProducto|default:"-" }}</span>
+      </div>
+      <div>
+        <span class="text-gray-600">Tipo:</span>
+        <span class="font-semibold ml-2">{{ producto.tipoProducto|default:"-" }}</span>
+      </div>
+      <div>
+        <span class="text-gray-600">Unidad:</span>
+        <span class="font-semibold ml-2">{{ producto.unidadMedida|default:"-" }}</span>
+      </div>
+      <div>
+        <span class="text-gray-600">Estado:</span>
+        <span class="font-semibold ml-2 {% if producto.activo %}text-green-600{% else %}text-red-600{% endif %}">
+          {% if producto.activo %}Activo{% else %}Inactivo{% endif %}
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Lista de insumos (receta) -->
+  <div class="bg-white shadow rounded-xl overflow-hidden">
+    <div class="flex items-center justify-between px-6 py-4 border-b">
+      <h2 class="text-xl font-bold flex items-center gap-2">
+        <span class="material-symbols-outlined">list_alt</span>
+        Insumos Requeridos
+        <span class="text-sm font-normal text-gray-500">({{ receta|length }})</span>
+      </h2>
+      {% if can_productos_editar %}
+      <a href="{% url 'agregar_insumo_receta' producto.idProducto %}"
+         class="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg shadow transition">
+        <span class="material-symbols-outlined">add</span>
+        Agregar Insumo
+      </a>
+      {% endif %}
+    </div>
+
+    {% if receta %}
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-sm">
+        <thead class="bg-gray-100 text-gray-700">
+          <tr>
+            <th class="py-3 px-5">Código</th>
+            <th class="py-3 px-5">Nombre del Insumo</th>
+            <th class="py-3 px-5">Unidad</th>
+            <th class="py-3 px-5 text-right">Cantidad por Unidad</th>
+            <th class="py-3 px-5">Tipo</th>
+            <th class="py-3 px-5 text-center">Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in receta %}
+          <tr class="border-b hover:bg-gray-50">
+            <td class="py-3 px-5 font-medium">{{ item.insumo.codigo }}</td>
+            <td class="py-3 px-5">{{ item.insumo.nombre }}</td>
+            <td class="py-3 px-5">{{ item.insumo.unidadMedida|default:"-" }}</td>
+            <td class="py-3 px-5 text-right font-semibold">{{ item.cantidad_por_unidad }}</td>
+            <td class="py-3 px-5">
+              <span class="px-2 py-1 rounded text-xs font-medium
+                {% if item.insumo.tipoInsumo.nombreTipoInsumo == 'Papel' %}bg-blue-100 text-blue-700
+                {% elif item.insumo.tipoInsumo.nombreTipoInsumo == 'Tinta' %}bg-purple-100 text-purple-700
+                {% elif item.insumo.tipoInsumo.nombreTipoInsumo == 'Plancha' %}bg-yellow-100 text-yellow-700
+                {% else %}bg-gray-100 text-gray-700{% endif %}">
+                {{ item.insumo.tipoInsumo.nombreTipoInsumo|default:"Otro" }}
+              </span>
+            </td>
+            <td class="py-3 px-5 flex justify-center gap-3">
+              {% if can_productos_editar %}
+              <a href="{% url 'editar_insumo_receta' item.pk %}"
+                 class="text-amber-600 hover:text-amber-800 flex items-center gap-1" title="Editar cantidad">
+                <span class="material-symbols-outlined text-sm">edit</span>
+              </a>
+              {% endif %}
+              {% if can_productos_eliminar %}
+              <a href="{% url 'eliminar_insumo_receta' item.pk %}"
+                 class="text-red-600 hover:text-red-800 flex items-center gap-1" title="Eliminar">
+                <span class="material-symbols-outlined text-sm">delete</span>
+              </a>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="py-12 text-center text-gray-500">
+      <span class="material-symbols-outlined text-6xl mb-3 block opacity-30">inventory_2</span>
+      <p class="text-lg font-medium">No hay insumos en la receta</p>
+      <p class="text-sm mt-1">Agrega insumos para definir qué materiales se necesitan para producir este producto.</p>
+      {% if can_productos_editar %}
+      <a href="{% url 'agregar_insumo_receta' producto.idProducto %}"
+         class="inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg shadow transition mt-4">
+        <span class="material-symbols-outlined">add</span>
+        Agregar Primer Insumo
+      </a>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Ayuda -->
+  <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-6">
+    <div class="flex items-start gap-3">
+      <span class="material-symbols-outlined text-blue-600">info</span>
+      <div class="text-sm text-blue-900">
+        <p class="font-semibold mb-1">¿Cómo funciona la receta?</p>
+        <p>La receta define qué insumos y en qué cantidad se necesitan para producir <strong>1 unidad</strong> de este producto. 
+        Por ejemplo, si un folleto requiere 2 pliegos de papel, debes agregar el insumo "Papel A4" con cantidad 2.</p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

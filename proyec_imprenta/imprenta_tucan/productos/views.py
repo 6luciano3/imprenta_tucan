@@ -5,14 +5,15 @@ from django.contrib import messages
 from django.core.paginator import Paginator
 from django.views.decorators.clickjacking import xframe_options_sameorigin
 from django.urls import reverse
-from .models import Producto, CategoriaProducto, TipoProducto, UnidadMedida
+from .models import Producto, CategoriaProducto, TipoProducto, UnidadMedida, ProductoInsumo
 from .forms import (
     ProductoForm,
     CategoriaProductoForm,
     TipoProductoForm,
     UnidadMedidaForm,
+    ProductoInsumoForm,
 )
-from pedidos.models import Pedido
+from pedidos.models import Pedido, LineaPedido
 from pedidos.services import calcular_consumo_producto, verificar_stock_consumo
 from configuracion.permissions import require_perm
 
@@ -101,8 +102,8 @@ def editar_producto(request, idProducto):
 def eliminar_producto(request, idProducto):
     producto = get_object_or_404(Producto, idProducto=idProducto)
     if request.method == 'POST':
-        # Validar que no esté asociado a pedidos (consideramos cualquier pedido como bloqueo)
-        if Pedido.objects.filter(producto=producto).exists():
+        # Validar que no esté asociado a líneas de pedidos
+        if LineaPedido.objects.filter(producto=producto).exists():
             messages.error(request, 'No se puede eliminar: el producto está asociado a pedidos.')
             return redirect('lista_productos')
         producto.delete()
@@ -376,3 +377,90 @@ def receta_insumos(request, producto_id: int):
         return JsonResponse({'success': True, 'producto': producto.nombreProducto, 'insumos': items})
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=400)
+
+
+# =============================
+# GESTIÓN DE RECETAS (ProductoInsumo)
+# =============================
+
+@require_perm('Productos', 'Ver', redirect_to='lista_productos')
+def gestionar_receta(request, idProducto):
+    """Vista principal para gestionar la receta de un producto (lista de insumos requeridos)."""
+    producto = get_object_or_404(Producto, idProducto=idProducto)
+    receta = ProductoInsumo.objects.filter(producto=producto).select_related('insumo').order_by('insumo__nombre')
+    
+    context = {
+        'producto': producto,
+        'receta': receta,
+    }
+    return render(request, 'productos/gestionar_receta.html', context)
+
+
+@require_perm('Productos', 'Editar', redirect_to='lista_productos')
+def agregar_insumo_receta(request, idProducto):
+    """Agregar un insumo a la receta del producto."""
+    producto = get_object_or_404(Producto, idProducto=idProducto)
+    
+    if request.method == 'POST':
+        form = ProductoInsumoForm(request.POST, producto=producto)
+        if form.is_valid():
+            producto_insumo = form.save(commit=False)
+            producto_insumo.producto = producto
+            producto_insumo.save()
+            messages.success(request, f'Insumo "{producto_insumo.insumo.nombre}" agregado a la receta.')
+            return redirect('gestionar_receta', idProducto=producto.idProducto)
+    else:
+        form = ProductoInsumoForm(producto=producto)
+    
+    context = {
+        'form': form,
+        'producto': producto,
+        'modo': 'agregar',
+    }
+    return render(request, 'productos/insumo_receta_form.html', context)
+
+
+@require_perm('Productos', 'Editar', redirect_to='lista_productos')
+def editar_insumo_receta(request, pk):
+    """Editar la cantidad de un insumo en la receta."""
+    producto_insumo = get_object_or_404(ProductoInsumo, pk=pk)
+    producto = producto_insumo.producto
+    
+    if request.method == 'POST':
+        form = ProductoInsumoForm(request.POST, instance=producto_insumo, producto=producto)
+        if form.is_valid():
+            form.save()
+            messages.success(request, f'Cantidad de "{producto_insumo.insumo.nombre}" actualizada.')
+            return redirect('gestionar_receta', idProducto=producto.idProducto)
+    else:
+        form = ProductoInsumoForm(instance=producto_insumo, producto=producto)
+        # Permitir seleccionar el mismo insumo al editar
+        form.fields['insumo'].disabled = True
+    
+    context = {
+        'form': form,
+        'producto': producto,
+        'producto_insumo': producto_insumo,
+        'modo': 'editar',
+    }
+    return render(request, 'productos/insumo_receta_form.html', context)
+
+
+@require_perm('Productos', 'Eliminar', redirect_to='lista_productos')
+def eliminar_insumo_receta(request, pk):
+    """Eliminar un insumo de la receta del producto."""
+    producto_insumo = get_object_or_404(ProductoInsumo, pk=pk)
+    producto = producto_insumo.producto
+    
+    if request.method == 'POST':
+        insumo_nombre = producto_insumo.insumo.nombre
+        producto_insumo.delete()
+        messages.success(request, f'Insumo "{insumo_nombre}" eliminado de la receta.')
+        return redirect('gestionar_receta', idProducto=producto.idProducto)
+    
+    context = {
+        'producto': producto,
+        'producto_insumo': producto_insumo,
+    }
+    return render(request, 'productos/eliminar_insumo_receta.html', context)
+
