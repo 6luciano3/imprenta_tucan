@@ -1,5 +1,4 @@
 from django.shortcuts import render, redirect, get_object_or_404
-from settings_custom import MESSAGES, USER_STATES
 from django.contrib.auth import authenticate, login, logout
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required

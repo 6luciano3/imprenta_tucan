@@ -46,9 +46,6 @@ def calcular_consumo_pedido(pedido) -> dict:
 def reservar_insumos_para_pedido(pedido):
     from insumos.models import Insumo
     from pedidos.models import OrdenProduccion
-    from auditoria.models import AuditEntry
-    import json
-
     consumos = calcular_consumo_pedido(pedido)
     for insumo_id, cantidad in consumos.items():
         insumo = Insumo.objects.select_for_update().get(idInsumo=insumo_id)
@@ -59,25 +56,7 @@ def reservar_insumos_para_pedido(pedido):
         insumo.stock -= int(cantidad)
         insumo.save()
 
-        # Registrar movimiento en auditoria
-        AuditEntry.objects.create(
-            app_label="insumos",
-            model="Insumo",
-            object_id=str(insumo.idInsumo),
-            object_repr=str(insumo),
-            action=AuditEntry.ACTION_UPDATE,
-            changes=json.dumps({
-                "stock": [stock_anterior, insumo.stock],
-                "motivo": f"Pedido #{pedido.id} -> En Proceso",
-                "cantidad_consumida": float(cantidad),
-                "cliente": str(pedido.cliente),
-            }, ensure_ascii=False),
-            extra=json.dumps({
-                "pedido_id": pedido.id,
-                "insumo_codigo": insumo.codigo,
-                "insumo_nombre": insumo.nombre,
-            }, ensure_ascii=False),
-        )
+
 
     OrdenProduccion.objects.get_or_create(pedido=pedido)
 
