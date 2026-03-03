@@ -47,13 +47,13 @@ class Pedido(models.Model):
         estado_proceso = None
         if not self.pk:
             from .models import EstadoPedido
-            estado_proceso = EstadoPedido.objects.filter(nombre__iexact='proceso').first()
+            estado_proceso = EstadoPedido.objects.filter(nombre__icontains='proceso').first()
         else:
             old = type(self).objects.get(pk=self.pk)
-            estado_proceso = self.estado if self.estado.nombre.lower() == 'proceso' else None
+            estado_proceso = self.estado if 'proceso' in self.estado.nombre.lower() else None
             old_estado = old.estado.nombre.lower() if old.estado else None
             new_estado = self.estado.nombre.lower() if self.estado else None
-            if old_estado != 'proceso' and new_estado == 'proceso':
+            if 'proceso' not in old_estado and 'proceso' in new_estado:
                 reservar_insumos_para_pedido(self)
         super().save(*args, **kwargs)
         try:
