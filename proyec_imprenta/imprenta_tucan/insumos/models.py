@@ -24,6 +24,13 @@ from usuarios.models import Usuario
 
 
 class Insumo(models.Model):
+    TIPO_DIRECTO = 'directo'
+    TIPO_INDIRECTO = 'indirecto'
+    TIPO_CHOICES = [
+        (TIPO_DIRECTO, 'Directo'),
+        (TIPO_INDIRECTO, 'Indirecto'),
+    ]
+
     @property
     def cantidad_a_reponer(self):
         minimo = self.stock_minimo_sugerido
@@ -41,6 +48,12 @@ class Insumo(models.Model):
     stock = models.IntegerField(default=0)
     precio = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     activo = models.BooleanField(default=True)
+    tipo = models.CharField(
+        max_length=10,
+        choices=TIPO_CHOICES,
+        default=TIPO_DIRECTO,
+        help_text='Directo: se incorpora al producto. Indirecto: usado en el proceso pero no en el producto final.'
+    )
 
     @property
     def consumo_promedio_mensual(self):

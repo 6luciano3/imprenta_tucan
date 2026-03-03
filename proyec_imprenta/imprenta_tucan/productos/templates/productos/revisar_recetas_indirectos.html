@@ -1,0 +1,145 @@
+{% extends 'base.html' %}
+{% block title %}Auditoría de Insumos Indirectos - {{ producto.nombreProducto }}{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto">
+  <!-- Encabezado -->
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <h1 class="text-3xl font-black flex items-center gap-2">
+        <span class="material-symbols-outlined text-3xl text-orange-500">warning</span>
+        Auditoría de Insumos Indirectos
+      </h1>
+      <p class="text-gray-600 mt-1">
+        Producto: <span class="font-semibold">{{ producto.nombreProducto }}</span>
+      </p>
+    </div>
+    <a href="{% url 'gestionar_receta' producto.idProducto %}"
+       class="flex items-center gap-2 bg-gray-300 hover:bg-gray-400 text-gray-800 px-4 py-2 rounded-lg shadow transition">
+      <span class="material-symbols-outlined">arrow_back</span>
+      Volver a la Receta
+    </a>
+  </div>
+
+  <!-- Explicación -->
+  <div class="bg-orange-50 border border-orange-200 rounded-xl p-5 mb-6">
+    <div class="flex items-start gap-3">
+      <span class="material-symbols-outlined text-orange-500 text-2xl">info</span>
+      <div>
+        <p class="font-semibold text-orange-900 mb-1">¿Por qué eliminar insumos indirectos de la receta?</p>
+        <p class="text-sm text-orange-800">
+          Los <strong>insumos indirectos</strong> (solventes, trapos, aceites, embalaje, etc.) se usan en el proceso productivo
+          pero <strong>no se incorporan al producto final</strong> y no son trazables por unidad producida.
+          Incluirlos en la receta genera cálculos de consumo incorrectos al crear órdenes de producción.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  {% if indirectos %}
+  <form method="post">
+    {% csrf_token %}
+
+    <div class="bg-white shadow rounded-xl overflow-hidden mb-4">
+      <div class="flex items-center justify-between px-6 py-4 border-b bg-orange-50">
+        <h2 class="font-bold text-orange-800 flex items-center gap-2">
+          <span class="material-symbols-outlined">list_alt</span>
+          Insumos Indirectos encontrados en la receta
+          <span class="bg-orange-200 text-orange-900 text-xs font-bold px-2 py-1 rounded-full">{{ indirectos|length }}</span>
+        </h2>
+        <label class="flex items-center gap-2 text-sm font-medium cursor-pointer">
+          <input type="checkbox" id="selectAll" class="w-4 h-4 rounded"> Seleccionar todos
+        </label>
+      </div>
+
+      <table class="w-full text-left text-sm">
+        <thead class="bg-gray-100 text-gray-700">
+          <tr>
+            <th class="py-3 px-5 w-10"></th>
+            <th class="py-3 px-5">Código</th>
+            <th class="py-3 px-5">Nombre del Insumo</th>
+            <th class="py-3 px-5">Categoría</th>
+            <th class="py-3 px-5 text-right">Cantidad x Unidad</th>
+            <th class="py-3 px-5 text-center">Tipo</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in indirectos %}
+          <tr class="border-b hover:bg-red-50 bg-orange-50">
+            <td class="py-3 px-5">
+              <input type="checkbox" name="ids" value="{{ item.pk }}" class="item-check w-4 h-4 rounded">
+            </td>
+            <td class="py-3 px-5 font-medium">{{ item.insumo.codigo }}</td>
+            <td class="py-3 px-5">{{ item.insumo.nombre }}</td>
+            <td class="py-3 px-5 text-gray-500">{{ item.insumo.categoria|default:"-" }}</td>
+            <td class="py-3 px-5 text-right">{{ item.cantidad_por_unidad }}</td>
+            <td class="py-3 px-5 text-center">
+              <span class="px-2 py-1 rounded-full text-xs font-semibold bg-orange-100 text-orange-800">Indirecto</span>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Botones de acción -->
+    <div class="flex flex-wrap gap-3 justify-between items-center bg-white rounded-xl shadow p-4">
+      <p class="text-sm text-gray-600">
+        <span id="selectedCount" class="font-bold text-orange-700">0</span> insumo(s) seleccionado(s)
+      </p>
+      <div class="flex gap-3">
+        <button type="submit" name="eliminar_todos" value="1"
+                class="flex items-center gap-2 bg-red-700 hover:bg-red-800 text-white px-5 py-2 rounded-lg shadow transition"
+                onclick="return confirm('¿Eliminar TODOS los insumos indirectos de esta receta?')">
+          <span class="material-symbols-outlined">delete_sweep</span>
+          Eliminar Todos ({{ indirectos|length }})
+        </button>
+        <button type="submit" id="btnEliminarSeleccionados"
+                class="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-5 py-2 rounded-lg shadow transition disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled
+                onclick="return confirm('¿Eliminar los insumos indirectos seleccionados?')">
+          <span class="material-symbols-outlined">delete</span>
+          Eliminar Seleccionados
+        </button>
+      </div>
+    </div>
+  </form>
+
+  <script>
+    const selectAll = document.getElementById('selectAll');
+    const checks = document.querySelectorAll('.item-check');
+    const btnEliminar = document.getElementById('btnEliminarSeleccionados');
+    const countEl = document.getElementById('selectedCount');
+
+    function updateCount() {
+      const selected = document.querySelectorAll('.item-check:checked').length;
+      countEl.textContent = selected;
+      btnEliminar.disabled = selected === 0;
+    }
+
+    selectAll.addEventListener('change', function () {
+      checks.forEach(c => c.checked = this.checked);
+      updateCount();
+    });
+
+    checks.forEach(c => c.addEventListener('change', updateCount));
+  </script>
+
+  {% else %}
+  <!-- Sin indirectos: receta limpia -->
+  <div class="bg-white rounded-xl shadow p-12 text-center">
+    <span class="material-symbols-outlined text-6xl text-green-500 block mb-4">check_circle</span>
+    <h2 class="text-2xl font-bold text-green-700 mb-2">¡Receta limpia!</h2>
+    <p class="text-gray-600 mb-6">
+      No hay insumos indirectos en la receta de <strong>{{ producto.nombreProducto }}</strong>.
+      Todos los insumos se incorporan directamente al producto final.
+    </p>
+    <a href="{% url 'gestionar_receta' producto.idProducto %}"
+       class="inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg shadow transition">
+      <span class="material-symbols-outlined">arrow_back</span>
+      Volver a la Receta
+    </a>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

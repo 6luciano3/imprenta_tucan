@@ -7,7 +7,8 @@ class ProductoForm(forms.ModelForm):
     class Meta:
         model = Producto
         fields = ['nombreProducto', 'descripcion', 'precioUnitario',
-                  'categoriaProducto', 'tipoProducto', 'unidadMedida']
+                  'categoriaProducto', 'tipoProducto', 'unidadMedida',
+                  'formula', 'tinta_insumo', 'activo']
         widgets = {
             'nombreProducto': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Nombre del producto'}),
             'descripcion': forms.Textarea(attrs={'class': 'form-control', 'placeholder': 'Descripción (opcional)', 'rows': 3}),
@@ -15,6 +16,9 @@ class ProductoForm(forms.ModelForm):
             'categoriaProducto': forms.Select(attrs={'class': 'form-select'}),
             'tipoProducto': forms.Select(attrs={'class': 'form-select'}),
             'unidadMedida': forms.Select(attrs={'class': 'form-select'}),
+            'formula': forms.Select(attrs={'class': 'form-select'}),
+            'tinta_insumo': forms.Select(attrs={'class': 'form-select'}),
+            'activo': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
 
     def clean_precioUnitario(self):
@@ -87,13 +91,12 @@ class ProductoInsumoForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         
         # Si ya hay un insumo asignado, excluirlo de las opciones
+        from insumos.models import Insumo
         if producto:
             insumos_ya_usados = ProductoInsumo.objects.filter(producto=producto).values_list('insumo_id', flat=True)
-            from insumos.models import Insumo
-            self.fields['insumo'].queryset = Insumo.objects.exclude(idInsumo__in=insumos_ya_usados).order_by('nombre')
+            self.fields['insumo'].queryset = Insumo.objects.filter(tipo='directo').exclude(idInsumo__in=insumos_ya_usados).order_by('nombre')
         else:
-            from insumos.models import Insumo
-            self.fields['insumo'].queryset = Insumo.objects.all().order_by('nombre')
+            self.fields['insumo'].queryset = Insumo.objects.filter(tipo='directo').order_by('nombre')
     
     def clean_cantidad_por_unidad(self):
         cantidad = self.cleaned_data.get('cantidad_por_unidad')

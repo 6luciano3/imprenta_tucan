@@ -7,7 +7,7 @@
   <div class="flex items-center justify-between mb-6">
     <div>
       <h1 class="text-3xl font-black flex items-center gap-2">
-        <span class="material-symbols-outlined text-3xl">recipe_long</span>
+        <span class="material-symbols-outlined text-3xl">format_list_bulleted</span>
         Receta del Producto
       </h1>
       <p class="text-gray-600 mt-1">
@@ -65,13 +65,22 @@
         Insumos Requeridos
         <span class="text-sm font-normal text-gray-500">({{ receta|length }})</span>
       </h2>
-      {% if can_productos_editar %}
-      <a href="{% url 'agregar_insumo_receta' producto.idProducto %}"
-         class="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg shadow transition">
-        <span class="material-symbols-outlined">add</span>
-        Agregar Insumo
-      </a>
-      {% endif %}
+      <div class="flex gap-2">
+        {% if can_productos_editar %}
+        <a href="{% url 'revisar_recetas_indirectos' producto.idProducto %}"
+           class="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg shadow transition">
+          <span class="material-symbols-outlined">warning</span>
+          Auditar Indirectos
+        </a>
+        {% endif %}
+        {% if can_productos_editar %}
+        <a href="{% url 'agregar_insumo_receta' producto.idProducto %}"
+           class="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg shadow transition">
+          <span class="material-symbols-outlined">add</span>
+          Agregar Insumo
+        </a>
+        {% endif %}
+      </div>
     </div>
 
     {% if receta %}
@@ -83,25 +92,28 @@
             <th class="py-3 px-5">Nombre del Insumo</th>
             <th class="py-3 px-5">Unidad</th>
             <th class="py-3 px-5 text-right">Cantidad por Unidad</th>
-            <th class="py-3 px-5">Tipo</th>
+            <th class="py-3 px-5 text-center">Tipo</th>
             <th class="py-3 px-5 text-center">Acciones</th>
           </tr>
         </thead>
         <tbody>
           {% for item in receta %}
-          <tr class="border-b hover:bg-gray-50">
+          <tr class="border-b hover:bg-gray-50 {% if item.insumo.tipo == 'indirecto' %}bg-orange-50{% endif %}">
             <td class="py-3 px-5 font-medium">{{ item.insumo.codigo }}</td>
-            <td class="py-3 px-5">{{ item.insumo.nombre }}</td>
+            <td class="py-3 px-5">
+              {{ item.insumo.nombre }}
+              {% if item.insumo.tipo == 'indirecto' %}
+              <span class="ml-1 text-xs text-orange-600" title="Insumo indirecto: no se incorpora al producto final">⚠️</span>
+              {% endif %}
+            </td>
             <td class="py-3 px-5">{{ item.insumo.unidadMedida|default:"-" }}</td>
             <td class="py-3 px-5 text-right font-semibold">{{ item.cantidad_por_unidad }}</td>
-            <td class="py-3 px-5">
-              <span class="px-2 py-1 rounded text-xs font-medium
-                {% if item.insumo.tipoInsumo.nombreTipoInsumo == 'Papel' %}bg-blue-100 text-blue-700
-                {% elif item.insumo.tipoInsumo.nombreTipoInsumo == 'Tinta' %}bg-purple-100 text-purple-700
-                {% elif item.insumo.tipoInsumo.nombreTipoInsumo == 'Plancha' %}bg-yellow-100 text-yellow-700
-                {% else %}bg-gray-100 text-gray-700{% endif %}">
-                {{ item.insumo.tipoInsumo.nombreTipoInsumo|default:"Otro" }}
-              </span>
+            <td class="py-3 px-5 text-center">
+              {% if item.insumo.tipo == 'directo' %}
+                <span class="px-2 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">Directo</span>
+              {% else %}
+                <span class="px-2 py-1 rounded-full text-xs font-semibold bg-orange-100 text-orange-800">Indirecto</span>
+              {% endif %}
             </td>
             <td class="py-3 px-5 flex justify-center gap-3">
               {% if can_productos_editar %}

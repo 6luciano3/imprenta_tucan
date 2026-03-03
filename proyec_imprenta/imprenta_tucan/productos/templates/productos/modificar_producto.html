@@ -2,34 +2,70 @@
 {% block title %}Modificar Producto{% endblock %}
 {% block content %}
 <div class="max-w-4xl mx-auto">
-    <h1 class="text-4xl font-black mb-8">Modificar Producto: {{ producto.nombre }}</h1>
+  <h1 class="text-3xl font-black mb-8 flex items-center gap-2">
+    <span class="material-symbols-outlined text-3xl">edit</span>
+    Modificar Producto: {{ producto.nombreProducto }}
+  </h1>
 
-    <form method="post" class="space-y-8">
-        {% csrf_token %}
-        <section>
-            <h2 class="text-2xl font-bold mb-4 border-b pb-2">Datos Generales</h2>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {{ form.nombre }}
-                {{ form.categoria }}
-            </div>
-        </section>
+  <form method="post" class="bg-white p-8 rounded-xl shadow space-y-6">
+    {% csrf_token %}
 
-        <section>
-            <h2 class="text-2xl font-bold mb-4 border-b pb-2">Detalles</h2>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {{ form.precio }}
-                {{ form.stock }}
-            </div>
-        </section>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <label class="flex flex-col">
+        <span class="font-semibold mb-1">Nombre *</span>
+        {{ form.nombreProducto }}
+        {% if form.nombreProducto.errors %}<p class="text-red-500 text-sm mt-1">{{ form.nombreProducto.errors }}</p>{% endif %}
+      </label>
+      <label class="flex flex-col">
+        <span class="font-semibold mb-1">Precio Unitario *</span>
+        {{ form.precioUnitario }}
+        {% if form.precioUnitario.errors %}<p class="text-red-500 text-sm mt-1">{{ form.precioUnitario.errors }}</p>{% endif %}
+      </label>
+    </div>
 
-        <div class="flex justify-end gap-4 pt-4">
-            <a href="{% url 'lista_productos' %}" class="px-6 h-12 flex items-center justify-center rounded-lg bg-gray-light text-text-light font-bold hover:bg-gray-dark">
-                Cancelar
-            </a>
-            <button type="submit" class="px-6 h-12 flex items-center justify-center rounded-lg bg-primary text-white font-bold hover:bg-primary-dark">
-                Guardar Cambios
-            </button>
-        </div>
-    </form>
+    <label class="flex flex-col">
+      <span class="font-semibold mb-1">Descripción</span>
+      {{ form.descripcion }}
+    </label>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <label class="flex flex-col">
+        <span class="font-semibold mb-1">Categoría *</span>
+        {{ form.categoriaProducto }}
+      </label>
+      <label class="flex flex-col">
+        <span class="font-semibold mb-1">Tipo *</span>
+        {{ form.tipoProducto }}
+      </label>
+      <label class="flex flex-col">
+        <span class="font-semibold mb-1">Unidad de Medida *</span>
+        {{ form.unidadMedida }}
+      </label>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <label class="flex flex-col">
+        <span class="font-semibold mb-1">Fórmula de cálculo *</span>
+        {{ form.formula }}
+        {% if form.formula.errors %}<p class="text-red-500 text-sm mt-1">{{ form.formula.errors }}</p>{% endif %}
+      </label>
+      <label class="flex flex-col">
+        <span class="font-semibold mb-1">Insumo de tinta (opcional)</span>
+        {{ form.tinta_insumo }}
+      </label>
+    </div>
+
+    <label class="flex items-center gap-3 cursor-pointer">
+      {{ form.activo }}
+      <span class="font-semibold">Producto activo</span>
+    </label>
+
+    <div class="flex justify-end gap-4 pt-4">
+      <a href="{% url 'lista_productos' %}"
+         class="px-6 py-2 bg-gray-300 rounded-lg hover:bg-gray-400 transition">Cancelar</a>
+      <button type="submit"
+              class="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition">Guardar Cambios</button>
+    </div>
+  </form>
 </div>
 {% endblock %}

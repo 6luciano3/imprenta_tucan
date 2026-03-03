@@ -42,6 +42,7 @@
 						<th class="py-3 px-5">Código</th>
 						<th class="py-3 px-5">Nombre</th>
 						<th class="py-3 px-5 hidden sm:table-cell">Categoría</th>
+						<th class="py-3 px-5">Tipo</th>
 						<th class="py-3 px-5 hidden md:table-cell">Stock</th>
 						<th class="py-3 px-5 hidden md:table-cell">Precio</th>
 						<th class="py-3 px-5 text-center">Acciones</th>
@@ -54,8 +55,13 @@
 						<td class="py-3 px-5">
 							{{ insumo.nombre|default:"-" }}
 						</td>
-						<td class="py-3 px-5 hidden sm:table-cell">{{ insumo.categoria|default:"-" }}</td>
-						<td class="py-3 px-5 hidden md:table-cell">{{ insumo.stock|default:"-" }}</td>
+						<td class="py-3 px-5 hidden sm:table-cell">{{ insumo.categoria|default:"-" }}</td>					<td class="py-3 px-5">
+						{% if insumo.tipo == 'directo' %}
+							<span class="px-2 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">Directo</span>
+						{% else %}
+							<span class="px-2 py-1 rounded-full text-xs font-semibold bg-orange-100 text-orange-800">Indirecto</span>
+						{% endif %}
+					</td>						<td class="py-3 px-5 hidden md:table-cell">{{ insumo.stock|default:"-" }}</td>
 						<td class="py-3 px-5 hidden md:table-cell">{{ insumo.precio|default:"-" }}</td>
 												<td class="py-3 px-5 text-center">
 													<div class="flex items-center justify-center gap-3">

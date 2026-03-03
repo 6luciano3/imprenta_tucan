@@ -464,3 +464,39 @@ def eliminar_insumo_receta(request, pk):
     }
     return render(request, 'productos/eliminar_insumo_receta.html', context)
 
+
+@require_perm('Productos', 'Editar', redirect_to='lista_productos')
+def revisar_recetas_indirectos(request, idProducto):
+    """Muestra todos los insumos indirectos en la receta de un producto y permite eliminarlos."""
+    producto = get_object_or_404(Producto, idProducto=idProducto)
+    indirectos = (
+        ProductoInsumo.objects
+        .filter(producto=producto, insumo__tipo='indirecto')
+        .select_related('insumo')
+        .order_by('insumo__nombre')
+    )
+
+    if request.method == 'POST':
+        # Eliminar los seleccionados o todos si se envió 'eliminar_todos'
+        eliminar_todos = request.POST.get('eliminar_todos') == '1'
+        ids_a_eliminar = request.POST.getlist('ids') if not eliminar_todos else []
+
+        if eliminar_todos:
+            cantidad = indirectos.count()
+            indirectos.delete()
+            messages.success(request, f'{cantidad} insumo(s) indirecto(s) eliminado(s) de la receta.')
+        elif ids_a_eliminar:
+            cantidad = ProductoInsumo.objects.filter(
+                pk__in=ids_a_eliminar, producto=producto, insumo__tipo='indirecto'
+            ).delete()[0]
+            messages.success(request, f'{cantidad} insumo(s) indirecto(s) eliminado(s) de la receta.')
+        else:
+            messages.warning(request, 'No se seleccionó ningún insumo para eliminar.')
+
+        return redirect('gestionar_receta', idProducto=producto.idProducto)
+
+    context = {
+        'producto': producto,
+        'indirectos': indirectos,
+    }
+    return render(request, 'productos/revisar_recetas_indirectos.html', context)

@@ -35,4 +35,5 @@ urlpatterns = [
     path('<int:idProducto>/receta/agregar/', views.agregar_insumo_receta, name='agregar_insumo_receta'),
     path('receta/editar/<int:pk>/', views.editar_insumo_receta, name='editar_insumo_receta'),
     path('receta/eliminar/<int:pk>/', views.eliminar_insumo_receta, name='eliminar_insumo_receta'),
+    path('<int:idProducto>/receta/indirectos/', views.revisar_recetas_indirectos, name='revisar_recetas_indirectos'),
 ]

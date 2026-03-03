@@ -47,6 +47,23 @@
     </label>
   </div>
 
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <label class="flex flex-col">
+      <span class="font-semibold mb-1">Fórmula de cálculo *</span>
+      {{ form.formula }}
+      {% if form.formula.errors %}<p class="text-red-500 text-sm mt-1">{{ form.formula.errors }}</p>{% endif %}
+    </label>
+    <label class="flex flex-col">
+      <span class="font-semibold mb-1">Insumo de tinta (opcional)</span>
+      {{ form.tinta_insumo }}
+    </label>
+  </div>
+
+  <label class="flex items-center gap-3 cursor-pointer">
+    {{ form.activo }}
+    <span class="font-semibold">Producto activo</span>
+  </label>
+
   <div class="flex justify-end gap-4 pt-4">
     <a href="{% url 'lista_productos' %}"
        class="px-6 py-2 bg-gray-300 rounded-lg hover:bg-gray-400 transition">Cancelar</a>

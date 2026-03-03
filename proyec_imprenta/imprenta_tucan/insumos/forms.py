@@ -11,19 +11,29 @@ class InsumoForm(forms.ModelForm):
             'codigo',
             'nombre',
             'categoria',
+            'tipo',
             'stock',
             'precio',
             'activo',
         ]
+        widgets = {
+            'codigo': forms.TextInput(attrs={'class': 'form-control'}),
+            'nombre': forms.TextInput(attrs={'class': 'form-control'}),
+            'categoria': forms.TextInput(attrs={'class': 'form-control'}),
+            'tipo': forms.Select(attrs={'class': 'form-select'}),
+            'stock': forms.NumberInput(attrs={'class': 'form-control', 'min': '0'}),
+            'precio': forms.NumberInput(attrs={'class': 'form-control', 'min': '0', 'step': '0.01'}),
+        }
 
 
 class AltaInsumoForm(forms.ModelForm):
     class Meta:
         model = Insumo
-        fields = ["nombre", "codigo", "proveedor", "cantidad", "precio_unitario"]
+        fields = ["nombre", "codigo", "tipo", "proveedor", "cantidad", "precio_unitario"]
         widgets = {
             "nombre": forms.TextInput(attrs={"class": "form-control", "required": True, "maxlength": 100}),
             "codigo": forms.TextInput(attrs={"class": "form-control", "required": True, "maxlength": 20}),
+            "tipo": forms.Select(attrs={"class": "form-select", "required": True}),
             "proveedor": forms.Select(attrs={"class": "form-select", "required": True}),
             "cantidad": forms.NumberInput(attrs={"class": "form-control", "required": True, "min": 1, "step": 1}),
             "precio_unitario": forms.NumberInput(attrs={"class": "form-control", "required": True, "min": 0.01, "step": "0.01"}),

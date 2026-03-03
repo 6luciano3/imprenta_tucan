@@ -18,6 +18,11 @@ class RecetaProductoForm(forms.ModelForm):
             'descripcion': forms.Textarea(attrs={'rows': 2}),
         }
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        from insumos.models import Insumo
+        self.fields['insumos'].queryset = Insumo.objects.filter(tipo='directo').order_by('codigo')
+
 
 class FormulaForm(forms.ModelForm):
     class Meta:

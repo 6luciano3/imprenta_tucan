@@ -23,16 +23,15 @@ class UnidadMedidaAdmin(admin.ModelAdmin):
 @admin.register(Producto)
 class ProductoAdmin(admin.ModelAdmin):
     list_display = (
-        "idProducto", "nombreProducto", "precioUnitario", "categoriaProducto", "tipoProducto", "unidadMedida",
-        "unidades_por_pliego", "merma_papel", "gramos_por_pliego", "merma_tinta", "papel_insumo", "tinta_insumo",
+        "idProducto", "nombreProducto", "precioUnitario", "categoriaProducto",
+        "tipoProducto", "unidadMedida", "tinta_insumo", "activo",
     )
-    list_filter = ("categoriaProducto", "tipoProducto", "unidadMedida")
+    list_filter = ("categoriaProducto", "tipoProducto", "unidadMedida", "activo")
     search_fields = ("nombreProducto",)
     fieldsets = (
         (None, {"fields": ("nombreProducto", "descripcion", "precioUnitario",
          "categoriaProducto", "tipoProducto", "unidadMedida", "activo")}),
-        ("Parámetros de cálculo", {"fields": ("unidades_por_pliego", "merma_papel",
-         "papel_insumo", "gramos_por_pliego", "merma_tinta", "tinta_insumo")}),
+        ("Cálculo de insumos", {"fields": ("formula", "tinta_insumo")}),
     )
 
 

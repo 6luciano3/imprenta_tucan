@@ -49,48 +49,50 @@
         <td class="py-3 px-5 hidden md:table-cell">{{ producto.categoriaProducto }}</td>
         <td class="py-3 px-5 hidden md:table-cell">{{ producto.tipoProducto }}</td>
         <td class="py-3 px-5 hidden md:table-cell">{{ producto.unidadMedida }}</td>
-        <td class="py-3 px-5 flex justify-center gap-3">
-          <a href="{% url 'detalle_producto' producto.idProducto %}"
-             class="text-blue-600 hover:text-blue-800 flex items-center gap-1" title="Ver detalles">
-            <span class="material-symbols-outlined text-sm">visibility</span>
-          </a>
-          <button type="button"
-                  class="text-indigo-600 hover:text-indigo-800 flex items-center btn-ver-insumos"
-                  data-producto-id="{{ producto.idProducto }}"
-                  data-producto-nombre="{{ producto.nombreProducto }}"
-                  title="Ver detalle de insumos">
-            <span class="material-symbols-outlined text-sm">list_alt</span>
-          </button>
-          {% if can_productos_ver %}
-          <a href="{% url 'gestionar_receta' producto.idProducto %}"
-             class="text-purple-600 hover:text-purple-800 flex items-center gap-1" title="Gestionar Receta (Insumos)">
-            <span class="material-symbols-outlined text-sm">recipe_long</span>
-          </a>
-          {% endif %}
-          {% if can_productos_editar %}
-          <a href="{% url 'modificar_producto' producto.idProducto %}"
-             class="text-amber-600 hover:text-amber-800 flex items-center gap-1" title="Modificar">
-            <span class="material-symbols-outlined text-sm">edit</span>
-          </a>
-          {% endif %}
-          {% if can_productos_activar %}
-          <form method="POST" action="{% url 'activar_producto' producto.idProducto %}" class="inline">
-            {% csrf_token %}
-            <button type="submit" 
-                    class="{% if producto.activo %}text-orange-600 hover:text-orange-800{% else %}text-green-600 hover:text-green-800{% endif %} flex items-center gap-1"
-                    title="{% if producto.activo %}Desactivar{% else %}Activar{% endif %}">
-              <span class="material-symbols-outlined text-sm">
-                {% if producto.activo %}toggle_on{% else %}toggle_off{% endif %}
-              </span>
+        <td class="py-3 px-5">
+          <div class="flex items-center justify-center gap-2">
+            <a href="{% url 'detalle_producto' producto.idProducto %}"
+               class="text-blue-600 hover:text-blue-800" title="Ver detalles">
+              <span class="material-symbols-outlined text-xl">visibility</span>
+            </a>
+            <button type="button"
+                    class="text-indigo-600 hover:text-indigo-800 btn-ver-insumos"
+                    data-producto-id="{{ producto.idProducto }}"
+                    data-producto-nombre="{{ producto.nombreProducto }}"
+                    title="Ver detalle de insumos">
+              <span class="material-symbols-outlined text-xl">list_alt</span>
             </button>
-          </form>
-          {% endif %}
-          {% if can_productos_eliminar %}
-          <a href="{% url 'eliminar_producto' producto.idProducto %}"
-             class="text-red-600 hover:text-red-800 flex items-center gap-1" title="Eliminar">
-            <span class="material-symbols-outlined text-sm">delete</span>
-          </a>
-          {% endif %}
+            {% if can_productos_ver %}
+            <a href="{% url 'gestionar_receta' producto.idProducto %}"
+               class="text-purple-600 hover:text-purple-800" title="Gestionar Receta">
+              <span class="material-symbols-outlined text-xl">format_list_bulleted</span>
+            </a>
+            {% endif %}
+            {% if can_productos_editar %}
+            <a href="{% url 'modificar_producto' producto.idProducto %}"
+               class="text-amber-600 hover:text-amber-800" title="Modificar">
+              <span class="material-symbols-outlined text-xl">edit</span>
+            </a>
+            {% endif %}
+            {% if can_productos_activar %}
+            <form method="POST" action="{% url 'activar_producto' producto.idProducto %}" class="inline">
+              {% csrf_token %}
+              <button type="submit"
+                      class="{% if producto.activo %}text-orange-600 hover:text-orange-800{% else %}text-green-600 hover:text-green-800{% endif %}"
+                      title="{% if producto.activo %}Desactivar{% else %}Activar{% endif %}">
+                <span class="material-symbols-outlined text-xl">
+                  {% if producto.activo %}toggle_on{% else %}toggle_off{% endif %}
+                </span>
+              </button>
+            </form>
+            {% endif %}
+            {% if can_productos_eliminar %}
+            <a href="{% url 'eliminar_producto' producto.idProducto %}"
+               class="text-red-600 hover:text-red-800" title="Eliminar">
+              <span class="material-symbols-outlined text-xl">delete</span>
+            </a>
+            {% endif %}
+          </div>
         </td>
       </tr>
       {% empty %}

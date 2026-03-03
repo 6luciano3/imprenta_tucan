@@ -92,26 +92,23 @@ def calcular_consumo_producto(producto, cantidad: int) -> dict:
 
 
 def calcular_consumo_pedido(pedido) -> dict:
-    """Calcula consumo para un Pedido (único producto/cantidad en este proyecto)."""
-    from productos.models import ProductoInsumo
-    from decimal import Decimal
+    """Calcula consumo total para un Pedido iterando todas sus líneas (LineaPedido)."""
     req = defaultdict(Decimal)
-    if not pedido or not pedido.producto or not pedido.cantidad:
-        return req
-    for r in ProductoInsumo.objects.filter(producto=pedido.producto).only("insumo_id", "cantidad_por_unidad"):
-        req[r.insumo_id] += Decimal(r.cantidad_por_unidad) * Decimal(pedido.cantidad)
-    # Puedes agregar aquí lógica adicional si necesitas fórmulas específicas
+    if not pedido:
+        return dict(req)
+    for linea in pedido.lineas.select_related('producto').all():
+        consumo_linea = calcular_consumo_producto(linea.producto, linea.cantidad)
+        for insumo_id, cantidad in consumo_linea.items():
+            req[insumo_id] += Decimal(cantidad)
     return dict(req)
 
 
 def reservar_insumos_para_pedido(pedido):
     from insumos.models import Insumo
     from pedidos.models import OrdenProduccion
-    from pedidos.strategies import seleccionar_estrategia
-    estrategia = seleccionar_estrategia(pedido.producto)
-    consumos = estrategia.consumo_por_insumo(pedido)
-    for insumo_id, cantidad in consumos:
-        insumo = Insumo.objects.select_for_update().get(id=insumo_id)
+    consumos = calcular_consumo_pedido(pedido)
+    for insumo_id, cantidad in consumos.items():
+        insumo = Insumo.objects.select_for_update().get(idInsumo=insumo_id)
         if insumo.stock < cantidad:
             raise ValueError(f"Stock insuficiente para {insumo.nombre}")
         insumo.stock -= cantidad

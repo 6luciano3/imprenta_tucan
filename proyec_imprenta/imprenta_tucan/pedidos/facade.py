@@ -1,4 +1,3 @@
-from .strategies import seleccionar_estrategia
 from .repository import PedidoRepository
 from .unit_of_work import UnitOfWork
 from insumos.models import Insumo
@@ -9,13 +8,13 @@ class PresupuestoFacade:
         self.pedido = pedido
 
     def generar_presupuesto(self):
-        estrategia = seleccionar_estrategia(self.pedido.producto)
-        consumos = estrategia.consumo_por_insumo(self.pedido)
+        from .services import calcular_consumo_pedido
+        consumos = calcular_consumo_pedido(self.pedido)
 
         detalles = []
         total = 0
-        for insumo_id, cantidad in consumos:
-            insumo = Insumo.objects.get(id=insumo_id)
+        for insumo_id, cantidad in consumos.items():
+            insumo = Insumo.objects.get(idInsumo=insumo_id)
             precio_unitario = self._obtener_precio_insumo(insumo)
             monto = precio_unitario * cantidad
             detalles.append({
