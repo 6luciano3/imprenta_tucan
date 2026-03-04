@@ -1,4 +1,104 @@
 from django.views.decorators.csrf import csrf_exempt
+
+# --- Helper: retroalimentación del ranking según respuesta del cliente a una oferta ---
+def _ajustar_score_por_feedback(cliente, accion):
+    """
+    Ajusta el score del RankingCliente según la respuesta del cliente a una oferta.
+    accion 'aceptar' → +3 pts  |  'rechazar' → -1 pt
+    El cambio es intencional y pequeño para no distorsionar el ranking,
+    que se recalcula completamente en cada tarea periódica.
+    """
+    try:
+        from automatizacion.models import RankingCliente
+        delta = 3.0 if accion == 'aceptar' else -1.0
+        rc = RankingCliente.objects.filter(cliente=cliente).first()
+        if rc:
+            nuevo_score = max(0.0, min(100.0, (rc.score or 0) + delta))
+            rc.score = nuevo_score
+            rc.save(update_fields=['score'])
+            # Sincronizar puntaje_estrategico del cliente
+            try:
+                cliente.puntaje_estrategico = nuevo_score
+                cliente.save(update_fields=['puntaje_estrategico'])
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+# --- Helper: crea un Pedido automáticamente cuando el cliente acepta una oferta ---
+def _crear_pedido_desde_oferta(oferta):
+    """
+    Genera un Pedido con las líneas del combo personalizado del cliente.
+    - Calcula subtotal a partir del combo.
+    - Aplica el porcentaje de descuento de la oferta.
+    - Marca la oferta como 'aplicada' antes de crear el Pedido para evitar
+      que Pedido.save() aplique el descuento por segunda vez.
+    - Devuelve el Pedido creado, o None si el combo está vacío o hay error.
+    """
+    try:
+        from decimal import Decimal
+        from datetime import timedelta
+        from pedidos.models import Pedido, LineaPedido, EstadoPedido
+        from automatizacion.views_combos import generar_combo_para_cliente
+
+        cliente = oferta.cliente
+        parametros = oferta.parametros or {}
+        descuento_pct = Decimal(str(parametros.get('descuento', 0)))
+
+        # Obtener el combo personalizado para este cliente
+        combo = generar_combo_para_cliente(cliente)
+        if not combo or not combo.comboofertaproducto_set.exists():
+            return None
+
+        # Calcular subtotal y aplicar descuento
+        lineas_data = list(
+            combo.comboofertaproducto_set.select_related('producto').all()
+        )
+        subtotal = Decimal('0')
+        for cop in lineas_data:
+            precio = Decimal(str(cop.producto.precioUnitario or 0))
+            subtotal += precio * cop.cantidad
+
+        factor = (Decimal('100') - descuento_pct) / Decimal('100')
+        monto_final = (subtotal * factor).quantize(Decimal('0.01'))
+
+        # Marcar oferta como 'aplicada' ANTES de crear el Pedido
+        # para que Pedido.save() no intente aplicar el descuento de nuevo
+        oferta.estado = 'aplicada'
+        params_actualizados = dict(parametros)
+        params_actualizados['generado_pedido_auto'] = True
+        oferta.parametros = params_actualizados
+        oferta.save(update_fields=['estado', 'parametros'])
+
+        estado_pedido, _ = EstadoPedido.objects.get_or_create(nombre='pendiente')
+        fecha_entrega = timezone.now().date() + timedelta(days=7)
+
+        pedido = Pedido.objects.create(
+            cliente=cliente,
+            fecha_entrega=fecha_entrega,
+            monto_total=monto_final,
+            estado=estado_pedido,
+            descuento=descuento_pct,
+        )
+
+        for cop in lineas_data:
+            LineaPedido.objects.create(
+                pedido=pedido,
+                producto=cop.producto,
+                cantidad=cop.cantidad,
+                precio_unitario=Decimal(str(cop.producto.precioUnitario or 0)),
+                especificaciones=f'Generado automáticamente desde oferta #{oferta.id} – {oferta.titulo}',
+            )
+
+        # Actualizar parametros de la oferta con el id del pedido creado
+        params_actualizados['aplicada_pedido_id'] = pedido.pk
+        oferta.parametros = params_actualizados
+        oferta.save(update_fields=['parametros'])
+
+        return pedido
+    except Exception:
+        return None
+
 @csrf_exempt
 def aceptar_oferta_token(request, token):
     oferta = get_object_or_404(OfertaPropuesta, token_email=token)
@@ -13,7 +113,13 @@ def aceptar_oferta_token(request, token):
             canal='email',
             detalle='Cliente aceptó la oferta desde el email',
         )
-        return render(request, 'automatizacion/oferta_individual.html', {'oferta': oferta, 'accion_realizada': 'aceptada'})
+        _ajustar_score_por_feedback(oferta.cliente, 'aceptar')
+        pedido = _crear_pedido_desde_oferta(oferta)
+        return render(request, 'automatizacion/oferta_individual.html', {
+            'oferta': oferta,
+            'accion_realizada': 'aceptada',
+            'pedido_generado': pedido,
+        })
     return render(request, 'automatizacion/oferta_individual.html', {'oferta': oferta})
 
 @csrf_exempt
@@ -30,9 +136,9 @@ def rechazar_oferta_token(request, token):
             canal='email',
             detalle='Cliente rechazó la oferta desde el email',
         )
+        _ajustar_score_por_feedback(oferta.cliente, 'rechazar')
         return render(request, 'automatizacion/oferta_individual.html', {'oferta': oferta, 'accion_realizada': 'rechazada'})
     return render(request, 'automatizacion/oferta_individual.html', {'oferta': oferta})
-from django.views.decorators.csrf import csrf_exempt
 
 # Vista pública para mostrar solo una oferta por token
 @csrf_exempt
@@ -67,41 +173,6 @@ def crear_propuesta_para_insumo(request):
     )
     messages.success(request, f'Propuesta creada para {insumo.nombre}. Completa los datos desde la edición.')
     return redirect('compras_propuestas')
-# Endpoints públicos para aceptar/rechazar desde email
-from .models import OfertaPropuesta, AccionCliente
-from django.utils import timezone
-from django.http import JsonResponse
-from django.views.decorators.http import require_POST
-
-def aceptar_oferta_token(request, token):
-    oferta = get_object_or_404(OfertaPropuesta, token_email=token)
-    if oferta.estado != 'aceptada':
-        oferta.estado = 'aceptada'
-        oferta.fecha_validacion = timezone.now()
-        oferta.save()
-        AccionCliente.objects.create(
-            cliente=oferta.cliente,
-            oferta=oferta,
-            tipo='aceptar',
-            canal='email',
-            detalle='Cliente aceptó la oferta desde el email',
-        )
-    return redirect('/automatizacion/propuestas/')
-
-def rechazar_oferta_token(request, token):
-    oferta = get_object_or_404(OfertaPropuesta, token_email=token)
-    if oferta.estado != 'rechazada':
-        oferta.estado = 'rechazada'
-        oferta.fecha_validacion = timezone.now()
-        oferta.save()
-        AccionCliente.objects.create(
-            cliente=oferta.cliente,
-            oferta=oferta,
-            tipo='rechazar',
-            canal='email',
-            detalle='Cliente rechazó la oferta desde el email',
-        )
-    return redirect('/automatizacion/propuestas/')
 
 @require_POST
 def actualizar_titulo_oferta(request):
@@ -545,6 +616,12 @@ def confirmar_oferta_cliente(request, oferta_id):
         )
     except Exception:
         pass
+    _ajustar_score_por_feedback(oferta.cliente, 'aceptar')
+    pedido = _crear_pedido_desde_oferta(oferta)
+    if pedido:
+        messages.success(request, f'Oferta aceptada. Se generó automáticamente el Pedido #{pedido.id} con fecha de entrega {pedido.fecha_entrega}.')
+    else:
+        messages.success(request, 'Oferta aceptada correctamente.')
     return redirect('mis_ofertas_cliente')
 
 
@@ -568,6 +645,7 @@ def rechazar_oferta_cliente(request, oferta_id):
         )
     except Exception:
         pass
+    _ajustar_score_por_feedback(oferta.cliente, 'rechazar')
     # Notificar área comercial y registrar log
     try:
         from usuarios.models import Usuario, Notificacion

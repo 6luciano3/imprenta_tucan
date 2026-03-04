@@ -24,10 +24,10 @@ def main():
     print("🔄 Aplicando migraciones...")
     try:
         print("  📋 Migraciones generales...")
-        subprocess.run([python_env, "manage.py", "makemigrations"], check=False)
+        subprocess.run([python_env, "manage.py", "makemigrations", "--noinput"], check=False)
         
         print("  💾 Aplicando migraciones...")
-        subprocess.run([python_env, "manage.py", "migrate"], check=False)
+        subprocess.run([python_env, "manage.py", "migrate", "--noinput"], check=False)
         print("✅ Migraciones aplicadas")
     except Exception as e:
         print(f"⚠️ Advertencia en migraciones: {e}")

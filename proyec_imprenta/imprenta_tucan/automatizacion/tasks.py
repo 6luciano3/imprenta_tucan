@@ -51,23 +51,6 @@ def tarea_anticipacion_compras():
 
 @shared_task
 def tarea_ranking_clientes():
-    # DEMO: Asignar puntajes inventados para mostrar los 4 tipos de clientes
-    # Premium >= 90, Estratégico >= 60, Estándar >= 30, Nuevo < 30
-    from clientes.models import Cliente
-    clientes = list(Cliente.objects.all())
-    if len(clientes) >= 4:
-        scores_demo = [95, 75, 45, 15]
-        for i, score in enumerate(scores_demo):
-            c = clientes[i]
-            RankingCliente.objects.update_or_create(
-                cliente_id=c.id,
-                defaults={'score': score}
-            )
-            Cliente.objects.filter(id=c.id).update(
-                puntaje_estrategico=score,
-                fecha_ultima_actualizacion=timezone.now()
-            )
-        return "Puntajes demo asignados a los primeros 4 clientes."
     # Recalcular RankingCliente basado en algoritmo multicriterio configurable (últimos N días)
     try:
         # Parámetros
@@ -93,8 +76,10 @@ def tarea_ranking_clientes():
             .distinct()
         )
 
-        # Precalcular costo unitario por producto (para margen)
-        producto_ids = list(pedidos_qs.values_list('producto_id', flat=True).distinct())
+        # Precalcular costo unitario por producto (para margen) usando LineaPedido
+        from pedidos.models import LineaPedido
+        lineas_qs = LineaPedido.objects.filter(pedido__fecha_pedido__gte=desde).select_related('pedido')
+        producto_ids = list(lineas_qs.values_list('producto_id', flat=True).distinct())
         costo_unitario_por_producto = {}
         if producto_ids:
             # Traer receta BOM por producto y sumar cantidad_por_unidad * precio_unitario
@@ -108,29 +93,29 @@ def tarea_ranking_clientes():
         # Métricas por cliente
         # Frecuencia: pedidos por mes dentro de la ventana
         meses_ventana = max(1, int(int(ventana_dias) / 30))
-        # Construir mapa cliente -> métricas
+        # Construir mapa cliente -> líneas de pedido
         cliente_metrics = {}
-        # Para margen, iterar pedidos del cliente
-        pedidos_por_cliente = {}
-        for p in pedidos_qs.select_related('producto').all():
-            pedidos_por_cliente.setdefault(p.cliente_id, []).append(p)
+        lineas_por_cliente = {}
+        for linea in lineas_qs:
+            lineas_por_cliente.setdefault(linea.pedido.cliente_id, []).append(linea)
 
         for a in agregados:
             cliente_id = a['cliente_id']
             total = float(a['total'] or 0)
             cant = int(a['cantidad'] or 0)
             freq = cant / meses_ventana
-            # Consumo crítico: total de pedidos con productos críticos
-            crit_total = (
-                Pedido.objects.filter(fecha_pedido__gte=desde, cliente_id=cliente_id, producto_id__in=productos_criticos)
-                .aggregate(s=Sum('monto_total'))['s'] or 0
+            # Consumo crítico: ingresos de líneas con productos críticos del cliente
+            crit_total = sum(
+                float(linea.precio_unitario) * float(linea.cantidad)
+                for linea in lineas_por_cliente.get(cliente_id, [])
+                if linea.producto_id in productos_criticos
             )
             # Margen total: ingresos - costo insumos (usando BOM por unidad)
             margin_total = 0.0
-            for p in pedidos_por_cliente.get(cliente_id, []):
-                costo_unit = float(costo_unitario_por_producto.get(p.producto_id, 0.0))
-                costo_total = costo_unit * float(p.cantidad or 0)
-                ingreso = float(p.monto_total or 0)
+            for linea in lineas_por_cliente.get(cliente_id, []):
+                costo_unit = float(costo_unitario_por_producto.get(linea.producto_id, 0.0))
+                costo_total = costo_unit * float(linea.cantidad)
+                ingreso = float(linea.precio_unitario) * float(linea.cantidad)
                 margin_total += max(0.0, ingreso - costo_total)
             cliente_metrics[cliente_id] = {
                 'total': total,
@@ -202,9 +187,11 @@ def tarea_ranking_clientes():
                 score = score_reglas
 
 
-            # Piso mínimo: si el cliente tiene al menos un pedido, el score mínimo es 10
+            # Piso mínimo y techo máximo
             if m['cant'] > 0 and score < 10:
                 score = 10.0
+            if score > 100.0:
+                score = 100.0
 
             RankingCliente.objects.update_or_create(
                 cliente_id=cliente_id,
@@ -343,23 +330,50 @@ def tarea_generar_ofertas():
             if ya_existe:
                 continue
 
-            # Generar combo personalizado
+            # Generar combo personalizado con los productos de ESTE cliente
             try:
                 combo = generar_combo_para_cliente(cliente)
             except Exception:
                 combo = None
 
-            titulo = f"{categoria['titulo_prefijo']} - {combo.nombre}" if combo else categoria['titulo_prefijo']
+            # Armar título y descripción a partir de los productos reales del combo
+            if combo and combo.comboofertaproducto_set.exists():
+                nombres_productos = list(
+                    combo.comboofertaproducto_set
+                    .select_related('producto')
+                    .values_list('producto__nombreProducto', flat=True)[:3]
+                )
+                nombres_str = ' + '.join(n[:25] for n in nombres_productos)
+                titulo = f"{categoria['titulo_prefijo']} – {nombres_str}"
+                if len(titulo) > 118:
+                    titulo = titulo[:115] + '...'
+                descripcion = (
+                    f"{categoria['descripcion']} "
+                    f"Incluye: {', '.join(nombres_productos)}."
+                )
+                parametros_oferta = {
+                    'descuento': round(float(combo.descuento), 1),
+                    'categoria': categoria['nombre'],
+                    'productos': nombres_productos,
+                    'combo_id': combo.pk,
+                }
+            else:
+                titulo = categoria['titulo_prefijo']
+                descripcion = categoria['descripcion']
+                parametros_oferta = {
+                    'descuento': categoria['descuento'],
+                    'categoria': categoria['nombre'],
+                }
 
             OfertaPropuesta.objects.create(
                 cliente=cliente,
                 titulo=titulo,
-                descripcion=categoria['descripcion'],
+                descripcion=descripcion,
                 tipo=categoria['tipo'],
                 estado='pendiente',
                 periodo=periodo_str,
-                score_al_generar=rc.score,
-                parametros={'descuento': categoria['descuento'], 'categoria': categoria['nombre']},
+                score_al_generar=min(float(rc.score or 0), 100.0),
+                parametros=parametros_oferta,
             )
             generadas += 1
 
@@ -576,3 +590,60 @@ def tarea_automatizacion_presupuestos_ponderada():
         return f"auto_presupuesto: {propuestas_creadas} propuestas generadas; {aceptadas_auto} aceptadas automáticamente"
     except Exception as e:
         return f"auto_presupuesto: error {e}"
+
+
+@shared_task
+def tarea_vencer_ofertas():
+    """
+    Cierra automáticamente las ofertas que no fueron respondidas antes de su fecha_expiracion.
+    - Afecta solo estados 'pendiente' y 'enviada'.
+    - Registra un AutomationLog por cada oferta vencida.
+    - Notifica al staff sobre el total de ofertas vencidas.
+    Se debe programar para ejecutarse diariamente (por ejemplo a las 00:00).
+    """
+    try:
+        ahora = timezone.now()
+        vencidas_qs = OfertaPropuesta.objects.filter(
+            estado__in=['pendiente', 'enviada'],
+            fecha_expiracion__lt=ahora,
+        ).select_related('cliente')
+
+        total = vencidas_qs.count()
+        if total == 0:
+            return 'vencer_ofertas: ninguna oferta vencida'
+
+        vencidas_ids = list(vencidas_qs.values_list('id', flat=True))
+
+        # Marcar como vencidas en bulk
+        OfertaPropuesta.objects.filter(id__in=vencidas_ids).update(
+            estado='vencida',
+            fecha_validacion=ahora,
+        )
+
+        # Registrar log por cada una
+        try:
+            from automatizacion.models import AutomationLog
+            logs = [
+                AutomationLog(
+                    evento='oferta_vencida',
+                    descripcion=f'Oferta #{oid} vencida automáticamente',
+                    datos={'oferta_id': oid},
+                )
+                for oid in vencidas_ids
+            ]
+            AutomationLog.objects.bulk_create(logs, ignore_conflicts=True)
+        except Exception:
+            pass
+
+        # Notificar al staff
+        try:
+            from usuarios.models import Usuario, Notificacion
+            mensaje = f'{total} oferta(s) vencieron sin respuesta del cliente y fueron cerradas automáticamente.'
+            for u in Usuario.objects.filter(is_staff=True):
+                Notificacion.objects.create(usuario=u, mensaje=mensaje)
+        except Exception:
+            pass
+
+        return f'vencer_ofertas: {total} oferta(s) marcadas como vencidas'
+    except Exception as e:
+        return f'vencer_ofertas: error {e}'

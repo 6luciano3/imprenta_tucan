@@ -68,16 +68,13 @@ class OfertaAutomatica(models.Model):
 class OfertaPropuesta(models.Model):
     token_email = models.CharField(max_length=32, blank=True, null=True, unique=True)
 
-    def save(self, *args, **kwargs):
-        if not self.token_email:
-            self.token_email = get_random_string(32)
-        super().save(*args, **kwargs)
     ESTADOS = [
         ('pendiente', 'Pendiente de aprobación'),
         ('enviada', 'Enviada al cliente'),
         ('aceptada', 'Aceptada por el cliente'),
         ('rechazada', 'Rechazada por el cliente'),
         ('aplicada', 'Aplicada en pedido'),
+        ('vencida', 'Vencida (no respondida a tiempo)'),
     ]
 
     TIPOS = [
@@ -99,6 +96,36 @@ class OfertaPropuesta(models.Model):
     actualizada = models.DateTimeField(auto_now=True)
     administrador = models.ForeignKey(get_user_model(), on_delete=models.SET_NULL, null=True, blank=True)
     fecha_validacion = models.DateTimeField(null=True, blank=True)
+    fecha_expiracion = models.DateTimeField(
+        null=True, blank=True,
+        help_text='Fecha límite para que el cliente responda. Se asigna automáticamente al crear.'
+    )
+
+    def save(self, *args, **kwargs):
+        # Auto-generar token único para links de email
+        if not self.token_email:
+            self.token_email = get_random_string(32)
+        # Auto-asignar fecha_expiracion si no se indicó (30 días por defecto, configurable)
+        if not self.fecha_expiracion and not self.pk:
+            try:
+                from configuracion.models import Parametro
+                dias = int(Parametro.get('OFERTA_DIAS_VIGENCIA', 30))
+            except Exception:
+                dias = 30
+            from django.utils import timezone
+            from datetime import timedelta
+            self.fecha_expiracion = timezone.now() + timedelta(days=dias)
+        super().save(*args, **kwargs)
+
+    @property
+    def esta_vencida(self):
+        """True si la fecha_expiracion ya pasó y la oferta sigue sin respuesta."""
+        from django.utils import timezone
+        return (
+            self.fecha_expiracion is not None
+            and timezone.now() > self.fecha_expiracion
+            and self.estado in ('pendiente', 'enviada')
+        )
 
     def __str__(self):
         return f"{self.titulo} - {self.cliente} ({self.estado})"
