@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "skills": {
+    "django-expert": {
+      "source": "jeffallan/claude-skills",
+      "sourceType": "github",
+      "computedHash": "b6f94cb9ab191a372c8e082f8ef8f1902f1537a460bdace4c5e22c5f65105c73"
+    },
+    "django-orm-patterns": {
+      "source": "thebushidocollective/han",
+      "sourceType": "github",
+      "computedHash": "d405220628c8c22d0aca1560ad50deba6de9a4d0f1fbefcfc2a55e50b5acf506"
+    },
+    "django-patterns": {
+      "source": "affaan-m/everything-claude-code",
+      "sourceType": "github",
+      "computedHash": "68b6f71bf032d7a2ed9a74bcf9c0732a7f2fe2d6126996d0d813baab9d7170d9"
+    },
+    "django-security": {
+      "source": "affaan-m/everything-claude-code",
+      "sourceType": "github",
+      "computedHash": "7d7a2cd3340482d1a99b5f0a5ab2929ad7a5259c81973d09e8676fb19565c624"
+    },
+    "performance-optimization": {
+      "source": "farhanaliraza/django-bolt",
+      "sourceType": "github",
+      "computedHash": "b7f7bc5a763478e7cc342dac55e93f72d3c6903d829eea627b6eda0c0535c479"
+    }
+  }
+}
