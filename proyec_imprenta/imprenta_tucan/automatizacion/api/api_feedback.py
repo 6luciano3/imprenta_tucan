@@ -9,7 +9,6 @@ from .services import ProveedorInteligenteService
 from django.contrib.auth import get_user_model
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
-from .services import CRITERIOS_PESOS
 
 User = get_user_model()
 
@@ -59,10 +58,11 @@ class FeedbackRecomendacionAPIView(APIView):
 @method_decorator(csrf_exempt, name='dispatch')
 class CriteriosPesosAPIView(APIView):
     def get(self, request):
-        # Devuelve los pesos actuales de criterios para autocompletar el formulario
+        # Devuelve los pesos actuales leídos desde BD
+        pesos = ProveedorInteligenteService._get_pesos()
         return Response({
-            'precio': CRITERIOS_PESOS.get('precio', 0),
-            'cumplimiento': CRITERIOS_PESOS.get('cumplimiento', 0),
-            'incidencias': CRITERIOS_PESOS.get('incidencias', 0),
-            'disponibilidad': CRITERIOS_PESOS.get('disponibilidad', 0),
+            'precio': pesos.get('precio', 0),
+            'cumplimiento': pesos.get('cumplimiento', 0),
+            'incidencias': pesos.get('incidencias', 0),
+            'disponibilidad': pesos.get('disponibilidad', 0),
         })

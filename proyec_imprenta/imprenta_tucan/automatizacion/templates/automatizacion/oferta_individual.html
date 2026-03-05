@@ -37,10 +37,15 @@
                 </div>
                 {% if pedido_generado %}
                 <p class="text-emerald-800 text-sm mt-1">
-                    Se generó automáticamente el <strong>Pedido #{{ pedido_generado.id }}</strong>
-                    con los productos de tu combo, aplicando el descuento correspondiente.
+                    Se registró automáticamente el <strong>Pedido #{{ pedido_generado.id }}</strong>
+                    con descuento del {{ pedido_generado.descuento }}%.
                     Fecha de entrega estimada: <strong>{{ pedido_generado.fecha_entrega }}</strong>.
                 </p>
+                {% if pedido_generado.monto_total > 0 %}
+                <p class="text-emerald-700 text-sm">Monto total: <strong>${{ pedido_generado.monto_total }}</strong></p>
+                {% else %}
+                <p class="text-amber-700 text-sm mt-1">El equipo de Imprenta Tucán completará los detalles del pedido y te contactará a la brevedad.</p>
+                {% endif %}
                 {% else %}
                 <p class="text-emerald-700 text-sm mt-1">Nos pondremos en contacto para confirmar los detalles del pedido.</p>
                 {% endif %}

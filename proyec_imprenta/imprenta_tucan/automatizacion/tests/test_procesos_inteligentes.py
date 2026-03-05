@@ -44,7 +44,7 @@ from automatizacion.models import (
     ConsultaStockProveedor,
     CompraPropuesta,
 )
-from automatizacion.api.services import ProveedorInteligenteService, CRITERIOS_PESOS
+from automatizacion.api.services import ProveedorInteligenteService
 
 
 # ---------------------------------------------------------------------------
@@ -178,9 +178,9 @@ class ProveedorInteligenteServiceTest(TestCase):
     def test_score_solo_confirmadas_es_consistente(self):
         """Proveedor con todas confirmadas debe tener score predecible."""
         score = ProveedorInteligenteService.calcular_score(self.prov_bueno, self.insumo)
-        # precio=1 (neutro), cumplimiento=1, incidencias=0, disponibilidad=1
-        # score = 0.4*(1-1) + 0.3*1 + 0.2*(1-0) + 0.1*1 = 0 + 0.3 + 0.2 + 0.1 = 0.6 → 60.0
-        self.assertAlmostEqual(score, 60.0, places=1)
+        # precio=0.5 (neutro, sin proveedor asignado), cumplimiento=1, incidencias=0, disponibilidad=1
+        # score = 0.4*(1-0.5) + 0.3*1 + 0.2*(1-0) + 0.1*1 = 0.2 + 0.3 + 0.2 + 0.1 = 0.8 → 80.0
+        self.assertAlmostEqual(score, 80.0, places=1)
 
 
 # ===========================================================================
@@ -287,7 +287,27 @@ class OfertaPropuestaTest(TestCase):
         url = reverse("aceptar_oferta_token", args=[self.oferta.token_email])
         c.post(url)
         self.oferta.refresh_from_db()
-        self.assertEqual(self.oferta.estado, "aceptada")
+        # Al aceptar se crea el pedido automáticamente → estado pasa a 'aplicada'
+        self.assertIn(self.oferta.estado, ("aceptada", "aplicada"),
+                      "La oferta debe quedar en 'aceptada' o 'aplicada' tras el POST")
+
+    def test_aceptar_oferta_crea_pedido_automaticamente(self):
+        """Al aceptar una oferta vía token siempre se genera un Pedido."""
+        from pedidos.models import Pedido
+        self.oferta.estado = "enviada"
+        self.oferta.save()
+        pedidos_antes = Pedido.objects.filter(cliente=self.cliente).count()
+        c = TestClient()
+        url = reverse("aceptar_oferta_token", args=[self.oferta.token_email])
+        c.post(url)
+        pedidos_despues = Pedido.objects.filter(cliente=self.cliente).count()
+        self.assertEqual(pedidos_despues, pedidos_antes + 1,
+                         "Debe crearse exactamente un Pedido al aceptar la oferta")
+        pedido = Pedido.objects.filter(cliente=self.cliente).order_by('-id').first()
+        self.assertEqual(pedido.estado.nombre, "pendiente")
+        self.oferta.refresh_from_db()
+        self.assertEqual(self.oferta.parametros.get('aplicada_pedido_id'), pedido.pk,
+                         "El parametros de la oferta debe guardar el id del pedido generado")
 
     def test_rechazar_oferta_via_token_cambia_estado(self):
         self.oferta.estado = "enviada"
@@ -481,7 +501,7 @@ class WebhookConsultaStockTest(TestCase):
             insumo=self.insumo,
             cantidad_requerida=20,
             proveedor_recomendado=self.proveedor,
-            pesos_usados=CRITERIOS_PESOS,
+            pesos_usados={"precio": 0.4, "cumplimiento": 0.3, "incidencias": 0.2, "disponibilidad": 0.1},
             motivo_trigger="stock_minimo_vencido",
             estado="consultado",
             borrador_oc=oc,

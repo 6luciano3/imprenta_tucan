@@ -28,12 +28,12 @@ def _ajustar_score_por_feedback(cliente, accion):
 # --- Helper: crea un Pedido automáticamente cuando el cliente acepta una oferta ---
 def _crear_pedido_desde_oferta(oferta):
     """
-    Genera un Pedido con las líneas del combo personalizado del cliente.
-    - Calcula subtotal a partir del combo.
-    - Aplica el porcentaje de descuento de la oferta.
-    - Marca la oferta como 'aplicada' antes de crear el Pedido para evitar
-      que Pedido.save() aplique el descuento por segunda vez.
-    - Devuelve el Pedido creado, o None si el combo está vacío o hay error.
+    Genera un Pedido automáticamente cuando el cliente acepta una oferta.
+    - Si el cliente tiene un combo personalizado, lo usa para calcular el monto.
+    - Si no hay combo, crea un pedido borrador (monto=0) para que el operador lo complete.
+    - Siempre marca la oferta como 'aplicada' ANTES de crear el Pedido para
+      evitar que Pedido.save() aplique el descuento por segunda vez.
+    - Devuelve el Pedido creado, o None solo si ocurre un error inesperado.
     """
     try:
         from decimal import Decimal
@@ -45,22 +45,21 @@ def _crear_pedido_desde_oferta(oferta):
         parametros = oferta.parametros or {}
         descuento_pct = Decimal(str(parametros.get('descuento', 0)))
 
-        # Obtener el combo personalizado para este cliente
-        combo = generar_combo_para_cliente(cliente)
-        if not combo or not combo.comboofertaproducto_set.exists():
-            return None
-
-        # Calcular subtotal y aplicar descuento
-        lineas_data = list(
-            combo.comboofertaproducto_set.select_related('producto').all()
-        )
-        subtotal = Decimal('0')
-        for cop in lineas_data:
-            precio = Decimal(str(cop.producto.precioUnitario or 0))
-            subtotal += precio * cop.cantidad
-
-        factor = (Decimal('100') - descuento_pct) / Decimal('100')
-        monto_final = (subtotal * factor).quantize(Decimal('0.01'))
+        # Intentar obtener el combo personalizado del cliente
+        lineas_data = []
+        monto_final = Decimal('0.00')
+        try:
+            combo = generar_combo_para_cliente(cliente)
+            if combo and combo.comboofertaproducto_set.exists():
+                lineas_data = list(combo.comboofertaproducto_set.select_related('producto').all())
+                subtotal = Decimal('0')
+                for cop in lineas_data:
+                    precio = Decimal(str(cop.producto.precioUnitario or 0))
+                    subtotal += precio * cop.cantidad
+                factor = (Decimal('100') - descuento_pct) / Decimal('100')
+                monto_final = (subtotal * factor).quantize(Decimal('0.01'))
+        except Exception:
+            pass  # Sin combo → pedido borrador con monto 0
 
         # Marcar oferta como 'aplicada' ANTES de crear el Pedido
         # para que Pedido.save() no intente aplicar el descuento de nuevo
@@ -90,7 +89,7 @@ def _crear_pedido_desde_oferta(oferta):
                 especificaciones=f'Generado automáticamente desde oferta #{oferta.id} – {oferta.titulo}',
             )
 
-        # Actualizar parametros de la oferta con el id del pedido creado
+        # Guardar id del pedido creado en los parámetros de la oferta
         params_actualizados['aplicada_pedido_id'] = pedido.pk
         oferta.parametros = params_actualizados
         oferta.save(update_fields=['parametros'])
@@ -227,7 +226,7 @@ from django.core.paginator import Paginator
 from django.db.models import OuterRef, Subquery, F, Count, Case, When, Value, IntegerField
 from clientes.models import Cliente
 from django.http import JsonResponse
-from .models import OrdenSugerida, OfertaAutomatica, RankingCliente, RankingHistorico, OfertaPropuesta
+from .models import OrdenSugerida, OfertaAutomatica, RankingCliente, RankingHistorico, OfertaPropuesta, AccionCliente
 from django.utils import timezone
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import get_user_model
