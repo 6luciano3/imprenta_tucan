@@ -30,7 +30,7 @@
           <th class="px-4 py-2 text-left">Cantidad</th>
           <th class="px-4 py-2 text-left">Proveedor recomendado</th>
           <th class="px-4 py-2 text-left">Estado</th>
-          <th class="px-4 py-2 text-left">Orden Compra</th>
+          <th class="px-4 py-2 text-left">Orden de Cotización</th>
           <th class="px-4 py-2 text-left">Consulta Stock</th>
           <th class="px-4 py-2 text-center w-40">Acciones</th>
         </tr>
@@ -49,11 +49,13 @@
             </span>
           </td>
           <td class="px-4 py-2">
-            {% if p.borrador_oc %}
-              <a href="{% url 'orden_compra_detalle' p.borrador_oc.id %}" target="_blank" class="flex items-center gap-2 text-sky-700 hover:underline">
-                <span class="material-symbols-outlined text-amber-600 text-base">receipt_long</span>
-                #{{ p.borrador_oc.id }} ({{ p.borrador_oc.estado }})
-              </a>
+            {% if p.borrador_oc and p.proveedor_recomendado %}
+              <button type="button"
+                onclick="openCotizacionModal('{{ p.proveedor_recomendado.id }}')"
+                class="inline-flex items-center gap-1 px-2 py-1 rounded bg-sky-50 border border-sky-200 text-sky-700 hover:bg-sky-100 text-xs">
+                <span class="material-symbols-outlined text-sm">request_quote</span>
+                Ver cotización
+              </button>
             {% else %}
               <span class="text-slate-400">—</span>
             {% endif %}
@@ -161,7 +163,97 @@
     </div>
   </div>
 </div>
+{% for prov_id, items in cotizaciones.items %}
+{% with prov=items.0.proveedor_recomendado %}
+<div id="modal-cotizacion-{{ prov_id }}" class="fixed inset-0 bg-black/40 z-50 hidden">
+  <div class="bg-white rounded-xl shadow-xl w-full max-w-2xl mx-auto mt-16 p-0 overflow-hidden">
+    <!-- Header -->
+    <div class="bg-slate-700 text-white px-6 py-4 flex justify-between items-center">
+      <div>
+        <div class="text-xs text-slate-300 uppercase tracking-wide">Solicitud de Cotización de Insumos</div>
+        <div class="font-bold text-lg">Nº {{ items.0.borrador_oc.id|stringformat:"06d" }}</div>
+      </div>
+      <button type="button" class="p-1 rounded hover:bg-slate-600" onclick="closeCotizacionModal('{{ prov_id }}')">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+    <!-- Empresa + Proveedor -->
+    <div class="flex justify-between px-6 pt-4 pb-2 border-b">
+      <div class="text-sm">
+        <div class="font-bold text-base">{{ empresa_razon_social }}</div>
+        <div class="text-slate-500">{{ empresa_domicilio }}</div>
+        <div class="text-slate-500">IVA: {{ empresa_condicion_iva }}</div>
+      </div>
+      <div class="text-sm text-right">
+        <div class="text-slate-500">Proveedor:</div>
+        <div class="font-bold">{{ prov.nombre }}</div>
+        <div class="text-slate-500">CUIT: {{ prov.cuit }}</div>
+        <div class="text-slate-500">{{ prov.direccion }}</div>
+        <div class="text-slate-500">{{ prov.email }}</div>
+      </div>
+    </div>
+    <!-- Fecha Moneda -->
+    <div class="flex gap-8 px-6 py-2 border-b text-sm text-slate-600">
+      <div><span class="font-semibold">Fecha:</span> {% now "d/m/Y" %}</div>
+      <div><span class="font-semibold">Moneda:</span> ARS</div>
+      <div><span class="font-semibold">Proveedor:</span> {{ prov.nombre }}</div>
+    </div>
+    <!-- Tabla insumos -->
+    <div class="px-6 py-3">
+      <div class="font-semibold text-sm mb-2">Detalle de Productos</div>
+      <table class="min-w-full text-xs border">
+        <thead class="bg-slate-700 text-white">
+          <tr>
+            <th class="px-2 py-1 text-left border-r border-slate-600">Código</th>
+            <th class="px-2 py-1 text-left border-r border-slate-600">Descripción</th>
+            <th class="px-2 py-1 text-center border-r border-slate-600">Cantidad solicitada</th>
+            <th class="px-2 py-1 text-center">Unidad</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in items %}
+          <tr class="{% cycle 'bg-white' 'bg-sky-50' %}">
+            <td class="border px-2 py-1">{{ item.insumo.codigo }}</td>
+            <td class="border px-2 py-1">{{ item.insumo.nombre }}</td>
+            <td class="border px-2 py-1 text-center">{{ item.cantidad_requerida }}</td>
+            <td class="border px-2 py-1 text-center">{{ item.insumo.unidad_medida|default:"unidad" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <!-- Entrega + Generado -->
+    <div class="flex gap-4 px-6 py-3 border-t text-sm">
+      <div class="flex-1">
+        <div class="font-semibold mb-1">Entrega a:</div>
+        <div>{{ empresa_razon_social }}</div>
+        <div class="text-slate-500">{{ empresa_domicilio }}</div>
+        <div class="text-slate-500">Tel: {{ empresa_telefono }}</div>
+      </div>
+      <div class="flex-1 text-right text-slate-600">
+        <div><span class="font-semibold">Generado por:</span> {{ request.user.get_full_name|default:request.user.username }}</div>
+        <div><span class="font-semibold">Fecha:</span> {% now "d/m/Y" %}</div>
+      </div>
+    </div>
+    <!-- Firma -->
+    <div class="px-6 pb-4 pt-2 border-t flex gap-8">
+      <div><div class="h-8 border-b border-slate-400 w-28"></div><div class="text-xs text-slate-500 mt-1">Firma autorizada</div></div>
+      <div><div class="h-8 border-b border-slate-400 w-28"></div><div class="text-xs text-slate-500 mt-1">Cargo</div></div>
+    </div>
+  </div>
+</div>
+{% endwith %}
+{% endfor %}
+
 <script>
+  function openCotizacionModal(id) {
+    var m = document.getElementById('modal-cotizacion-' + id);
+    if (m) { m.classList.remove('hidden'); }
+  }
+  function closeCotizacionModal(id) {
+    var m = document.getElementById('modal-cotizacion-' + id);
+    if (m) { m.classList.add('hidden'); }
+  }
   function openPropuestaModal(id) {
     var m = document.getElementById('modal-propuesta-' + id);
     if (m) { m.classList.remove('hidden'); }

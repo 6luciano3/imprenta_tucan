@@ -426,13 +426,13 @@ def editar_reglas_ofertas(request):
 def empresa_config(request):
     from .models import Parametro, GrupoParametro
     CAMPOS = [
-        ('EMPRESA_RAZON_SOCIAL', 'Raz?n Social'),
-        ('EMPRESA_CUIT',         'CUIT'),
-        ('EMPRESA_DOMICILIO',    'Domicilio'),
-        ('EMPRESA_TELEFONO',     'Tel?fono'),
-        ('EMPRESA_EMAIL',        'Email interno'),
-        ('EMPRESA_EMAIL_CONTACTO', 'Email p?blico de contacto'),
-        ('EMPRESA_CONDICION_IVA','Condici?n ante IVA'),
+        ('EMPRESA_RAZON_SOCIAL',   'Razón Social'),
+        ('EMPRESA_CUIT',           'CUIT'),
+        ('EMPRESA_DOMICILIO',      'Domicilio'),
+        ('EMPRESA_TELEFONO',       'Teléfono'),
+        ('EMPRESA_EMAIL',          'Email interno'),
+        ('EMPRESA_EMAIL_CONTACTO', 'Email público de contacto'),
+        ('EMPRESA_CONDICION_IVA',  'Condición ante IVA'),
     ]
     if request.method == 'POST':
         grupo, _ = GrupoParametro.objects.get_or_create(
@@ -454,8 +454,12 @@ def empresa_config(request):
         from django.shortcuts import redirect
         return redirect('empresa_config')
 
-    datos = {codigo: Parametro.get(codigo, '') for codigo, _ in CAMPOS}
+    # Pasar lista de (codigo, nombre, valor) para evitar lookup de dict en template
+    campos_con_valor = [
+        (codigo, nombre, Parametro.get(codigo, ''))
+        for codigo, nombre in CAMPOS
+    ]
     from django.shortcuts import render
     return render(request, 'configuracion/empresa_config.html', {
-        'datos': datos, 'campos': CAMPOS
+        'campos_con_valor': campos_con_valor
     })

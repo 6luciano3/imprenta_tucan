@@ -814,7 +814,7 @@ def _ensure_demo_ordenes():
                 defaults={
                     "nombre": "Demo",
                     "apellido": "Cliente",
-                    "razon_social": "Imprenta Tucán",
+                    "razon_social": Parametro.get("EMPRESA_RAZON_SOCIAL", "Imprenta Tucán"),
                     "direccion": "Av. Demo 123",
                     "ciudad": "Posadas",
                     "provincia": "Misiones",
@@ -948,11 +948,21 @@ def compras_propuestas_admin(request):
     # Sort: propuestas por nombre de insumo
     rows.sort(key=lambda x: str(x.insumo.nombre))
 
+    # Agrupar por proveedor para modales de cotizacion
+    from collections import defaultdict
+    cotizaciones = defaultdict(list)
+    for p in rows:
+        if p.proveedor_recomendado and p.borrador_oc:
+            cotizaciones[p.proveedor_recomendado.id].append(p)
+
     # Paginate
     paginator = Paginator(rows, page_size)
     page = request.GET.get('page')
     propuestas = paginator.get_page(page)
-    return render(request, 'automatizacion/compras_propuestas.html', {'propuestas': propuestas})
+    return render(request, 'automatizacion/compras_propuestas.html', {
+        'propuestas': propuestas,
+        'cotizaciones': dict(cotizaciones),
+    })
 
 
 @login_required
@@ -1039,7 +1049,7 @@ def aceptar_compra_propuesta(request, propuesta_id):
                 'orden': oc,
                 'proveedor': oc.proveedor,
                 'empresa': {
-                    'razon_social': 'Imprenta Tucán S.A.',
+                    'razon_social': Parametro.get('EMPRESA_RAZON_SOCIAL', 'Imprenta Tucán S.A.'),
                     'cuit': '30-12345678-9',
                     'domicilio': 'Av. Principal 123, Tucumán',
                     'telefono': '381-4000000',
@@ -1052,7 +1062,7 @@ def aceptar_compra_propuesta(request, propuesta_id):
             }
             html_message = render_to_string('pedidos/orden_compra_detalle.html', context)
             send_mail(
-                subject=f"Orden de Compra #{oc.id:06d} - Imprenta Tucán",
+                subject=f"Orden de Compra #{oc.id:06d} - {Parametro.get('EMPRESA_RAZON_SOCIAL', 'Imprenta Tucán')}",
                 message="Adjuntamos la orden de compra generada.",
                 from_email=getattr(settings, 'DEFAULT_FROM_EMAIL', 'info@imprentatucan.com'),
                 recipient_list=[oc.proveedor.email],

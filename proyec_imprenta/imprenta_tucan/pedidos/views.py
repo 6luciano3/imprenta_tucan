@@ -579,8 +579,11 @@ def orden_compra_detalle(request, pk):
         'orden': orden,
         'proveedor': proveedor,
         'empresa': empresa,
+        'precio_unitario': '{:.2f}'.format(float(precio_unitario)) if precio_unitario else None,
         'subtotal': '{:.2f}'.format(subtotal),
         'iva': '{:.2f}'.format(iva),
         'total': '{:.2f}'.format(total),
+        'stock_actual': getattr(orden.insumo, 'stock', None),
+        'stock_minimo': getattr(orden.insumo, 'stock_minimo', None),
     }
     return render(request, 'pedidos/orden_compra_detalle.html', context)

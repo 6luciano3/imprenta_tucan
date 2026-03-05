@@ -48,6 +48,7 @@ class Insumo(models.Model):
     stock = models.IntegerField(default=0)
     precio = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     activo = models.BooleanField(default=True)
+    unidad_medida = models.CharField(max_length=20, default='unidad', blank=True)
     tipo = models.CharField(
         max_length=10,
         choices=TIPO_CHOICES,
