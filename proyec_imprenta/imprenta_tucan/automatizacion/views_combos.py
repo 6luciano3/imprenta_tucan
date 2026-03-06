@@ -27,9 +27,16 @@ def _productos_mas_pedidos(cliente, top_n=5, ventana_dias=180):
 
 def _determinar_descuento(cliente):
     """
-    Descuento continuo proporcional al score exacto del cliente.
-    Escala lineal: score 0 → 3 %, score 100 → 20 %.
-    Así el Total Final baja a medida que el score sube.
+    Descuento (%) según el tier del cliente, usando la misma tabla de
+    categorías que generar_ofertas_segmentadas() (core/ai_ml/ofertas.py).
+
+      Premium    (score ≥ 90): 15 %
+      Estratégico(score ≥ 60): 10 %
+      Estándar   (score ≥ 30):  7 %
+      Nuevo      (score  < 30):  5 %
+
+    Unificar ambas vías en una sola función evita inconsistencias cuando
+    los combos se crean desde la vista y desde la tarea Celery en paralelo.
     """
     try:
         from automatizacion.models import RankingCliente
@@ -37,7 +44,9 @@ def _determinar_descuento(cliente):
         score = max(0.0, min(100.0, float(rc.score) if rc else 0.0))
     except Exception:
         score = 0.0
-    return round(3 + (score / 100) * 17, 1)  # rango [3.0 .. 20.0]
+    # Deferred import para evitar circularidad a nivel de módulo
+    from core.ai_ml.ofertas import descuento_por_score
+    return descuento_por_score(score)
 
 def _cantidad_fallback(producto):
     """Cantidad realista por tipo de producto cuando no hay historial de pedidos."""

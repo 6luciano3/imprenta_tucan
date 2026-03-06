@@ -7,6 +7,13 @@ Pipeline:
     2. Clasifica clientes en tiers: Premium / Estratégico / Estándar / Nuevo.
     3. Genera combos personalizados con filtrado colaborativo.
     4. Retroalimenta el score cuando el cliente acepta/rechaza una oferta.
+
+Separación de responsabilidades:
+    - La lógica de ranking reside en core/ai_ml/ranking.py.
+    - La lógica de generación de ofertas reside en core/ai_ml/ofertas.py.
+    - Este engine actúa como orquestador; no duplica algoritmos.
+    - Las tareas Celery (tarea_ranking_clientes, tarea_generar_ofertas) son
+      thin wrappers que delegan a los módulos ai_ml, no a este engine.
 """
 from .base import ProcesoInteligenteBase
 
@@ -17,21 +24,21 @@ class ClienteInteligenteEngine(ProcesoInteligenteBase):
     def ejecutar(self, **kwargs) -> dict:
         """
         Ejecuta el ciclo completo:
-            1. Recalcula ranking multicriterio de todos los clientes.
-            2. Genera ofertas segmentadas por tier.
+            1. Recalcula ranking multicriterio (core/ai_ml/ranking.py).
+            2. Genera ofertas segmentadas por tier (core/ai_ml/ofertas.py).
 
         Retorna:
             {
                 'estado': 'ok',
-                'ranking': <resultado de tarea_ranking_clientes>,
-                'ofertas': <resultado de tarea_generar_ofertas>,
+                'ranking': {'actualizados': int, 'periodo': str},
+                'ofertas': {'generadas': int, 'periodo': str},
             }
         """
         try:
-            # Importación diferida para evitar problemas con Django setup
-            from automatizacion.tasks import tarea_ranking_clientes, tarea_generar_ofertas
-            res_ranking = tarea_ranking_clientes()
-            res_ofertas = tarea_generar_ofertas()
+            from core.ai_ml.ranking import calcular_ranking_clientes
+            from core.ai_ml.ofertas import generar_ofertas_segmentadas
+            res_ranking = calcular_ranking_clientes()
+            res_ofertas = generar_ofertas_segmentadas()
             return {
                 'estado': 'ok',
                 'ranking': res_ranking,

@@ -8,12 +8,14 @@ Permite modificar el comportamiento del motor sin desplegar código.
 # Valores por defecto — se usan cuando la BD no tiene el parámetro
 DEFAULTS = {
     # --- Ranking de Clientes ---
-    'RANKING_VENTANA_DIAS': 90,
+    # Los cinco pesos deben sumar 100 (se usan como porcentajes enteros).
+    # Distribución: valor_total=30, margen=25, cantidad=20, frecuencia=15, critico=10 → total=100
+    'RANKING_VENTANA_DIAS': 365,
     'RANKING_PESO_VALOR_TOTAL': 30,
-    'RANKING_PESO_CANTIDAD': 25,
-    'RANKING_PESO_FRECUENCIA': 20,
-    'RANKING_PESO_CONSUMO_CRITICO': 20,
-    'RANKING_PESO_MARGEN': 30,
+    'RANKING_PESO_CANTIDAD': 20,
+    'RANKING_PESO_FRECUENCIA': 15,
+    'RANKING_PESO_CONSUMO_CRITICO': 10,
+    'RANKING_PESO_MARGEN': 25,
     'RANKING_PERIODICIDAD': 'mensual',
 
     # --- Proceso de Proveedores ---
