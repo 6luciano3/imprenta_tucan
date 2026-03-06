@@ -101,11 +101,20 @@ class OrdenCompra(models.Model):
     comentario = models.TextField(blank=True)
     # Token único para que el proveedor confirme/rechace sin necesidad de login
     token_proveedor = models.CharField(max_length=64, blank=True, unique=True, null=True)
+    # Fecha en que el proveedor respondió (confirma o rechaza). Permite medir latencia.
+    fecha_respuesta = models.DateTimeField(
+        null=True, blank=True,
+        help_text='Se asigna automáticamente la primera vez que el estado cambia a confirmada o rechazada.',
+    )
 
     def save(self, *args, **kwargs):
         if not self.token_proveedor:
             import uuid
             self.token_proveedor = uuid.uuid4().hex
+        # Registrar fecha de respuesta la primera vez que se confirma o rechaza
+        if self.estado in ('confirmada', 'rechazada') and not self.fecha_respuesta:
+            from django.utils import timezone
+            self.fecha_respuesta = timezone.now()
         super().save(*args, **kwargs)
 
     def __str__(self):

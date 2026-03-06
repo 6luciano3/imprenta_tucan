@@ -40,94 +40,181 @@ class ProveedorInteligenteEngine(ProcesoInteligenteBase):
 
     def _precio_relativo(self, proveedor, insumo=None) -> float:
         """
-        Precio relativo del proveedor en escala [0, 1].
-        0 = más barato que la media; 1 = el doble de la media o más.
+        Precio relativo normalizado min-max sobre todos los proveedores activos.
+        0.0 = precio mínimo (más barato); 1.0 = precio máximo (más caro).
 
-        - Con insumo: compara precio_unitario del insumo vs. media del mismo nombre.
-        - Sin insumo: compara promedio de todos los insumos del proveedor vs. media global.
-        - Si no hay datos suficientes: retorna 0.5 (neutro).
+        Reemplaza la normalización por media*2 que saturaba para precios
+        más del doble de la media sin discriminar entre ellos.
+
+        - Con insumo: rango de precios del mismo insumo en todos los proveedores activos.
+        - Sin insumo: rango de precios promedio por proveedor activo.
+        - Rango nulo o sin datos: retorna 0.5 (neutro).
         """
-        from django.db.models import Avg
+        from django.db.models import Avg, Min, Max
         from insumos.models import Insumo as InsumoModel
         try:
             if insumo is not None:
                 precio_insumo = float(insumo.precio_unitario or 0)
-                global_avg = (
+                stats = (
                     InsumoModel.objects
                     .filter(nombre=insumo.nombre, proveedor__activo=True)
-                    .aggregate(avg=Avg('precio_unitario'))['avg']
+                    .aggregate(min_p=Min('precio_unitario'), max_p=Max('precio_unitario'))
                 )
-                if not global_avg or global_avg == 0:
-                    return 0.5
-                return min(1.0, max(0.0, precio_insumo / (float(global_avg) * 2)))
+                min_p = float(stats['min_p'] or 0)
+                max_p = float(stats['max_p'] or 0)
             else:
                 proveedor_avg = (
                     InsumoModel.objects
                     .filter(proveedor=proveedor)
                     .aggregate(avg=Avg('precio_unitario'))['avg']
                 )
-                global_avg = (
+                if proveedor_avg is None:
+                    return 0.5
+                precio_insumo = float(proveedor_avg)
+                # Min-max del precio promedio por proveedor activo
+                rows = (
                     InsumoModel.objects
                     .filter(proveedor__activo=True)
-                    .aggregate(avg=Avg('precio_unitario'))['avg']
+                    .values('proveedor')
+                    .annotate(avg_p=Avg('precio_unitario'))
                 )
-                if not proveedor_avg or not global_avg or global_avg == 0:
+                avgs = [float(r['avg_p'] or 0) for r in rows if r['avg_p'] is not None]
+                if not avgs:
                     return 0.5
-                return min(1.0, max(0.0, float(proveedor_avg) / (float(global_avg) * 2)))
+                min_p, max_p = min(avgs), max(avgs)
+
+            rango = max_p - min_p
+            if rango < 0.0001:
+                return 0.5  # todos los proveedores tienen el mismo precio
+            return min(1.0, max(0.0, (precio_insumo - min_p) / rango))
         except Exception:
             return 0.5
 
     def _cumplimiento(self, proveedor) -> float:
-        """Proporción de órdenes confirmadas. Sin historial → 1.0 (beneficio de la duda)."""
+        """
+        Proporción PONDERADA de órdenes confirmadas con decaimiento temporal exponencial.
+        Órdenes recientes tienen mayor peso; órdenes antiguas impactan menos.
+        Lambda (por día) configurable desde BD (CUMPLIMIENTO_DECAY_LAMBDA).
+        Sin historial → 1.0 (beneficio de la duda).
+        """
+        import math
+        from django.utils import timezone
         from pedidos.models import OrdenCompra
-        ordenes = OrdenCompra.objects.filter(proveedor=proveedor)
-        total = ordenes.count()
-        if total == 0:
+        ordenes = list(
+            OrdenCompra.objects.filter(proveedor=proveedor).order_by('-fecha_creacion')[:100]
+        )
+        if not ordenes:
             return 1.0
-        return ordenes.filter(estado='confirmada').count() / total
+        lam = MotorConfig.get('CUMPLIMIENTO_DECAY_LAMBDA', cast=float) or 0.01
+        ahora = timezone.now()
+        peso_total = peso_confirmadas = 0.0
+        for o in ordenes:
+            dias = max(0, (ahora - o.fecha_creacion).days)
+            w = math.exp(-lam * dias)
+            peso_total += w
+            if o.estado == 'confirmada':
+                peso_confirmadas += w
+        return peso_confirmadas / peso_total if peso_total > 0 else 1.0
 
     def _incidencias(self, proveedor) -> float:
-        """Proporción de órdenes rechazadas. Sin historial → 0.0 (sin incidencias conocidas)."""
+        """
+        Proporción PONDERADA de órdenes rechazadas con decaimiento temporal exponencial.
+        Órdenes recientes tienen mayor peso; órdenes antiguas impactan menos.
+        Sin historial → 0.0 (sin incidencias conocidas).
+        """
+        import math
+        from django.utils import timezone
         from pedidos.models import OrdenCompra
-        ordenes = OrdenCompra.objects.filter(proveedor=proveedor)
-        total = ordenes.count()
-        if total == 0:
+        ordenes = list(
+            OrdenCompra.objects.filter(proveedor=proveedor).order_by('-fecha_creacion')[:100]
+        )
+        if not ordenes:
             return 0.0
-        return ordenes.filter(estado='rechazada').count() / total
+        lam = MotorConfig.get('CUMPLIMIENTO_DECAY_LAMBDA', cast=float) or 0.01
+        ahora = timezone.now()
+        peso_total = peso_rechazadas = 0.0
+        for o in ordenes:
+            dias = max(0, (ahora - o.fecha_creacion).days)
+            w = math.exp(-lam * dias)
+            peso_total += w
+            if o.estado == 'rechazada':
+                peso_rechazadas += w
+        return peso_rechazadas / peso_total if peso_total > 0 else 0.0
 
     def _disponibilidad(self, proveedor, insumo=None) -> float:
         """
-        Proporción de consultas de stock con resultado positivo (últimas 10).
-        Sin historial → 1.0 (asumir disponible).
+        Proporción de consultas de stock positivas en el período reciente.
+        Filtra por los últimos DISPONIBILIDAD_DIAS días (default 90) y,
+        si se indica, por insumo. Sin historial reciente → 1.0 (disponible).
         """
         from automatizacion.models import ConsultaStockProveedor
-        qs = ConsultaStockProveedor.objects.filter(proveedor=proveedor)
+        from django.utils import timezone
+        from datetime import timedelta
+        dias = MotorConfig.get('DISPONIBILIDAD_DIAS', cast=int) or 90
+        desde = timezone.now() - timedelta(days=dias)
+        qs = ConsultaStockProveedor.objects.filter(proveedor=proveedor, creado__gte=desde)
         if insumo is not None:
             qs = qs.filter(insumo=insumo)
-        qs = qs.order_by('-creado')[:10]
         if not qs.exists():
             return 1.0
         positivas = qs.filter(estado__in=['disponible', 'parcial']).count()
         return positivas / qs.count()
+
+    def _latencia_promedio_dias(self, proveedor) -> float:
+        """
+        Latencia media de respuesta (fecha_creacion → fecha_respuesta) normalizada [0, 1].
+        0.0 = responde instantáneamente (mejor score); 1.0 = supera LATENCIA_MAX_DIAS.
+        Sin órdenes con fecha_respuesta registrada → 0.5 (neutro).
+        """
+        from pedidos.models import OrdenCompra
+        max_dias = MotorConfig.get('LATENCIA_MAX_DIAS', cast=float) or 30.0
+        qs = OrdenCompra.objects.filter(
+            proveedor=proveedor,
+            estado='confirmada',
+            fecha_respuesta__isnull=False,
+        )
+        if not qs.exists():
+            return 0.5  # neutro cuando no hay datos históricos de latencia
+        total_dias = 0.0
+        count = 0
+        for o in qs:
+            delta = (o.fecha_respuesta - o.fecha_creacion).days
+            if delta >= 0:
+                total_dias += delta
+                count += 1
+        if count == 0:
+            return 0.5
+        return min(1.0, max(0.0, (total_dias / count) / max_dias))
 
     # ------------------------------------------------------------------ #
     # Score ponderado                                                      #
     # ------------------------------------------------------------------ #
 
     def calcular_score(self, proveedor, insumo=None) -> float:
-        """Score ponderado [0, 100]. Mayor es mejor."""
+        """
+        Score ponderado [0, 100]. Mayor es mejor.
+        Incorpora 5 criterios: precio (min-max), cumplimiento (ponderado temporal),
+        incidencias (ponderado temporal), disponibilidad (ventana reciente), latencia.
+        Los pesos se normalizan por su suma para mantener la escala 0-100.
+        """
         pesos = self._get_pesos()
-        precio = self._precio_relativo(proveedor, insumo)
-        cumplimiento = self._cumplimiento(proveedor)
-        incidencias = self._incidencias(proveedor)
+        peso_latencia = MotorConfig.get('PESO_LATENCIA', cast=float) or 0.1
+
+        precio        = self._precio_relativo(proveedor, insumo)
+        cumplimiento  = self._cumplimiento(proveedor)
+        incidencias   = self._incidencias(proveedor)
         disponibilidad = self._disponibilidad(proveedor, insumo)
-        score = (
-            pesos['precio'] * (1 - precio) +
-            pesos['cumplimiento'] * cumplimiento +
-            pesos['incidencias'] * (1 - incidencias) +
-            pesos['disponibilidad'] * disponibilidad
+        latencia      = self._latencia_promedio_dias(proveedor)
+
+        score_bruto = (
+            pesos['precio']         * (1 - precio) +
+            pesos['cumplimiento']   * cumplimiento +
+            pesos['incidencias']    * (1 - incidencias) +
+            pesos['disponibilidad'] * disponibilidad +
+            peso_latencia           * (1 - latencia)
         )
-        return round(score * 100, 2)
+        peso_sum = sum(pesos.values()) + peso_latencia
+        return round((score_bruto / peso_sum) * 100, 2) if peso_sum > 0 else 0.0
 
     # ------------------------------------------------------------------ #
     # Recomendación                                                        #

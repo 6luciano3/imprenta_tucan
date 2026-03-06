@@ -26,6 +26,16 @@ DEFAULTS = {
     'DEMANDA_MESES_HISTORICO': 3,
     'INSUMO_CRITICO_UMBRAL_PRECIO': 500.0,
     'STOCK_MINIMO_GLOBAL': 10,
+
+    # --- Temporización / Latencia de Proveedores ---
+    # lambda para decaimiento exponencial en cumplimiento/incidencias (por día)
+    'CUMPLIMIENTO_DECAY_LAMBDA': 0.01,
+    # ventana de tiempo para consultas de stock (días)
+    'DISPONIBILIDAD_DIAS': 90,
+    # días máximos esperados de respuesta del proveedor (normaliza latencia)
+    'LATENCIA_MAX_DIAS': 30.0,
+    # peso del criterio latencia en el score final
+    'PESO_LATENCIA': 0.1,
 }
 
 

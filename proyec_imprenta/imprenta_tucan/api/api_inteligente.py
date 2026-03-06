@@ -200,11 +200,12 @@ class ScoreProveedorViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         qs = ScoreProveedor.objects.select_related('proveedor').all()
         if not qs.exists():
-            # Fallback: calcular y persistir scores para proveedores activos
+            # Fallback: calcular y persistir scores usando el motor PI-2 actualizado
             from proveedores.models import Proveedor
+            from core.motor.proveedor_engine import ProveedorInteligenteEngine
+            engine = ProveedorInteligenteEngine()
             for proveedor in Proveedor.objects.filter(activo=True):
-                # Usa servicio inteligente para cálculo real
-                score = ProveedorInteligenteService.calcular_score(proveedor, insumo=None)
+                score = engine.calcular_score(proveedor, insumo=None)
                 ScoreProveedor.objects.update_or_create(
                     proveedor=proveedor,
                     defaults={'score': score}
