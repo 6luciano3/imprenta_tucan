@@ -30,8 +30,10 @@ from productos.models import Producto
 from proveedores.models import Proveedor
 from insumos.models import Insumo
 from .models import OrdenCompra
+from configuracion.permissions import require_perm
 
 
+@require_perm('Pedidos', 'Listar')
 def lista_pedidos(request):
     """Lista unificada con búsqueda, orden y paginación para Pedidos."""
     query = (request.GET.get("q", "") or request.GET.get("criterio", "")).strip()
@@ -45,7 +47,7 @@ def lista_pedidos(request):
     if order_by not in valid_order_fields:
         order_by = "id"
 
-    qs = Pedido.objects.select_related("cliente", "estado")
+    qs = Pedido.objects.select_related("cliente", "estado").prefetch_related("lineas__producto")
 
     if query:
         if query.isdigit():
@@ -53,14 +55,16 @@ def lista_pedidos(request):
                            Q(cliente__nombre__icontains=query) |
                            Q(cliente__apellido__icontains=query) |
                            Q(cliente__razon_social__icontains=query) |
-                           Q(estado__nombre__icontains=query))
+                           Q(estado__nombre__icontains=query) |
+                           Q(lineas__producto__nombreProducto__icontains=query)).distinct()
         else:
             qs = qs.filter(
                 Q(cliente__nombre__icontains=query) |
                 Q(cliente__apellido__icontains=query) |
                 Q(cliente__razon_social__icontains=query) |
-                Q(estado__nombre__icontains=query)
-            )
+                Q(estado__nombre__icontains=query) |
+                Q(lineas__producto__nombreProducto__icontains=query)
+            ).distinct()
 
     order_field = f"-{order_by}" if direction == "desc" else order_by
     qs = qs.order_by(order_field)
@@ -82,6 +86,7 @@ def lista_pedidos(request):
     )
 
 
+@require_perm('Pedidos', 'Crear')
 def alta_pedido(request):
     # Permitir precargar cliente vía querystring ?cliente=<id>
     initial = {}
@@ -128,6 +133,23 @@ def alta_pedido(request):
                     )
             except Exception:
                 pass
+
+            # Requiere al menos un producto
+            if not lineas:
+                messages.error(request, "Debe agregar al menos un producto al pedido.")
+                return render(request, "pedidos/alta_pedido.html", {
+                    "header_form": header_form,
+                    "formset": formset,
+                    "fecha_pedido_hoy": timezone.now().date(),
+                    "precios": {p.pk: float(p.precio) for p in Producto.objects.all()},
+                    "productos_calculadora": list(
+                        Producto.objects.filter(activo=True)
+                        .order_by('nombreProducto')
+                        .values('idProducto', 'nombreProducto', 'unidadMedida__abreviatura', 'unidadMedida__nombreUnidad')
+                    ),
+                    "proximo_numero_pedido": (Pedido.objects.order_by('-id').first().id + 1) if Pedido.objects.exists() else 1,
+                    "clientes_data": [],
+                })
 
             ok, faltantes = verificar_insumos_para_lineas([(p, c) for (p, c, _e) in lineas])
             if not ok:
@@ -225,12 +247,32 @@ def alta_pedido(request):
     )
     precios = {p.pk: float(p.precio) for p in Producto.objects.all()}
 
-    # Exponer todos los datos de clientes para JS (id, nombre, apellido, razon_social, email, telefono, celular)
+    # Exponer todos los datos de clientes para JS (id, nombre, apellido, razon_social, email, telefono, celular, ranking)
     from clientes.models import Cliente
+    from automatizacion.models import RankingCliente
+
+    # Construir mapa de ranking por cliente_id
+    ranking_map = {
+        cliente_id: score
+        for cliente_id, score in RankingCliente.objects.values_list('cliente_id', 'score')
+    }
+
+    def _score_a_tier(score):
+        if score is None:
+            return {'tier': 'Sin ranking', 'descuento': 0, 'color': 'secondary'}
+        if score >= 90:
+            return {'tier': 'Premium', 'descuento': 15, 'color': 'warning'}
+        if score >= 60:
+            return {'tier': 'Estratégico', 'descuento': 10, 'color': 'primary'}
+        if score >= 30:
+            return {'tier': 'Estándar', 'descuento': 7, 'color': 'info'}
+        return {'tier': 'Nuevo', 'descuento': 5, 'color': 'success'}
+
     clientes_data = []
     for c in Cliente.objects.all():
-        # Si el modelo tiene un campo CUIT, inclúyelo. Si no, deja vacío.
         cuit = getattr(c, 'cuit', '')
+        score = ranking_map.get(c.id)
+        tier_info = _score_a_tier(score)
         clientes_data.append({
             "id": c.id,
             "nombre": c.nombre,
@@ -241,6 +283,10 @@ def alta_pedido(request):
             "telefono": c.telefono,
             "celular": c.celular or "",
             "tipo_cliente": getattr(c, 'tipo_cliente', '') or '',
+            "score": round(score, 2) if score is not None else None,
+            "tier": tier_info['tier'],
+            "descuento_ranking": tier_info['descuento'],
+            "tier_color": tier_info['color'],
         })
 
     return render(
@@ -351,6 +397,7 @@ def verificar_stock_modificar(request, idPedido: int):
     return JsonResponse({"ok": False, "faltantes": detalle})
 
 
+@require_perm('Pedidos', 'Ver')
 def buscar_pedido(request):
     cliente_context = None
     pedidos = None
@@ -373,6 +420,7 @@ def buscar_pedido(request):
     return render(request, "pedidos/buscar_pedido.html", {"form": form, "pedidos": pedidos, "cliente": cliente_context})
 
 
+@require_perm('Pedidos', 'Ver')
 def detalle_pedido(request, pk: int):
     from django.shortcuts import get_object_or_404
 
@@ -413,6 +461,7 @@ def detalle_pedido(request, pk: int):
     )
 
 
+@require_perm('Pedidos', 'Editar')
 def modificar_pedido(request, idPedido: int):
     """Permite modificar un pedido existente.
 
@@ -529,6 +578,7 @@ def modificar_pedido(request, idPedido: int):
     })
 
 
+@require_perm('Pedidos', 'Eliminar')
 def eliminar_pedido(request, idPedido: int):
     """Eliminar Pedido con confirmación (POST). Visible para todos; el servidor valida permisos."""
     from django.shortcuts import get_object_or_404
@@ -558,6 +608,7 @@ def eliminar_pedido(request, idPedido: int):
     return redirect("lista_pedidos")
 
 
+@require_perm('Pedidos', 'Ver')
 def orden_compra_detalle(request, pk):
     orden = OrdenCompra.objects.select_related('proveedor', 'insumo').get(pk=pk)
     proveedor = orden.proveedor

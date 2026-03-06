@@ -4,10 +4,12 @@ from django.core.paginator import Paginator
 from django.contrib import messages
 from .models import Cliente
 from .forms import ClienteForm
+from configuracion.permissions import require_perm
 
 # Alta de cliente
 
 
+@require_perm('Clientes', 'Crear')
 def alta_cliente(request):
     if request.method == 'POST':
         form = ClienteForm(request.POST)
@@ -25,6 +27,7 @@ def alta_cliente(request):
 # Lista de clientes unificada con búsqueda y ordenamiento (reemplaza "buscar")
 
 
+@require_perm('Clientes', 'Listar')
 def lista_clientes(request):
     # Parámetros unificados: usamos 'q' para búsqueda; mantenemos 'criterio' como alias por compatibilidad
     query = request.GET.get('q', '') or request.GET.get('criterio', '')
@@ -70,6 +73,7 @@ def lista_clientes(request):
 # Detalle de cliente
 
 
+@require_perm('Clientes', 'Ver')
 def detalle_cliente(request, id):
     cliente = get_object_or_404(Cliente, id=id)
     return render(request, 'clientes/detalle_cliente.html', {'cliente': cliente})
@@ -77,6 +81,7 @@ def detalle_cliente(request, id):
 # Editar cliente
 
 
+@require_perm('Clientes', 'Editar')
 def editar_cliente(request, id):
     cliente = get_object_or_404(Cliente, id=id)
     if request.method == 'POST':
@@ -95,6 +100,7 @@ def editar_cliente(request, id):
 # Eliminar cliente
 
 
+@require_perm('Clientes', 'Eliminar')
 def eliminar_cliente(request, id):
     cliente = get_object_or_404(Cliente, id=id)
     if request.method == 'POST':
@@ -106,6 +112,7 @@ def eliminar_cliente(request, id):
 
 
 # Activar/desactivar cliente (toggle)
+@require_perm('Clientes', 'Activar')
 def activar_cliente(request, id):
     cliente = get_object_or_404(Cliente, id=id)
     if request.method == 'POST':
@@ -117,6 +124,7 @@ def activar_cliente(request, id):
 
 
 # Buscar cliente
+@require_perm('Clientes', 'Listar')
 def buscar_cliente(request):
     """Vista legacy: redirige a la lista unificada preservando querystring."""
     params = request.GET.urlencode()
@@ -128,6 +136,7 @@ def buscar_cliente(request):
 # Confirmar eliminación de cliente
 
 
+@require_perm('Clientes', 'Eliminar')
 def confirmar_eliminacion_cliente(request, id):
     cliente = get_object_or_404(Cliente, id=id)
 
@@ -139,6 +148,7 @@ def confirmar_eliminacion_cliente(request, id):
     return render(request, 'clientes/confirmar_eliminacion.html', {'cliente': cliente})
 
 
+@require_perm('Clientes', 'Activar')
 def activar_cliente(request, id):
     """Activar/desactivar cliente para igualar funcionalidad de proveedores"""
     cliente = get_object_or_404(Cliente, id=id)

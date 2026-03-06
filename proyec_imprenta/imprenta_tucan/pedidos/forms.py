@@ -30,9 +30,11 @@ class AltaPedidoHeaderForm(forms.Form):
 
     DESCUENTO_CHOICES = [
         ("0", "Sin descuento"),
-        ("20", "Descuento 20%"),
-        ("15", "Descuento 15%"),
-        ("10", "Descuento 10%"),
+        ("5", "Descuento 5% — Nuevo"),
+        ("7", "Descuento 7% — Estándar"),
+        ("10", "Descuento 10% — Estratégico"),
+        ("15", "Descuento 15% — Premium"),
+        ("20", "Descuento 20% (manual)"),
     ]
     descuento = forms.ChoiceField(
         label="Descuento",
@@ -63,7 +65,7 @@ class LineaPedidoForm(forms.Form):
 
 
 # Formset para múltiples líneas
-LineaPedidoFormSet = formset_factory(LineaPedidoForm, extra=1, can_delete=True)
+LineaPedidoFormSet = formset_factory(LineaPedidoForm, extra=0, can_delete=True)
 
 
 class SeleccionarClienteForm(forms.Form):

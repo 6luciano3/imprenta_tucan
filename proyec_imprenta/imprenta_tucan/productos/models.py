@@ -94,6 +94,10 @@ class ProductoInsumo(models.Model):
     cantidad_por_unidad = models.DecimalField(
         max_digits=10, decimal_places=3, help_text="Cantidad requerida por unidad de producto"
     )
+    es_costo_fijo = models.BooleanField(
+        default=False,
+        help_text="Si es True, la cantidad es fija por trabajo (no se multiplica por la cantidad pedida). Usar para planchas, fotolitos y similares."
+    )
 
     class Meta:
         unique_together = ('producto', 'insumo')

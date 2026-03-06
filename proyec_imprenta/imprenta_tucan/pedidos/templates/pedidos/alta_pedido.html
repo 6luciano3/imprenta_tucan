@@ -125,6 +125,10 @@
                 <div class="flex-grow-1">
                   <label class="form-label" for="id_descuento">Descuento</label>
                   {{ header_form.descuento }}
+                  <div id="rankingBadge" class="mt-1 d-none">
+                    <span id="rankingBadgeText" class="badge"></span>
+                    <small id="rankingBadgeHint" class="text-muted ms-1"></small>
+                  </div>
                 </div>
               </div>
             </div>
@@ -155,7 +159,7 @@
                 <td class="text-end"><input type="text" class="form-control text-end linea-total" value="0.00" readonly></td>
                 <td class="remove-line">
                   <button type="button" class="btn btn-outline-danger btn-sm btn-remove">Quitar</button>
-                  {% if form.DELETE %}{{ form.DELETE }}{% endif %}
+                  {% if form.DELETE %}<span class="d-none">{{ form.DELETE }}</span>{% endif %}
                 </td>
               </tr>
               {% endfor %}
@@ -168,10 +172,28 @@
             <button type="button" id="btnAdd" class="btn btn-outline-primary">+ Agregar producto</button>
           </div>
           <div>
-            <label class="form-label me-2 mb-0">Subtotal</label>
-            <input id="subtotal" class="form-control d-inline-block subtotal-box text-end" type="text" value="0.00" readonly style="width: 160px;">
-            <label class="form-label ms-3 me-2 mb-0">Monto Total</label>
-            <input id="montoTotal" class="form-control d-inline-block subtotal-box text-end" type="text" value="0.00" readonly style="width: 160px;">
+            <table class="table table-sm table-borderless mb-0 text-end" style="width: auto; min-width: 320px;">
+              <tbody>
+                <tr>
+                  <td class="text-muted pe-3">Subtotal</td>
+                  <td style="width:160px;">
+                    <input id="subtotal" class="form-control subtotal-box text-end" type="text" value="0.00" readonly>
+                  </td>
+                </tr>
+                <tr id="rowDescuento" class="d-none text-danger">
+                  <td class="pe-3" id="labelDescuento">Descuento (0%)</td>
+                  <td><input id="montoDescuento" class="form-control text-end text-danger" type="text" value="0.00" readonly></td>
+                </tr>
+                <tr id="rowIVA" class="d-none text-primary">
+                  <td class="pe-3">IVA (21%)</td>
+                  <td><input id="montoIVA" class="form-control text-end text-primary" type="text" value="0.00" readonly></td>
+                </tr>
+                <tr class="border-top fw-bold">
+                  <td class="pe-3">Monto Total</td>
+                  <td><input id="montoTotal" class="form-control subtotal-box text-end" type="text" value="0.00" readonly></td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
 
@@ -208,7 +230,7 @@
     <td class="text-end"><input type="text" class="form-control text-end linea-total" value="0.00" readonly></td>
     <td class="remove-line">
       <button type="button" class="btn btn-outline-danger btn-sm btn-remove">Quitar</button>
-      {% if formset.empty_form.DELETE %}{{ formset.empty_form.DELETE.as_widget }}{% endif %}
+      {% if formset.empty_form.DELETE %}<span class="d-none">{{ formset.empty_form.DELETE.as_widget }}</span>{% endif %}
     </td>
   </tr>
   </template>
@@ -341,10 +363,34 @@
       if (descuentoSelect) {
         descuento = parseFloat(descuentoSelect.value) || 0;
       }
-      const subtotalConDescuento = subtotal * (1 - descuento / 100);
+      const montoDescuento = subtotal * (descuento / 100);
+      const subtotalConDescuento = subtotal - montoDescuento;
       const aplicar = ivaCheckbox?.checked;
-      const total = aplicar ? subtotalConDescuento * 1.21 : subtotalConDescuento;
+      const montoIVA = aplicar ? subtotalConDescuento * 0.21 : 0;
+      const total = subtotalConDescuento + montoIVA;
       totalInput.value = format(total);
+
+      // Desglose visual de descuento
+      const rowDescuento = document.getElementById('rowDescuento');
+      const labelDescuento = document.getElementById('labelDescuento');
+      const montoDescuentoInput = document.getElementById('montoDescuento');
+      if (descuento > 0 && subtotal > 0) {
+        if (labelDescuento) labelDescuento.textContent = `Descuento (${descuento}%)`;
+        if (montoDescuentoInput) montoDescuentoInput.value = '- ' + format(montoDescuento);
+        rowDescuento?.classList.remove('d-none');
+      } else {
+        rowDescuento?.classList.add('d-none');
+      }
+
+      // Desglose visual de IVA
+      const rowIVA = document.getElementById('rowIVA');
+      const montoIVAInput = document.getElementById('montoIVA');
+      if (aplicar && subtotal > 0) {
+        if (montoIVAInput) montoIVAInput.value = '+ ' + format(montoIVA);
+        rowIVA?.classList.remove('d-none');
+      } else {
+        rowIVA?.classList.add('d-none');
+      }
     }
 
     function bindRowEvents(tr) {
@@ -569,6 +615,19 @@
     for (const c of clientesData) {
       clienteMap[String(c.id)] = c;
     }
+    const rankingBadge = document.getElementById('rankingBadge');
+    const rankingBadgeText = document.getElementById('rankingBadgeText');
+    const rankingBadgeHint = document.getElementById('rankingBadgeHint');
+    const descuentoSel = document.getElementById('id_descuento');
+
+    const TIER_BADGE_COLORS = {
+      'Premium': 'bg-warning text-dark',
+      'Estrat\u00e9gico': 'bg-primary text-white',
+      'Est\u00e1ndar': 'bg-info text-dark',
+      'Nuevo': 'bg-success text-white',
+      'Sin ranking': 'bg-secondary text-white',
+    };
+
     function updateClienteFields() {
       const id = clienteSelect.value;
       const datos = clienteMap[id] || {};
@@ -577,6 +636,27 @@
       emailInput.value = datos.email || '';
       telefonoInput.value = datos.telefono || '';
       document.getElementById('tipoCliente').value = datos.tipo_cliente || '';
+
+      // Aplicar descuento según ranking
+      if (datos.tier && datos.descuento_ranking !== undefined && descuentoSel) {
+        const descStr = String(datos.descuento_ranking);
+        const optionExists = Array.from(descuentoSel.options).some(o => o.value === descStr);
+        if (optionExists) {
+          descuentoSel.value = descStr;
+          descuentoSel.dispatchEvent(new Event('change'));
+        }
+        // Mostrar badge del tier
+        if (rankingBadge && rankingBadgeText) {
+          const color = TIER_BADGE_COLORS[datos.tier] || 'bg-secondary text-white';
+          rankingBadgeText.className = 'badge ' + color;
+          rankingBadgeText.textContent = datos.tier;
+          const scoreText = datos.score !== null && datos.score !== undefined ? ` (score: ${datos.score})` : '';
+          if (rankingBadgeHint) rankingBadgeHint.textContent = `Descuento ${datos.descuento_ranking}% aplicado automáticamente${scoreText}`;
+          rankingBadge.classList.remove('d-none');
+        }
+      } else if (rankingBadge) {
+        rankingBadge.classList.add('d-none');
+      }
     }
     if (clienteSelect) {
       clienteSelect.addEventListener('change', updateClienteFields);
@@ -584,30 +664,6 @@
     }
   });
 </script>
-          for (const c of clientesData) {
-            clienteMap[String(c.id)] = c;
-          }
-          function updateClienteFields() {
-            const val = clienteSelect.value;
-            const c = clienteMap[val] || {};
-            if (razonSocialInput) razonSocialInput.value = c.razon_social || '';
-            if (cuitInput) cuitInput.value = c.cuit || '';
-            if (emailInput) emailInput.value = c.email || '';
-            if (telefonoInput) telefonoInput.value = c.telefono || '';
-            const tipoClienteInput = document.getElementById('tipoCliente');
-            if (tipoClienteInput) {
-              let tipo = c.tipo_cliente || '';
-              if (tipo === 'premium') tipo = 'Premium';
-              else if (tipo === 'estrategico') tipo = 'Estratégico';
-              else if (tipo === 'estandar') tipo = 'Estándar';
-              else if (tipo === 'nuevo') tipo = 'Nuevo';
-              tipoClienteInput.value = tipo;
-            }
-          }
-          if (clienteSelect) {
-            clienteSelect.addEventListener('change', updateClienteFields);
-            updateClienteFields();
-          }
         });
     </script>
   <script>

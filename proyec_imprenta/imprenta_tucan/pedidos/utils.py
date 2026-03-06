@@ -55,11 +55,15 @@ def verificar_insumos_para_lineas(lineas: list[tuple]) -> tuple[bool, dict]:
         if not producto or not cantidad:
             continue
         # Usar receta detallada por producto-insumo con cantidad_por_unidad
-        receta_items = list(ProductoInsumo.objects.filter(producto=producto).only('insumo_id', 'cantidad_por_unidad'))
+        receta_items = list(ProductoInsumo.objects.filter(producto=producto).only('insumo_id', 'cantidad_por_unidad', 'es_costo_fijo'))
         if receta_items:
             hay_receta = True
             for r in receta_items:
-                requeridos[r.insumo_id] += float(r.cantidad_por_unidad) * float(cantidad)
+                if r.es_costo_fijo:
+                    # Costo fijo: la cantidad es por trabajo, no se multiplica por los ejemplares
+                    requeridos[r.insumo_id] += float(r.cantidad_por_unidad)
+                else:
+                    requeridos[r.insumo_id] += float(r.cantidad_por_unidad) * float(cantidad)
 
     if not hay_receta:
         # Si no hay recetas en ninguna línea, mantener la validación simple por cada línea
@@ -88,8 +92,11 @@ def descontar_insumos_para_lineas(lineas: list[tuple]) -> None:
     for producto, cantidad in lineas:
         if not producto or not cantidad:
             continue
-        for r in ProductoInsumo.objects.filter(producto=producto).only('insumo_id', 'cantidad_por_unidad'):
-            requeridos[r.insumo_id] += float(r.cantidad_por_unidad) * float(cantidad)
+        for r in ProductoInsumo.objects.filter(producto=producto).only('insumo_id', 'cantidad_por_unidad', 'es_costo_fijo'):
+            if r.es_costo_fijo:
+                requeridos[r.insumo_id] += float(r.cantidad_por_unidad)
+            else:
+                requeridos[r.insumo_id] += float(r.cantidad_por_unidad) * float(cantidad)
 
     if not requeridos:
         return
@@ -117,8 +124,11 @@ def _calcular_requerimientos(lineas: list[tuple]) -> dict:
     for producto, cantidad in lineas:
         if not producto or not cantidad:
             continue
-        for r in ProductoInsumo.objects.filter(producto=producto).only('insumo_id', 'cantidad_por_unidad'):
-            requeridos[r.insumo_id] += float(r.cantidad_por_unidad) * float(cantidad)
+        for r in ProductoInsumo.objects.filter(producto=producto).only('insumo_id', 'cantidad_por_unidad', 'es_costo_fijo'):
+            if r.es_costo_fijo:
+                requeridos[r.insumo_id] += float(r.cantidad_por_unidad)
+            else:
+                requeridos[r.insumo_id] += float(r.cantidad_por_unidad) * float(cantidad)
     return requeridos
 
 

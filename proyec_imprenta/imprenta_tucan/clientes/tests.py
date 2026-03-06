@@ -5,12 +5,16 @@ from usuarios.models import Usuario
 
 class ClienteListaViewTest(TestCase):
     def setUp(self):
-        self.user = Usuario.objects.create_user(email="testuser@test.com", password="testpass", nombre="Test", apellido="User", telefono="1234")
+        self.user = Usuario.objects.create_user(
+            email="testuser@test.com", password="testpass",
+            nombre="Test", apellido="User", telefono="1234",
+            is_staff=True,
+        )
         self.client = Client()
         self.client.force_login(self.user)
-        Cliente.objects.create(nombre="Juan", apellido="Pérez", email="juan@test.com", telefono="1234", direccion="Calle 1")
-        Cliente.objects.create(nombre="Ana", apellido="García", email="ana@test.com", telefono="5678", direccion="Calle 2")
-        Cliente.objects.create(nombre="Pedro", apellido="López", email="pedro@test.com", telefono="9999", direccion="Calle 3")
+        Cliente.objects.create(nombre="Juan", apellido="Pérez", email="juan@test.com", telefono="1234", direccion="Calle 1", cuit="20-11111111-1")
+        Cliente.objects.create(nombre="Ana", apellido="García", email="ana@test.com", telefono="5678", direccion="Calle 2", cuit="20-22222222-2")
+        Cliente.objects.create(nombre="Pedro", apellido="López", email="pedro@test.com", telefono="9999", direccion="Calle 3", cuit="20-33333333-3")
 
     def test_busqueda_por_nombre(self):
         response = self.client.get(reverse('lista_clientes'), {'q': 'Juan'})

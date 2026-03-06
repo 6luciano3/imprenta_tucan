@@ -65,10 +65,6 @@ def require_perm(modulo: str, accion: Optional[str] = None, redirect_to: Optiona
                 messages.error(request, 'Debe iniciar sesión para acceder a esta funcionalidad.')
                 return redirect('login')
 
-            # Permitir acceso a cualquier usuario autenticado en tests
-            if getattr(django.conf.settings, 'TESTING', False):
-                return view_func(request, *args, **kwargs)
-
             # Admin/staff pasa sin restricción
             if user.is_staff or user.is_superuser:
                 return view_func(request, *args, **kwargs)

@@ -39,7 +39,17 @@
           <tr class="border-b hover:bg-gray-50">
             <td class="py-3 px-5 font-medium">{{ pedido.id }}</td>
             <td class="py-3 px-5">{{ pedido.cliente }}</td>
-            <td class="py-3 px-5 hidden md:table-cell">{{ pedido.producto.nombreProducto }}</td>
+            <td class="py-3 px-5 hidden md:table-cell">
+              {% with lineas=pedido.lineas.all %}
+                {% if lineas %}
+                  {% for linea in lineas %}{{ linea.producto.nombreProducto }}{% if not forloop.last %}, {% endif %}{% endfor %}
+                {% else %}
+                  <span class="inline-flex items-center gap-1 text-amber-600 text-xs" title="Pedido sin productos asignados. Usá Modificar para agregar productos.">
+                    <span class="material-symbols-outlined text-sm">warning</span> Sin productos
+                  </span>
+                {% endif %}
+              {% endwith %}
+            </td>
             <td class="py-3 px-5 hidden sm:table-cell">{{ pedido.fecha_pedido|date:"d/m/Y" }}</td>
             <td class="py-3 px-5 hidden md:table-cell">{{ pedido.fecha_entrega|date:"d/m/Y" }}</td>
             <td class="py-3 px-5 hidden md:table-cell">{{ pedido.estado.nombre|default:"-" }}</td>

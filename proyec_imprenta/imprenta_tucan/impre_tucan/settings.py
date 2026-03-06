@@ -32,20 +32,18 @@ AWS_REGION = os.environ.get('AWS_REGION', 'us-east-1').strip()
 
 
 # Debug prints
-print("[DEBUG settings.py] BASE_DIR:", BASE_DIR)
-print("[DEBUG settings.py] STATICFILES_DIRS:", STATICFILES_DIRS)
-print("[DEBUG settings.py] STATIC_ROOT:", STATIC_ROOT)
-print("[DEBUG settings.py] MEDIA_ROOT:", MEDIA_ROOT)
-print("[DEBUG settings.py] EMAIL_FILE_PATH:", EMAIL_FILE_PATH)
-print("[DEBUG settings.py] DEFAULT_FROM_EMAIL:", DEFAULT_FROM_EMAIL)
-print("[DEBUG settings.py] AWS_REGION:", AWS_REGION)
 
 
 
 # Seguridad y entorno
-SECRET_KEY = os.environ.get('SECRET_KEY', 'clave-insegura')
 DEBUG = os.environ.get('DEBUG', 'False').lower() in ('true', '1', 'yes')
 ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost').split(',')
+
+# SECRET_KEY: falla ruidosamente en producción si no está definida en el entorno.
+if not DEBUG:
+    SECRET_KEY = os.environ['SECRET_KEY']  # KeyError en producción si falta
+else:
+    SECRET_KEY = os.environ.get('SECRET_KEY', 'dev-secret-key-no-usar-en-produccion')
 
 # Aplicaciones instaladas
 INSTALLED_APPS = [
@@ -75,6 +73,8 @@ INSTALLED_APPS = [
     'automatizacion',
     'dashboard',
     'rest_framework',
+    'reportes',
+    'api',
     # 'anymail',  # desactivado - usando Gmail SMTP directo
 ]
 
@@ -84,6 +84,7 @@ AUTH_USER_MODEL = 'usuarios.Usuario'
 # Middleware
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -117,23 +118,17 @@ TEMPLATES = [
 ]
 
 # Prints de depuración después del cierre del bloque TEMPLATES
-print("[DEBUG settings.py] TEMPLATES:", TEMPLATES)
+
 
 db_name_env = os.environ.get('DB_NAME')
 db_name = db_name_env if db_name_env else str(BASE_DIR / 'db.sqlite3')
-# Depuración de base de datos
-db_name_env = os.environ.get('DB_NAME')
-db_name = db_name_env if db_name_env else str(BASE_DIR / 'db.sqlite3')
-print('[DEBUG settings.py] db_name_env:', db_name_env)
-print('[DEBUG settings.py] db_name:', db_name)
-print('[DEBUG settings.py] BASE_DIR:', BASE_DIR)
 DATABASES = {
     'default': {
         'ENGINE': os.environ.get('DB_ENGINE', 'django.db.backends.sqlite3'),
         'NAME': db_name,
     }
 }
-print("[DEBUG settings.py] DATABASES:", DATABASES)
+
 
 # Internacionalización
 LANGUAGE_CODE = 'es'

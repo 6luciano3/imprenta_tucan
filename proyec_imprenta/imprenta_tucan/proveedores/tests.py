@@ -5,7 +5,11 @@ from usuarios.models import Usuario
 
 class ProveedorListaViewTest(TestCase):
     def setUp(self):
-        self.user = Usuario.objects.create_user(email="testuser@test.com", password="testpass", nombre="Test", apellido="User", telefono="1234")
+        self.user = Usuario.objects.create_user(
+            email="testuser@test.com", password="testpass",
+            nombre="Test", apellido="User", telefono="1234",
+            is_staff=True,
+        )
         self.client = Client()
         self.client.force_login(self.user)
         Proveedor.objects.create(nombre="Proveedor A", email="a@proveedor.com", telefono="1111", direccion="Calle 1", cuit="20-11111111-1")

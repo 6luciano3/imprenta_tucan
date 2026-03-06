@@ -19,6 +19,7 @@ from clientes.models import Cliente
 from pedidos.models import Pedido
 from configuracion.services import get_page_size
 from django.db.models import Q
+from configuracion.permissions import require_perm
 
 
 try:
@@ -244,6 +245,7 @@ def _export_dispatch(request, fmt: str, title: str, headers: list[str], rows: li
     })
 
 
+@require_perm('Reportes', 'Ver')
 def reporte_stock(request):
     fmt = _get_format(request)
     # Búsqueda y orden
@@ -253,7 +255,7 @@ def reporte_stock(request):
     valid_order_fields = ['codigo', 'nombre', 'categoria', 'stock']
     if order_by not in valid_order_fields:
         order_by = 'nombre'
-    qs = Insumo.objects.filter(activo=True)
+    qs = Insumo.objects.filter(activo=True).select_related('proveedor')
     if query:
         qs = qs.filter(
             Q(nombre__icontains=query) |
@@ -296,6 +298,7 @@ def reporte_stock(request):
     return _export_dispatch(request, fmt, 'Stock disponible', headers, rows, records)
 
 
+@require_perm('Reportes', 'Ver')
 def reporte_proveedores_activos(request):
     fmt = _get_format(request)
     query = request.GET.get('q', '') or request.GET.get('criterio', '')
@@ -304,7 +307,7 @@ def reporte_proveedores_activos(request):
     valid_order_fields = ['nombre', 'cuit', 'rubro', 'email', 'telefono']
     if order_by not in valid_order_fields:
         order_by = 'nombre'
-    qs = Proveedor.objects.filter(activo=True)
+    qs = Proveedor.objects.filter(activo=True).select_related('rubro_fk')
     if query:
         qs = qs.filter(
             Q(nombre__icontains=query) |
@@ -346,6 +349,7 @@ def reporte_proveedores_activos(request):
     return _export_dispatch(request, fmt, 'Proveedores activos', headers, rows, records)
 
 
+@require_perm('Reportes', 'Ver')
 def reporte_clientes_frecuentes(request):
     from django.db.models import Count, Sum
     from pedidos.models import LineaPedido
@@ -509,6 +513,7 @@ def _preview_context(title: str, headers: list[str], rows: list[list]):
     }
 
 
+@require_perm('Reportes', 'Ver')
 def preview_stock(request):
     query = request.GET.get('q', '') or request.GET.get('criterio', '')
     order_by = request.GET.get('order_by', 'nombre')
@@ -516,7 +521,7 @@ def preview_stock(request):
     valid_order_fields = ['codigo', 'nombre', 'categoria', 'stock']
     if order_by not in valid_order_fields:
         order_by = 'nombre'
-    qs = Insumo.objects.filter(activo=True)
+    qs = Insumo.objects.filter(activo=True).select_related('proveedor')
     if query:
         qs = qs.filter(
             Q(nombre__icontains=query) |
@@ -541,6 +546,7 @@ def preview_stock(request):
     return render(request, 'reportes/preview.html', ctx)
 
 
+@require_perm('Reportes', 'Ver')
 def preview_proveedores_activos(request):
     query = request.GET.get('q', '') or request.GET.get('criterio', '')
     order_by = request.GET.get('order_by', 'nombre')
@@ -548,7 +554,7 @@ def preview_proveedores_activos(request):
     valid_order_fields = ['nombre', 'cuit', 'rubro', 'email', 'telefono']
     if order_by not in valid_order_fields:
         order_by = 'nombre'
-    qs = Proveedor.objects.filter(activo=True)
+    qs = Proveedor.objects.filter(activo=True).select_related('rubro_fk')
     if query:
         qs = qs.filter(
             Q(nombre__icontains=query) |
@@ -574,6 +580,7 @@ def preview_proveedores_activos(request):
     return render(request, 'reportes/preview.html', ctx)
 
 
+@require_perm('Reportes', 'Ver')
 def preview_clientes_frecuentes(request):
     from django.db.models import Count
 

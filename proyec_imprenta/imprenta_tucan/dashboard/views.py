@@ -1,9 +1,12 @@
 from django.shortcuts import render
 from django.urls import reverse
 from django.conf import settings
+from configuracion.permissions import require_perm
 import subprocess
 import os
 
+
+@require_perm('Dashboard', 'Ver')
 def dashboard_tests(request):
     """
     Vista para mostrar resultados de pruebas unitarias.
