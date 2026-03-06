@@ -74,9 +74,93 @@
     <canvas id="chartTopProductos" width="300" height="300"></canvas>
   </div>
 </div>
-        <!-- ...existing code... -->
 
-  <!-- ...existing code... -->
+<!-- ── Panel de Inteligencia ─────────────────────────────────────────────── -->
+<h2 class="text-xl font-bold mb-3 flex items-center gap-2 mt-2">
+  <span class="material-symbols-outlined">psychology</span>
+  Panel de Inteligencia
+</h2>
+
+<!-- Resumen de motores -->
+<div id="resumenInteligencia" class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+  <!-- Motor 1: Clientes -->
+  <div class="bg-white p-4 rounded-xl shadow border-l-4 border-blue-500">
+    <div class="font-bold text-blue-700 mb-2">Motor Clientes</div>
+    <div class="text-sm text-gray-600 space-y-1" id="resumenClientes">
+      <div class="animate-pulse">Cargando...</div>
+    </div>
+  </div>
+  <!-- Motor 2: Proveedores -->
+  <div class="bg-white p-4 rounded-xl shadow border-l-4 border-green-500">
+    <div class="font-bold text-green-700 mb-2">Motor Proveedores</div>
+    <div class="text-sm text-gray-600 space-y-1" id="resumenProveedores">
+      <div class="animate-pulse">Cargando...</div>
+    </div>
+  </div>
+  <!-- Motor 3: Insumos -->
+  <div class="bg-white p-4 rounded-xl shadow border-l-4 border-orange-500">
+    <div class="font-bold text-orange-700 mb-2">Motor Insumos / Demanda</div>
+    <div class="text-sm text-gray-600 space-y-1" id="resumenInsumos">
+      <div class="animate-pulse">Cargando...</div>
+    </div>
+  </div>
+</div>
+
+<!-- Top clientes + Proyección demanda -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+
+  <!-- Top clientes por score -->
+  <div class="bg-white p-4 rounded-xl shadow">
+    <h3 class="font-bold mb-3 flex items-center gap-1">
+      <span class="material-symbols-outlined text-base">leaderboard</span>
+      Top Clientes por Score
+    </h3>
+    <table class="w-full text-sm" id="tablaTopClientes">
+      <thead>
+        <tr class="text-left text-gray-500 border-b">
+          <th class="pb-1">Cliente</th>
+          <th class="pb-1 text-center">Score</th>
+          <th class="pb-1 text-center">Tier</th>
+        </tr>
+      </thead>
+      <tbody id="bodyTopClientes">
+        <tr><td colspan="3" class="text-gray-400 py-2">Cargando...</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Proyección de demanda de insumos -->
+  <div class="bg-white p-4 rounded-xl shadow">
+    <h3 class="font-bold mb-3 flex items-center gap-1">
+      <span class="material-symbols-outlined text-base">trending_up</span>
+      Proyección Demanda Insumos
+      <span class="text-xs text-gray-400 font-normal ml-1">(próximos 3 meses)</span>
+    </h3>
+    <table class="w-full text-sm" id="tablaProyeccion">
+      <thead>
+        <tr class="text-left text-gray-500 border-b">
+          <th class="pb-1">Insumo</th>
+          <th class="pb-1 text-center">Stock</th>
+          <th class="pb-1 text-center">Proyectado</th>
+          <th class="pb-1 text-center">Diferencia</th>
+        </tr>
+      </thead>
+      <tbody id="bodyProyeccion">
+        <tr><td colspan="4" class="text-gray-400 py-2">Cargando...</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+</div>
+
+<!-- Insumos urgentes -->
+<div class="bg-white p-4 rounded-xl shadow mb-6">
+  <h3 class="font-bold mb-3 flex items-center gap-1">
+    <span class="material-symbols-outlined text-base text-red-500">warning</span>
+    Insumos con Acción Urgente
+  </h3>
+  <div id="listaUrgentes" class="text-sm text-gray-400">Cargando...</div>
+</div>
 <!-- script block eliminado -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
@@ -142,6 +226,142 @@ function refreshAll(){
   drawLine('chartIngresos', '/estadisticas/api/ingresos-por-mes/' + buildParams(), 'Ingresos');
   drawBar('chartTopProductos', '/estadisticas/api/top-productos/' + buildParams(), 'Ingresos');
   refreshKPIs();
+  refreshInteligencia();
+}
+
+// ── Panel de Inteligencia ─────────────────────────────────────────────────────
+
+const TIER_COLORS = {
+  'Premium':     'bg-purple-100 text-purple-800',
+  'Estratégico': 'bg-blue-100 text-blue-800',
+  'Estándar':    'bg-green-100 text-green-800',
+  'Nuevo':       'bg-gray-100 text-gray-700',
+};
+
+async function refreshInteligencia() {
+  await Promise.all([
+    cargarResumenMotores(),
+    cargarTopClientes(),
+    cargarProyeccionDemanda(),
+    cargarInsumosUrgentes(),
+  ]);
+}
+
+async function cargarResumenMotores() {
+  try {
+    const r = await fetch('/estadisticas/api/resumen-inteligencia/');
+    const d = await r.json();
+    if (d.error) throw new Error(d.error);
+
+    const c = d.motor_clientes;
+    document.getElementById('resumenClientes').innerHTML = `
+      <div>Clientes rankeados: <strong>${c.clientes_rankeados}</strong></div>
+      <div>Score promedio: <strong>${c.score_promedio}</strong></div>
+      <div>Ofertas pendientes: <strong>${c.ofertas_pendientes}</strong></div>
+      <div>Ofertas enviadas: <strong>${c.ofertas_enviadas}</strong></div>
+      <div class="mt-1">Modelo ML: <span class="${c.ml_activo ? 'text-green-600 font-bold' : 'text-orange-500'}">${c.ml_activo ? '✓ Activo' : '⚠ Sin entrenar'}</span></div>
+    `;
+
+    const p = d.motor_proveedores;
+    document.getElementById('resumenProveedores').innerHTML = `
+      <div>Proveedores rankeados: <strong>${p.proveedores_rankeados}</strong></div>
+      <div>Mejor proveedor: <strong>${p.mejor_proveedor || '—'}</strong></div>
+      <div>Score líder: <strong>${p.mejor_score ?? '—'}</strong></div>
+      <div class="mt-1">Modelo ML: <span class="${p.ml_activo ? 'text-green-600 font-bold' : 'text-orange-500'}">${p.ml_activo ? '✓ Activo' : '⚠ Sin entrenar'}</span></div>
+    `;
+
+    const i = d.motor_insumos;
+    document.getElementById('resumenInsumos').innerHTML = `
+      <div>Sin stock: <strong class="${i.sin_stock > 0 ? 'text-red-600' : ''}">${i.sin_stock}</strong></div>
+      <div>Bajo mínimo: <strong class="${i.bajo_minimo > 0 ? 'text-orange-500' : ''}">${i.bajo_minimo}</strong></div>
+      <div>Propuestas compra pendientes: <strong>${i.propuestas_compra_pendientes}</strong></div>
+      <div class="mt-1">Modelo ML: <span class="${i.ml_activo ? 'text-green-600 font-bold' : 'text-orange-500'}">${i.ml_activo ? '✓ Activo' : '⚠ Sin entrenar'}</span></div>
+    `;
+  } catch (e) {
+    document.getElementById('resumenClientes').textContent = 'Error al cargar';
+    document.getElementById('resumenProveedores').textContent = 'Error al cargar';
+    document.getElementById('resumenInsumos').textContent = 'Error al cargar';
+  }
+}
+
+async function cargarTopClientes() {
+  try {
+    const r = await fetch('/estadisticas/api/top-clientes-score/?n=8');
+    const d = await r.json();
+    if (d.error) throw new Error(d.error);
+
+    const tbody = document.getElementById('bodyTopClientes');
+    if (!d.clientes.length) {
+      tbody.innerHTML = '<tr><td colspan="3" class="text-gray-400 py-2">Sin datos</td></tr>';
+      return;
+    }
+    tbody.innerHTML = d.clientes.map(c => {
+      const badge = TIER_COLORS[c.tier] || 'bg-gray-100 text-gray-700';
+      return `<tr class="border-b last:border-0">
+        <td class="py-1 pr-2">${c.nombre}</td>
+        <td class="py-1 text-center font-mono">${c.score}</td>
+        <td class="py-1 text-center"><span class="px-2 py-0.5 rounded text-xs font-medium ${badge}">${c.tier}</span></td>
+      </tr>`;
+    }).join('');
+  } catch (e) {
+    document.getElementById('bodyTopClientes').innerHTML =
+      `<tr><td colspan="3" class="text-red-400 py-2">Error: ${e.message}</td></tr>`;
+  }
+}
+
+async function cargarProyeccionDemanda() {
+  try {
+    const r = await fetch('/estadisticas/api/proyeccion-demanda/?n=8&meses=3');
+    const d = await r.json();
+    if (d.error) throw new Error(d.error);
+
+    const tbody = document.getElementById('bodyProyeccion');
+    if (!d.proyecciones.length) {
+      tbody.innerHTML = '<tr><td colspan="4" class="text-gray-400 py-2">Sin datos</td></tr>';
+      return;
+    }
+    tbody.innerHTML = d.proyecciones.map(p => {
+      const difClass = p.diferencia < 0 ? 'text-red-600 font-bold' : 'text-green-600';
+      const difText  = p.diferencia < 0 ? `▼ ${Math.abs(p.diferencia)}` : `▲ ${p.diferencia}`;
+      return `<tr class="border-b last:border-0">
+        <td class="py-1 pr-2 truncate max-w-32" title="${p.nombre}">${p.nombre}</td>
+        <td class="py-1 text-center font-mono">${p.stock_actual}</td>
+        <td class="py-1 text-center font-mono">${p.demanda_proyectada}</td>
+        <td class="py-1 text-center font-mono ${difClass}">${difText}</td>
+      </tr>`;
+    }).join('');
+  } catch (e) {
+    document.getElementById('bodyProyeccion').innerHTML =
+      `<tr><td colspan="4" class="text-red-400 py-2">Error: ${e.message}</td></tr>`;
+  }
+}
+
+async function cargarInsumosUrgentes() {
+  const el = document.getElementById('listaUrgentes');
+  try {
+    const r = await fetch('/estadisticas/api/insumos-urgentes/');
+    const d = await r.json();
+    if (d.error) throw new Error(d.error);
+
+    if (!d.urgentes.length) {
+      el.innerHTML = '<span class="text-green-600">✓ Sin insumos urgentes en este momento.</span>';
+      return;
+    }
+    const items = d.urgentes.map(u => {
+      const tipo_label = {
+        'sin_stock_critico': '🔴 Sin stock crítico',
+        'compra_urgente':    '🟠 Compra urgente',
+        'compra_preventiva': '🟡 Compra preventiva',
+      }[u.tipo] || u.tipo;
+      return `<div class="flex items-center justify-between py-1 border-b last:border-0">
+        <span>${tipo_label}: <strong>${u.insumo_nombre}</strong></span>
+        <span class="text-gray-500 text-xs">Stock: ${u.stock_actual} | Sugerido: ${u.cantidad_sugerida}</span>
+      </div>`;
+    }).join('');
+    el.innerHTML = items;
+  } catch (e) {
+    el.innerHTML = `<span class="text-red-400">Error: ${e.message}</span>`;
+  }
 }
 
 document.addEventListener('DOMContentLoaded', function() {

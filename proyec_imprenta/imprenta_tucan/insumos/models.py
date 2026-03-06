@@ -60,11 +60,11 @@ class Insumo(models.Model):
     def consumo_promedio_mensual(self):
         # Si hay registros de consumo real, calcular el promedio del último año
         from insumos.models import ConsumoRealInsumo
+        from django.utils import timezone
         import datetime
-        hoy = datetime.date.today()
-        hace_un_ano = hoy - datetime.timedelta(days=365)
-        consumos = ConsumoRealInsumo.objects.filter(insumo=self, fecha__gte=hace_un_ano)
-        total = sum(c.cantidad for c in consumos)
+        hace_un_ano = timezone.now() - datetime.timedelta(days=365)
+        consumos = ConsumoRealInsumo.objects.filter(insumo=self, fecha_registro__gte=hace_un_ano)
+        total = sum(c.cantidad_consumida for c in consumos)
         meses = 12
         return total / meses if total > 0 else 0
 

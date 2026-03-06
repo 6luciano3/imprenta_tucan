@@ -70,7 +70,31 @@ def tarea_anticipacion_compras():
         }
         decisiones = evaluar_reglas(contexto)
         criticas = sum(1 for d in decisiones if d.get('prioridad') == 'critica')
-        return f"anticipacion_compras: {len(decisiones)} decisiones ({criticas} críticas)"
+
+        # Anticipación proactiva: detectar insumos que agotarán stock
+        # antes del lead time aunque aún no estén bajo el mínimo
+        try:
+            from core.ai_ml.anticipation import anticipar_compras
+            anticipaciones = 0
+            for item in insumos_data:
+                resultado_ant = anticipar_compras(item['id'], item['demanda_predicha'])
+                if resultado_ant and resultado_ant.get('urgencia') in ('critica', 'alta'):
+                    anticipaciones += 1
+                    decisiones.append({
+                        'tipo': 'anticipacion_proactiva',
+                        'insumo_id': item['id'],
+                        'insumo_nombre': item['nombre'],
+                        'cantidad_sugerida': resultado_ant['cantidad_sugerida'],
+                        'prioridad': resultado_ant['urgencia'],
+                        'accion': resultado_ant['motivo'],
+                    })
+        except Exception:
+            anticipaciones = 0
+
+        return (
+            f"anticipacion_compras: {len(decisiones)} decisiones ({criticas} críticas, "
+            f"{anticipaciones} anticipaciones proactivas)"
+        )
     except Exception as e:
         return f"anticipacion_compras: error {e}"
 
@@ -81,9 +105,19 @@ def tarea_ranking_clientes():
     try:
         from core.ai_ml.ranking import calcular_ranking_clientes
         resultado = calcular_ranking_clientes()
-        return f"ranking_clientes: {resultado['actualizados']} clientes actualizados ({resultado['periodo']})"
+        msg = f"ranking_clientes: {resultado['actualizados']} clientes actualizados ({resultado['periodo']})"
     except Exception as e:
         return f"ranking_clientes: error {e}"
+
+    # Tras recalcular el ranking, detectar ascensos de tier y activar campañas
+    try:
+        from core.automation.campanas import detectar_y_activar_campanas_tier
+        res_camp = detectar_y_activar_campanas_tier()
+        msg += f" | campañas activadas: {res_camp.get('campanas_activadas', 0)}"
+    except Exception as e:
+        msg += f" | campañas: error {e}"
+
+    return msg
 
 
 @shared_task
