@@ -211,7 +211,7 @@
 
 <!-- Exponer datos de clientes para JS -->
 <script>
-  window.clientesData = {{ clientes_data|safe }};
+  window.clientesData = {{ clientes_data_json|safe }};
 </script>
 
 <!-- Fila plantilla para agregar dinámicamente -->
@@ -620,6 +620,13 @@
     const rankingBadgeHint = document.getElementById('rankingBadgeHint');
     const descuentoSel = document.getElementById('id_descuento');
 
+    const TIPO_LABELS = {
+      'premium': 'Premium',
+      'estrategico': 'Estratégico',
+      'estandar': 'Estándar',
+      'nuevo': 'Nuevo',
+    };
+
     const TIER_BADGE_COLORS = {
       'Premium': 'bg-warning text-dark',
       'Estrat\u00e9gico': 'bg-primary text-white',
@@ -635,7 +642,7 @@
       cuitInput.value = datos.cuit || '';
       emailInput.value = datos.email || '';
       telefonoInput.value = datos.telefono || '';
-      document.getElementById('tipoCliente').value = datos.tipo_cliente || '';
+      document.getElementById('tipoCliente').value = TIPO_LABELS[datos.tipo_cliente] || datos.tipo_cliente || '';
 
       // Aplicar descuento según ranking
       if (datos.tier && datos.descuento_ranking !== undefined && descuentoSel) {

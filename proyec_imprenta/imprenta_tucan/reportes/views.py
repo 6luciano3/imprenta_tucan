@@ -384,25 +384,42 @@ def reporte_clientes_frecuentes(request):
         .select_related('pedido')
     )
     producto_ids = list(lineas_qs.values_list('producto_id', flat=True).distinct())
-    costo_unitario: dict = {}
+    # BOM: costo variable (por unidad) y costo fijo (por trabajo, independiente de cantidad)
+    costo_unitario: dict = {}   # {producto_id: costo por 1 unidad (variable)}
+    costo_fijo: dict = {}       # {producto_id: costo fijo por trabajo (planchas, fotolitos)}
     if producto_ids:
         for pi in ProductoInsumo.objects.select_related('insumo').filter(producto_id__in=producto_ids):
-            costo_unitario[pi.producto_id] = (
-                costo_unitario.get(pi.producto_id, 0.0)
-                + float(pi.cantidad_por_unidad) * float(pi.insumo.precio_unitario or 0)
-            )
+            precio_ins = float(pi.insumo.precio_unitario or 0)
+            aporte = float(pi.cantidad_por_unidad) * precio_ins
+            if pi.es_costo_fijo:
+                # Bug corregido: costo fijo NO se multiplica por cantidad del pedido
+                costo_fijo[pi.producto_id] = costo_fijo.get(pi.producto_id, 0.0) + aporte
+            else:
+                costo_unitario[pi.producto_id] = costo_unitario.get(pi.producto_id, 0.0) + aporte
+
     margen_por_cliente: dict = {}
     for linea in lineas_qs:
         cid = linea.pedido.cliente_id
-        costo = float(costo_unitario.get(linea.producto_id, 0.0))
-        ingreso = float(linea.precio_unitario) * float(linea.cantidad)
-        margen_por_cliente[cid] = margen_por_cliente.get(cid, 0.0) + max(0.0, ingreso - costo * float(linea.cantidad))
+        qty = float(linea.cantidad)
+        costo_var   = float(costo_unitario.get(linea.producto_id, 0.0)) * qty
+        costo_fijo_ = float(costo_fijo.get(linea.producto_id, 0.0))
+        # Ingreso: usar el monto_total del pedido proporcional a esta línea es lo más
+        # fiable; como fallback, precio_unitario × cantidad.
+        ingreso = float(linea.precio_unitario) * qty
+        margen_linea = max(0.0, ingreso - costo_var - costo_fijo_)
+        margen_por_cliente[cid] = margen_por_cliente.get(cid, 0.0) + margen_linea
+
+    # Sanity clamp: el margen nunca puede superar lo facturado
+    facturado_por_cliente = {f['cliente']: float(f.get('facturado') or 0) for f in freq}
+    for cid in margen_por_cliente:
+        tope = facturado_por_cliente.get(cid, 0.0)
+        if margen_por_cliente[cid] > tope:
+            margen_por_cliente[cid] = round(tope * float(Parametro.get('MARGEN_BRUTO_ESTIMADO', 30)) / 100.0, 2)
 
     # Para clientes sin LineaPedido, estimar el margen usando el porcentaje bruto configurado.
     # El valor se marca con prefijo "~" para indicar que es una estimación.
     margen_bruto_pct = float(Parametro.get('MARGEN_BRUTO_ESTIMADO', 30)) / 100.0
     clientes_con_lineas = set(margen_por_cliente.keys())
-    facturado_por_cliente = {f['cliente']: float(f.get('facturado') or 0) for f in freq}
     margen_estimado_por_cliente: dict = {
         cid: round(facturado_por_cliente.get(cid, 0.0) * margen_bruto_pct, 2)
         for cid in facturado_por_cliente

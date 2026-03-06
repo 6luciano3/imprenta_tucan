@@ -64,11 +64,13 @@ class ClienteInteligenteEngine(ProcesoInteligenteBase):
         try:
             from automatizacion.models import RankingCliente
             from clientes.models import Cliente
+            from django.db import transaction
             delta = 3.0 if accion == 'aceptar' else -1.0
-            rc = RankingCliente.objects.filter(cliente_id=cliente_id).first()
-            if rc:
-                rc.score = max(0.0, min(100.0, (rc.score or 0) + delta))
-                rc.save(update_fields=['score'])
-                Cliente.objects.filter(id=cliente_id).update(puntaje_estrategico=rc.score)
+            with transaction.atomic():
+                rc = RankingCliente.objects.select_for_update().filter(cliente_id=cliente_id).first()
+                if rc:
+                    rc.score = max(0.0, min(100.0, (rc.score or 0) + delta))
+                    rc.save(update_fields=['score'])
+                    Cliente.objects.filter(id=cliente_id).update(puntaje_estrategico=rc.score)
         except Exception:
             pass

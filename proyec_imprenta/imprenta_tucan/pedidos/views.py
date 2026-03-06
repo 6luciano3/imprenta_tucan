@@ -148,7 +148,7 @@ def alta_pedido(request):
                         .values('idProducto', 'nombreProducto', 'unidadMedida__abreviatura', 'unidadMedida__nombreUnidad')
                     ),
                     "proximo_numero_pedido": (Pedido.objects.order_by('-id').first().id + 1) if Pedido.objects.exists() else 1,
-                    "clientes_data": [],
+                    "clientes_data_json": "[]",
                 })
 
             ok, faltantes = verificar_insumos_para_lineas([(p, c) for (p, c, _e) in lineas])
@@ -299,7 +299,7 @@ def alta_pedido(request):
             "precios": precios,
             "productos_calculadora": productos_calculadora,
             "proximo_numero_pedido": proximo_numero_pedido,
-            "clientes_data": clientes_data,
+            "clientes_data_json": json.dumps(clientes_data),
         },
     )
 
@@ -439,12 +439,11 @@ def detalle_pedido(request, pk: int):
             "precio_unitario": l.precio_unitario,
             "importe": importe,
         })
-    # Obtener descuento e IVA
+    # Usar el valor guardado como autoritativo (evita divergencias por recálculo)
     descuento = Decimal(str(getattr(pedido, 'descuento', 0)))
     aplicar_iva = getattr(pedido, 'aplicar_iva', False)
     subtotal_con_descuento = subtotal * (Decimal("1") - descuento / Decimal("100")) if descuento else subtotal
-    iva_multiplier = Decimal("1.21") if aplicar_iva else Decimal("1")
-    monto_total = subtotal_con_descuento * iva_multiplier
+    iva_monto = (subtotal_con_descuento * Decimal("0.21")) if aplicar_iva else Decimal("0")
     return render(
         request,
         "pedidos/detalle_pedido.html",
@@ -455,8 +454,8 @@ def detalle_pedido(request, pk: int):
             "descuento": descuento,
             "subtotal_con_descuento": subtotal_con_descuento,
             "aplicar_iva": aplicar_iva,
-            "iva_monto": (subtotal_con_descuento * Decimal("0.21")) if aplicar_iva else Decimal("0"),
-            "monto_total": monto_total,
+            "iva_monto": iva_monto,
+            "monto_total": pedido.monto_total,  # valor guardado en BD = mismo que la lista
         },
     )
 
@@ -514,14 +513,19 @@ def modificar_pedido(request, idPedido: int):
                 return render(request, "pedidos/modificar_pedido.html",
                               {"form": form, "formset": formset, "pedido": pedido, "precios": precios})
 
-            # Calcular monto_total
+            # Calcular monto_total aplicando descuento e IVA igual que en alta_pedido
             from decimal import Decimal
-            monto_total = Decimal("0")
+            subtotal = Decimal("0")
             for f in formset.cleaned_data:
                 if f and not f.get('DELETE', False):
                     producto = f["producto"]
                     cantidad = f["cantidad"]
-                    monto_total += (producto.precio or Decimal("0")) * cantidad
+                    subtotal += (producto.precio or Decimal("0")) * cantidad
+
+            descuento_val = Decimal(str(descuento))
+            subtotal_con_descuento = subtotal * (1 - descuento_val / Decimal("100"))
+            iva_multiplier = Decimal("1.21") if aplicar_iva else Decimal("1")
+            monto_total = subtotal_con_descuento * iva_multiplier
 
             with transaction.atomic():
                 ajustar_insumos_por_diferencia(old_lineas, new_lineas)
@@ -538,6 +542,8 @@ def modificar_pedido(request, idPedido: int):
                         )
                 pedido.estado = estado
                 pedido.fecha_entrega = fecha_entrega
+                pedido.descuento = descuento_val
+                pedido.aplicar_iva = aplicar_iva
                 pedido.monto_total = monto_total
                 pedido.save()
 

@@ -8,20 +8,19 @@ from geo.models import Ciudad
 
 
 class ClienteForm(forms.ModelForm):
-    tipo_cliente = forms.ChoiceField(
+    tipo_cliente = forms.CharField(
         label="Tipo de Cliente",
-        choices=[
-            ("premium", "Premium"),
-            ("estrategico", "Estratégico"),
-            ("estandar", "Estándar"),
-            ("nuevo", "Nuevo"),
-        ],
         initial="nuevo",
         required=True,
-        widget=forms.Select(attrs={
-            'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500',
+        widget=forms.TextInput(attrs={
+            'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-100 cursor-not-allowed',
+            'value': 'Nuevo',
+            'readonly': 'readonly',
         })
     )
+
+    def clean_tipo_cliente(self):
+        return 'nuevo'
 
     RAZON_SOCIAL_CHOICES = [
         ("S.A.", "S.A."),

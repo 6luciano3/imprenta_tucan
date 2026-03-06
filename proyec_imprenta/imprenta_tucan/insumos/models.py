@@ -50,6 +50,10 @@ class Insumo(models.Model):
         null=True, blank=True,
         help_text='Stock mínimo sugerido (cargado manualmente). Se usa cuando no hay historial de consumo.',
     )
+    cantidad_compra_sugerida = models.PositiveIntegerField(
+        null=True, blank=True,
+        help_text='Cantidad estándar a reponer cuando se detecta necesidad de compra. Reemplaza el dict hardcodeado en tasks.',
+    )
     precio = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     activo = models.BooleanField(default=True)
     unidad_medida = models.CharField(max_length=20, default='unidad', blank=True)
