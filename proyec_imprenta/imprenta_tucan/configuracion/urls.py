@@ -6,6 +6,8 @@ from .views_api import formula_validate_api
 urlpatterns = [
     path('empresa/', views.empresa_config, name='empresa_config'),
     path('', views.configuracion_home, name='configuracion_home'),
+    path('motor-demanda/', views.motor_demanda_config, name='motor_demanda_config'),
+    path('proyeccion-demanda/', views.proyeccion_demanda_config, name='proyeccion_demanda_config'),
     path('ofertas/reglas/', views.editar_reglas_ofertas, name='editar_reglas_ofertas'),
     path('unidades/', views.unidad_list, name='unidad_list'),
     path('unidades/nueva/', views.unidad_create, name='unidad_create'),

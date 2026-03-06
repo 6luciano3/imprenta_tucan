@@ -219,6 +219,7 @@ def api_proyeccion_demanda(request):
         2. Media móvil de ConsumoRealInsumo de los últimos MESES meses.
         3. Media mensual de OrdenCompra de los últimos 6 meses (proxy real).
         4. insumo.cantidad (cantidad típica de compra definida en el catálogo).
+        5. stock_minimo_manual como proxy de consumo mensual PYME.
 
     Query params: n (default 8), meses (default 3).
     """
@@ -228,82 +229,93 @@ def api_proyeccion_demanda(request):
         from django.utils import timezone
         from django.db.models import Sum
         from datetime import timedelta
-    except ImportError as e:
-        return JsonResponse({'error': str(e)}, status=500)
+        from core.motor.config import MotorConfig
 
-    n = int(request.GET.get('n', 8))
-    meses = int(request.GET.get('meses', 3))
+        _n_default = MotorConfig.get('PROYECCION_N_INSUMOS', cast=int)
+        _m_default = MotorConfig.get('PROYECCION_MESES', cast=int)
+        n = int(request.GET.get('n', _n_default if _n_default is not None else 8))
+        meses = int(request.GET.get('meses', _m_default if _m_default is not None else 3))
+    except Exception as e:
+        return JsonResponse({'error': str(e), 'proyecciones': []}, status=500)
 
-    hoy = timezone.now()
-    periodo_actual = hoy.strftime('%Y-%m')
+    try:
+        hoy = timezone.now()
+        periodo_actual = hoy.strftime('%Y-%m')
 
-    # Pre-cargar proyecciones del período actual para evitar N queries
-    proyecciones_bd = {
-        p.insumo_id: p.cantidad_proyectada
-        for p in ProyeccionInsumo.objects.filter(periodo=periodo_actual)
-    }
+        # Pre-cargar proyecciones del período actual para evitar N queries
+        proyecciones_bd = {
+            p.insumo_id: p.cantidad_proyectada
+            for p in ProyeccionInsumo.objects.filter(periodo=periodo_actual)
+        }
 
-    # Pre-cargar media mensual de ordenes de compra (últimos 6 meses) por insumo
-    hace_6m = hoy - timedelta(days=180)
-    ordenes_por_insumo = {}
-    for row in (
-        OrdenCompra.objects
-        .filter(fecha_creacion__gte=hace_6m)
-        .values('insumo_id')
-        .annotate(total=Sum('cantidad'))
-    ):
-        ordenes_por_insumo[row['insumo_id']] = row['total'] / 6.0  # promedio mensual
+        # Pre-cargar media mensual de ordenes de compra (últimos 6 meses) por insumo
+        hace_6m = hoy - timedelta(days=180)
+        ordenes_por_insumo = {}
+        for row in (
+            OrdenCompra.objects
+            .filter(fecha_creacion__gte=hace_6m)
+            .values('insumo_id')
+            .annotate(total=Sum('cantidad'))
+        ):
+            ordenes_por_insumo[row['insumo_id']] = row['total'] / 6.0  # promedio mensual
 
-    # Solo insumos directos (se incorporan al producto final)
-    # Insumos con proyección explícita primero, luego por stock (más críticos)
-    insumos_con_proy = list(
-        Insumo.objects.filter(activo=True, tipo=Insumo.TIPO_DIRECTO, idInsumo__in=proyecciones_bd.keys())
-    )
-    insumos_sin_proy = list(
-        Insumo.objects.filter(activo=True, tipo=Insumo.TIPO_DIRECTO)
-        .exclude(idInsumo__in=proyecciones_bd.keys())
-        .order_by('stock')[:n * 2]
-    )
-    insumos = (insumos_con_proy + insumos_sin_proy)[:n * 3]
+        # Solo insumos directos (se incorporan al producto final)
+        # Insumos con proyección explícita primero, luego por stock (más críticos)
+        insumos_con_proy = list(
+            Insumo.objects.filter(activo=True, tipo=Insumo.TIPO_DIRECTO, idInsumo__in=proyecciones_bd.keys())
+        )
+        insumos_sin_proy = list(
+            Insumo.objects.filter(activo=True, tipo=Insumo.TIPO_DIRECTO)
+            .exclude(idInsumo__in=proyecciones_bd.keys())
+            .order_by('stock')[:n * 2]
+        )
+        insumos = (insumos_con_proy + insumos_sin_proy)[:n * 3]
 
-    proyecciones = []
-    for insumo in insumos:
-        # 1) ProyeccionInsumo oficial
-        demanda = proyecciones_bd.get(insumo.idInsumo)
+        proyecciones = []
+        for insumo in insumos:
+            # 1) ProyeccionInsumo oficial
+            demanda = proyecciones_bd.get(insumo.idInsumo)
 
-        # 2) Media móvil de ConsumoRealInsumo
-        if demanda is None:
-            demanda = predecir_demanda_media_movil(insumo, periodo_actual, meses=meses)
+            # 2) Media móvil de ConsumoRealInsumo
+            if demanda is None:
+                demanda = predecir_demanda_media_movil(insumo, periodo_actual, meses=meses)
 
-        # 3) Media de OrdenCompra
-        if demanda is None or demanda == 0:
-            demanda = ordenes_por_insumo.get(insumo.idInsumo)
+            # 3) Media de OrdenCompra
+            if demanda is None or demanda == 0:
+                demanda = ordenes_por_insumo.get(insumo.idInsumo)
 
-        # 4) cantidad típica del catálogo
-        if demanda is None or demanda == 0:
-            demanda = float(insumo.cantidad or 0)
+            # 4) cantidad típica del catálogo
+            if demanda is None or demanda == 0:
+                demanda = float(insumo.cantidad or 0)
 
-        demanda = float(demanda or 0)
-        proyecciones.append({
-            'insumo_id':          insumo.idInsumo,
-            'nombre':             insumo.nombre,
-            'codigo':             insumo.codigo,
-            'stock_actual':       float(insumo.stock or 0),
-            'stock_minimo':       float(insumo.stock_minimo_sugerido or 0),
-            'demanda_proyectada': round(demanda, 1),
-            'diferencia':         round(float(insumo.stock or 0) - demanda, 1),
-            'fuente':             (
-                'proyeccion' if insumo.idInsumo in proyecciones_bd else
-                'ordenes'    if insumo.idInsumo in ordenes_por_insumo else
-                'catalogo'
-            ),
-        })
+            # 5) stock mínimo manual como proxy de consumo mensual PYME
+            if demanda is None or demanda == 0:
+                demanda = float(insumo.stock_minimo_manual or 0)
 
-    # Más críticos primero (menor diferencia stock - demanda)
-    proyecciones.sort(key=lambda x: x['diferencia'])
-    proyecciones = proyecciones[:n]
+            demanda = float(demanda or 0)
+            proyecciones.append({
+                'insumo_id':          insumo.idInsumo,
+                'nombre':             insumo.nombre,
+                'codigo':             insumo.codigo,
+                'stock_actual':       float(insumo.stock or 0),
+                'stock_minimo':       float(insumo.stock_minimo_sugerido or 0),
+                'demanda_proyectada': round(demanda, 1),
+                'diferencia':         round(float(insumo.stock or 0) - demanda, 1),
+                'fuente':             (
+                    'proyeccion' if insumo.idInsumo in proyecciones_bd else
+                    'ordenes'    if insumo.idInsumo in ordenes_por_insumo else
+                    'catalogo'
+                ),
+            })
 
-    return JsonResponse({'proyecciones': proyecciones, 'periodo': periodo_actual, 'ventana_meses': meses})
+        # Más críticos primero (menor diferencia stock - demanda)
+        proyecciones.sort(key=lambda x: x['diferencia'])
+        proyecciones = proyecciones[:n]
+
+        return JsonResponse({'proyecciones': proyecciones, 'periodo': periodo_actual, 'ventana_meses': meses})
+
+    except Exception as e:
+        return JsonResponse({'error': str(e), 'proyecciones': []}, status=500)
 
 
 def api_resumen_inteligencia(request):

@@ -28,6 +28,14 @@ DEFAULTS = {
     'DEMANDA_MESES_HISTORICO': 3,
     'INSUMO_CRITICO_UMBRAL_PRECIO': 500.0,
     'STOCK_MINIMO_GLOBAL': 10,
+    # Umbral para R1: stock <= este valor → sin_stock_critico (alta)
+    'DEMANDA_UMBRAL_CRITICO': 0,
+    # Factor para R3: stock < demanda × factor → compra_preventiva (media)
+    'DEMANDA_FACTOR_PREVENTIVO': 1.0,
+
+    # --- Tabla de Proyección Demanda (dashboard) ---
+    'PROYECCION_N_INSUMOS': 8,   # cantidad de insumos a mostrar en la tabla
+    'PROYECCION_MESES': 3,        # ventana de meses para media móvil (fuente 2)
 
     # --- Temporización / Latencia de Proveedores ---
     # lambda para decaimiento exponencial en cumplimiento/incidencias (por día)

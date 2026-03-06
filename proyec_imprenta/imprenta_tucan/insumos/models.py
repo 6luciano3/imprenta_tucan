@@ -46,6 +46,10 @@ class Insumo(models.Model):
     precio_unitario = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     categoria = models.CharField(max_length=100, blank=True)
     stock = models.IntegerField(default=0)
+    stock_minimo_manual = models.PositiveIntegerField(
+        null=True, blank=True,
+        help_text='Stock mínimo sugerido (cargado manualmente). Se usa cuando no hay historial de consumo.',
+    )
     precio = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     activo = models.BooleanField(default=True)
     unidad_medida = models.CharField(max_length=20, default='unidad', blank=True)
@@ -70,13 +74,15 @@ class Insumo(models.Model):
 
     @property
     def stock_minimo_sugerido(self):
-        # Días de reposición: parámetro fijo (ejemplo: 15 días)
-        dias_reposicion = 15
+        # Si hay historial de consumo, calcularlo dinámicamente
         consumo_mensual = self.consumo_promedio_mensual
-        if consumo_mensual == 0:
-            return 0
-        # Stock mínimo = consumo promedio mensual * (días de reposición / 30)
-        return round(consumo_mensual * dias_reposicion / 30)
+        if consumo_mensual > 0:
+            dias_reposicion = 15
+            return round(consumo_mensual * dias_reposicion / 30)
+        # Sin historial: usar el mínimo manual cargado
+        if self.stock_minimo_manual is not None:
+            return self.stock_minimo_manual
+        return 0
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

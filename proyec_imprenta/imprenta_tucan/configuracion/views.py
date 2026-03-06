@@ -42,6 +42,102 @@ def configuracion_home(request):
     return render(request, 'configuracion/dashboard.html')
 
 
+@login_required
+def motor_demanda_config(request):
+    """Permite editar los umbrales R1, R2 y R3 del Motor de Demanda."""
+    from configuracion.models import Parametro, GrupoParametro
+    from core.motor.config import MotorConfig, DEFAULTS
+
+    PARAMS = [
+        {
+            'clave': 'DEMANDA_UMBRAL_CRITICO',
+            'nombre': 'R1 — Umbral stock crítico',
+            'descripcion': 'Stock ≤ este valor activa "🔴 Sin stock crítico" (prioridad Alta). Valor 0 = solo se activa cuando el stock llega a cero.',
+            'tipo': Parametro.TIPO_INT,
+            'step': '1',
+            'min': '0',
+        },
+        {
+            'clave': 'STOCK_MINIMO_GLOBAL',
+            'nombre': 'R2 — Stock mínimo global',
+            'descripcion': 'Stock < este valor activa "🟠 Compra urgente" (prioridad Alta). Se usa como piso cuando no hay historial de consumo registrado.',
+            'tipo': Parametro.TIPO_INT,
+            'step': '1',
+            'min': '0',
+        },
+        {
+            'clave': 'DEMANDA_FACTOR_PREVENTIVO',
+            'nombre': 'R3 — Factor demanda preventiva',
+            'descripcion': 'Stock < demanda × este factor activa "🟡 Compra preventiva" (prioridad Media). Valor 1.0 = se activa cuando el stock es menor a la demanda proyectada.',
+            'tipo': Parametro.TIPO_FLOAT,
+            'step': '0.1',
+            'min': '0',
+        },
+    ]
+
+    if request.method == 'POST':
+        grupo, _ = GrupoParametro.objects.get_or_create(
+            codigo='MOTOR_DEMANDA',
+            defaults={'nombre': 'Motor de Demanda'},
+        )
+        for p in PARAMS:
+            raw = request.POST.get(p['clave'], '').strip()
+            if raw:
+                Parametro.set(p['clave'], raw, tipo=p['tipo'], grupo=grupo, nombre=p['nombre'])
+        return redirect(request.path + '?saved=1')
+
+    saved = request.GET.get('saved') == '1'
+    params = [
+        {**p, 'valor': MotorConfig.get(p['clave']) if MotorConfig.get(p['clave']) is not None else DEFAULTS.get(p['clave'], '')}
+        for p in PARAMS
+    ]
+    return render(request, 'configuracion/motor_demanda.html', {'params': params, 'saved': saved})
+
+
+@login_required
+def proyeccion_demanda_config(request):
+    """Permite editar los parámetros de visualización de la tabla Proyección Demanda."""
+    from configuracion.models import Parametro, GrupoParametro
+    from core.motor.config import MotorConfig, DEFAULTS
+
+    PARAMS = [
+        {
+            'clave': 'PROYECCION_N_INSUMOS',
+            'nombre': 'Cantidad de insumos a mostrar',
+            'descripcion': 'Número de filas que se muestran en la tabla "Proyección Demanda Insumos" del dashboard.',
+            'tipo': Parametro.TIPO_INT,
+            'step': '1',
+            'min': '1',
+        },
+        {
+            'clave': 'PROYECCION_MESES',
+            'nombre': 'Ventana de meses (media móvil)',
+            'descripcion': 'Cantidad de meses hacia atrás usados para calcular el promedio de consumo real cuando no hay proyección oficial.',
+            'tipo': Parametro.TIPO_INT,
+            'step': '1',
+            'min': '1',
+        },
+    ]
+
+    if request.method == 'POST':
+        grupo, _ = GrupoParametro.objects.get_or_create(
+            codigo='PROYECCION_DEMANDA',
+            defaults={'nombre': 'Proyección Demanda'},
+        )
+        for p in PARAMS:
+            raw = request.POST.get(p['clave'], '').strip()
+            if raw:
+                Parametro.set(p['clave'], raw, tipo=p['tipo'], grupo=grupo, nombre=p['nombre'])
+        return redirect(request.path + '?saved=1')
+
+    saved = request.GET.get('saved') == '1'
+    params = [
+        {**p, 'valor': MotorConfig.get(p['clave']) if MotorConfig.get(p['clave']) is not None else DEFAULTS.get(p['clave'], '')}
+        for p in PARAMS
+    ]
+    return render(request, 'configuracion/proyeccion_demanda.html', {'params': params, 'saved': saved})
+
+
 def redirect_configuracion(request):
     return redirect('lista_formulas')
 

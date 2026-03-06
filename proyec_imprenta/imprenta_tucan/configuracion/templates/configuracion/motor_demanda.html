@@ -1,0 +1,67 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="max-w-2xl mx-auto">
+
+  <div class="flex items-center gap-3 mb-6">
+    <span class="material-symbols-outlined text-3xl text-primary">rule_settings</span>
+    <h1 class="text-2xl font-bold">Motor de Demanda — Reglas de Alerta</h1>
+  </div>
+
+  {% if saved %}
+  <div class="bg-green-50 border border-green-300 text-green-800 rounded-lg px-4 py-3 mb-6 flex items-center gap-2">
+    <span class="material-symbols-outlined text-green-600">check_circle</span>
+    Parámetros guardados correctamente. Los cambios se aplican de inmediato.
+  </div>
+  {% endif %}
+
+  <!-- Explicación -->
+  <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6 text-sm text-blue-800">
+    <p class="font-semibold mb-1">¿Cómo funcionan las reglas?</p>
+    <p>El motor evalúa cada insumo activo y aplica las 3 reglas en orden de prioridad:</p>
+    <ol class="list-decimal list-inside mt-2 space-y-1">
+      <li><strong>R1 (Alta)</strong>: stock ≤ umbral crítico → 🔴 Sin stock crítico</li>
+      <li><strong>R2 (Alta)</strong>: stock &lt; stock mínimo → 🟠 Compra urgente</li>
+      <li><strong>R3 (Media)</strong>: stock &lt; demanda × factor → 🟡 Compra preventiva</li>
+    </ol>
+    <p class="mt-2 text-blue-600">Solo R1 y R2 aparecen en "Insumos con Acción Urgente" (prioridad Alta).</p>
+  </div>
+
+  <form method="POST" class="bg-white rounded-xl shadow p-6 space-y-6">
+    {% csrf_token %}
+
+    {% for p in params %}
+    <div class="border border-gray-200 rounded-lg p-4">
+      <label class="block text-sm font-semibold text-gray-700 mb-1">
+        {{ p.nombre }}
+      </label>
+      <p class="text-sm text-gray-500 mb-3">{{ p.descripcion }}</p>
+      <input
+        type="number"
+        name="{{ p.clave }}"
+        value="{{ p.valor }}"
+        step="{{ p.step }}"
+        min="{{ p.min }}"
+        class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+        required
+      />
+      <p class="text-xs text-gray-400 mt-1">Clave interna: <code>{{ p.clave }}</code></p>
+    </div>
+    {% endfor %}
+
+    <div class="flex items-center gap-3 pt-2">
+      <button type="submit"
+        class="flex items-center gap-2 bg-primary text-white px-5 py-2 rounded-lg hover:bg-primary-dark transition shadow">
+        <span class="material-symbols-outlined text-sm">save</span>
+        Guardar cambios
+      </button>
+      <a href="{% url 'configuracion_home' %}"
+        class="flex items-center gap-2 bg-gray-100 text-gray-700 px-5 py-2 rounded-lg hover:bg-gray-200 transition">
+        <span class="material-symbols-outlined text-sm">arrow_back</span>
+        Volver
+      </a>
+    </div>
+  </form>
+
+</div>
+{% endblock %}
