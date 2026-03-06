@@ -39,6 +39,9 @@
     <option value="cliente" {% if order_by == 'cliente' %}selected{% endif %}>Cliente</option>
     <option value="email" {% if order_by == 'email' %}selected{% endif %}>Email</option>
     <option value="cnt" {% if order_by == 'cnt' %}selected{% endif %}>Pedidos</option>
+    <option value="facturado" {% if order_by == 'facturado' %}selected{% endif %}>Facturado</option>
+    <option value="margen" {% if order_by == 'margen' %}selected{% endif %}>Margen</option>
+    <option value="frecuencia" {% if order_by == 'frecuencia' %}selected{% endif %}>Frecuencia</option>
     <option value="puntaje_estrategico" {% if order_by == 'puntaje_estrategico' %}selected{% endif %}>Puntaje estratégico</option>
   {% endif %}
 {% endblock %}

@@ -347,56 +347,113 @@ def reporte_proveedores_activos(request):
 
 
 def reporte_clientes_frecuentes(request):
-    from django.db.models import Count
+    from django.db.models import Count, Sum
+    from pedidos.models import LineaPedido
+    from productos.models import ProductoInsumo
+    from configuracion.models import Parametro
 
     fmt = _get_format(request)
     query = request.GET.get('q', '') or request.GET.get('criterio', '')
     order_by = request.GET.get('order_by', 'cnt')
     direction = request.GET.get('direction', 'desc')
     top = int(request.GET.get('top', '20') or 20)
-    freq = (
-        Pedido.objects.values('cliente')
-        .annotate(cnt=Count('id'))
+
+    ventana_dias = int(Parametro.get('RANKING_VENTANA_DIAS', 365))
+    meses_ventana = max(1, ventana_dias // 30)
+    from datetime import timedelta
+    from django.utils import timezone
+    desde = timezone.now().date() - timedelta(days=ventana_dias)
+
+    freq = list(
+        Pedido.objects.filter(fecha_pedido__gte=desde)
+        .values('cliente')
+        .annotate(cnt=Count('id'), facturado=Sum('monto_total'))
         .order_by('-cnt')[:top]
     )
     cliente_ids = [f['cliente'] for f in freq]
     clientes_map = {c.id: c for c in Cliente.objects.filter(id__in=cliente_ids, estado='Activo')}
 
-    # Filtrar por búsqueda
+    # Calcular margen por cliente (ingresos de LineaPedido - costo BOM)
+    lineas_qs = (
+        LineaPedido.objects
+        .filter(pedido__fecha_pedido__gte=desde, pedido__cliente_id__in=cliente_ids)
+        .select_related('pedido')
+    )
+    producto_ids = list(lineas_qs.values_list('producto_id', flat=True).distinct())
+    costo_unitario: dict = {}
+    if producto_ids:
+        for pi in ProductoInsumo.objects.select_related('insumo').filter(producto_id__in=producto_ids):
+            costo_unitario[pi.producto_id] = (
+                costo_unitario.get(pi.producto_id, 0.0)
+                + float(pi.cantidad_por_unidad) * float(pi.insumo.precio_unitario or 0)
+            )
+    margen_por_cliente: dict = {}
+    for linea in lineas_qs:
+        cid = linea.pedido.cliente_id
+        costo = float(costo_unitario.get(linea.producto_id, 0.0))
+        ingreso = float(linea.precio_unitario) * float(linea.cantidad)
+        margen_por_cliente[cid] = margen_por_cliente.get(cid, 0.0) + max(0.0, ingreso - costo * float(linea.cantidad))
+
+    # Para clientes sin LineaPedido, estimar el margen usando el porcentaje bruto configurado.
+    # El valor se marca con prefijo "~" para indicar que es una estimación.
+    margen_bruto_pct = float(Parametro.get('MARGEN_BRUTO_ESTIMADO', 30)) / 100.0
+    clientes_con_lineas = set(margen_por_cliente.keys())
+    facturado_por_cliente = {f['cliente']: float(f.get('facturado') or 0) for f in freq}
+    margen_estimado_por_cliente: dict = {
+        cid: round(facturado_por_cliente.get(cid, 0.0) * margen_bruto_pct, 2)
+        for cid in facturado_por_cliente
+        if cid not in clientes_con_lineas
+    }
     if query:
         clientes_map = {k: v for k, v in clientes_map.items() if query.lower() in (f"{v.nombre} {v.apellido} {v.email}".lower())}
         freq = [f for f in freq if f['cliente'] in clientes_map]
 
     # Ordenar por campo
-    valid_order_fields = ['cliente', 'email', 'cnt', 'puntaje_estrategico']
+    valid_order_fields = ['cliente', 'email', 'cnt', 'facturado', 'margen', 'frecuencia', 'puntaje_estrategico']
     if order_by not in valid_order_fields:
         order_by = 'cnt'
     reverse_sort = direction == 'desc'
     def get_sort_key(f):
         c = clientes_map.get(f['cliente'])
         if not c:
-            return ''
+            return 0
         if order_by == 'cliente':
             return f"{c.nombre} {c.apellido}"
         if order_by == 'email':
             return c.email
+        if order_by == 'facturado':
+            return float(f.get('facturado') or 0)
+        if order_by == 'margen':
+            cid = f['cliente']
+            return margen_por_cliente.get(cid, margen_estimado_por_cliente.get(cid, -1.0))
+        if order_by == 'frecuencia':
+            return f['cnt'] / meses_ventana
         if order_by == 'puntaje_estrategico':
-            return c.puntaje_estrategico
+            return float(c.puntaje_estrategico or 0)
         return f['cnt']
     freq = sorted(freq, key=get_sort_key, reverse=reverse_sort)
 
-    headers = ['Cliente', 'Email', 'Pedidos', 'Puntaje estratégico']
+    headers = ['Cliente', 'Email', 'Pedidos', 'Facturado ($)', 'Margen ($)', 'Frecuencia (ped/mes)', 'Puntaje estratégico']
+
+    def _build_row(f):
+        c = clientes_map.get(f['cliente'])
+        if not c:
+            return None
+        cid = f['cliente']
+        facturado = round(float(f.get('facturado') or 0), 2)
+        if cid in clientes_con_lineas:
+            margen = round(margen_por_cliente[cid], 2)
+        else:
+            # Sin líneas de detalle: estimación basada en margen bruto configurado
+            margen = f'~{margen_estimado_por_cliente.get(cid, 0.0)}'
+        frecuencia = round(f['cnt'] / meses_ventana, 2)
+        return [f"{c.nombre} {c.apellido}", c.email, f['cnt'], facturado, margen, frecuencia, c.puntaje_estrategico]
 
     if fmt == 'html':
         paginator = Paginator(list(freq), get_page_size())
         page = request.GET.get('page')
         page_obj = paginator.get_page(page)
-        rows_page = []
-        for f in page_obj.object_list:
-            c = clientes_map.get(f['cliente'])
-            if not c:
-                continue
-            rows_page.append([f"{c.nombre} {c.apellido}", c.email, f['cnt'], c.puntaje_estrategico])
+        rows_page = [row for f in page_obj.object_list for row in [_build_row(f)] if row]
         return render(request, 'reportes/lista.html', {
             'title': 'Clientes frecuentes',
             'headers': headers,
@@ -410,15 +467,18 @@ def reporte_clientes_frecuentes(request):
 
     rows, records = [], []
     for f in freq:
-        c = clientes_map.get(f['cliente'])
-        if not c:
+        row = _build_row(f)
+        if not row:
             continue
-        rows.append([f"{c.nombre} {c.apellido}", c.email, f['cnt'], c.puntaje_estrategico])
+        rows.append(row)
         records.append({
-            'cliente': f"{c.nombre} {c.apellido}",
-            'email': c.email,
-            'pedidos': f['cnt'],
-            'puntaje_estrategico': c.puntaje_estrategico,
+            'cliente': row[0],
+            'email': row[1],
+            'pedidos': row[2],
+            'facturado': row[3],
+            'margen': row[4],
+            'frecuencia': row[5],
+            'puntaje_estrategico': row[6],
         })
 
     return _export_dispatch(request, fmt, 'Clientes frecuentes', headers, rows, records)
