@@ -27,7 +27,7 @@
   {% if messages %}
     <div class="mb-3">
       {% for message in messages %}
-        <div class="alert alert-{{ message.tags }} mb-2">{{ message }}</div>
+        <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} mb-2">{{ message }}</div>
       {% endfor %}
     </div>
   {% endif %}
@@ -35,6 +35,12 @@
   <div class="card shadow-sm">
     <div class="card-body">
       <div id="stockAlert" class="alert alert-danger d-none" role="alert"></div>
+      {% if pedido.estado.nombre|lower == 'entregado' %}
+      <div class="alert alert-warning d-flex align-items-center gap-2" role="alert">
+        <span class="material-symbols-outlined">lock</span>
+        Este pedido ya fue <strong>Entregado</strong> y no puede modificarse.
+      </div>
+      {% endif %}
       <form method="post" novalidate>
         {% csrf_token %}
 
@@ -53,20 +59,25 @@
           </div>
           <div class="col-md-4">
             <label class="form-label">Fecha de Entrega</label>
-            <input type="date" name="fecha_entrega" value="{{ fecha_entrega }}" class="form-control" required id="id_fecha_entrega">
+            <input type="date" name="fecha_entrega" value="{{ fecha_entrega }}" class="form-control{% if pedido.estado.nombre|lower == 'entregado' %} bg-light{% endif %}" {% if pedido.estado.nombre|lower != 'entregado' %}required{% endif %} {% if pedido.estado.nombre|lower == 'entregado' %}readonly{% endif %} id="id_fecha_entrega">
           </div>
           <div class="col-md-4">
             <label class="form-label">Estado</label>
+            {% if pedido.estado.nombre|lower == 'entregado' %}
+            <input type="text" class="form-control bg-light" value="{{ pedido.estado.nombre }}" readonly>
+            <input type="hidden" name="estado" value="{{ pedido.estado.pk }}">
+            {% else %}
             {{ form.estado }}
+            {% endif %}
           </div>
           <div class="col-md-4 d-flex align-items-end mt-2 gap-3">
             <div class="form-check">
-              <input type="checkbox" name="aplicar_iva" class="form-check-input" id="id_aplicar_iva" {% if aplicar_iva_actual %}checked{% endif %}>
+              <input type="checkbox" name="aplicar_iva" class="form-check-input" id="id_aplicar_iva" {% if aplicar_iva_actual %}checked{% endif %} {% if pedido.estado.nombre|lower == 'entregado' %}disabled{% endif %}>
               <label class="form-check-label ms-1" for="id_aplicar_iva">IVA 21%</label>
             </div>
             <div class="flex-grow-1">
               <label class="form-label" for="id_descuento">Descuento</label>
-              <select name="descuento" class="form-select" id="id_descuento">
+              <select name="descuento" class="form-select" id="id_descuento" {% if pedido.estado.nombre|lower == 'entregado' %}disabled{% endif %}>
                 <option value="0" {% if descuento_actual == 0 %}selected{% endif %}>Sin descuento</option>
                 <option value="20" {% if descuento_actual == 20 %}selected{% endif %}>Descuento 20%</option>
                 <option value="15" {% if descuento_actual == 15 %}selected{% endif %}>Descuento 15%</option>
@@ -99,7 +110,9 @@
                 <td class="text-end"><input type="text" class="form-control text-end unitario" value="0.00" readonly></td>
                 <td class="text-end"><input type="text" class="form-control text-end linea-total" value="0.00" readonly></td>
                 <td class="remove-line">
+                  {% if pedido.estado.nombre|lower != 'entregado' %}
                   <button type="button" class="btn btn-outline-danger btn-sm btn-remove">Quitar</button>
+                  {% endif %}
                   {% if form.DELETE %}<div class="d-none">{{ form.DELETE }}</div>{% endif %}
                 </td>
               </tr>
@@ -110,7 +123,9 @@
 
         <div class="d-flex justify-content-between align-items-center mt-2 gap-2">
           <div class="d-flex gap-2">
+            {% if pedido.estado.nombre|lower != 'entregado' %}
             <button type="button" id="btnAdd" class="btn btn-outline-primary">+ Agregar producto</button>
+            {% endif %}
           </div>
           <div>
             <table class="table table-sm table-borderless mb-0 text-end" style="width: auto; min-width: 320px;">
@@ -139,8 +154,10 @@
         </div>
 
         <div class="d-flex justify-content-end gap-2 mt-4">
-          <a href="{% url 'lista_pedidos' %}" class="btn btn-outline-secondary">Cancelar</a>
-          <button type="submit" class="btn btn-primary" id="btnSubmit">Guardar Cambios</button>
+          <a href="{% url 'lista_pedidos' %}" class="btn btn-outline-secondary">Volver</a>
+          {% if pedido.estado.nombre|lower != 'entregado' %}
+          <button type="submit" class="btn btn-primary" id="btnSubmit" onclick="return window._validarCantidades()">Guardar Cambios</button>
+          {% endif %}
         </div>
       </form>
     </div>
@@ -148,6 +165,29 @@
 </div>
 
 <script>
+// Validación global de cantidades — independiente del IIFE
+window._validarCantidades = function() {
+  var filas = document.querySelectorAll('#tablaLineas tbody tr.linea');
+  for (var i = 0; i < filas.length; i++) {
+    var tr = filas[i];
+    if (tr.classList.contains('tr-hidden')) continue;
+    var del = tr.querySelector('input[name$="-DELETE"]');
+    if (del && del.checked) continue;
+    var inp = tr.querySelector('.cantidad-input');
+    var val = parseInt((inp && inp.value) || '0', 10);
+    if (!val || val < 1 || val > 1000000) {
+      var alerta = document.getElementById('stockAlert');
+      if (alerta) {
+        alerta.textContent = 'La cantidad debe ser un número entre 1 y 1.000.000. Valor ingresado: ' + ((inp && inp.value) || '(vacío');
+        alerta.classList.remove('d-none');
+        alerta.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      return false;
+    }
+  }
+  return true;
+};
+
 (function() {
   const precios = {{ precios|default:'{}'|safe }};
   // Precios guardados por línea (precio_unitario al momento del pedido).
@@ -161,6 +201,7 @@
   const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
   const stockAlert = document.getElementById('stockAlert');
   const btnSubmit = document.getElementById('btnSubmit');
+  let debounceTimer;
 
   function format(n) { return (Math.round(n * 100) / 100).toFixed(2); }
   function toNumber(v) { const n = parseFloat(v); return isFinite(n) ? n : 0; }
@@ -253,6 +294,33 @@
     });
   }
 
+  // Interceptor submit: bloquear si hay faltantes de insumos o cantidades inválidas
+  const form = document.querySelector('form[method="post"]');
+  form?.addEventListener('submit', function(e) {
+    // 1) Validar cantidades
+    let cantidadInvalida = false;
+    tbody.querySelectorAll('tr.linea').forEach(tr => {
+      if (tr.classList.contains('tr-hidden')) return;
+      const del = tr.querySelector('input[name$="-DELETE"]');
+      if (del?.checked) return;
+      const cantInput = tr.querySelector('.cantidad-input');
+      const val = parseInt(cantInput?.value || '0', 10);
+      if (!val || val < 1 || val > 1000000) cantidadInvalida = true;
+    });
+    if (cantidadInvalida) {
+      e.preventDefault();
+      stockAlert.textContent = 'La cantidad debe ser un número entre 1 y 1.000.000.';
+      stockAlert.classList.remove('d-none');
+      stockAlert.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+    // 2) Bloquear si el banner de insumos está visible
+    if (!stockAlert.classList.contains('d-none') && stockAlert.textContent.trim() !== '') {
+      e.preventDefault();
+      return;
+    }
+  });
+
   // Inicializar filas: poblar unitario/importe usando precio_unitario de BD.
   // Los totales del resumen ya vienen precargados desde Django ({{ subtotal_inicial }}, etc.).
   // NO llamar recalcSubtotal aquí para no pisar esos valores.
@@ -297,7 +365,6 @@
   });
 
   // Verificación de stock AJAX para múltiples líneas
-  let debounceTimer;
   function scheduleCheckStock() {
     clearTimeout(debounceTimer);
     debounceTimer = setTimeout(checkStock, 400);
@@ -330,16 +397,19 @@
         headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
         body: JSON.stringify({ lineas })
       });
-      if (!resp.ok) throw new Error('Error');
+      console.log('[Stock] status:', resp.status);
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
       const data = await resp.json();
+      console.log('[Stock] respuesta:', data);
       if (data.ok) { clearStockAlert(); return; }
       const detalle = (data.faltantes || [])
         .map(f => `${f.codigo} - ${f.nombre}: faltan ${Number(f.faltan).toFixed(2)}`).join(', ');
-      stockAlert.textContent = detalle || 'No hay insumos suficientes.';
+      stockAlert.textContent = detalle || 'No hay insumos suficientes para las cantidades ingresadas.';
       stockAlert.classList.remove('d-none');
-      btnSubmit.disabled = false; // no bloquear, solo advertir
+      btnSubmit.disabled = true; // bloquear guardado
     } catch (e) {
-      stockAlert.textContent = 'No se pudo verificar el stock.';
+      console.error('[Stock] error:', e);
+      stockAlert.textContent = 'No se pudo verificar el stock. Ver consola para detalle.';
       stockAlert.classList.remove('d-none');
       btnSubmit.disabled = false;
     }

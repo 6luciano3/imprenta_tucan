@@ -477,6 +477,10 @@ def modificar_pedido(request, idPedido: int):
     lineas_actuales = list(pedido.lineas.select_related('producto').all())
 
     if request.method == "POST":
+        estado_nombre = (pedido.estado.nombre or "").lower() if pedido.estado else ""
+        if estado_nombre == "entregado":
+            messages.error(request, f"El pedido #{pedido.id} no puede modificarse porque ya fue Entregado.")
+            return redirect(request.path)
         formset = LineaPedidoFormSet(request.POST, prefix="linea")
         form = ModificarPedidoForm(request.POST)
         if form.is_valid() and formset.is_valid():
@@ -490,23 +494,31 @@ def modificar_pedido(request, idPedido: int):
                     new_lineas.append((f["producto"], f["cantidad"]))
 
             old_lineas = [(l.producto, l.cantidad) for l in lineas_actuales]
-            ok, faltantes = verificar_insumos_para_ajuste(old_lineas, new_lineas)
-            if not ok:
-                if faltantes:
+
+            # Bloquear siempre si hay insumos faltantes para las nuevas líneas
+            ok_stock, faltantes_stock = verificar_insumos_para_lineas(new_lineas)
+            if not ok_stock:
+                if faltantes_stock:
                     try:
                         from insumos.models import Insumo
                         info = {i.idInsumo: (i.codigo, i.nombre)
-                                for i in Insumo.objects.filter(idInsumo__in=faltantes.keys())}
+                                for i in Insumo.objects.filter(idInsumo__in=faltantes_stock.keys())}
                     except Exception:
                         info = {}
                     detalle = ", ".join([
-                        f"{info.get(iid, ('-',f'Insumo {iid}'))[0]} - "
-                        f"{info.get(iid, ('-',f'Insumo {iid}'))[1]}: faltan {falt:.2f}"
-                        for iid, falt in faltantes.items()
+                        f"{info.get(iid, ('-', f'Insumo {iid}'))[1]}: faltan {falt:.2f}"
+                        for iid, falt in faltantes_stock.items()
                     ])
-                    messages.warning(request, f"Advertencia: insumos insuficientes ({detalle}). El pedido se guardó de todas formas.")
+                    messages.error(
+                        request,
+                        f"No se puede guardar el pedido: insumos insuficientes ({detalle})."
+                    )
                 else:
-                    messages.warning(request, "Advertencia: no hay insumos suficientes. El pedido se guardó de todas formas.")
+                    messages.error(
+                        request,
+                        "No se puede guardar el pedido: insumos insuficientes para las cantidades ingresadas."
+                    )
+                return redirect(request.path)
 
             # Calcular monto_total aplicando descuento e IVA igual que en alta_pedido
             from decimal import Decimal
@@ -545,7 +557,15 @@ def modificar_pedido(request, idPedido: int):
             messages.success(request, "El pedido ha sido modificado correctamente.")
             return redirect("lista_pedidos")
         else:
-            messages.error(request, "Revisá los datos del formulario")
+            # Detectar si hay error de cantidad fuera de rango
+            cantidad_error = any(
+                form_linea.errors.get('cantidad') for form_linea in formset.forms
+            )
+            if cantidad_error:
+                messages.error(request, "La cantidad por línea debe ser entre 1 y 1.000.000.")
+            else:
+                messages.error(request, "Revisá los datos del formulario.")
+            return redirect(request.path)
     else:
         # Precargar con datos actuales
         initial_lineas = [
@@ -615,6 +635,10 @@ def eliminar_pedido(request, idPedido: int):
     if request.method == "POST":
         if not request.user.is_staff:
             messages.error(request, "No tenés permisos para eliminar pedidos.")
+            return redirect("lista_pedidos")
+        estado_nombre = (pedido.estado.nombre or "").lower() if pedido.estado else ""
+        if estado_nombre not in ("cancelado", "entregado"):
+            messages.error(request, f"El pedido #{pedido.id} no puede eliminarse porque su estado es '{pedido.estado}'. Solo se pueden eliminar pedidos con estado Cancelado o Entregado.")
             return redirect("lista_pedidos")
         descripcion = f"Pedido {pedido.id} - {pedido.cliente}"
         from productos.models import ProductoInsumo
