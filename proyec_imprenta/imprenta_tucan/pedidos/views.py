@@ -481,11 +481,9 @@ def modificar_pedido(request, idPedido: int):
         form = ModificarPedidoForm(request.POST)
         if form.is_valid() and formset.is_valid():
             estado = form.cleaned_data["estado"]
-            if form.is_valid() and formset.is_valid():
-                estado = form.cleaned_data["estado"]
-                fecha_entrega = form.cleaned_data["fecha_entrega"]
-                aplicar_iva = form.cleaned_data.get("aplicar_iva", False)
-                descuento = form.cleaned_data.get("descuento", "0")
+            fecha_entrega = form.cleaned_data["fecha_entrega"]
+            aplicar_iva = form.cleaned_data.get("aplicar_iva", False)
+            descuento = form.cleaned_data.get("descuento", "0")
             new_lineas = []
             for f in formset.cleaned_data:
                 if f and not f.get('DELETE', False):
@@ -506,12 +504,9 @@ def modificar_pedido(request, idPedido: int):
                         f"{info.get(iid, ('-',f'Insumo {iid}'))[1]}: faltan {falt:.2f}"
                         for iid, falt in faltantes.items()
                     ])
-                    messages.error(request, f"No hay insumos suficientes: {detalle}")
+                    messages.warning(request, f"Advertencia: insumos insuficientes ({detalle}). El pedido se guardó de todas formas.")
                 else:
-                    messages.error(request, "No hay insumos suficientes.")
-                precios = {p.pk: float(p.precio) for p in Producto.objects.all()}
-                return render(request, "pedidos/modificar_pedido.html",
-                              {"form": form, "formset": formset, "pedido": pedido, "precios": precios})
+                    messages.warning(request, "Advertencia: no hay insumos suficientes. El pedido se guardó de todas formas.")
 
             # Calcular monto_total aplicando descuento e IVA igual que en alta_pedido
             from decimal import Decimal
@@ -570,17 +565,44 @@ def modificar_pedido(request, idPedido: int):
             "fecha_entrega": fecha_entrega_default,
         })
 
+    import json as _json
+    from decimal import Decimal as _D
     precios = {p.pk: float(p.precio) for p in Producto.objects.all()}
+    precios_lineas_json = _json.dumps([float(l.precio_unitario) for l in lineas_actuales])
+
+    # Calcular desglose inicial para mostrarlo desde el servidor (sin JS en la carga)
+    subtotal_inicial = sum(
+        (l.precio_unitario if l.precio_unitario else (l.producto.precio or _D("0"))) * l.cantidad
+        for l in lineas_actuales
+    )
+    descuento_bd = _D(str(pedido.descuento or 0))
+    monto_descuento_inicial = (subtotal_inicial * descuento_bd / _D("100")).quantize(_D("0.01"))
+    subtotal_con_desc = subtotal_inicial - monto_descuento_inicial
+    monto_iva_inicial = (subtotal_con_desc * _D("0.21")).quantize(_D("0.01")) if pedido.aplicar_iva else _D("0")
+
+    descuento_actual = int(float(pedido.descuento)) if pedido.descuento else 0
+    aplicar_iva_actual = bool(pedido.aplicar_iva)
+
+    # Mostrar desglose (descuento/IVA) solo si monto_total coincide con la fórmula.
+    # Para pedidos viejos (monto_total = solo la suma de líneas), ocultarlo evita confusión.
+    total_calculado = subtotal_con_desc * (_D("1.21") if aplicar_iva_actual else _D("1"))
+    mostrar_desglose = abs(total_calculado - pedido.monto_total) < _D("1")
+
     return render(request, "pedidos/modificar_pedido.html", {
         "form": form,
         "formset": formset,
         "pedido": pedido,
         "precios": precios,
+        "precios_lineas_json": precios_lineas_json,
         "estados": EstadoPedido.objects.all(),
         "productos": Producto.objects.filter(activo=True).order_by('nombreProducto'),
         "fecha_entrega": pedido.fecha_entrega.strftime('%Y-%m-%d') if pedido.fecha_entrega else '',
-        "descuento_actual": int(pedido.descuento) if hasattr(pedido, 'descuento') else 0,
-        "aplicar_iva_actual": pedido.aplicar_iva if hasattr(pedido, 'aplicar_iva') else False,
+        "descuento_actual": descuento_actual,
+        "mostrar_desglose": mostrar_desglose,
+        "aplicar_iva_actual": aplicar_iva_actual,
+        "subtotal_inicial": subtotal_inicial,
+        "monto_descuento_inicial": monto_descuento_inicial,
+        "monto_iva_inicial": monto_iva_inicial,
     })
 
 
