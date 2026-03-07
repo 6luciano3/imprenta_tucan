@@ -1,6 +1,7 @@
 from django.utils.crypto import get_random_string
 from django.db import models
 from django.contrib.auth import get_user_model
+from automatizacion.models_feedback import FeedbackRecomendacion  # noqa: F401 — necesario para que Django registre el modelo
 
 
 class RankingCliente(models.Model):
