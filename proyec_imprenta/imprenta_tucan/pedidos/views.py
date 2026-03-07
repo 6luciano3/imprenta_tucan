@@ -495,9 +495,10 @@ def modificar_pedido(request, idPedido: int):
 
             old_lineas = [(l.producto, l.cantidad) for l in lineas_actuales]
 
-            # Bloquear siempre si hay insumos faltantes para las nuevas líneas
+            # Bloquear si hay insumos faltantes, EXCEPTO cuando el nuevo estado es "Pendiente"
             ok_stock, faltantes_stock = verificar_insumos_para_lineas(new_lineas)
-            if not ok_stock:
+            estado_nuevo_nombre = (estado.nombre or "").lower()
+            if not ok_stock and estado_nuevo_nombre != "pendiente":
                 if faltantes_stock:
                     try:
                         from insumos.models import Insumo

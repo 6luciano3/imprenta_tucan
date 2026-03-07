@@ -34,7 +34,7 @@
 
   <div class="card shadow-sm">
     <div class="card-body">
-      <div id="stockAlert" class="alert alert-danger d-none" role="alert"></div>
+      <div id="stockAlert" class="alert alert-danger d-none" role="alert" data-bloquea="false"></div>
       {% if pedido.estado.nombre|lower == 'entregado' %}
       <div class="alert alert-warning d-flex align-items-center gap-2" role="alert">
         <span class="material-symbols-outlined">lock</span>
@@ -201,6 +201,7 @@ window._validarCantidades = function() {
   const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
   const stockAlert = document.getElementById('stockAlert');
   const btnSubmit = document.getElementById('btnSubmit');
+  const estadoSelect = document.getElementById('id_estado');
   let debounceTimer;
 
   function format(n) { return (Math.round(n * 100) / 100).toFixed(2); }
@@ -314,9 +315,10 @@ window._validarCantidades = function() {
       stockAlert.scrollIntoView({ behavior: 'smooth', block: 'center' });
       return;
     }
-    // 2) Bloquear si el banner de insumos está visible
-    if (!stockAlert.classList.contains('d-none') && stockAlert.textContent.trim() !== '') {
+    // 2) Bloquear si el banner marca bloqueo (estado != Pendiente con insumos faltantes)
+    if (stockAlert.dataset.bloquea === 'true') {
       e.preventDefault();
+      stockAlert.scrollIntoView({ behavior: 'smooth', block: 'center' });
       return;
     }
   });
@@ -325,6 +327,8 @@ window._validarCantidades = function() {
   // Los totales del resumen ya vienen precargados desde Django ({{ subtotal_inicial }}, etc.).
   // NO llamar recalcSubtotal aquí para no pisar esos valores.
   tbody.querySelectorAll('tr.linea').forEach(tr => { recalcRow(tr, false); bindRowEvents(tr); });
+  // Re-verificar stock cuando cambia el estado (el bloqueo depende de si es Pendiente o no)
+  estadoSelect?.addEventListener('change', scheduleCheckStock);
   scheduleCheckStock();
 
   // Agregar nueva fila desde template
@@ -372,7 +376,10 @@ window._validarCantidades = function() {
 
   function clearStockAlert() {
     stockAlert.classList.add('d-none');
+    stockAlert.classList.remove('alert-warning');
+    stockAlert.classList.add('alert-danger');
     stockAlert.textContent = '';
+    stockAlert.dataset.bloquea = 'false';
     btnSubmit.disabled = false;
   }
 
@@ -404,9 +411,23 @@ window._validarCantidades = function() {
       if (data.ok) { clearStockAlert(); return; }
       const detalle = (data.faltantes || [])
         .map(f => `${f.codigo} - ${f.nombre}: faltan ${Number(f.faltan).toFixed(2)}`).join(', ');
-      stockAlert.textContent = detalle || 'No hay insumos suficientes para las cantidades ingresadas.';
-      stockAlert.classList.remove('d-none');
-      btnSubmit.disabled = true; // bloquear guardado
+      const estadoTexto = (estadoSelect?.options[estadoSelect?.selectedIndex]?.text || '').toLowerCase().trim();
+      const esPendiente = estadoTexto === 'pendiente';
+      if (esPendiente) {
+        // Advertencia: se puede guardar porque el estado es Pendiente
+        stockAlert.textContent = '⚠️ Insumos insuficientes: ' + (detalle || 'no hay stock suficiente.') + ' — Se permite guardar porque el estado es Pendiente.';
+        stockAlert.classList.remove('d-none', 'alert-danger');
+        stockAlert.classList.add('alert-warning');
+        stockAlert.dataset.bloquea = 'false';
+        btnSubmit.disabled = false;
+      } else {
+        // Error: bloquear guardado
+        stockAlert.textContent = '🚫 No se puede guardar: ' + (detalle || 'insumos insuficientes para las cantidades ingresadas.');
+        stockAlert.classList.remove('d-none', 'alert-warning');
+        stockAlert.classList.add('alert-danger');
+        stockAlert.dataset.bloquea = 'true';
+        btnSubmit.disabled = true;
+      }
     } catch (e) {
       console.error('[Stock] error:', e);
       stockAlert.textContent = 'No se pudo verificar el stock. Ver consola para detalle.';
