@@ -57,9 +57,84 @@ CATEGORIAS: list[dict] = [
 ]
 
 
+def get_categorias() -> list[dict]:
+    """
+    Retorna la lista de tiers leyendo los parámetros de BD (Parametro).
+    Usa los valores hardcodeados de CATEGORIAS como fallback cuando el parámetro
+    aún no fue configurado.
+    """
+    try:
+        from configuracion.models import Parametro
+    except Exception:
+        return CATEGORIAS
+
+    defaults = {cat['nombre']: cat for cat in CATEGORIAS}
+
+    def _get_int(clave, fallback):
+        v = Parametro.get(clave, None)
+        if v is None:
+            return fallback
+        try:
+            return int(v)
+        except (ValueError, TypeError):
+            return fallback
+
+    def _get_str(clave, fallback):
+        v = Parametro.get(clave, None)
+        return v if v is not None else fallback
+
+    premium_d = defaults['Premium']
+    estrategico_d = defaults['Estrategico']
+    estandar_d = defaults['Estandar']
+    nuevo_d = defaults['Nuevo']
+
+    premium_score_min = _get_int('OFERTA_TIER_PREMIUM_SCORE_MIN', premium_d['score_min'])
+    estrategico_score_min = _get_int('OFERTA_TIER_ESTRATEGICO_SCORE_MIN', estrategico_d['score_min'])
+    estandar_score_min = _get_int('OFERTA_TIER_ESTANDAR_SCORE_MIN', estandar_d['score_min'])
+
+    return [
+        {
+            'nombre': 'Premium',
+            'score_min': premium_score_min,
+            'score_max': None,
+            'tipo': 'descuento',
+            'descuento': _get_int('OFERTA_TIER_PREMIUM_DESCUENTO', premium_d['descuento']),
+            'titulo_prefijo': _get_str('OFERTA_TIER_PREMIUM_TITULO', premium_d['titulo_prefijo']),
+            'descripcion': _get_str('OFERTA_TIER_PREMIUM_DESCRIPCION', premium_d['descripcion']),
+        },
+        {
+            'nombre': 'Estrategico',
+            'score_min': estrategico_score_min,
+            'score_max': premium_score_min,
+            'tipo': 'descuento',
+            'descuento': _get_int('OFERTA_TIER_ESTRATEGICO_DESCUENTO', estrategico_d['descuento']),
+            'titulo_prefijo': _get_str('OFERTA_TIER_ESTRATEGICO_TITULO', estrategico_d['titulo_prefijo']),
+            'descripcion': _get_str('OFERTA_TIER_ESTRATEGICO_DESCRIPCION', estrategico_d['descripcion']),
+        },
+        {
+            'nombre': 'Estandar',
+            'score_min': estandar_score_min,
+            'score_max': estrategico_score_min,
+            'tipo': 'promocion',
+            'descuento': _get_int('OFERTA_TIER_ESTANDAR_DESCUENTO', estandar_d['descuento']),
+            'titulo_prefijo': _get_str('OFERTA_TIER_ESTANDAR_TITULO', estandar_d['titulo_prefijo']),
+            'descripcion': _get_str('OFERTA_TIER_ESTANDAR_DESCRIPCION', estandar_d['descripcion']),
+        },
+        {
+            'nombre': 'Nuevo',
+            'score_min': None,
+            'score_max': estandar_score_min,
+            'tipo': 'promocion',
+            'descuento': _get_int('OFERTA_TIER_NUEVO_DESCUENTO', nuevo_d['descuento']),
+            'titulo_prefijo': _get_str('OFERTA_TIER_NUEVO_TITULO', nuevo_d['titulo_prefijo']),
+            'descripcion': _get_str('OFERTA_TIER_NUEVO_DESCRIPCION', nuevo_d['descripcion']),
+        },
+    ]
+
+
 def categoria_por_score(score: float) -> dict | None:
     """Retorna la categoría de tier correspondiente al score, o None si no aplica."""
-    for cat in CATEGORIAS:
+    for cat in get_categorias():
         min_ok = cat['score_min'] is None or score >= cat['score_min']
         max_ok = cat['score_max'] is None or score < cat['score_max']
         if min_ok and max_ok:
@@ -89,7 +164,7 @@ def generar_ofertas_segmentadas() -> dict:
     from configuracion.models import Parametro
     from automatizacion.models import RankingCliente, OfertaPropuesta
     # Deferred import para evitar circularidad a nivel de módulo
-    from automatizacion.views_combos import generar_combo_para_cliente
+    from automatizacion.services import generar_combo_para_cliente
 
     now = timezone.now()
     periodo_conf = Parametro.get('RANKING_PERIODICIDAD', 'mensual')
@@ -100,7 +175,7 @@ def generar_ofertas_segmentadas() -> dict:
     )
 
     generadas = 0
-    for rc in RankingCliente.objects.select_related('cliente').all():
+    for rc in RankingCliente.objects.select_related('cliente').iterator(chunk_size=500):
         cliente = rc.cliente
         score = float(rc.score or 0)
 

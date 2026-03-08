@@ -36,12 +36,8 @@ class FormulaForm(forms.ModelForm):
 class OfertasReglasForm(forms.Form):
     reglas_json = forms.CharField(
         label="Reglas de Ofertas (JSON)",
-        widget=forms.Textarea(attrs={
-            'rows': 18,
-            'class': 'w-full font-mono text-sm',
-            'placeholder': '[{"nombre":"Descuento","condiciones":{},"accion":{}}]'
-        }),
-        help_text="Pegá o edita el JSON de reglas. Validamos estructura básica.",
+        widget=forms.HiddenInput(),
+        required=True,
     )
 
     def clean_reglas_json(self):

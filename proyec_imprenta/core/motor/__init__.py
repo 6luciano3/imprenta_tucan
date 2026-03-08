@@ -31,6 +31,12 @@ from .config import MotorConfig
 # Los engines se cargan de forma perezosa para evitar que el __init__.py del paquete
 # tome el _ModuleLock de un submódulo mientras otro hilo intenta importarlo directamente,
 # lo que produciría un deadlock ("deadlock detected by _ModuleLock('core.motor.demanda_engine')").
+#
+# Estado de dependencias circulares (revisado):
+#   - core/ → automatizacion/views_*: ELIMINADO (D-1). ofertas.py ahora importa
+#     generar_combo_para_cliente desde automatizacion/services.py (capa de servicio),
+#     no desde views_combos (capa de presentación).
+#   - La dirección automatizacion/ → core/ es correcta y no forma ciclo.
 
 
 def _load_engines() -> dict:

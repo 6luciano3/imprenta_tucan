@@ -78,6 +78,16 @@ def enviar_oferta_email(oferta, request=None):
         return False, str(e)
 
 
+def generar_combo_para_cliente(cliente):
+    """
+    Proxy de servicio — delega a views_combos.
+    Usado por core/ai_ml/ofertas.py para evitar que el dominio importe
+    directamente desde una capa de presentación (views_*).
+    """
+    from automatizacion.views_combos import generar_combo_para_cliente as _fn
+    return _fn(cliente)
+
+
 def enviar_email_orden_compra_proveedor(orden_compra):
     """
     Envía un email al proveedor notificándole que se le asignó una nueva orden de compra,

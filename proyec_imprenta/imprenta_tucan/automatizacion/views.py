@@ -1,27 +1,15 @@
 from django.views.decorators.csrf import csrf_exempt
 
-# --- Helper: retroalimentación del ranking según respuesta del cliente a una oferta ---
+# --- Helper: retroalimentación del ranking — delega a ClienteInteligenteEngine.retroalimentar() ---
 def _ajustar_score_por_feedback(cliente, accion):
     """
     Ajusta el score del RankingCliente según la respuesta del cliente a una oferta.
+    Delega a ClienteInteligenteEngine.retroalimentar() que usa select_for_update.
     accion 'aceptar' → +3 pts  |  'rechazar' → -1 pt
-    El cambio es intencional y pequeño para no distorsionar el ranking,
-    que se recalcula completamente en cada tarea periódica.
     """
     try:
-        from automatizacion.models import RankingCliente
-        delta = 3.0 if accion == 'aceptar' else -1.0
-        rc = RankingCliente.objects.filter(cliente=cliente).first()
-        if rc:
-            nuevo_score = max(0.0, min(100.0, (rc.score or 0) + delta))
-            rc.score = nuevo_score
-            rc.save(update_fields=['score'])
-            # Sincronizar puntaje_estrategico del cliente
-            try:
-                cliente.puntaje_estrategico = nuevo_score
-                cliente.save(update_fields=['puntaje_estrategico'])
-            except Exception:
-                pass
+        from core.motor.cliente_engine import ClienteInteligenteEngine
+        ClienteInteligenteEngine().retroalimentar({'cliente_id': cliente.pk, 'accion': accion})
     except Exception:
         pass
 
@@ -207,13 +195,21 @@ def pixel_leido(request):
         try:
             oferta = OfertaPropuesta.objects.filter(pk=oferta_id, cliente_id=cliente_id).first()
             if oferta:
-                AccionCliente.objects.create(
+                # Idempotencia: un solo registro por cliente/oferta/tipo por día
+                ya_registrado = AccionCliente.objects.filter(
                     cliente_id=cliente_id,
                     oferta=oferta,
                     tipo=tipo,
-                    canal=canal,
-                    detalle='Tracking pixel (leído)',
-                )
+                    creado__date=timezone.now().date(),
+                ).exists()
+                if not ya_registrado:
+                    AccionCliente.objects.create(
+                        cliente_id=cliente_id,
+                        oferta=oferta,
+                        tipo=tipo,
+                        canal=canal,
+                        detalle='Tracking pixel (leído)',
+                    )
         except Exception:
             pass
     # 1x1 GIF transparente
@@ -1090,6 +1086,7 @@ def recalcular_alternativo_propuesta(request, propuesta_id):
 
 
 @login_required
+@require_POST
 def generar_compras_propuestas_demo(request):
     # Ejecuta la lógica de generación de propuestas (sin Celery) y redirige a la lista
     try:
@@ -1102,6 +1099,7 @@ def generar_compras_propuestas_demo(request):
 
 
 @login_required
+@require_POST
 def recalcular_scores_proveedores(request):
     """Acción rápida: recalcula `ScoreProveedor` para todos los proveedores activos."""
     try:
@@ -1126,9 +1124,9 @@ def webhook_consulta_stock(request, propuesta_id):
     expected = Parametro.get('WEBHOOK_TOKEN', '')
     if not expected or token != expected:
         return JsonResponse({'error': 'forbidden'}, status=403)
-    # Datos
-    estado = request.POST.get('estado') or request.GET.get('estado')  # 'disponible'|'parcial'|'no'
-    detalle = request.POST.get('detalle') or request.GET.get('detalle') or ''
+    # Solo acepta datos via POST body (no se lee de query string para evitar escrituras accidentales via GET)
+    estado = request.POST.get('estado')  # 'disponible'|'parcial'|'no'
+    detalle = request.POST.get('detalle', '')
     propuesta = get_object_or_404(CompraPropuesta, pk=propuesta_id)
     consulta = propuesta.consulta_stock
     if not consulta:

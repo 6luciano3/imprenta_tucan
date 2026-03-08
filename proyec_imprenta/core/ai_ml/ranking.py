@@ -156,6 +156,7 @@ def calcular_ranking_clientes() -> dict:
         peso_crit = float(Parametro.get('RANKING_PESO_CONSUMO_CRITICO', 10)) / 100.0
         peso_margen = float(Parametro.get('RANKING_PESO_MARGEN', 25)) / 100.0
         peso_sum = max(0.0001, peso_cant + peso_valor + peso_freq + peso_crit + peso_margen)
+        _clientes_scores = {}  # acumular para bulk update al final del loop
 
         for cliente_id, m in cliente_metrics.items():
             total_norm = m['total'] / max_total
@@ -198,10 +199,7 @@ def calcular_ranking_clientes() -> dict:
                 cliente_id=cliente_id,
                 defaults={'score': score},
             )
-            Cliente.objects.filter(id=cliente_id).update(
-                puntaje_estrategico=score,
-                fecha_ultima_actualizacion=now,
-            )
+            _clientes_scores[cliente_id] = score
 
             previo = (
                 RankingHistorico.objects
@@ -230,20 +228,29 @@ def calcular_ranking_clientes() -> dict:
             )
             actualizado_count += 1
 
+        # Bulk update puntaje_estrategico para todos los clientes con pedidos (una sola query)
+        if _clientes_scores:
+            from django.db.models import Case, When, Value, FloatField
+            Cliente.objects.filter(id__in=_clientes_scores.keys()).update(
+                puntaje_estrategico=Case(
+                    *[When(id=cid, then=Value(float(s))) for cid, s in _clientes_scores.items()],
+                    output_field=FloatField(),
+                ),
+                fecha_ultima_actualizacion=now,
+            )
+
     # --- Clientes sin pedidos en la ventana ---
     # Se les asigna un score mínimo configurable (por defecto 5) para que
     # aparezcan en el ranking y no queden con datos obsoletos indefinidamente.
     ids_con_pedidos = set(cliente_metrics.keys())
     clientes_sin_pedidos = Cliente.objects.filter(estado='Activo').exclude(id__in=ids_con_pedidos)
-    for cliente in clientes_sin_pedidos:
+    _ids_sin_pedidos = []
+    for cliente in clientes_sin_pedidos.iterator(chunk_size=500):
         RankingCliente.objects.update_or_create(
             cliente_id=cliente.id,
             defaults={'score': score_sin_pedidos},
         )
-        Cliente.objects.filter(id=cliente.id).update(
-            puntaje_estrategico=score_sin_pedidos,
-            fecha_ultima_actualizacion=now,
-        )
+        _ids_sin_pedidos.append(cliente.id)
         RankingHistorico.objects.update_or_create(
             cliente_id=cliente.id,
             periodo=periodo_str,
@@ -254,6 +261,13 @@ def calcular_ranking_clientes() -> dict:
             },
         )
         actualizado_count += 1
+
+    # Bulk update puntaje_estrategico para clientes sin pedidos (una sola query)
+    if _ids_sin_pedidos:
+        Cliente.objects.filter(id__in=_ids_sin_pedidos).update(
+            puntaje_estrategico=score_sin_pedidos,
+            fecha_ultima_actualizacion=now,
+        )
 
     return {'actualizados': actualizado_count, 'periodo': periodo_str}
 

@@ -515,6 +515,7 @@ def editar_reglas_ofertas(request):
     context = {
         'form': form,
         'saved': saved,
+        'reglas_actuales': reglas_actuales,
     }
     return render(request, 'configuracion/ofertas_reglas.html', context)
 
@@ -558,4 +559,183 @@ def empresa_config(request):
     from django.shortcuts import render
     return render(request, 'configuracion/empresa_config.html', {
         'campos_con_valor': campos_con_valor
+    })
+
+
+@login_required
+def ofertas_segmentadas_config(request):
+    """Permite editar los parámetros de cada tier de Ofertas Segmentadas (PI-1)."""
+    from configuracion.models import Parametro, GrupoParametro
+
+    # Definición de los 4 tiers y sus campos editables
+    TIERS = [
+        {
+            'clave_base': 'OFERTA_TIER_PREMIUM',
+            'nombre': 'Premium',
+            'color': 'yellow',
+            'icono': 'workspace_premium',
+            'tiene_score_min': True,
+            'score_min_label': 'Score mínimo',
+            'score_min_desc': 'Clientes con score ≥ este valor son clasificados como Premium.',
+            'score_min_default': 90,
+            'descuento_default': 15,
+            'titulo_default': 'Combo Premium',
+            'descripcion_default': 'Descuento exclusivo del 15% por ser nuestro cliente de mayor valor.',
+        },
+        {
+            'clave_base': 'OFERTA_TIER_ESTRATEGICO',
+            'nombre': 'Estratégico',
+            'color': 'blue',
+            'icono': 'stars',
+            'tiene_score_min': True,
+            'score_min_label': 'Score mínimo',
+            'score_min_desc': 'Clientes con score ≥ este valor (y < score mín. Premium) son Estratégicos.',
+            'score_min_default': 60,
+            'descuento_default': 10,
+            'titulo_default': 'Combo Estrategico',
+            'descripcion_default': 'Descuento especial del 10% por tu volumen y fidelidad.',
+        },
+        {
+            'clave_base': 'OFERTA_TIER_ESTANDAR',
+            'nombre': 'Estándar',
+            'color': 'green',
+            'icono': 'verified',
+            'tiene_score_min': True,
+            'score_min_label': 'Score mínimo',
+            'score_min_desc': 'Clientes con score ≥ este valor (y < score mín. Estratégico) son Estándar.',
+            'score_min_default': 30,
+            'descuento_default': 7,
+            'titulo_default': 'Combo Estandar',
+            'descripcion_default': 'Promocion del 7% en tu proximo pedido.',
+        },
+        {
+            'clave_base': 'OFERTA_TIER_NUEVO',
+            'nombre': 'Nuevo',
+            'color': 'gray',
+            'icono': 'person_add',
+            'tiene_score_min': False,
+            'score_min_label': None,
+            'score_min_desc': None,
+            'score_min_default': None,
+            'descuento_default': 5,
+            'titulo_default': 'Combo Bienvenida',
+            'descripcion_default': 'Descuento de bienvenida del 5% en tu primer combo.',
+        },
+    ]
+
+    if request.method == 'POST':
+        grupo, _ = GrupoParametro.objects.get_or_create(
+            codigo='OFERTAS_SEGMENTADAS',
+            defaults={'nombre': 'Ofertas Segmentadas', 'descripcion': 'Parámetros de tiers de ofertas segmentadas (PI-1)'},
+        )
+        for tier in TIERS:
+            base = tier['clave_base']
+            if tier['tiene_score_min']:
+                raw_min = request.POST.get(f'{base}_SCORE_MIN', '').strip()
+                if raw_min:
+                    try:
+                        int(raw_min)
+                        Parametro.set(f'{base}_SCORE_MIN', raw_min, tipo=Parametro.TIPO_INT,
+                                      grupo=grupo, nombre=f"Score mín. {tier['nombre']}")
+                    except ValueError:
+                        pass
+
+            raw_dsc = request.POST.get(f'{base}_DESCUENTO', '').strip()
+            if raw_dsc:
+                try:
+                    int(raw_dsc)
+                    Parametro.set(f'{base}_DESCUENTO', raw_dsc, tipo=Parametro.TIPO_INT,
+                                  grupo=grupo, nombre=f"Descuento {tier['nombre']} (%)")
+                except ValueError:
+                    pass
+
+            raw_tit = request.POST.get(f'{base}_TITULO', '').strip()
+            if raw_tit:
+                Parametro.set(f'{base}_TITULO', raw_tit, tipo=Parametro.TIPO_CADENA,
+                              grupo=grupo, nombre=f"Título prefijo {tier['nombre']}")
+
+            raw_desc = request.POST.get(f'{base}_DESCRIPCION', '').strip()
+            if raw_desc:
+                Parametro.set(f'{base}_DESCRIPCION', raw_desc, tipo=Parametro.TIPO_CADENA,
+                              grupo=grupo, nombre=f"Descripción oferta {tier['nombre']}")
+
+        return redirect(request.path + '?saved=1')
+
+    # Construir lista de tiers con valores actuales
+    tiers_con_valores = []
+    for tier in TIERS:
+        base = tier['clave_base']
+        tiers_con_valores.append({
+            **tier,
+            'score_min_valor': Parametro.get(f'{base}_SCORE_MIN', tier['score_min_default']),
+            'descuento_valor': Parametro.get(f'{base}_DESCUENTO', tier['descuento_default']),
+            'titulo_valor': Parametro.get(f'{base}_TITULO', tier['titulo_default']),
+            'descripcion_valor': Parametro.get(f'{base}_DESCRIPCION', tier['descripcion_default']),
+        })
+
+    saved = request.GET.get('saved') == '1'
+    return render(request, 'configuracion/ofertas_segmentadas.html', {
+        'tiers': tiers_con_valores,
+        'saved': saved,
+    })
+
+
+def ofertas_hub(request):
+    """Página índice de toda la configuración de Ofertas."""
+    return render(request, 'configuracion/ofertas_hub.html')
+
+
+@login_required
+def ofertas_general_config(request):
+    """Parámetros generales de la generación de ofertas: vigencia y periodicidad."""
+    from configuracion.models import Parametro, GrupoParametro
+
+    PARAMS = [
+        {
+            'clave': 'OFERTA_DIAS_VIGENCIA',
+            'nombre': 'Días de vigencia de la oferta',
+            'descripcion': (
+                'Cantidad de días que tiene el cliente para responder una oferta antes de que se '
+                'marque como vencida automáticamente. Valor por defecto: 30.'
+            ),
+            'tipo': Parametro.TIPO_INT,
+            'input_type': 'number',
+            'step': '1',
+            'min': '1',
+            'max': '365',
+            'default': 30,
+        },
+        {
+            'clave': 'RANKING_PERIODICIDAD',
+            'nombre': 'Periodicidad del ranking',
+            'descripcion': (
+                'Define el período que se usa al generar el ranking de clientes y al agrupar ofertas. '
+                '"mensual" agrupa por año-mes (2026-03); "trimestral" agrupa por año-trimestre (2026-Q1).'
+            ),
+            'tipo': Parametro.TIPO_CADENA,
+            'input_type': 'select',
+            'opciones': [('mensual', 'Mensual'), ('trimestral', 'Trimestral')],
+            'default': 'mensual',
+        },
+    ]
+
+    if request.method == 'POST':
+        grupo, _ = GrupoParametro.objects.get_or_create(
+            codigo='OFERTAS_GENERAL',
+            defaults={'nombre': 'Ofertas — General', 'descripcion': 'Parámetros generales de generación de ofertas'},
+        )
+        for p in PARAMS:
+            raw = request.POST.get(p['clave'], '').strip()
+            if raw:
+                Parametro.set(p['clave'], raw, tipo=p['tipo'], grupo=grupo, nombre=p['nombre'])
+        return redirect(request.path + '?saved=1')
+
+    saved = request.GET.get('saved') == '1'
+    params_con_valor = [
+        {**p, 'valor': Parametro.get(p['clave'], p['default'])}
+        for p in PARAMS
+    ]
+    return render(request, 'configuracion/ofertas_general.html', {
+        'params': params_con_valor,
+        'saved': saved,
     })

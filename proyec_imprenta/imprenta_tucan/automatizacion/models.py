@@ -89,8 +89,8 @@ class OfertaPropuesta(models.Model):
     titulo = models.CharField(max_length=120)
     descripcion = models.TextField()
     tipo = models.CharField(max_length=30, choices=TIPOS)
-    estado = models.CharField(max_length=20, choices=ESTADOS, default='pendiente')
-    periodo = models.CharField(max_length=20, blank=True)  # Período en el que se generó
+    estado = models.CharField(max_length=20, choices=ESTADOS, default='pendiente', db_index=True)
+    periodo = models.CharField(max_length=20, blank=True, db_index=True)  # Período en el que se generó
     score_al_generar = models.FloatField(default=0)
     parametros = models.JSONField(default=dict, blank=True)  # Ej: {"descuento": 10}
     creada = models.DateTimeField(auto_now_add=True)
@@ -181,11 +181,11 @@ class AccionCliente(models.Model):
 
     cliente = models.ForeignKey('clientes.Cliente', on_delete=models.CASCADE, related_name='acciones_cliente')
     oferta = models.ForeignKey(OfertaPropuesta, on_delete=models.CASCADE, null=True, blank=True, related_name='acciones_cliente')
-    tipo = models.CharField(max_length=20, choices=TIPOS)
+    tipo = models.CharField(max_length=20, choices=TIPOS, db_index=True)
     canal = models.CharField(max_length=20, choices=CANALES, default='web')
     detalle = models.TextField(blank=True)
     metadata = models.JSONField(default=dict, blank=True)
-    creado = models.DateTimeField(auto_now_add=True)
+    creado = models.DateTimeField(auto_now_add=True, db_index=True)
 
     class Meta:
         ordering = ('-creado',)
@@ -261,7 +261,7 @@ class CompraPropuesta(models.Model):
     proveedor_recomendado = models.ForeignKey('proveedores.Proveedor', on_delete=models.SET_NULL, null=True, blank=True)
     pesos_usados = models.JSONField(default=dict, blank=True)  # {'precio':0.4,'cumplimiento':0.3,...}
     motivo_trigger = models.CharField(max_length=30, choices=TRIGGER)
-    estado = models.CharField(max_length=30, choices=ESTADOS, default='pendiente')
+    estado = models.CharField(max_length=30, choices=ESTADOS, default='pendiente', db_index=True)
     borrador_oc = models.ForeignKey('pedidos.OrdenCompra', on_delete=models.SET_NULL, null=True, blank=True)
     consulta_stock = models.ForeignKey(ConsultaStockProveedor, on_delete=models.SET_NULL, null=True, blank=True)
     administrador = models.ForeignKey(get_user_model(), on_delete=models.SET_NULL, null=True, blank=True)

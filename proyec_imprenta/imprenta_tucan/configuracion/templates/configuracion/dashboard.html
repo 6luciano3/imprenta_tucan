@@ -51,4 +51,12 @@
     <p class="text-gray-600 mb-4">Ajusta la cantidad de insumos en la tabla del dashboard y la ventana de meses para la media móvil.</p>
     <a href="{% url 'proyeccion_demanda_config' %}" class="px-4 py-2 bg-primary text-white rounded hover:bg-primary-dark transition">Configurar Proyección</a>
   </div>
+  <div class="bg-white rounded-xl shadow p-6 flex flex-col items-start mt-6">
+    <div class="flex items-center gap-3 mb-2">
+      <span class="material-symbols-outlined text-primary text-3xl">local_offer</span>
+      <span class="text-lg font-semibold">Ofertas Segmentadas</span>
+    </div>
+    <p class="text-gray-600 mb-4">Configurá la generación automática de ofertas: parámetros generales, niveles de cliente y reglas avanzadas.</p>
+    <a href="{% url 'ofertas_hub' %}" class="px-4 py-2 bg-primary text-white rounded hover:bg-primary-dark transition">Configurar Ofertas</a>
+  </div>
 {% endblock %}

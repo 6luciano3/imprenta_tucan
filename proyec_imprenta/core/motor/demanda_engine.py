@@ -84,25 +84,33 @@ class DemandaInteligenteEngine(ProcesoInteligenteBase):
         Ejemplo: si marzo siempre consume el doble del promedio → factor=2.0.
         Rango acotado [0.5, 2.5] para evitar extremos con pocos datos.
         Requiere al menos 3 registros históricos para activarse.
+        Una sola query trae todos los datos; el filtrado por mes se hace en Python.
         """
         try:
             from insumos.models import ConsumoRealInsumo
-            from django.db.models import Avg
 
-            consumos_todos = ConsumoRealInsumo.objects.filter(insumo=insumo)
-            if consumos_todos.count() < 3:
+            # 1 query: trae periodo + cantidad para todos los registros del insumo
+            consumos_vals = list(
+                ConsumoRealInsumo.objects
+                .filter(insumo=insumo)
+                .values_list('periodo', 'cantidad_consumida')
+            )
+            if len(consumos_vals) < 3:
                 return 1.0
 
-            avg_general = consumos_todos.aggregate(avg=Avg('cantidad_consumida'))['avg'] or 0
+            cantidades = [float(c) for _, c in consumos_vals if c is not None]
+            if not cantidades:
+                return 1.0
+            avg_general = sum(cantidades) / len(cantidades)
             if avg_general == 0:
                 return 1.0
 
             mes_str = f'-{mes_actual:02d}'
-            consumos_mes = consumos_todos.filter(periodo__endswith=mes_str)
-            if not consumos_mes.exists():
+            cantidades_mes = [float(c) for p, c in consumos_vals if c is not None and str(p).endswith(mes_str)]
+            if not cantidades_mes:
                 return 1.0
 
-            avg_mes = consumos_mes.aggregate(avg=Avg('cantidad_consumida'))['avg'] or 0
+            avg_mes = sum(cantidades_mes) / len(cantidades_mes)
             factor = avg_mes / avg_general
             return min(2.5, max(0.5, factor))
         except Exception:

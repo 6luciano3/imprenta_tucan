@@ -1,3 +1,4 @@
+import logging
 from celery import shared_task
 from datetime import timedelta
 from django.utils import timezone
@@ -6,6 +7,8 @@ import requests
 from configuracion.models import Parametro
 from pedidos.models import Pedido
 from proveedores.models import Proveedor
+
+logger = logging.getLogger(__name__)
 
 # Integraciones AI/Rules (placeholders con llamadas reales si se completan módulos)
 try:
@@ -129,15 +132,10 @@ def tarea_recalcular_scores_proveedores():
     """
     try:
         from core.motor.proveedor_engine import ProveedorInteligenteEngine
+        # recomendar() usa _calcular_scores_batch(): 4-5 queries totales en lugar de N*5
         engine = ProveedorInteligenteEngine()
-        count = 0
-        for proveedor in Proveedor.objects.filter(activo=True):
-            score = engine.calcular_score(proveedor, insumo=None)
-            ScoreProveedor.objects.update_or_create(
-                proveedor=proveedor,
-                defaults={'score': score, 'actualizado': timezone.now()},
-            )
-            count += 1
+        engine.recomendar(insumo=None)
+        count = Proveedor.objects.filter(activo=True).count()
         return f"scores_proveedores: {count} proveedores actualizados"
     except Exception as e:
         return f"scores_proveedores: error {e}"
@@ -170,6 +168,98 @@ def tarea_alertas_retraso():
 # CANTIDADES_COMPRA fue eliminado — use insumo.cantidad_compra_sugerida (ver migration 0009)
 # Para poblar el campo ejecute: python manage.py poblar_cantidad_compra
 
+
+# ---------------------------------------------------------------------------
+# Helpers privados para tarea_automatizacion_presupuestos_ponderada
+# ---------------------------------------------------------------------------
+
+def _consultar_stock_http(proveedor, insumo, cantidad_req, consulta):
+    """Envía consulta HTTP al proveedor (fuera de atomic) y actualiza ConsultaStockProveedor."""
+    if not proveedor.api_stock_url:
+        return
+    try:
+        resp = requests.post(
+            proveedor.api_stock_url,
+            json={'insumo_id': insumo.id, 'cantidad': cantidad_req},
+            timeout=10,
+        )
+        data = resp.json()
+        estado_resp = data.get('estado')
+        detalle_resp = data.get('detalle', '')
+        if estado_resp in {'disponible', 'parcial', 'no'}:
+            consulta.estado = estado_resp
+            consulta.respuesta = {'detalle': detalle_resp}
+            consulta.save()
+    except Exception as e:
+        consulta.estado = 'error'
+        consulta.respuesta = {'detalle': str(e)}
+        consulta.save()
+
+
+def _notificar_proveedor_email(oc):
+    """Envía email de notificación al proveedor (fuera de atomic)."""
+    try:
+        from automatizacion.services import enviar_email_orden_compra_proveedor
+        enviar_email_orden_compra_proveedor(oc)
+    except Exception as e:
+        logger.warning('enviar_email_orden_compra_proveedor falló: %s', e)
+
+
+def _crear_propuesta_compra(insumo, cantidad_req, comentario_oc, motivo_trigger, criterios_pesos):
+    """
+    Crea (o actualiza) una CompraPropuesta:
+      1. Recomienda proveedor óptimo.
+      2. Dentro de atomic: crea OC + ConsultaStockProveedor + propuesta.
+      3. Fuera de atomic: HTTP al proveedor + email.
+    Retorna (proveedor, oc, consulta).
+    """
+    from django.db import transaction
+    from automatizacion.models import CompraPropuesta, ConsultaStockProveedor
+    from pedidos.models import OrdenCompra
+    from automatizacion.api.services import ProveedorInteligenteService
+
+    proveedor = ProveedorInteligenteService.recomendar_proveedor(insumo)
+    with transaction.atomic():
+        oc = OrdenCompra.objects.create(
+            insumo=insumo,
+            cantidad=cantidad_req,
+            proveedor=proveedor,
+            estado='sugerida',
+            comentario=comentario_oc,
+        )
+        consulta = ConsultaStockProveedor.objects.create(
+            proveedor=proveedor,
+            insumo=insumo,
+            cantidad=cantidad_req,
+            estado='pendiente',
+            respuesta={},
+        )
+        propuesta_existente = CompraPropuesta.objects.filter(
+            insumo=insumo, consulta_stock__isnull=True
+        ).order_by('-creada').first()
+        if propuesta_existente:
+            propuesta_existente.consulta_stock = consulta
+            propuesta_existente.borrador_oc = oc
+            propuesta_existente.proveedor_recomendado = proveedor
+            propuesta_existente.estado = 'consultado'
+            propuesta_existente.save()
+        else:
+            CompraPropuesta.objects.create(
+                insumo=insumo,
+                cantidad_requerida=cantidad_req,
+                proveedor_recomendado=proveedor,
+                pesos_usados=criterios_pesos,
+                motivo_trigger=motivo_trigger,
+                estado='consultado',
+                borrador_oc=oc,
+                consulta_stock=consulta,
+            )
+    # HTTP y email fuera del atomic
+    _consultar_stock_http(proveedor, insumo, cantidad_req, consulta)
+    _notificar_proveedor_email(oc)
+    return proveedor, oc, consulta
+
+
 @shared_task
 def tarea_automatizacion_presupuestos_ponderada():
     """Detecta necesidades de compra y genera propuestas automáticas:
@@ -180,18 +270,17 @@ def tarea_automatizacion_presupuestos_ponderada():
     """
     try:
         from decimal import Decimal
-        from django.db import transaction
         from pedidos.services import calcular_consumo_pedido, verificar_stock_consumo
         from automatizacion.api.services import ProveedorInteligenteService
-        CRITERIOS_PESOS = ProveedorInteligenteService._get_pesos()
-        from automatizacion.models import CompraPropuesta, ConsultaStockProveedor
-        from pedidos.models import OrdenCompra
+        from automatizacion.models import CompraPropuesta
         from insumos.models import Insumo
 
-        # 1) Revisar pedidos recientes (últimos 7 días) y/o parametrizable
+        CRITERIOS_PESOS = ProveedorInteligenteService._get_pesos()
+
+        # 1) Revisar pedidos recientes (últimos 7 días, parametrizable)
         ventana_dias = int(Parametro.get('AUTOPRESUPUESTO_VENTANA_DIAS', 7))
         desde = timezone.now().date() - timedelta(days=ventana_dias)
-        pedidos_recientes = Pedido.objects.filter(fecha_pedido__gte=desde)
+        pedidos_recientes = Pedido.objects.select_related('cliente', 'estado').filter(fecha_pedido__gte=desde)
 
         propuestas_creadas = 0
 
@@ -199,158 +288,38 @@ def tarea_automatizacion_presupuestos_ponderada():
             consumo = calcular_consumo_pedido(pedido)
             ok, faltantes = verificar_stock_consumo(consumo)
             if ok:
-                continue  # no hay faltante
+                continue
             for insumo_id, faltan in faltantes.items():
                 try:
                     insumo = Insumo.objects.get(idInsumo=insumo_id)
                 except Insumo.DoesNotExist:
                     continue
                 cantidad_req = insumo.cantidad_compra_sugerida or int(Decimal(str(faltan)))
-                # 2) Recomendar proveedor óptimo
-                proveedor = ProveedorInteligenteService.recomendar_proveedor(insumo)
-                # 3) Generar borrador de Orden de Compra
-                with transaction.atomic():
-                    oc = OrdenCompra.objects.create(
-                        insumo=insumo,
-                        cantidad=cantidad_req,
-                        proveedor=proveedor,
-                        estado='sugerida',
-                        comentario=f"Auto por pedido {pedido.id}: faltante {cantidad_req}"
-                    )
-                    # 4) Registrar consulta de stock
-                    consulta = ConsultaStockProveedor.objects.create(
-                        proveedor=proveedor,
-                        insumo=insumo,
-                        cantidad=cantidad_req,
-                        estado='pendiente',
-                        respuesta={}
-                    )
-                    # --- INTEGRACIÓN REAL: consulta HTTP si el proveedor tiene api_stock_url ---
-                    if proveedor.api_stock_url:
-                        try:
-                            resp = requests.post(
-                                proveedor.api_stock_url,
-                                json={
-                                    'insumo_id': insumo.id,
-                                    'cantidad': cantidad_req
-                                },
-                                timeout=10
-                            )
-                            data = resp.json()
-                            estado = data.get('estado')  # 'disponible', 'parcial', 'no', etc.
-                            detalle = data.get('detalle', '')
-                            if estado in {'disponible', 'parcial', 'no'}:
-                                consulta.estado = estado
-                                consulta.respuesta = {'detalle': detalle}
-                                consulta.save()
-                        except Exception as e:
-                            consulta.estado = 'error'
-                            consulta.respuesta = {'detalle': str(e)}
-                            consulta.save()
-                    # 5) Actualizar propuesta existente sin consulta, o crear nueva
-                    propuesta_existente = CompraPropuesta.objects.filter(
-                        insumo=insumo, consulta_stock__isnull=True
-                    ).order_by('-creada').first()
-                    if propuesta_existente:
-                        propuesta_existente.consulta_stock = consulta
-                        propuesta_existente.borrador_oc = oc
-                        propuesta_existente.proveedor_recomendado = proveedor
-                        propuesta_existente.estado = 'consultado'
-                        propuesta_existente.save()
-                    else:
-                        CompraPropuesta.objects.create(
-                            insumo=insumo,
-                            cantidad_requerida=cantidad_req,
-                            proveedor_recomendado=proveedor,
-                            pesos_usados=CRITERIOS_PESOS,
-                            motivo_trigger='pedido_mayor_stock',
-                            estado='consultado',
-                            borrador_oc=oc,
-                            consulta_stock=consulta,
-                        )
-                    propuestas_creadas += 1
-                    # 6) Notificar al proveedor por email
-                    try:
-                        from automatizacion.services import enviar_email_orden_compra_proveedor
-                        enviar_email_orden_compra_proveedor(oc)
-                    except Exception:
-                        pass
+                _crear_propuesta_compra(
+                    insumo=insumo,
+                    cantidad_req=cantidad_req,
+                    comentario_oc=f"Auto por pedido {pedido.id}: faltante {cantidad_req}",
+                    motivo_trigger='pedido_mayor_stock',
+                    criterios_pesos=CRITERIOS_PESOS,
+                )
+                propuestas_creadas += 1
 
         # 6) Revisar insumos bajo stock mínimo global
         stock_minimo = int(Parametro.get('STOCK_MINIMO_GLOBAL', 10))
         bajos = Insumo.objects.filter(stock__lte=stock_minimo, activo=True)
         for insumo in bajos:
-                # evitar duplicar si ya hay propuesta con consulta de stock registrada
             ya = CompraPropuesta.objects.filter(insumo=insumo, consulta_stock__isnull=False).exists()
             if ya:
                 continue
-            proveedor = ProveedorInteligenteService.recomendar_proveedor(insumo)
             cantidad_req = insumo.cantidad_compra_sugerida or max(1, stock_minimo * 2)
-            with transaction.atomic():
-                oc = OrdenCompra.objects.create(
-                    insumo=insumo,
-                    cantidad=cantidad_req,
-                    proveedor=proveedor,
-                    estado='sugerida',
-                    comentario=f"Auto stock mínimo: sugerido {cantidad_req}"
-                )
-                consulta = ConsultaStockProveedor.objects.create(
-                    proveedor=proveedor,
-                    insumo=insumo,
-                    cantidad=cantidad_req,
-                    estado='pendiente',
-                    respuesta={}
-                )
-                # --- INTEGRACIÓN REAL: consulta HTTP si el proveedor tiene api_stock_url ---
-                if proveedor.api_stock_url:
-                    try:
-                        resp = requests.post(
-                            proveedor.api_stock_url,
-                            json={
-                                'insumo_id': insumo.id,
-                                'cantidad': cantidad_req
-                            },
-                            timeout=10
-                        )
-                        data = resp.json()
-                        estado = data.get('estado')
-                        detalle = data.get('detalle', '')
-                        if estado in {'disponible', 'parcial', 'no'}:
-                            consulta.estado = estado
-                            consulta.respuesta = {'detalle': detalle}
-                            consulta.save()
-                    except Exception as e:
-                        consulta.estado = 'error'
-                        consulta.respuesta = {'detalle': str(e)}
-                        consulta.save()
-                # Actualizar propuesta existente sin consulta, o crear nueva
-                propuesta_existente = CompraPropuesta.objects.filter(
-                    insumo=insumo, consulta_stock__isnull=True
-                ).order_by('-creada').first()
-                if propuesta_existente:
-                    propuesta_existente.consulta_stock = consulta
-                    propuesta_existente.borrador_oc = oc
-                    propuesta_existente.proveedor_recomendado = proveedor
-                    propuesta_existente.estado = 'consultado'
-                    propuesta_existente.save()
-                else:
-                    CompraPropuesta.objects.create(
-                        insumo=insumo,
-                        cantidad_requerida=cantidad_req,
-                        proveedor_recomendado=proveedor,
-                        pesos_usados=CRITERIOS_PESOS,
-                        motivo_trigger='stock_minimo_vencido',
-                        estado='consultado',
-                        borrador_oc=oc,
-                        consulta_stock=consulta,
-                    )
-                propuestas_creadas += 1
-                # Notificar al proveedor por email
-                try:
-                    from automatizacion.services import enviar_email_orden_compra_proveedor
-                    enviar_email_orden_compra_proveedor(oc)
-                except Exception:
-                    pass
+            _crear_propuesta_compra(
+                insumo=insumo,
+                cantidad_req=cantidad_req,
+                comentario_oc=f"Auto stock mínimo: sugerido {cantidad_req}",
+                motivo_trigger='stock_minimo_vencido',
+                criterios_pesos=CRITERIOS_PESOS,
+            )
+            propuestas_creadas += 1
 
         # 7) Auto-aceptación según parámetros si hay respuesta disponible y el proveedor cumple umbral
         auto_aprobar = bool(Parametro.get('AUTO_APROBAR_PROPUESTAS', False))

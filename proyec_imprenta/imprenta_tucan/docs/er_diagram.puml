@@ -1,0 +1,836 @@
+@startuml Imprenta_Tucan_ER
+' =========================================================
+' Diagrama ER — Imprenta Tucan
+' Generado desde db.sqlite3 — 2026-03-08
+' =========================================================
+
+skinparam linetype ortho
+skinparam roundcorner 5
+skinparam class {
+  BackgroundColor #F8F9FA
+  BorderColor #495057
+  ArrowColor #495057
+  FontSize 11
+}
+hide circle
+hide methods
+
+' =========================================================
+' Módulo: Usuarios & Roles
+' =========================================================
+
+package "Usuarios & Roles" #DDEEFF {
+
+  entity "usuarios_usuario" as Usuario {
+    * id : bigint <<PK>>
+    --
+    email : varchar(254)
+    nombreUsuario : varchar(100)
+    apellido : varchar(100)
+    telefono : varchar(15)
+    estado : varchar(10)
+    is_staff : bool
+    is_superuser : bool
+    is_active : bool
+    last_login : datetime
+    date_joined : datetime
+    --
+    # rol_id : int <<FK>>
+  }
+
+  entity "rol" as Rol {
+    * idRol : int <<PK>>
+    --
+    nombreRol : varchar(50)
+    descripcion : text
+    estado : varchar(10)
+  }
+
+  entity "permisos_permiso" as Permiso {
+    * id : bigint <<PK>>
+    --
+    nombre : varchar(100)
+    modulo : varchar(100)
+    acciones : text
+    descripcion : text
+    estado : varchar(10)
+  }
+
+  entity "rol_permisos" as RolPermiso {
+    * id : bigint <<PK>>
+    --
+    # rol_id : int <<FK>>
+    # permiso_id : bigint <<FK>>
+  }
+
+  entity "usuarios_notificacion" as Notificacion {
+    * id : bigint <<PK>>
+    --
+    mensaje : text
+    fecha : datetime
+    leida : bool
+    --
+    # usuario_id : bigint <<FK>>
+  }
+}
+
+' =========================================================
+' Módulo: Clientes
+' =========================================================
+
+package "Clientes" #DDFFD6 {
+
+  entity "clientes_cliente" as Cliente {
+    * id : bigint <<PK>>
+    --
+    nombre : varchar(100)
+    apellido : varchar(100)
+    email : varchar(254)
+    celular : varchar(20)
+    telefono : varchar(20)
+    dirección : varchar(200)
+    ciudad : varchar(100)
+    provincia : varchar(100)
+    pais : varchar(100)
+    razónSocial : varchar(150)
+    cuit : varchar(11)
+    tipo_cliente : varchar(15)
+    estadoCliente : varchar(10)
+    puntaje_estrategico : real
+    fecha_ultima_actualizacion : datetime
+  }
+}
+
+' =========================================================
+' Módulo: Proveedores
+' =========================================================
+
+package "Proveedores" #FFF3CD {
+
+  entity "proveedores_proveedor" as Proveedor {
+    * id : bigint <<PK>>
+    --
+    nombreProveedor : varchar(100)
+    apellido : varchar(100)
+    cuit : varchar(13)
+    email : varchar(254)
+    telefono : varchar(20)
+    direccion : text
+    rubro : varchar(50)
+    api_stock_url : varchar(200)
+    activo : bool
+    fecha_creacion : datetime
+    --
+    # rubro_fk_id : bigint <<FK>>
+  }
+
+  entity "proveedores_rubro" as Rubro {
+    * id : bigint <<PK>>
+    --
+    nombre : varchar(100)
+    descripcion : text
+    activo : bool
+    created_at : datetime
+    updated_at : datetime
+  }
+
+  entity "proveedores_proveedorparametro" as ProveedorParametro {
+    * id : bigint <<PK>>
+    --
+    clave : varchar(50)
+    valor : varchar(200)
+    descripcion : text
+    activo : bool
+  }
+}
+
+' =========================================================
+' Módulo: Productos & Recetas
+' =========================================================
+
+package "Productos" #FFE8D6 {
+
+  entity "productos_producto" as Producto {
+    * idProducto : int <<PK>>
+    --
+    nombreProducto : varchar(100)
+    descripcion : text
+    precioUnitario : decimal
+    activo : bool
+    --
+    # categoriaProducto_id : bigint <<FK>>
+    # tipoProducto_id : bigint <<FK>>
+    # unidadMedida_id : bigint <<FK>>
+    # tinta_insumo_id : int <<FK>>
+    # formula_id : bigint <<FK>>
+  }
+
+  entity "productos_categoriaproducto" as CatProducto {
+    * id : bigint <<PK>>
+    --
+    nombreCategoria : varchar(100)
+    descripcion : text
+  }
+
+  entity "productos_tipoproducto" as TipoProducto {
+    * id : bigint <<PK>>
+    --
+    nombreTipoProducto : varchar(100)
+    descripcion : text
+  }
+
+  entity "productos_unidadmedida" as UnidadMedida {
+    * id : bigint <<PK>>
+    --
+    nombreUnidad : varchar(50)
+    abreviatura : varchar(10)
+  }
+
+  entity "productos_productoinsumo" as ProductoInsumo {
+    * id : bigint <<PK>>
+    --
+    cantidad_por_unidad : decimal
+    es_costo_fijo : bool
+    --
+    # producto_id : int <<FK>>
+    # insumo_id : int <<FK>>
+  }
+
+  entity "productos_parametroproducto" as ParamProducto {
+    * id : bigint <<PK>>
+    --
+    R, M, C, F, Formas : decimal/smallint
+    ancho_pliego_cm : decimal
+    alto_pliego_cm : decimal
+    gramaje : decimal
+    At, Ct, Cb, Plam : decimal
+    tiene_barniz : bool
+    tiene_laminado : bool
+    --
+    # producto_id : int <<FK>>
+  }
+
+  entity "productos_recetadinamica" as RecetaDinamica {
+    * id : bigint <<PK>>
+    --
+    version : int
+    activo : bool
+    notas : text
+    creado_en, actualizado_en : datetime
+    --
+    # producto_id : int <<FK>>
+  }
+
+  entity "productos_lineareceta" as LineaReceta {
+    * id : bigint <<PK>>
+    --
+    tipo : varchar(10)
+    activo : bool
+    orden : smallint
+    notas : varchar(200)
+    --
+    # receta_id : bigint <<FK>>
+    # insumo_id : int <<FK>>
+  }
+}
+
+' =========================================================
+' Módulo: Insumos
+' =========================================================
+
+package "Insumos" #E8D5F5 {
+
+  entity "insumos_insumo" as Insumo {
+    * idInsumo : int <<PK>>
+    --
+    codigo : varchar(20)
+    nombre : varchar(100)
+    categoria : varchar(100)
+    descripcion : text
+    tipo : varchar(10)
+    unidad_medida : varchar(20)
+    stock : int
+    stock_minimo_manual : int
+    precio : decimal
+    precio_unitario : decimal
+    cantidad : int
+    cantidad_compra_sugerida : int
+    activo : bool
+    created_at, updated_at : datetime
+    --
+    # proveedor_id : bigint <<FK>>
+  }
+
+  entity "insumos_proyeccioninsumo" as Proyeccion {
+    * id : bigint <<PK>>
+    --
+    periodo : varchar(20)
+    cantidad_proyectada : int
+    cantidad_validada : int
+    estado : varchar(20)
+    comentario_admin : text
+    fecha_generacion : datetime
+    fecha_validacion : datetime
+    --
+    # insumo_id : int <<FK>>
+    # administrador_id : bigint <<FK>>
+    # proveedor_sugerido_id : bigint <<FK>>
+    # proveedor_validado_id : bigint <<FK>>
+  }
+
+  entity "insumos_consumorealinsumo" as ConsumoReal {
+    * id : bigint <<PK>>
+    --
+    periodo : varchar(20)
+    cantidad_consumida : int
+    fecha_registro : datetime
+    comentario : text
+    --
+    # insumo_id : int <<FK>>
+    # usuario_id : bigint <<FK>>
+  }
+}
+
+' =========================================================
+' Módulo: Pedidos
+' =========================================================
+
+package "Pedidos" #D6EAF8 {
+
+  entity "pedidos_pedido" as Pedido {
+    * id : bigint <<PK>>
+    --
+    fecha_pedido : date
+    fecha_entrega : date
+    monto_total : decimal
+    descuento : decimal
+    aplicar_iva : bool
+    --
+    # cliente_id : bigint <<FK>>
+    # estado_id : bigint <<FK>>
+  }
+
+  entity "pedidos_estadopedido" as EstadoPedido {
+    * id : bigint <<PK>>
+    --
+    nombre : varchar(20)
+  }
+
+  entity "pedidos_lineapedido" as LineaPedido {
+    * id : bigint <<PK>>
+    --
+    cantidad : int
+    precio_unitario : decimal
+    especificaciones : text
+    --
+    # pedido_id : bigint <<FK>>
+    # producto_id : int <<FK>>
+  }
+
+  entity "pedidos_ordencompra" as OrdenCompra {
+    * id : bigint <<PK>>
+    --
+    cantidad : int
+    estado : varchar(20)
+    comentario : text
+    token_proveedor : varchar(64)
+    fecha_creacion : datetime
+    fecha_respuesta : datetime
+    --
+    # insumo_id : int <<FK>>
+    # proveedor_id : bigint <<FK>>
+  }
+
+  entity "pedidos_ordenproduccion" as OrdenProduccion {
+    * id : bigint <<PK>>
+    --
+    estado : varchar(20)
+    fecha_creacion : datetime
+    --
+    # pedido_id : bigint <<FK>>
+  }
+}
+
+' =========================================================
+' Módulo: Presupuestos
+' =========================================================
+
+package "Presupuestos" #FDEBD0 {
+
+  entity "presupuestos_presupuesto" as Presupuesto {
+    * id : bigint <<PK>>
+    --
+    numero : varchar(20)
+    fecha : date
+    validez : date
+    total : decimal
+    estado : varchar(10)
+    razon_social : varchar(150)
+    respuesta_cliente : varchar(10)
+    token : char(32)
+    observaciones : text
+    --
+    # cliente_id : bigint <<FK>>
+  }
+
+  entity "presupuestos_presupuestodetalle" as PresupuestoDetalle {
+    * id : bigint <<PK>>
+    --
+    cantidad : int
+    precio_unitario : decimal
+    subtotal : decimal
+    descuento : decimal
+    iva : decimal
+    --
+    # presupuesto_id : bigint <<FK>>
+    # producto_id : int <<FK>>
+  }
+}
+
+' =========================================================
+' Módulo: Automatización / Procesos Inteligentes
+' =========================================================
+
+package "Automatización" #F2D7D5 {
+
+  entity "automatizacion_rankingcliente" as RankingCliente {
+    * id : bigint <<PK>>
+    --
+    score : real
+    actualizado : datetime
+    --
+    # cliente_id : bigint <<FK>>
+  }
+
+  entity "automatizacion_rankinghistorico" as RankingHistorico {
+    * id : bigint <<PK>>
+    --
+    periodo : varchar(20)
+    score : real
+    variacion : real
+    metricas : json
+    generado : datetime
+    --
+    # cliente_id : bigint <<FK>>
+  }
+
+  entity "automatizacion_scoreproveedor" as ScoreProveedor {
+    * id : bigint <<PK>>
+    --
+    score : real
+    actualizado : datetime
+    --
+    # proveedor_id : bigint <<FK>>
+  }
+
+  entity "automatizacion_ofertapropuesta" as OfertaPropuesta {
+    * id : bigint <<PK>>
+    --
+    titulo : varchar(120)
+    descripcion : text
+    tipo : varchar(30)
+    estado : varchar(20)
+    periodo : varchar(20)
+    score_al_generar : real
+    parametros : json
+    token_email : varchar(32)
+    fecha_expiracion : datetime
+    creada, actualizada : datetime
+    fecha_validacion : datetime
+    --
+    # cliente_id : bigint <<FK>>
+    # administrador_id : bigint <<FK>>
+  }
+
+  entity "automatizacion_combooferta" as ComboOferta {
+    * id : bigint <<PK>>
+    --
+    nombre : varchar(100)
+    descripcion : text
+    descuento : decimal
+    fecha_inicio, fecha_fin : datetime
+    enviada, aceptada, rechazada : bool
+    fecha_envio, fecha_respuesta : datetime
+    --
+    # cliente_id : bigint <<FK>>
+  }
+
+  entity "automatizacion_comboofertaproducto" as ComboOfertaProducto {
+    * id : bigint <<PK>>
+    --
+    cantidad : int
+    --
+    # combo_id : bigint <<FK>>
+    # producto_id : int <<FK>>
+  }
+
+  entity "automatizacion_mensajeoferta" as MensajeOferta {
+    * id : bigint <<PK>>
+    --
+    estado : varchar(20)
+    canal : varchar(20)
+    provider_id : varchar(120)
+    detalle : text
+    enviado_en, actualizado : datetime
+    --
+    # oferta_id : bigint <<FK>>
+    # cliente_id : bigint <<FK>>
+  }
+
+  entity "automatizacion_accioncliente" as AccionCliente {
+    * id : bigint <<PK>>
+    --
+    tipo : varchar(20)
+    canal : varchar(20)
+    detalle : text
+    metadata : json
+    creado : datetime
+    --
+    # oferta_id : bigint <<FK>>
+    # cliente_id : bigint <<FK>>
+  }
+
+  entity "automatizacion_comprapropuesta" as CompraPropuesta {
+    * id : bigint <<PK>>
+    --
+    cantidad_requerida : int
+    motivo_trigger : varchar(30)
+    estado : varchar(30)
+    decision : varchar(20)
+    pesos_usados : json
+    feedback_pesos : json
+    comentario_admin : text
+    creada, actualizada : datetime
+    --
+    # insumo_id : int <<FK>>
+    # proveedor_recomendado_id : bigint <<FK>>
+    # borrador_oc_id : bigint <<FK>>
+    # consulta_stock_id : bigint <<FK>>
+    # administrador_id : bigint <<FK>>
+  }
+
+  entity "automatizacion_consultastockproveedor" as ConsultaStock {
+    * id : bigint <<PK>>
+    --
+    cantidad : int
+    estado : varchar(20)
+    respuesta : json
+    creado, actualizado : datetime
+    --
+    # proveedor_id : bigint <<FK>>
+    # insumo_id : int <<FK>>
+  }
+
+  entity "automatizacion_feedbackrecomendacion" as FeedbackRecomendacion {
+    * id : bigint <<PK>>
+    --
+    decision : varchar(20)
+    comentario : text
+    fecha : datetime
+    feedback_precio : real
+    feedback_cumplimiento : real
+    feedback_incidencias : real
+    feedback_disponibilidad : real
+    --
+    # pedido_id : bigint <<FK>>
+    # insumo_id : int <<FK>>
+    # proveedor_recomendado_id : bigint <<FK>>
+    # proveedor_final_id : bigint <<FK>>
+    # usuario_id : bigint <<FK>>
+  }
+
+  entity "automatizacion_ordensugerida" as OrdenSugerida {
+    * id : bigint <<PK>>
+    --
+    cantidad : int
+    generada : datetime
+    confirmada : bool
+    --
+    # pedido_id : bigint <<FK>>
+    # insumo_id : int <<FK>>
+  }
+
+  entity "automatizacion_aprobacionautomatica" as AprobacionAutomatica {
+    * id : bigint <<PK>>
+    --
+    aprobado : bool
+    comentario : text
+    fecha_aprobacion : datetime
+    --
+    # pedido_id : bigint <<FK>>
+    # aprobado_por_id : bigint <<FK>>
+  }
+
+  entity "automatizacion_ofertaautomatica" as OfertaAutomatica {
+    * id : bigint <<PK>>
+    --
+    descripcion : text
+    fecha_inicio, fecha_fin : datetime
+    activa : bool
+    generada : datetime
+    --
+    # cliente_id : bigint <<FK>>
+  }
+
+  entity "automatizacion_automationlog" as AutomationLog {
+    * id : bigint <<PK>>
+    --
+    evento : varchar(100)
+    descripcion : text
+    fecha : datetime
+    datos : json
+    --
+    # usuario_id : bigint <<FK>>
+  }
+}
+
+' =========================================================
+' Módulo: Configuración
+' =========================================================
+
+package "Configuración" #E8F8E8 {
+
+  entity "configuracion_parametro" as Parametro {
+    * id : bigint <<PK>>
+    --
+    codigo : varchar(100)
+    nombre : varchar(150)
+    descripcion : text
+    tipo : varchar(10)
+    valor : text
+    activo : bool
+    editable : bool
+    creado, actualizado : datetime
+    --
+    # grupo_id : bigint <<FK>>
+  }
+
+  entity "configuracion_grupoparametro" as GrupoParametro {
+    * id : bigint <<PK>>
+    --
+    codigo : varchar(50)
+    nombre : varchar(100)
+    descripcion : text
+  }
+
+  entity "configuracion_formula" as Formula {
+    * id : bigint <<PK>>
+    --
+    codigo : varchar(100)
+    nombre : varchar(200)
+    descripcion : text
+    expresion : text
+    variables_json : text
+    version : int
+    activo : bool
+    creado_en, actualizado_en : datetime
+    --
+    # insumo_id : int <<FK>>
+  }
+
+  entity "configuracion_formulahistorial" as FormulaHistorial {
+    * id : bigint <<PK>>
+    --
+    version : int
+    expresion : text
+    creado_en : datetime
+    --
+    # formula_id : bigint <<FK>>
+    # usuario_id : bigint <<FK>>
+  }
+
+  entity "configuracion_recetaproducto" as RecetaProducto {
+    * id : bigint <<PK>>
+    --
+    descripcion : text
+    activo : bool
+    creado_en, actualizado_en : datetime
+    --
+    # producto_id : int <<FK>>
+  }
+
+  entity "configuracion_recetaproducto_insumos" as RecetaProductoInsumo {
+    * id : bigint <<PK>>
+    --
+    # recetaproducto_id : bigint <<FK>>
+    # insumo_id : int <<FK>>
+  }
+
+  entity "configuracion_featureflag" as FeatureFlag {
+    * id : bigint <<PK>>
+    --
+    codigo : varchar(80)
+    descripcion : varchar(200)
+    activo : bool
+    creado, actualizado : datetime
+  }
+
+  entity "configuracion_listaconfig" as ListaConfig {
+    * id : bigint <<PK>>
+    --
+    codigo : varchar(80)
+    descripcion : varchar(200)
+    page_size : int
+    max_page_size : int
+    orden_default : varchar(120)
+    columnas_visibles : text
+    activo : bool
+    actualizado : datetime
+  }
+
+  entity "configuracion_unidaddemedida" as UnidadMedidaConf {
+    * id : bigint <<PK>>
+    --
+    nombre : varchar(50)
+    simbolo : varchar(10)
+    descripcion : text
+    activo : bool
+  }
+}
+
+' =========================================================
+' Módulo: Auditoría & Geo
+' =========================================================
+
+package "Auditoría & Geo" #F5F5F5 {
+
+  entity "auditoria_auditentry" as AuditEntry {
+    * id : bigint <<PK>>
+    --
+    timestamp : datetime
+    ip_address : varchar(39)
+    path : varchar(512)
+    method : varchar(10)
+    app_label : varchar(100)
+    model : varchar(100)
+    object_id : varchar(64)
+    object_repr : text
+    action : varchar(10)
+    changes : text
+    extra : text
+    --
+    # user_id : bigint <<FK>>
+  }
+
+  entity "geo_ciudad" as Ciudad {
+    * id : bigint <<PK>>
+    --
+    nombre : varchar(120)
+    provincia : varchar(120)
+    activo : bool
+    creado, actualizado : datetime
+  }
+}
+
+' =========================================================
+' Relaciones — Usuarios & Roles
+' =========================================================
+Usuario }o--|| Rol : "rol_id"
+RolPermiso }o--|| Rol : "rol_id"
+RolPermiso }o--|| Permiso : "permiso_id"
+Notificacion }o--|| Usuario : "usuario_id"
+
+' =========================================================
+' Relaciones — Proveedores
+' =========================================================
+Proveedor }o--o| Rubro : "rubro_fk_id"
+
+' =========================================================
+' Relaciones — Insumos
+' =========================================================
+Insumo }o--o| Proveedor : "proveedor_id"
+Proyeccion }o--|| Insumo : "insumo_id"
+Proyeccion }o--o| Proveedor : "proveedor_sugerido_id"
+Proyeccion }o--o| Proveedor : "proveedor_validado_id"
+Proyeccion }o--o| Usuario : "administrador_id"
+ConsumoReal }o--|| Insumo : "insumo_id"
+ConsumoReal }o--o| Usuario : "usuario_id"
+
+' =========================================================
+' Relaciones — Productos
+' =========================================================
+Producto }o--o| CatProducto : "categoriaProducto_id"
+Producto }o--o| TipoProducto : "tipoProducto_id"
+Producto }o--o| UnidadMedida : "unidadMedida_id"
+Producto }o--o| Insumo : "tinta_insumo_id"
+Producto }o--|| Formula : "formula_id"
+ProductoInsumo }o--|| Producto : "producto_id"
+ProductoInsumo }o--|| Insumo : "insumo_id"
+ParamProducto ||--|| Producto : "producto_id"
+RecetaDinamica }o--|| Producto : "producto_id"
+LineaReceta }o--|| RecetaDinamica : "receta_id"
+LineaReceta }o--|| Insumo : "insumo_id"
+
+' =========================================================
+' Relaciones — Pedidos
+' =========================================================
+Pedido }o--|| Cliente : "cliente_id"
+Pedido }o--|| EstadoPedido : "estado_id"
+LineaPedido }o--|| Pedido : "pedido_id"
+LineaPedido }o--|| Producto : "producto_id"
+OrdenCompra }o--|| Insumo : "insumo_id"
+OrdenCompra }o--|| Proveedor : "proveedor_id"
+OrdenProduccion }o--|| Pedido : "pedido_id"
+
+' =========================================================
+' Relaciones — Presupuestos
+' =========================================================
+Presupuesto }o--|| Cliente : "cliente_id"
+PresupuestoDetalle }o--|| Presupuesto : "presupuesto_id"
+PresupuestoDetalle }o--|| Producto : "producto_id"
+
+' =========================================================
+' Relaciones — Automatización
+' =========================================================
+RankingCliente }o--|| Cliente : "cliente_id"
+RankingHistorico }o--|| Cliente : "cliente_id"
+ScoreProveedor }o--|| Proveedor : "proveedor_id"
+
+OfertaPropuesta }o--|| Cliente : "cliente_id"
+OfertaPropuesta }o--o| Usuario : "administrador_id"
+ComboOferta }o--|| Cliente : "cliente_id"
+ComboOfertaProducto }o--|| ComboOferta : "combo_id"
+ComboOfertaProducto }o--|| Producto : "producto_id"
+MensajeOferta }o--|| OfertaPropuesta : "oferta_id"
+MensajeOferta }o--|| Cliente : "cliente_id"
+AccionCliente }o--|| Cliente : "cliente_id"
+AccionCliente }o--o| OfertaPropuesta : "oferta_id"
+
+ConsultaStock }o--|| Proveedor : "proveedor_id"
+ConsultaStock }o--|| Insumo : "insumo_id"
+CompraPropuesta }o--|| Insumo : "insumo_id"
+CompraPropuesta }o--o| Proveedor : "proveedor_recomendado_id"
+CompraPropuesta }o--o| OrdenCompra : "borrador_oc_id"
+CompraPropuesta }o--o| ConsultaStock : "consulta_stock_id"
+CompraPropuesta }o--o| Usuario : "administrador_id"
+
+FeedbackRecomendacion }o--|| Pedido : "pedido_id"
+FeedbackRecomendacion }o--|| Insumo : "insumo_id"
+FeedbackRecomendacion }o--o| Proveedor : "proveedor_recomendado_id"
+FeedbackRecomendacion }o--o| Proveedor : "proveedor_final_id"
+FeedbackRecomendacion }o--o| Usuario : "usuario_id"
+
+OrdenSugerida }o--|| Pedido : "pedido_id"
+OrdenSugerida }o--|| Insumo : "insumo_id"
+AprobacionAutomatica }o--|| Pedido : "pedido_id"
+AprobacionAutomatica }o--o| Usuario : "aprobado_por_id"
+OfertaAutomatica }o--o| Cliente : "cliente_id"
+AutomationLog }o--o| Usuario : "usuario_id"
+
+' =========================================================
+' Relaciones — Configuración
+' =========================================================
+Parametro }o--|| GrupoParametro : "grupo_id"
+Formula }o--o| Insumo : "insumo_id"
+FormulaHistorial }o--|| Formula : "formula_id"
+FormulaHistorial }o--o| Usuario : "usuario_id"
+RecetaProducto }o--|| Producto : "producto_id"
+RecetaProductoInsumo }o--|| RecetaProducto : "recetaproducto_id"
+RecetaProductoInsumo }o--|| Insumo : "insumo_id"
+
+' =========================================================
+' Relaciones — Auditoría
+' =========================================================
+AuditEntry }o--o| Usuario : "user_id"
+
+@enduml

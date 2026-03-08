@@ -193,8 +193,147 @@ class ProveedorInteligenteEngine(ProcesoInteligenteBase):
         return min(1.0, max(0.0, (total_dias / count) / max_dias))
 
     # ------------------------------------------------------------------ #
-    # Score ponderado                                                      #
+    # Score ponderado (batch + individual)                                 #
     # ------------------------------------------------------------------ #
+
+    def _calcular_scores_batch(self, proveedores, insumo=None) -> dict:
+        """
+        Calcula scores para una lista de proveedores en batch.
+        Elimina el N+1 de recomendar(): en lugar de N*(4-5 queries) se
+        ejecutan 4-5 queries totales para todos los proveedores.
+        Retorna {proveedor_id: score}.
+        """
+        from pedidos.models import OrdenCompra
+        from automatizacion.models import ConsultaStockProveedor
+        from insumos.models import Insumo as InsumoModel
+        from django.db.models import Avg, Min, Max, Count
+        from django.utils import timezone
+        from datetime import timedelta
+        import math
+
+        if not proveedores:
+            return {}
+
+        pesos = self._get_pesos()
+        peso_latencia = MotorConfig.get('PESO_LATENCIA', cast=float) or 0.1
+        lam = MotorConfig.get('CUMPLIMIENTO_DECAY_LAMBDA', cast=float) or 0.01
+        dias_disp = MotorConfig.get('DISPONIBILIDAD_DIAS', cast=int) or 90
+        max_dias_lat = MotorConfig.get('LATENCIA_MAX_DIAS', cast=float) or 30.0
+        peso_sum = sum(pesos.values()) + peso_latencia
+
+        prov_ids = [p.id for p in proveedores]
+        ahora = timezone.now()
+        desde_disp = ahora - timedelta(days=dias_disp)
+
+        # ── 1) Precios relativos (1–2 queries) ───────────────────────────────────────
+        try:
+            if insumo is not None:
+                precio_insumo = float(insumo.precio_unitario or 0)
+                stats = (
+                    InsumoModel.objects
+                    .filter(nombre=insumo.nombre, proveedor__activo=True)
+                    .aggregate(min_p=Min('precio_unitario'), max_p=Max('precio_unitario'))
+                )
+                min_p = float(stats['min_p'] or 0)
+                max_p = float(stats['max_p'] or 0)
+                rango = max_p - min_p
+                precio_por_prov = {
+                    p.id: (min(1.0, max(0.0, (precio_insumo - min_p) / rango)) if rango > 0.0001 else 0.5)
+                    for p in proveedores
+                }
+            else:
+                rows = (
+                    InsumoModel.objects
+                    .filter(proveedor__activo=True)
+                    .values('proveedor_id')
+                    .annotate(avg_p=Avg('precio_unitario'))
+                )
+                avg_map = {r['proveedor_id']: float(r['avg_p']) for r in rows if r['avg_p'] is not None}
+                avgs = list(avg_map.values())
+                rango = (max(avgs) - min(avgs)) if avgs else 0
+                min_p = min(avgs) if avgs else 0
+                precio_por_prov = {}
+                for p in proveedores:
+                    v = avg_map.get(p.id)
+                    if v is None or rango < 0.0001:
+                        precio_por_prov[p.id] = 0.5
+                    else:
+                        precio_por_prov[p.id] = min(1.0, max(0.0, (v - min_p) / rango))
+        except Exception:
+            precio_por_prov = {p.id: 0.5 for p in proveedores}
+
+        # ── 2) Órdenes históricas: 1 query, agrupadas en Python ────────────────
+        todas_ordenes = list(
+            OrdenCompra.objects
+            .filter(proveedor_id__in=prov_ids)
+            .order_by('proveedor_id', '-fecha_creacion')
+            .values('proveedor_id', 'estado', 'fecha_creacion', 'fecha_respuesta')
+        )
+        ordenes_por_prov: dict = {}
+        conteo: dict = {}
+        for o in todas_ordenes:
+            pid = o['proveedor_id']
+            if conteo.get(pid, 0) < 100:
+                ordenes_por_prov.setdefault(pid, []).append(o)
+                conteo[pid] = conteo.get(pid, 0) + 1
+
+        # ── 3) Disponibilidad: 2 queries ────────────────────────────────────
+        qs_disp = ConsultaStockProveedor.objects.filter(
+            proveedor_id__in=prov_ids, creado__gte=desde_disp
+        )
+        if insumo is not None:
+            qs_disp = qs_disp.filter(insumo=insumo)
+        total_disp = dict(
+            qs_disp.values('proveedor_id').annotate(n=Count('id')).values_list('proveedor_id', 'n')
+        )
+        pos_disp = dict(
+            qs_disp.filter(estado__in=['disponible', 'parcial'])
+            .values('proveedor_id').annotate(n=Count('id')).values_list('proveedor_id', 'n')
+        )
+
+        # ── 4) Calcular score por proveedor en Python ────────────────────────
+        scores = {}
+        for p in proveedores:
+            try:
+                pid = p.id
+                ordenes = ordenes_por_prov.get(pid, [])
+                if ordenes:
+                    peso_total = peso_conf = peso_rech = 0.0
+                    lat_dias = lat_count = 0
+                    for o in ordenes:
+                        dias = max(0, (ahora - o['fecha_creacion']).days)
+                        w = math.exp(-lam * dias)
+                        peso_total += w
+                        if o['estado'] == 'confirmada':
+                            peso_conf += w
+                            if o['fecha_respuesta'] is not None:
+                                delta = (o['fecha_respuesta'] - o['fecha_creacion']).days
+                                if delta >= 0:
+                                    lat_dias += delta
+                                    lat_count += 1
+                        elif o['estado'] == 'rechazada':
+                            peso_rech += w
+                    cumplimiento = peso_conf / peso_total if peso_total > 0 else 1.0
+                    incidencias = peso_rech / peso_total if peso_total > 0 else 0.0
+                    latencia = min(1.0, max(0.0, (lat_dias / lat_count) / max_dias_lat)) if lat_count > 0 else 0.5
+                else:
+                    cumplimiento, incidencias, latencia = 1.0, 0.0, 0.5
+
+                total = total_disp.get(pid, 0)
+                disponibilidad = (pos_disp.get(pid, 0) / total) if total > 0 else 1.0
+                precio = precio_por_prov.get(pid, 0.5)
+
+                score_bruto = (
+                    pesos['precio']         * (1 - precio) +
+                    pesos['cumplimiento']   * cumplimiento +
+                    pesos['incidencias']    * (1 - incidencias) +
+                    pesos['disponibilidad'] * disponibilidad +
+                    peso_latencia           * (1 - latencia)
+                )
+                scores[pid] = round((score_bruto / peso_sum) * 100, 2) if peso_sum > 0 else 0.0
+            except Exception:
+                scores[p.id] = 0.0
+        return scores
 
     def calcular_score(self, proveedor, insumo=None) -> float:
         """
@@ -234,16 +373,21 @@ class ProveedorInteligenteEngine(ProcesoInteligenteBase):
 
     def recomendar(self, insumo=None):
         """
-        Calcula el score de todos los proveedores activos, persiste en ScoreProveedor
-        y retorna (mejor_proveedor, score).
+        Calcula el score de todos los proveedores activos en batch, persiste en
+        ScoreProveedor y retorna (mejor_proveedor, score).
+        Usa _calcular_scores_batch() para evitar el N+1 de queries por proveedor.
         """
         from proveedores.models import Proveedor
         from automatizacion.models import ScoreProveedor
         from django.utils import timezone
+        proveedores = list(Proveedor.objects.filter(activo=True))
+        if not proveedores:
+            return None, 0.0
+        scores = self._calcular_scores_batch(proveedores, insumo)
         mejor = None
         mejor_score = -1.0
-        for p in Proveedor.objects.filter(activo=True):
-            score = self.calcular_score(p, insumo)
+        for p in proveedores:
+            score = scores.get(p.id, 0.0)
             ScoreProveedor.objects.update_or_create(
                 proveedor=p,
                 defaults={'score': score, 'actualizado': timezone.now()},

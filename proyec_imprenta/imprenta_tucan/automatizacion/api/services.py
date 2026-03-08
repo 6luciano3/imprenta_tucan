@@ -1,12 +1,3 @@
-# Pesos por defecto — sólo usados si ProveedorParametro no tiene el valor.
-_PESOS_DEFAULT = {
-    'precio': 0.4,
-    'cumplimiento': 0.3,
-    'incidencias': 0.2,
-    'disponibilidad': 0.1,
-}
-
-
 class ProveedorInteligenteService:
 
     @staticmethod

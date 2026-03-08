@@ -1,0 +1,67 @@
+﻿{% extends 'base.html' %}
+{% block content %}
+
+<div class="max-w-3xl mx-auto">
+
+  <div class="flex items-center gap-3 mb-6">
+    <span class="material-symbols-outlined text-3xl text-primary">local_offer</span>
+    <div>
+      <h1 class="text-2xl font-bold">Configuración de Ofertas</h1>
+      <p class="text-sm text-gray-500">Ajustá todos los aspectos del módulo de generación automática de ofertas.</p>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+
+    <!-- General -->
+    <a href="{% url 'ofertas_general_config' %}"
+       class="bg-white rounded-xl shadow p-6 flex flex-col hover:shadow-md transition group">
+      <div class="flex items-center gap-3 mb-3">
+        <span class="material-symbols-outlined text-2xl text-indigo-500 group-hover:scale-110 transition">tune</span>
+        <span class="text-base font-semibold text-gray-800">Parámetros generales</span>
+      </div>
+      <p class="text-sm text-gray-500 flex-1">
+        Días de vigencia de las ofertas y periodicidad del ranking (mensual / trimestral).
+      </p>
+      <span class="mt-4 text-xs font-medium text-indigo-500">Configurar →</span>
+    </a>
+
+    <!-- Niveles -->
+    <a href="{% url 'ofertas_segmentadas_config' %}"
+       class="bg-white rounded-xl shadow p-6 flex flex-col hover:shadow-md transition group">
+      <div class="flex items-center gap-3 mb-3">
+        <span class="material-symbols-outlined text-2xl text-yellow-500 group-hover:scale-110 transition">local_offer</span>
+        <span class="text-base font-semibold text-gray-800">Niveles de cliente</span>
+      </div>
+      <p class="text-sm text-gray-500 flex-1">
+        Umbrales de score, porcentajes de descuento, títulos y descripciones de cada nivel
+        (Premium, Estratégico, Estándar, Nuevo).
+      </p>
+      <span class="mt-4 text-xs font-medium text-yellow-500">Configurar →</span>
+    </a>
+
+    <!-- Reglas JSON -->
+    <a href="{% url 'editar_reglas_ofertas' %}"
+       class="bg-white rounded-xl shadow p-6 flex flex-col hover:shadow-md transition group">
+      <div class="flex items-center gap-3 mb-3">
+        <span class="material-symbols-outlined text-2xl text-green-500 group-hover:scale-110 transition">code</span>
+        <span class="text-base font-semibold text-gray-800">Reglas avanzadas (JSON)</span>
+      </div>
+      <p class="text-sm text-gray-500 flex-1">
+        Editor JSON para reglas complejas de descuento, fidelización, prioridad de stock y promociones.
+      </p>
+      <span class="mt-4 text-xs font-medium text-green-500">Configurar →</span>
+    </a>
+
+  </div>
+
+  <div class="mt-6">
+    <a href="{% url 'configuracion_home' %}"
+       class="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 transition">
+      <span class="material-symbols-outlined text-base">arrow_back</span>
+      Volver al Panel de Configuración
+    </a>
+  </div>
+
+</div>
+{% endblock %}

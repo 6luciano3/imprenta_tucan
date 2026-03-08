@@ -1,109 +1,352 @@
-{% load static %}
-<!DOCTYPE html>
-<html lang="es" class="light">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Reglas de Ofertas | Configuración</title>
-  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&display=swap" rel="stylesheet">
-  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
-  <style>
-    .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 500, 'GRAD' 0, 'opsz' 24; }
-    textarea { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
-  </style>
-</head>
-<body class="bg-gray-50 text-gray-800 font-sans min-h-screen">
-  <header class="sticky top-0 z-30 bg-white/90 backdrop-blur border-b border-gray-200">
-    <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-      <div class="flex items-center gap-3">
-        <span class="material-symbols-outlined text-blue-700">tune</span>
-        <span class="font-black">Configuración</span>
-        <span class="text-gray-300">|</span>
-        <span class="text-gray-600">Reglas de Ofertas</span>
+﻿{% extends 'base.html' %}
+{% block content %}
+{{ reglas_actuales|json_script:"reglas-data" }}
+
+<div class="max-w-4xl mx-auto">
+
+  <!-- Encabezado -->
+  <div class="flex items-center justify-between mb-6">
+    <div class="flex items-center gap-3">
+      <span class="material-symbols-outlined text-3xl text-primary">rule</span>
+      <div>
+        <h1 class="text-2xl font-bold">Reglas de Ofertas</h1>
+        <p class="text-sm text-gray-500">Configurá las condiciones y acciones para la generación automática de ofertas.</p>
       </div>
-      <a href="/usuarios/dashboard/" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 text-sm">
-        <span class="material-symbols-outlined text-sm">arrow_back</span>Volver al Dashboard
+    </div>
+    <button type="button" id="btn-add-rule"
+      class="flex items-center gap-2 bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary-dark transition shadow text-sm">
+      <span class="material-symbols-outlined text-base">add</span>
+      Nueva regla
+    </button>
+  </div>
+
+  <!-- Banner guardado -->
+  {% if saved %}
+  <div class="bg-green-50 border border-green-300 text-green-800 rounded-lg px-4 py-3 mb-5 flex items-center gap-2">
+    <span class="material-symbols-outlined text-green-600 text-base">check_circle</span>
+    Reglas guardadas correctamente. Los cambios se aplican en el próximo ciclo de ofertas.
+  </div>
+  {% endif %}
+
+  <!-- Errores de validación -->
+  {% if form.reglas_json.errors %}
+  <div class="bg-red-50 border border-red-300 text-red-800 rounded-lg px-4 py-3 mb-5 flex items-center gap-2">
+    <span class="material-symbols-outlined text-red-600 text-base">error</span>
+    {{ form.reglas_json.errors|striptags }}
+  </div>
+  {% endif %}
+
+  <!-- Info box -->
+  <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6 text-sm text-blue-800">
+    <p class="font-semibold mb-1">¿Cómo funcionan las reglas?</p>
+    <p>Cada regla evalúa sus <strong>condiciones</strong> contra el perfil del cliente. Si todas se cumplen, se ejecuta la <strong>acción</strong> definida.</p>
+    <p class="mt-1 text-xs text-blue-600">Las condiciones usan el score de compra, períodos de caída, criticidad de insumos y margen de contribución normalizado (0–1).</p>
+  </div>
+
+  <!-- Lista dinámica de reglas -->
+  <div id="reglas-lista" class="space-y-4 mb-6"></div>
+
+  <div id="no-reglas" class="hidden bg-gray-50 border-2 border-dashed border-gray-200 rounded-xl p-10 text-center mb-6">
+    <span class="material-symbols-outlined text-4xl text-gray-300 block mb-2">rule_settings</span>
+    <p class="text-gray-400 text-sm">No hay reglas configuradas.</p>
+    <p class="text-gray-400 text-xs">Hacé clic en "Nueva regla" para agregar la primera.</p>
+  </div>
+
+  <!-- Formulario de guardado -->
+  <form method="post" id="form-reglas">
+    {% csrf_token %}
+    {{ form.reglas_json }}
+    <div class="flex items-center gap-3 pt-2 border-t border-gray-100">
+      <button type="submit"
+        class="flex items-center gap-2 bg-primary text-white px-5 py-2 rounded-lg hover:bg-primary-dark transition shadow">
+        <span class="material-symbols-outlined text-sm">save</span>
+        Guardar reglas
+      </button>
+      <a href="{% url 'ofertas_hub' %}"
+        class="flex items-center gap-2 bg-gray-100 text-gray-700 px-5 py-2 rounded-lg hover:bg-gray-200 transition">
+        <span class="material-symbols-outlined text-sm">arrow_back</span>
+        Volver
       </a>
     </div>
-  </header>
+  </form>
 
-  <main class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-    <div class="bg-white border border-gray-200 rounded-xl shadow-sm">
-      <div class="p-5 border-b border-gray-200 flex items-center justify-between">
-        <h1 class="text-xl font-bold flex items-center gap-2">
-          <span class="material-symbols-outlined text-indigo-600">loyalty</span>
-          Editar reglas de ofertas (JSON)
-        </h1>
-      </div>
-      <div class="p-5">
-        {% if saved %}
-          <div class="mb-4 p-3 bg-green-50 text-green-700 border border-green-200 rounded-lg">
-            <span class="material-symbols-outlined align-middle">check_circle</span>
-            Cambios guardados correctamente.
-          </div>
-        {% endif %}
-        <p class="text-sm text-gray-600 mb-4">Estas reglas controlan la generación de ofertas automáticas. Edita el JSON y guarda para aplicar cambios inmediatamente.</p>
-        <form method="post" class="space-y-4">
-          {% csrf_token %}
-          <label class="block text-sm font-medium text-gray-700" for="id_reglas_json">Reglas</label>
-          {{ form.reglas_json }}
-          {% if form.reglas_json.errors %}
-            <p class="text-sm text-red-600">{{ form.reglas_json.errors|striptags }}</p>
-          {% endif %}
-          <div class="flex items-center gap-3">
-            <button type="submit" class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700">
-              <span class="material-symbols-outlined text-sm">save</span>
-              Guardar reglas
-            </button>
-            <a href="#" id="btn-pretty" class="text-sm text-gray-600 hover:text-gray-900 inline-flex items-center gap-1">
-              <span class="material-symbols-outlined text-sm">format_align_left</span>Formatear JSON
-            </a>
-          </div>
-        </form>
-        <div class="mt-6">
-          <details class="bg-gray-50 border border-gray-200 rounded-lg p-4">
-            <summary class="cursor-pointer font-medium text-gray-700">Ejemplo de estructura</summary>
-            <pre class="mt-2 text-xs text-gray-700">[
-  {
-    "nombre": "Descuento por alto desempeño",
-    "condiciones": {"score_gte": 80},
-    "accion": {
-      "tipo": "descuento",
-      "titulo": "Descuento por alto desempeño",
-      "descripcion": "Descuento del 10% en el próximo pedido.",
-      "parametros": {"descuento": 10}
-    }
-  },
-  {
-    "nombre": "Fidelización por caída",
-    "condiciones": {"decline_periods_gte": 2, "decline_delta_lte": -10},
-    "accion": {
-      "tipo": "fidelizacion",
-      "titulo": "Oferta de fidelización",
-      "descripcion": "Condiciones de pago mejoradas (30 días sin intereses).",
-      "parametros": {"dias_sin_interes": 30}
-    }
+</div>
+
+<script>
+(function () {
+  const INITIAL_REGLAS = JSON.parse(document.getElementById('reglas-data').textContent);
+
+  const TIPOS_ACCION = {
+    descuento:       { label: 'Descuento',          icon: 'percent',      color: 'green',  params: [{ key: 'descuento',           label: 'Descuento (%)',       type: 'number', default: 10 }] },
+    fidelizacion:    { label: 'Fidelización',        icon: 'favorite',     color: 'blue',   params: [{ key: 'dias_sin_interes',    label: 'Días sin interés',    type: 'number', default: 30 }] },
+    prioridad_stock: { label: 'Prioridad de stock',  icon: 'inventory_2',  color: 'orange', params: [{ key: 'prioridad',           label: 'Nivel de prioridad',  type: 'select', options: ['alta', 'media', 'baja'], default: 'alta' }] },
+    promocion:       { label: 'Promoción',           icon: 'local_offer',  color: 'purple', params: [{ key: 'bonificacion',        label: 'Tipo de bonificación',type: 'text',   default: 'servicio_complementario' }] },
+  };
+
+  const TIPOS_CONDICION = [
+    { key: 'score_gte',           label: 'Puntaje mínimo (≥)' },
+    { key: 'score_lte',           label: 'Puntaje máximo (≤)' },
+    { key: 'decline_periods_gte', label: 'Períodos de caída (≥)' },
+    { key: 'decline_delta_lte',   label: 'Variación máxima Δ (≤)' },
+    { key: 'crit_norm_gte',       label: 'Criticidad normalizada (≥ 0–1)' },
+    { key: 'margen_norm_gte',     label: 'Margen normalizado (≥ 0–1)' },
+  ];
+
+  const TIPO_BADGE = {
+    green:  'bg-green-100 text-green-700',
+    blue:   'bg-blue-100 text-blue-700',
+    orange: 'bg-orange-100 text-orange-700',
+    purple: 'bg-purple-100 text-purple-700',
+  };
+
+  let reglas = INITIAL_REGLAS.slice();
+
+  function esc(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
-]</pre>
-          </details>
+
+  function condicionOptions(selected) {
+    return TIPOS_CONDICION.map(c =>
+      `<option value="${c.key}" ${c.key === selected ? 'selected' : ''}>${esc(c.label)}</option>`
+    ).join('');
+  }
+
+  function condicionRow(idx, key, val) {
+    return `
+      <div class="condicion-row flex items-center gap-2">
+        <select class="flex-1 border border-gray-300 rounded-lg px-2 py-1.5 text-xs bg-white outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400">
+          ${condicionOptions(key)}
+        </select>
+        <input type="number" step="any" value="${esc(String(val))}"
+          class="w-20 border border-gray-300 rounded-lg px-2 py-1.5 text-xs text-center outline-none focus:ring-2 focus:ring-indigo-300">
+        <button type="button" class="text-gray-400 hover:text-red-500 transition flex-none" onclick="quitarCondicion(this, ${idx})">
+          <span class="material-symbols-outlined text-sm">close</span>
+        </button>
+      </div>`;
+  }
+
+  function paramsHtml(tipo, parametros, idx) {
+    const info = TIPOS_ACCION[tipo];
+    if (!info) return '';
+    return info.params.map(p => {
+      const val = parametros != null && p.key in parametros ? parametros[p.key] : p.default;
+      if (p.type === 'select') {
+        const opts = p.options.map(o => `<option value="${o}" ${o === val ? 'selected' : ''}>${o}</option>`).join('');
+        return `<div>
+          <label class="block text-xs font-medium text-gray-600 mb-1">${esc(p.label)}</label>
+          <select id="param-${p.key}-${idx}" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white outline-none focus:ring-2 focus:ring-indigo-300">${opts}</select>
+        </div>`;
+      }
+      return `<div>
+        <label class="block text-xs font-medium text-gray-600 mb-1">${esc(p.label)}</label>
+        <input type="${p.type}" id="param-${p.key}-${idx}" value="${esc(String(val))}" step="any"
+          class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-300">
+      </div>`;
+    }).join('');
+  }
+
+  function renderRegla(idx, regla) {
+    const tipo     = regla.accion?.tipo || 'descuento';
+    const tipoInfo = TIPOS_ACCION[tipo] || TIPOS_ACCION.descuento;
+    const badge    = TIPO_BADGE[tipoInfo.color];
+    const conds    = regla.condiciones || {};
+    const noConds  = Object.keys(conds).length === 0;
+
+    const condicionesHtml = Object.entries(conds).map(([k, v]) => condicionRow(idx, k, v)).join('');
+
+    const div = document.createElement('div');
+    div.className = 'bg-white rounded-xl shadow border border-gray-100 overflow-hidden';
+    div.dataset.idx = idx;
+    div.innerHTML = `
+      <!-- Encabezado colapsable -->
+      <div class="flex items-center justify-between px-5 py-3 bg-gray-50 border-b border-gray-100 cursor-pointer select-none"
+           onclick="toggleCard(${idx})">
+        <div class="flex items-center gap-3 min-w-0">
+          <span class="material-symbols-outlined text-indigo-500 flex-none">rule</span>
+          <div class="min-w-0">
+            <p class="font-semibold text-gray-800 text-sm truncate" id="regla-nombre-display-${idx}">${esc(regla.nombre || 'Regla sin nombre')}</p>
+            <span class="inline-block mt-0.5 text-xs px-2 py-0.5 rounded-full font-medium ${badge}">
+              <span class="material-symbols-outlined text-xs align-middle">${tipoInfo.icon}</span>
+              ${tipoInfo.label}
+            </span>
+          </div>
+        </div>
+        <div class="flex items-center gap-2 ml-4 flex-none">
+          <button type="button" onclick="event.stopPropagation(); eliminarRegla(${idx})"
+            class="text-gray-400 hover:text-red-500 transition p-1 rounded hover:bg-red-50">
+            <span class="material-symbols-outlined text-sm">delete</span>
+          </button>
+          <span class="material-symbols-outlined text-gray-400 text-sm" id="chevron-${idx}">expand_less</span>
         </div>
       </div>
-    </div>
-  </main>
 
-  <script>
-    document.getElementById('btn-pretty')?.addEventListener('click', function (e) {
-      e.preventDefault();
-      const ta = document.getElementById('id_reglas_json');
-      if (!ta) return;
-      try {
-        const obj = JSON.parse(ta.value);
-        ta.value = JSON.stringify(obj, null, 2);
-      } catch (err) {
-        alert('JSON inválido: ' + err);
-      }
+      <!-- Cuerpo -->
+      <div id="card-body-${idx}" class="p-5 space-y-5">
+
+        <!-- Nombre -->
+        <div>
+          <label class="block text-xs font-semibold text-gray-600 mb-1">Nombre de la regla</label>
+          <input type="text" id="nombre-${idx}" value="${esc(regla.nombre || '')}"
+            oninput="document.getElementById('regla-nombre-display-${idx}').textContent = this.value || 'Regla sin nombre'"
+            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400"
+            placeholder="Ej: Descuento por alto desempeño">
+        </div>
+
+        <!-- Condiciones -->
+        <div>
+          <div class="flex items-center justify-between mb-2">
+            <label class="text-xs font-semibold text-gray-600">Condiciones <span class="font-normal text-gray-400">(deben cumplirse todas)</span></label>
+            <button type="button" onclick="agregarCondicion(${idx})"
+              class="flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-800 border border-indigo-200 rounded-lg px-2 py-1 hover:bg-indigo-50 transition">
+              <span class="material-symbols-outlined text-xs">add</span> Agregar condición
+            </button>
+          </div>
+          <div id="condiciones-${idx}" class="space-y-2">
+            ${condicionesHtml}
+          </div>
+          <p id="no-cond-${idx}" class="${noConds ? '' : 'hidden'} mt-2 text-xs text-gray-400 italic">
+            <span class="material-symbols-outlined text-xs align-middle">info</span>
+            Sin condiciones — aplica a todos los clientes.
+          </p>
+        </div>
+
+        <!-- Acción -->
+        <div class="rounded-xl border border-indigo-100 bg-indigo-50/50 p-4 space-y-3">
+          <p class="text-xs font-semibold text-indigo-700">Acción a ejecutar</p>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-medium text-gray-600 mb-1">Tipo de acción</label>
+              <select id="accion-tipo-${idx}" onchange="onTipoChange(${idx})"
+                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white outline-none focus:ring-2 focus:ring-indigo-300">
+                ${Object.entries(TIPOS_ACCION).map(([k, v]) =>
+                  `<option value="${k}" ${tipo === k ? 'selected' : ''}>${v.label}</option>`
+                ).join('')}
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-600 mb-1">Título visible al cliente</label>
+              <input type="text" id="accion-titulo-${idx}" value="${esc(regla.accion?.titulo || '')}"
+                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-300"
+                placeholder="Ej: Descuento especial">
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">Descripción</label>
+            <input type="text" id="accion-desc-${idx}" value="${esc(regla.accion?.descripcion || '')}"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-300"
+              placeholder="Ej: 10% de descuento en el próximo pedido">
+          </div>
+
+          <div id="params-container-${idx}" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            ${paramsHtml(tipo, regla.accion?.parametros, idx)}
+          </div>
+        </div>
+
+      </div>`;
+    return div;
+  }
+
+  function renderTodo() {
+    const lista    = document.getElementById('reglas-lista');
+    const noReglas = document.getElementById('no-reglas');
+    lista.innerHTML = '';
+    if (reglas.length === 0) {
+      noReglas.classList.remove('hidden');
+    } else {
+      noReglas.classList.add('hidden');
+      reglas.forEach((r, i) => lista.appendChild(renderRegla(i, r)));
+    }
+  }
+
+  window.toggleCard = function (idx) {
+    const body    = document.getElementById(`card-body-${idx}`);
+    const chevron = document.getElementById(`chevron-${idx}`);
+    body.classList.toggle('hidden');
+    chevron.textContent = body.classList.contains('hidden') ? 'expand_more' : 'expand_less';
+  };
+
+  window.agregarCondicion = function (idx) {
+    const container = document.getElementById(`condiciones-${idx}`);
+    const noCond    = document.getElementById(`no-cond-${idx}`);
+    const row       = document.createElement('div');
+    row.innerHTML   = condicionRow(idx, 'score_gte', 0);
+    container.appendChild(row.firstElementChild);
+    if (noCond) noCond.classList.add('hidden');
+  };
+
+  window.quitarCondicion = function (btn, idx) {
+    btn.closest('.condicion-row').remove();
+    const container = document.getElementById(`condiciones-${idx}`);
+    const noCond    = document.getElementById(`no-cond-${idx}`);
+    if (noCond) noCond.classList.toggle('hidden', container.querySelectorAll('.condicion-row').length === 0);
+  };
+
+  window.onTipoChange = function (idx) {
+    const tipo     = document.getElementById(`accion-tipo-${idx}`).value;
+    const tipoInfo = TIPOS_ACCION[tipo];
+    // Actualizar badge en encabezado
+    document.getElementById(`regla-nombre-display-${idx}`)
+      .closest('.flex.items-center.gap-3')
+      .querySelector('span.inline-block').innerHTML =
+        `<span class="material-symbols-outlined text-xs align-middle">${tipoInfo.icon}</span> ${tipoInfo.label}`;
+    // Actualizar parámetros
+    document.getElementById(`params-container-${idx}`).innerHTML = paramsHtml(tipo, {}, idx);
+  };
+
+  window.eliminarRegla = function (idx) {
+    if (!confirm('¿Eliminar esta regla?')) return;
+    reglas.splice(idx, 1);
+    renderTodo();
+  };
+
+  document.getElementById('btn-add-rule').addEventListener('click', function () {
+    reglas.push({
+      nombre: '',
+      condiciones: {},
+      accion: { tipo: 'descuento', titulo: '', descripcion: '', parametros: { descuento: 10 } }
     });
-  </script>
-</body>
-</html>
+    renderTodo();
+    const nuevaCard = document.getElementById('reglas-lista').lastElementChild;
+    if (nuevaCard) {
+      nuevaCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      setTimeout(() => nuevaCard.querySelector(`input[id^="nombre-"]`)?.focus(), 300);
+    }
+  });
+
+  document.getElementById('form-reglas').addEventListener('submit', function () {
+    const resultado = [];
+    document.querySelectorAll('#reglas-lista > div[data-idx]').forEach((card, i) => {
+      const idx    = parseInt(card.dataset.idx);
+      const nombre = document.getElementById(`nombre-${idx}`)?.value || '';
+
+      const condiciones = {};
+      card.querySelectorAll('.condicion-row').forEach(row => {
+        const sel = row.querySelector('select');
+        const inp = row.querySelector('input[type="number"]');
+        if (sel && inp && sel.value) condiciones[sel.value] = parseFloat(inp.value) || 0;
+      });
+
+      const tipo  = document.getElementById(`accion-tipo-${idx}`)?.value || 'descuento';
+      const titulo = document.getElementById(`accion-titulo-${idx}`)?.value || '';
+      const desc   = document.getElementById(`accion-desc-${idx}`)?.value || '';
+
+      const parametros = {};
+      (TIPOS_ACCION[tipo]?.params || []).forEach(p => {
+        const el = document.getElementById(`param-${p.key}-${idx}`);
+        if (!el) return;
+        parametros[p.key] = p.type === 'number' ? (parseFloat(el.value) || 0) : el.value;
+      });
+
+      resultado.push({ nombre, condiciones, accion: { tipo, titulo, descripcion: desc, parametros } });
+    });
+
+    document.getElementById('id_reglas_json').value = JSON.stringify(resultado);
+  });
+
+  renderTodo();
+})();
+</script>
+
+{% endblock %}
