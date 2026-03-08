@@ -1,333 +1,438 @@
 {% extends 'base.html' %}
+{% load l10n %}
 {% block title %}Nuevo Presupuesto{% endblock %}
+
+{% block extra_head %}
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<style>
+  .section-card { border: 1px solid #dee2e6; border-radius: .75rem; background: #fff; }
+  .section-header { background: #f8f9fa; border-bottom: 1px solid #dee2e6; border-radius: .75rem .75rem 0 0; padding: .75rem 1.25rem; font-weight: 600; display: flex; align-items: center; gap: .5rem; }
+  .section-body { padding: 1.25rem; }
+  #tablaDetalles thead th { white-space: nowrap; background: #f8f9fa; font-size: .85rem; }
+  .total-row td { font-size: 1.05rem; font-weight: 700; }
+  .form-label { font-weight: 500; }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="container mx-auto max-w-4xl py-8">
-  <h1 class="text-3xl font-extrabold mb-6 text-gray-900 flex items-center gap-2">
-    <span class="material-symbols-outlined text-blue-600">request_quote</span>
-    Nuevo Presupuesto
-  </h1>
+<div class="container py-4" style="max-width: 960px;">
 
-  <!-- Resumen rápido -->
-  <div class="bg-blue-50 border-l-4 border-blue-400 p-4 mb-6 rounded">
-    <p class="text-blue-900 text-sm">
-      Complete los datos para crear un nuevo presupuesto. Los campos marcados con <span class="text-red-500">*</span> son obligatorios.<br>
-      Puede agregar observaciones o notas internas para el seguimiento.
-    </p>
+  <!-- Encabezado -->
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div class="d-flex align-items-center gap-3">
+      <span class="material-symbols-outlined fs-2 text-success">request_quote</span>
+      <div>
+        <h1 class="h4 fw-bold mb-0">Nuevo Presupuesto</h1>
+        <span class="badge bg-secondary fs-6">Se asignará N° automáticamente</span>
+      </div>
+    </div>
+    <a href="{% url 'presupuestos:lista' %}" class="btn btn-outline-secondary d-flex align-items-center gap-1">
+      <span class="material-symbols-outlined" style="font-size:1.1rem;">arrow_back</span> Volver
+    </a>
   </div>
 
-  <form method="post" novalidate class="bg-white rounded-xl shadow p-6">
-    {% csrf_token %}
-    <!-- Renderizar solo el management_form del formset -->
-    <div id="formset-hidden-fields" style="display:none;">
-      {{ formset.management_form }}
-    </div>
-    <!-- Mostrar errores del formulario principal -->
-    {% if form.errors %}
-      <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-2 rounded mb-4">
-        <strong>Errores en el formulario:</strong>
-        <ul>
-        {% for field, errors in form.errors.items %}
-          <li><strong>{{ field }}:</strong> {{ errors|join:', ' }}</li>
-        {% endfor %}
-        </ul>
+  {% if messages %}
+    {% for message in messages %}
+      <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} alert-dismissible fade show mb-3" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
       </div>
-    {% endif %}
-    <!-- Mostrar errores del formset -->
-    {% if formset.non_form_errors %}
-      <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-2 rounded mb-4">
-        <strong>Errores en los productos:</strong>
-        <ul>
-        {% for error in formset.non_form_errors %}
-          <li>{{ error }}</li>
-        {% endfor %}
-        </ul>
-      </div>
-    {% endif %}
-    {% for form_detalle in formset.forms %}
-      {% if form_detalle.errors %}
-        <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-2 rounded mb-2">
-          <strong>Producto:</strong>
-          <ul>
-          {% for field, errors in form_detalle.errors.items %}
-            <li><strong>{{ field }}:</strong> {{ errors|join:', ' }}</li>
-          {% endfor %}
-          </ul>
-        </div>
-      {% endif %}
     {% endfor %}
-    {{ form.non_field_errors }}
+  {% endif %}
 
+  <form method="post" novalidate>
+    {% csrf_token %}
 
-    <!-- Agrupar datos del cliente en una tarjeta -->
-    <div class="bg-white border rounded-lg shadow-sm p-4 mb-6">
-      <h2 class="text-lg font-bold mb-3 flex items-center gap-2"><span class="material-symbols-outlined text-blue-600">person</span> Datos del Cliente</h2>
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div>
-          <label class="block font-semibold mb-1" for="{{ form.cliente.id_for_label }}">{{ form.cliente.label }} <span class="text-red-500">*</span></label>
-          {{ form.cliente }}
-          {% for error in form.cliente.errors %}<div class="text-red-500 text-sm">{{ error }}</div>{% endfor %}
-        </div>
-        <div id="razon-social-section">
-          <label class="block font-semibold mb-1" for="id_razon_social">Razón Social</label>
-          <select id="id_razon_social" name="razon_social" class="form-control" style="border-radius:6px;border:1px solid #e0e0e0;padding:4px;width:100%;">
-            <option value="">Seleccione tipo de razón social</option>
-            <option value="Sociedad Anónima (S.A.)">Sociedad Anónima (S.A.)</option>
-            <option value="Sociedad de Responsabilidad Limitada (S.R.L.)">Sociedad de Responsabilidad Limitada (S.R.L.)</option>
-            <option value="Sociedad por Acciones Simplificada (S.A.S.)">Sociedad por Acciones Simplificada (S.A.S.)</option>
-            <option value="Sociedad Colectiva">Sociedad Colectiva</option>
-            <option value="Sociedad en Comandita Simple (S.C.S.)">Sociedad en Comandita Simple (S.C.S.)</option>
-            <option value="Sociedad en Comandita por Acciones (S.C.A.)">Sociedad en Comandita por Acciones (S.C.A.)</option>
-            <option value="Sociedad de Capital e Industria">Sociedad de Capital e Industria</option>
-            <option value="Sociedad Civil">Sociedad Civil</option>
-            <option value="Sociedad de Hecho">Sociedad de Hecho</option>
-            <option value="Empresa Unipersonal">Empresa Unipersonal</option>
-            <option value="Cooperativa">Cooperativa</option>
-            <option value="Asociación Civil">Asociación Civil</option>
-            <option value="Fundación">Fundación</option>
-          </select>
-          {% for error in form.razon_social.errors %}<div class="text-red-500 text-sm">{{ error }}</div>{% endfor %}
-        </div>
-        <div>
-          <label class="block font-semibold mb-1" for="{{ form.validez.id_for_label }}">{{ form.validez.label }}</label>
-          {{ form.validez }}
-          {% if form.validez.help_text %}<small class="text-gray-500">{{ form.validez.help_text }}</small>{% endif %}
-          {% for error in form.validez.errors %}<div class="text-red-500 text-sm">{{ error }}</div>{% endfor %}
+    <!-- Bloque 1: Datos del presupuesto -->
+    <div class="section-card mb-4">
+      <div class="section-header">
+        <span class="material-symbols-outlined text-secondary">info</span>
+        Datos del presupuesto
+      </div>
+      <div class="section-body">
+        <div class="row g-3">
+          <div class="col-md-3">
+            <label class="form-label">N° Presupuesto</label>
+            <input type="text" class="form-control bg-light" value="Automático" readonly>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Fecha de emisión</label>
+            <input type="text" class="form-control bg-light" value="{% now "d/m/Y" %}" readonly>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label" for="{{ form.validez.id_for_label }}">{{ form.validez.label }}</label>
+            <input type="date" name="validez" id="{{ form.validez.id_for_label }}" class="form-control" value="{{ validez_default }}">
+            {% for e in form.validez.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+          </div>
+          <div class="col-md-3">
+            <label class="form-label" for="{{ form.estado.id_for_label }}">{{ form.estado.label }}</label>
+            {{ form.estado }}
+            {% for e in form.estado.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+          </div>
         </div>
       </div>
-      <script>
-      // Mostrar la razón social del cliente seleccionado
-      document.addEventListener('DOMContentLoaded', function() {
-        const clienteSelect = document.getElementById('{{ form.cliente.id_for_label }}');
-        const razonSocialDiv = document.getElementById('razon-social-value');
-        // Mapear id de cliente a razón social
-        const clienteRazonSocial = {
-          {% for c in form.fields.cliente.queryset %}
-            '{{ c.pk }}': '{{ c.razon_social|default:"-"|escapejs }}',
-          {% endfor %}
-        };
-        function updateRazonSocial() {
-          const val = clienteSelect.value;
-          razonSocialDiv.textContent = clienteRazonSocial[val] || '-';
-        }
-        if (clienteSelect) {
-          clienteSelect.addEventListener('change', updateRazonSocial);
-          updateRazonSocial();
-        }
-      });
-      </script>
     </div>
 
-    <!-- Agrupar datos del presupuesto en otra tarjeta -->
-    <div class="bg-white border rounded-lg shadow-sm p-4 mb-6">
-      <h2 class="text-lg font-bold mb-3 flex items-center gap-2"><span class="material-symbols-outlined text-amber-600">description</span> Datos del Presupuesto</h2>
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label class="block font-semibold mb-1" for="{{ form.total.id_for_label }}">{{ form.total.label }} <span class="text-red-500">*</span></label>
-          {{ form.total }}
-          {% if form.total.help_text %}<small class="text-gray-500">{{ form.total.help_text }}</small>{% endif %}
-          {% for error in form.total.errors %}<div class="text-red-500 text-sm">{{ error }}</div>{% endfor %}
+    <!-- Bloque 2: Cliente -->
+    <div class="section-card mb-4">
+      <div class="section-header">
+        <span class="material-symbols-outlined text-primary">person</span>
+        Cliente
+      </div>
+      <div class="section-body">
+        <div class="row g-3 mb-3">
+          <div class="col-md-6">
+            <label class="form-label" for="{{ form.cliente.id_for_label }}">
+              {{ form.cliente.label }} <span class="text-danger">*</span>
+            </label>
+            {{ form.cliente }}
+            {% for e in form.cliente.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Tipo de cliente</label>
+            <input type="text" id="info_tipo_cliente" class="form-control bg-light" readonly>
+          </div>
         </div>
-        <div>
-          <label class="block font-semibold mb-1" for="{{ form.estado.id_for_label }}">{{ form.estado.label }}</label>
-          {{ form.estado }}
-          {% for error in form.estado.errors %}<div class="text-red-500 text-sm">{{ error }}</div>{% endfor %}
+        <div class="row g-3 mb-3">
+          <div class="col-md-6">
+            <label class="form-label">CUIT</label>
+            <input type="text" id="info_cuit" class="form-control bg-light" readonly>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Email</label>
+            <input type="text" id="info_email" class="form-control bg-light" readonly>
+          </div>
+        </div>
+        <div class="row g-3 mb-3">
+          <div class="col-md-4">
+            <label class="form-label">Teléfono</label>
+            <input type="text" id="info_telefono" class="form-control bg-light" readonly>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Celular</label>
+            <input type="text" id="info_celular" class="form-control bg-light" readonly>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Dirección</label>
+            <input type="text" id="info_direccion" class="form-control bg-light" readonly>
+          </div>
+        </div>
+        <div class="row g-3 mb-3">
+          <div class="col-md-4">
+            <label class="form-label">Ciudad</label>
+            <input type="text" id="info_ciudad" class="form-control bg-light" readonly>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Provincia</label>
+            <input type="text" id="info_provincia" class="form-control bg-light" readonly>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">País</label>
+            <input type="text" id="info_pais" class="form-control bg-light" readonly>
+          </div>
+        </div>
+        <hr class="my-3">
+        <div class="row g-3">
+          <div class="col-md-12">
+            <label class="form-label" for="{{ form.razon_social.id_for_label }}">{{ form.razon_social.label }} <small class="text-muted">(del presupuesto, editable)</small></label>
+            {{ form.razon_social }}
+            {% for e in form.razon_social.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+          </div>
         </div>
       </div>
-      <script>
-        // Sincronizar el Total General con el campo Total
-        function syncTotalGeneralToTotalField() {
-          var totalGeneral = document.getElementById('total-general').textContent.replace('$','').replace(',','');
-          var totalField = document.getElementById('{{ form.total.id_for_label }}');
-          if (totalField) {
-            totalField.value = parseFloat(totalGeneral) || 0;
-          }
-        }
-        // Actualizar cada vez que cambie el Total General
-        document.addEventListener('input', function(e) {
-          if (e.target.classList.contains('cantidad-input') || e.target.classList.contains('precio-input')) {
-            setTimeout(syncTotalGeneralToTotalField, 50);
-          }
-        });
-        document.addEventListener('DOMContentLoaded', function() {
-          setTimeout(syncTotalGeneralToTotalField, 100);
-        });
-        document.getElementById('agregar-producto').addEventListener('click', function() {
-          setTimeout(syncTotalGeneralToTotalField, 100);
-        });
-        document.getElementById('productos-body').addEventListener('click', function(e) {
-          if (e.target.classList.contains('eliminar-producto')) {
-            setTimeout(syncTotalGeneralToTotalField, 100);
-          }
-        });
-      </script>
-
-
-    <div class="mb-4">
-      <label class="block font-semibold mb-1" for="{{ form.observaciones.id_for_label }}">{{ form.observaciones.label }}</label>
-      {{ form.observaciones }}
-      {% for error in form.observaciones.errors %}<div class="text-red-500 text-sm">{{ error }}</div>{% endfor %}
     </div>
 
-    <!-- Sección de productos del presupuesto -->
-    <div class="mb-8">
-      <h2 class="text-lg font-bold mb-2 flex items-center gap-2"><span class="material-symbols-outlined text-green-600">add_shopping_cart</span> Productos del presupuesto</h2>
-      <div class="overflow-x-auto">
-        <table id="productos-table" class="min-w-full bg-gray-50 rounded shadow text-sm">
-          <thead style="background:#f5f5f5;">
-            <tr>
-              <th class="px-2 py-1 font-bold text-left" style="background:#f5f5f5;">Producto</th>
-              <th class="px-2 py-1 font-bold text-right" style="background:#f5f5f5;">Cantidad</th>
-              <th class="px-2 py-1 font-bold text-right" style="background:#f5f5f5;">Precio Unitario</th>
-              <th class="px-2 py-1 font-bold text-right" style="background:#f5f5f5;">Total</th>
-              <th class="px-2 py-1 font-bold text-center" style="background:#f5f5f5;">Eliminar</th>
-            </tr>
-          </thead>
-          <tbody id="productos-body">
-            <!-- Filas dinámicas -->
-          </tbody>
-          <tfoot>
-            <tr style="background:#f5f5f5;">
-              <td colspan="3" class="px-2 py-1 font-bold text-right">Total General</td>
-              <td id="total-general" class="px-2 py-1 font-bold text-right">$0.00</td>
-              <td></td>
-            </tr>
-          </tfoot>
-        </table>
+    <!-- Bloque 3: Líneas del presupuesto -->
+    <div class="section-card mb-4">
+      <div class="section-header">
+        <span class="material-symbols-outlined text-success">shopping_cart</span>
+        Líneas del presupuesto
       </div>
-      <button type="button" id="agregar-producto" class="mt-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 rounded shadow">Agregar otro producto</button>
-      <div class="text-xs text-gray-500 mt-2">Puede agregar más productos usando el botón "Agregar otro producto".</div>
-    </div>
-    <script>
-      // Obtener productos del backend usando template context
-      const productosBackend = [
-        {% for p in formset.forms.0.fields.producto.queryset %}
-          { value: '{{ p.pk }}', text: '{{ p.nombreProducto|escapejs }}' },
-        {% endfor %}
-      ];
-
-      function crearFila(producto = '', cantidad = '', precio = '') {
-        const tr = document.createElement('tr');
-        tr.style.background = '#fff';
-        tr.style.borderBottom = '1px solid #e0e0e0';
-        tr.innerHTML = `
-          <td class="px-2 py-1">
-            <select class="producto-input" style="width:100%;border-radius:6px;border:1px solid #e0e0e0;padding:4px;">
-              <option value="">Seleccione un producto</option>
-              ${productosBackend.map(p => `<option value="${p.value}" ${p.value==producto?'selected':''}>${p.text}</option>`).join('')}
+      <div class="section-body">
+        <div class="table-responsive">
+          <table class="table table-bordered align-middle mb-3" id="tablaDetalles">
+            <thead>
+              <tr>
+                <th style="min-width:220px;">Producto</th>
+                <th class="text-center" style="width:100px;">Cantidad</th>
+                <th class="text-end" style="width:130px;">Precio unit.</th>
+                <th class="text-end" style="width:140px;">Subtotal</th>
+                <th class="text-center" style="width:60px;"></th>
+              </tr>
+            </thead>
+            <tbody id="detallesTbody"></tbody>
+            <tfoot>
+              <tr class="table-light">
+                <td colspan="2" class="text-end pe-3 text-muted">Subtotal</td>
+                <td class="text-end text-muted" id="pres_subtotal">$ 0,00</td>
+                <td></td>
+              </tr>
+              <tr id="pres_rowDescuento" class="d-none text-danger">
+                <td colspan="2" class="text-end pe-3" id="pres_labelDescuento">Descuento (0%)</td>
+                <td class="text-end" id="pres_montoDescuento">- $ 0,00</td>
+                <td></td>
+              </tr>
+              <tr id="pres_rowIVA" class="d-none text-primary">
+                <td colspan="2" class="text-end pe-3">IVA (21%)</td>
+                <td class="text-end" id="pres_montoIVA">$ 0,00</td>
+                <td></td>
+              </tr>
+              <tr class="table-light total-row fw-bold border-top">
+                <td colspan="2" class="text-end pe-3">Total</td>
+                <td class="text-end" id="totalGeneral">$ 0,00</td>
+                <td></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+        <div class="d-flex align-items-end gap-4 mb-3 mt-2">
+          <div>
+            <label class="form-label mb-1 fw-semibold">Descuento global</label>
+            <select id="pres_descuento" class="form-select form-select-sm" style="width:170px;">
+              <option value="0" selected>Sin descuento (0%)</option>
+              <option value="5">5%</option>
+              <option value="10">10%</option>
+              <option value="15">15%</option>
+              <option value="20">20%</option>
+              <option value="25">25%</option>
+              <option value="30">30%</option>
             </select>
-          </td>
-          <td class="px-2 py-1">
-            <input type="number" min="1" class="cantidad-input" value="${cantidad}" style="width:80px;border-radius:6px;border:1px solid #e0e0e0;padding:4px;text-align:right;" />
-          </td>
-          <td class="px-2 py-1">
-            <input type="number" min="0" step="0.01" class="precio-input" value="${precio}" style="width:100px;border-radius:6px;border:1px solid #e0e0e0;padding:4px;text-align:right;" />
-          </td>
-          <td class="px-2 py-1 text-right total-celda" style="font-weight:bold;">$0.00</td>
-          <td class="px-2 py-1 text-center">
-            <button type="button" class="eliminar-producto bg-red-500 hover:bg-red-600 text-white rounded px-2 py-1">Eliminar</button>
-          </td>
-        `;
-        return tr;
-      }
-
-      function actualizarTotales() {
-        let totalGeneral = 0;
-        document.querySelectorAll('#productos-body tr').forEach(tr => {
-          const cantidad = parseFloat(tr.querySelector('.cantidad-input').value) || 0;
-          const precio = parseFloat(tr.querySelector('.precio-input').value) || 0;
-          const total = cantidad * precio;
-          tr.querySelector('.total-celda').textContent = `$${total.toFixed(2)}`;
-          totalGeneral += total;
-        });
-        document.getElementById('total-general').textContent = `$${totalGeneral.toFixed(2)}`;
-      }
-
-      document.getElementById('agregar-producto').addEventListener('click', function() {
-        const tbody = document.getElementById('productos-body');
-        const tr = crearFila();
-        tbody.appendChild(tr);
-        actualizarTotales();
-      });
-
-      document.getElementById('productos-body').addEventListener('input', function(e) {
-        if (e.target.classList.contains('cantidad-input') || e.target.classList.contains('precio-input')) {
-          actualizarTotales();
-        }
-      });
-
-      document.getElementById('productos-body').addEventListener('click', function(e) {
-        if (e.target.classList.contains('eliminar-producto')) {
-          e.target.closest('tr').remove();
-          actualizarTotales();
-        }
-      });
-
-      // Inicializar con una fila de ejemplo
-      document.addEventListener('DOMContentLoaded', function() {
-        const tbody = document.getElementById('productos-body');
-        const tr = crearFila('Folleto A4 Color', 1000, 23.00);
-        tbody.appendChild(tr);
-        actualizarTotales();
-      });
-    </script>
-
-    <div class="flex items-center gap-4 mt-6">
-      <button type="submit" id="guardar-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2 rounded shadow">Guardar</button>
-      <a href="{% url 'presupuestos:lista' %}" class="text-blue-600 hover:underline">Cancelar</a>
+          </div>
+          <div class="form-check mb-1">
+            <input type="checkbox" class="form-check-input" id="pres_aplicar_iva" checked>
+            <label class="form-check-label fw-semibold" for="pres_aplicar_iva">IVA 21%</label>
+          </div>
+        </div>
+        <button type="button" id="btnAgregarLinea" class="btn btn-outline-primary btn-sm">
+          <span class="material-symbols-outlined" style="font-size:1rem;vertical-align:-.15em;">add</span>
+          Agregar producto
+        </button>
+      </div>
     </div>
-    <script>
-      // Sincronizar la tabla dinámica con los campos ocultos del formset antes de enviar
-      document.querySelector('form').addEventListener('submit', function(e) {
-        const filas = document.querySelectorAll('#productos-body tr');
-        // Actualizar TOTAL_FORMS
-        const totalFormsInput = document.querySelector('input[name="form-TOTAL_FORMS"]');
-        totalFormsInput.value = filas.length;
-        // Limpiar campos ocultos previos
-        const hiddenFieldsDiv = document.getElementById('formset-hidden-fields');
-        hiddenFieldsDiv.querySelectorAll('input, select').forEach(el => {
-          if (el.name !== 'form-TOTAL_FORMS' && el.name !== 'form-INITIAL_FORMS' && el.name !== 'form-MIN_NUM_FORMS' && el.name !== 'form-MAX_NUM_FORMS') {
-            el.remove();
-          }
-        });
-        // Crear los campos ocultos necesarios
-        for (let idx = 0; idx < filas.length; idx++) {
-          const tr = filas[idx];
-          const producto = tr.querySelector('.producto-input').value;
-          const cantidad = tr.querySelector('.cantidad-input').value;
-          const precio = tr.querySelector('.precio-input').value;
-          // Producto
-          let inputProducto = document.createElement('input');
-          inputProducto.type = 'hidden';
-          inputProducto.name = `form-${idx}-producto`;
-          inputProducto.value = producto;
-          hiddenFieldsDiv.appendChild(inputProducto);
-          // Cantidad
-          let inputCantidad = document.createElement('input');
-          inputCantidad.type = 'hidden';
-          inputCantidad.name = `form-${idx}-cantidad`;
-          inputCantidad.value = cantidad;
-          hiddenFieldsDiv.appendChild(inputCantidad);
-          // Precio unitario
-          let inputPrecio = document.createElement('input');
-          inputPrecio.type = 'hidden';
-          inputPrecio.name = `form-${idx}-precio_unitario`;
-          inputPrecio.value = precio;
-          hiddenFieldsDiv.appendChild(inputPrecio);
-        }
-      });
-    </script>
-  </form>
 
-  <!-- Sección de ayuda contextual -->
-  <div class="mt-10 bg-gray-50 border-l-4 border-gray-300 p-4 rounded">
-    <h2 class="font-bold mb-2 text-gray-700 text-lg flex items-center gap-2"><span class="material-symbols-outlined text-gray-500">info</span> Consejos para presupuestar</h2>
-    <ul class="list-disc pl-6 text-gray-700 text-sm">
-      <li>Verifique que el cliente esté correctamente seleccionado.</li>
-      <li>Revise la validez del presupuesto para evitar confusiones.</li>
-      <li>Agregue observaciones para aclaraciones internas o condiciones especiales.</li>
-      <li>El campo "Total" debe reflejar el importe final acordado.</li>
-      <li>Recuerde guardar y revisar el presupuesto antes de enviarlo al cliente.</li>
-    </ul>
-  </div>
+    <!-- Bloque 4: Total y observaciones -->
+    <div class="section-card mb-4">
+      <div class="section-header">
+        <span class="material-symbols-outlined text-warning">receipt_long</span>
+        Resumen y observaciones
+      </div>
+      <div class="section-body">
+        <div class="row g-3 align-items-start">
+          <div class="col-md-4">
+            <label class="form-label" for="{{ form.total.id_for_label }}">
+              {{ form.total.label }} <span class="text-danger">*</span>
+            </label>
+            {{ form.total }}
+            <small class="text-muted">Se actualiza automáticamente al modificar productos.</small>
+            {% for e in form.total.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+          </div>
+          <div class="col-md-8">
+            <label class="form-label" for="{{ form.observaciones.id_for_label }}">{{ form.observaciones.label }}</label>
+            {{ form.observaciones }}
+            {% for e in form.observaciones.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Botones de acción -->
+    <div class="d-flex justify-content-end gap-2">
+      <a href="{% url 'presupuestos:lista' %}" class="btn btn-outline-secondary">Cancelar</a>
+      <button type="submit" class="btn btn-success px-4">
+        <span class="material-symbols-outlined" style="font-size:1rem;vertical-align:-.15em;">save</span>
+        Crear presupuesto
+      </button>
+    </div>
+
+  </form>
 </div>
+
+<script>
+(function () {
+  const PRODUCTOS = [
+    {% for p in productos_lista %}{ pk: {{ p.pk }}, nombre: "{{ p.nombreProducto|escapejs }}", precio: "{{ p.precioUnitario|default:'0'|unlocalize }}" },
+    {% endfor %}
+  ];
+
+  const tbody = document.getElementById('detallesTbody');
+  const totalInput = document.getElementById('{{ form.total.id_for_label }}');
+  const totalCell = document.getElementById('totalGeneral');
+  const subtotalCell = document.getElementById('pres_subtotal');
+  const rowDescuentoEl = document.getElementById('pres_rowDescuento');
+  const labelDescuentoEl = document.getElementById('pres_labelDescuento');
+  const montoDescuentoEl = document.getElementById('pres_montoDescuento');
+  const rowIVAEl = document.getElementById('pres_rowIVA');
+  const montoIVAEl = document.getElementById('pres_montoIVA');
+  const ivaCheckbox = document.getElementById('pres_aplicar_iva');
+  const descuentoSelect = document.getElementById('pres_descuento');
+  let rowIdx = 0;
+
+  function fmt(n) {
+    return '$ ' + parseFloat(n).toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  }
+
+  function buildProductSelect(selectedPk) {
+    let html = '<select class="form-select form-select-sm producto-select">';
+    html += '<option value="">-- Seleccionar --</option>';
+    PRODUCTOS.forEach(p => {
+      const sel = String(p.pk) === String(selectedPk) ? ' selected' : '';
+      html += `<option value="${p.pk}" data-precio="${p.precio}"${sel}>${p.nombre}</option>`;
+    });
+    return html + '</select>';
+  }
+
+  const DESCUENTOS_POR_TIPO = { 'nuevo': 0, 'estandar': 5, 'estrategico': 15, 'premium': 25 };
+
+  function recalcAll() {
+    let subtotal = 0;
+    tbody.querySelectorAll('tr').forEach(tr => {
+      const c    = parseFloat(tr.querySelector('.cantidad-input').value) || 0;
+      const p    = parseFloat(tr.querySelector('.precio-input').value) || 0;
+      const neto = c * p;
+      tr.querySelector('.subtotal-cell').textContent = fmt(neto);
+      subtotal += neto;
+    });
+    subtotalCell.textContent = fmt(subtotal);
+    recalcGrandTotal();
+  }
+
+  function recalcGrandTotal() {
+    const subtotalStr = subtotalCell.textContent.replace(/[^0-9,]/g, '').replace(',', '.');
+    const subtotal = parseFloat(subtotalStr) || 0;
+    const descPct = parseFloat(descuentoSelect.value) || 0;
+    const montoDesc = subtotal * (descPct / 100);
+    const subtotalConDesc = subtotal - montoDesc;
+    const aplicaIVA = ivaCheckbox.checked;
+    const montoIVA = aplicaIVA ? subtotalConDesc * 0.21 : 0;
+    const total = subtotalConDesc + montoIVA;
+
+    if (descPct > 0) {
+      labelDescuentoEl.textContent = `Descuento (${descPct}%)`;
+      montoDescuentoEl.textContent = `- ${fmt(montoDesc)}`;
+      rowDescuentoEl.classList.remove('d-none');
+    } else {
+      rowDescuentoEl.classList.add('d-none');
+    }
+
+    if (aplicaIVA) {
+      montoIVAEl.textContent = fmt(montoIVA);
+      rowIVAEl.classList.remove('d-none');
+    } else {
+      rowIVAEl.classList.add('d-none');
+    }
+
+    totalCell.textContent = fmt(total);
+    if (totalInput) totalInput.value = total.toFixed(2);
+  }
+
+  function addRow(productoPk, cantidad, precio) {
+    productoPk = productoPk || '';
+    cantidad   = cantidad   != null ? cantidad   : 1;
+    precio     = precio     != null ? precio     : '';
+    const tr = document.createElement('tr');
+    tr.dataset.idx = rowIdx++;
+    tr.innerHTML = `
+      <td>${buildProductSelect(productoPk)}</td>
+      <td class="text-center">
+        <input type="number" min="1" value="${cantidad}" class="form-control form-control-sm text-center cantidad-input" style="max-width:90px;margin:auto;">
+      </td>
+      <td class="text-end">
+        <input type="number" min="0" step="0.01" value="${precio}" class="form-control form-control-sm text-end precio-input" style="max-width:110px;margin-left:auto;">
+      </td>
+      <td class="text-end subtotal-cell fw-semibold">$ 0,00</td>
+      <td class="text-center">
+        <button type="button" class="btn btn-outline-danger btn-sm btn-quitar" title="Quitar línea">
+          <span class="material-symbols-outlined" style="font-size:.9rem;vertical-align:-.1em;">delete</span>
+        </button>
+      </td>`;
+
+    tr.querySelector('.producto-select').addEventListener('change', function () {
+      const opt = this.options[this.selectedIndex];
+      tr.querySelector('.precio-input').value = opt.dataset.precio || '';
+      recalcAll();
+    });
+    tr.querySelector('.cantidad-input').addEventListener('input', recalcAll);
+    tr.querySelector('.precio-input').addEventListener('input', recalcAll);
+    tr.querySelector('.btn-quitar').addEventListener('click', function () {
+      tr.remove(); recalcAll();
+    });
+
+    tbody.appendChild(tr);
+    recalcAll();
+  }
+
+  addRow();
+
+  document.getElementById('btnAgregarLinea').addEventListener('click', () => addRow());
+  descuentoSelect.addEventListener('change', recalcGrandTotal);
+  ivaCheckbox.addEventListener('change', recalcGrandTotal);
+
+  document.querySelector('form').addEventListener('submit', function () {
+    document.querySelectorAll('input[name^="det-"]').forEach(el => el.remove());
+    const descGlobal = descuentoSelect.value;
+    const ivaVal = ivaCheckbox.checked ? '21' : '0';
+    [['descuento_global', descGlobal], ['iva_aplicada', ivaVal]].forEach(([n, v]) => {
+      const inp = document.createElement('input');
+      inp.type = 'hidden'; inp.name = n; inp.value = v;
+      this.appendChild(inp);
+    }, this);
+    tbody.querySelectorAll('tr').forEach(function (tr, i) {
+      const prod   = tr.querySelector('.producto-select').value;
+      const cant   = tr.querySelector('.cantidad-input').value;
+      const precio = tr.querySelector('.precio-input').value;
+      if (!prod) return;
+      [['producto', prod], ['cantidad', cant], ['precio_unitario', precio]].forEach(([n, v]) => {
+        const inp = document.createElement('input');
+        inp.type = 'hidden'; inp.name = `det-${i}-${n}`; inp.value = v;
+        this.appendChild(inp);
+      }, this);
+    }, this);
+  });
+
+  const CLIENTES_DATA = {
+    {% for c in clientes_data %}
+    {{ c.pk }}: {
+      razon_social: "{{ c.razon_social|default:''|escapejs }}",
+      nombre:       "{{ c.nombre|default:''|escapejs }}",
+      apellido:     "{{ c.apellido|default:''|escapejs }}",
+      cuit:         "{{ c.cuit|escapejs }}",
+      email:        "{{ c.email|escapejs }}",
+      telefono:     "{{ c.telefono|escapejs }}",
+      celular:      "{{ c.celular|default:''|escapejs }}",
+      direccion:    "{{ c.direccion|escapejs }}",
+      ciudad:       "{{ c.ciudad|escapejs }}",
+      provincia:    "{{ c.provincia|escapejs }}",
+      pais:         "{{ c.pais|escapejs }}",
+      tipo_cliente: "{{ c.tipo_cliente|escapejs }}",
+    },
+    {% endfor %}
+  };
+
+  function fillClienteInfo(pk) {
+    const d = CLIENTES_DATA[pk] || {};
+    document.getElementById('info_cuit').value         = d.cuit        || '-';
+    document.getElementById('info_email').value        = d.email       || '-';
+    document.getElementById('info_telefono').value     = d.telefono    || '-';
+    document.getElementById('info_celular').value      = d.celular || d.telefono || '-';
+    document.getElementById('info_direccion').value    = d.direccion   || '-';
+    document.getElementById('info_ciudad').value       = d.ciudad      || '-';
+    document.getElementById('info_provincia').value    = d.provincia   || '-';
+    document.getElementById('info_pais').value         = d.pais        || '-';
+    document.getElementById('info_tipo_cliente').value = d.tipo_cliente || '-';
+    const descPct = DESCUENTOS_POR_TIPO[d.tipo_cliente] ?? 0;
+    descuentoSelect.value = String(descPct);
+    recalcGrandTotal();
+    const rsField = document.getElementById('{{ form.razon_social.id_for_label }}');
+    if (rsField) {
+      rsField.value = d.razon_social || 'Sin Razón Social';
+    }
+  }
+
+  const clienteSelect = document.getElementById('{{ form.cliente.id_for_label }}');
+  clienteSelect?.addEventListener('change', function () {
+    fillClienteInfo(parseInt(this.value) || 0);
+  });
+})();
+</script>
 {% endblock %}

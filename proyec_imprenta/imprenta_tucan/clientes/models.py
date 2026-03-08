@@ -23,7 +23,7 @@ class Cliente(models.Model):
     ciudad = models.CharField(max_length=100, default='Posadas')
     provincia = models.CharField(max_length=100, default='Misiones')
     pais = models.CharField(max_length=100, default='Argentina')
-    telefono = models.CharField(max_length=20)
+    telefono = models.CharField(max_length=20, blank=True, null=True)
     celular = models.CharField(max_length=20, blank=True, null=True)
     email = models.EmailField(unique=True)
     estado = models.CharField(max_length=10, choices=[('Activo', 'Activo'), ('Inactivo', 'Inactivo')], default='Activo', db_column='estadoCliente')

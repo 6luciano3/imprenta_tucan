@@ -49,7 +49,7 @@ class ClienteForm(forms.ModelForm):
             'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500',
             'placeholder': 'Ingrese 11 dígitos',
             'maxlength': '11',
-            'pattern': '\d{11}'
+            'pattern': r'\d{11}'
         })
     )
 
@@ -172,7 +172,7 @@ class ClienteForm(forms.ModelForm):
     def clean_telefono(self):
         telefono = self.cleaned_data.get('telefono')
         if not telefono:
-            raise ValidationError("El teléfono es obligatorio.")
+            return telefono
 
         # Remover espacios y caracteres especiales para validación
         telefono_clean = re.sub(r'[^\d+]', '', telefono)

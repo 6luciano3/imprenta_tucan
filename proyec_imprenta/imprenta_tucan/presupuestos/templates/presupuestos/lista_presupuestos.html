@@ -30,32 +30,139 @@
         <th class="py-2 px-4">Validez</th>
         <th class="py-2 px-4">Total</th>
         <th class="py-2 px-4">Estado</th>
+        <th class="py-2 px-4">Respuesta</th>
         <th class="py-2 px-4">Acciones</th>
       </tr>
     </thead>
     <tbody>
-      {% for presupuesto in presupuestos %}
-      <tr>
-        <td class="py-2 px-4">{{ presupuesto.numero }}</td>
-        <td class="py-2 px-4">{{ presupuesto.cliente }}</td>
-        <td class="py-2 px-4">{{ presupuesto.fecha|date:'d/m/Y' }}</td>
-        <td class="py-2 px-4">{{ presupuesto.validez|date:'d/m/Y'|default:'-' }}</td>
-        <td class="py-2 px-4">${{ presupuesto.total }}</td>
-        <td class="py-2 px-4">{{ presupuesto.estado }}</td>
+      {% for p in presupuestos %}
+      <tr class="border-t hover:bg-gray-50">
+        <td class="py-2 px-4">{{ p.numero }}</td>
+        <td class="py-2 px-4">{{ p.cliente }}</td>
+        <td class="py-2 px-4">{{ p.fecha|date:'d/m/Y' }}</td>
+        <td class="py-2 px-4">{{ p.validez|date:'d/m/Y'|default:'-' }}</td>
+        <td class="py-2 px-4">${{ p.total }}</td>
+        <td class="py-2 px-4">{{ p.estado }}</td>
         <td class="py-2 px-4">
-          <a href="{% url 'presupuestos:editar' presupuesto.pk %}" class="text-blue-600">Editar</a> |
-          <a href="{% url 'presupuestos:eliminar' presupuesto.pk %}" class="text-red-600">Eliminar</a>
+          {% if p.respuesta_cliente == 'aceptado' %}
+            <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">✅ Aceptado</span>
+          {% elif p.respuesta_cliente == 'rechazado' %}
+            <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">❌ Rechazado</span>
+          {% else %}
+            <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500">⏳ Pendiente</span>
+          {% endif %}
+        </td>
+        <td class="py-2 px-4 whitespace-nowrap">
+          <a href="{% url 'presupuestos:editar' p.pk %}" class="text-blue-600 hover:underline">Editar</a>
+          <span class="text-gray-300 mx-1">|</span>
+          <a href="{% url 'presupuestos:eliminar' p.pk %}" class="text-red-600 hover:underline">Eliminar</a>
+          <span class="text-gray-300 mx-1">|</span>
+          <button type="button"
+            class="btn-enviar-presupuesto text-purple-600 hover:underline text-sm font-medium"
+            data-pk="{{ p.pk }}"
+            data-token="{{ p.token }}"
+            data-numero="{{ p.numero }}"
+            data-cliente="{{ p.cliente }}"
+            data-total="{{ p.total }}"
+            data-email="{{ p.cliente.email|default:'' }}"
+            data-celular="{{ p.cliente.celular|default:'' }}"
+            data-telefono="{{ p.cliente.telefono|default:'' }}"
+          >Enviar</button>
         </td>
       </tr>
       {% empty %}
       <tr>
-        <td colspan="7" class="py-4 text-center text-gray-500">No hay presupuestos registrados.</td>
+        <td colspan="8" class="py-4 text-center text-gray-500">No hay presupuestos registrados.</td>
       </tr>
       {% endfor %}
     </tbody>
   </table>
 </div>
 {% include 'layouts/pagination.html' with page_obj=presupuestos %}
+
+<!-- Modal de envío de presupuesto al cliente -->
+<div id="modal-envio-presupuesto"
+     class="fixed inset-0 z-50 hidden bg-black/50 items-center justify-center p-4"
+     role="dialog" aria-modal="true" aria-labelledby="modal-envio-titulo">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col" style="max-height:90vh">
+    <div class="p-6 overflow-y-auto flex-1">
+      <div class="flex items-start justify-between mb-4">
+        <h2 id="modal-envio-titulo" class="text-xl font-bold text-gray-800 flex items-center gap-2">
+          <span class="material-symbols-outlined text-purple-600">send</span>
+          Enviar presupuesto
+        </h2>
+        <button onclick="cerrarModalEnvio()"
+                class="text-gray-400 hover:text-gray-600 transition rounded-full p-1"
+                aria-label="Cerrar">
+          <span class="material-symbols-outlined">close</span>
+        </button>
+      </div>
+
+      <!-- Info del presupuesto -->
+      <div class="mb-4 p-3 bg-blue-50 border border-blue-100 rounded-xl">
+        <div class="text-sm font-semibold text-blue-800" id="modal-pres-numero"></div>
+        <div class="text-sm text-blue-700 mt-0.5">Cliente: <span id="modal-pres-cliente"></span></div>
+        <div class="text-sm text-blue-700">Total: <span id="modal-pres-total" class="font-semibold"></span></div>
+      </div>
+
+      <p class="text-sm text-gray-600 mb-4">
+        Envíe el presupuesto al cliente para que pueda <strong>Aceptarlo</strong> o <strong>Rechazarlo</strong>:
+      </p>
+
+      <!-- Opciones de envío -->
+      <div id="modal-opciones" class="flex flex-col gap-3">
+        <!-- Email -->
+        <button id="btn-modal-email" onclick="enviarPresupuesto('email')"
+          class="flex items-center gap-3 p-3 rounded-xl border border-blue-200 hover:bg-blue-50 transition text-left">
+          <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+            <span class="material-symbols-outlined text-blue-600 text-xl">email</span>
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="font-medium text-gray-800">Email</div>
+            <div class="text-xs text-gray-500 truncate" id="modal-pres-email">Sin email registrado</div>
+          </div>
+          <span class="material-symbols-outlined text-gray-400">chevron_right</span>
+        </button>
+
+        <!-- WhatsApp -->
+        <button id="btn-modal-wa" onclick="enviarPresupuesto('whatsapp')"
+          class="flex items-center gap-3 p-3 rounded-xl border border-green-200 hover:bg-green-50 transition text-left">
+          <div class="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
+            <svg class="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+            </svg>
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="font-medium text-gray-800">WhatsApp</div>
+            <div class="text-xs text-gray-500 truncate" id="modal-pres-celular">Sin celular registrado</div>
+          </div>
+          <span class="material-symbols-outlined text-gray-400">chevron_right</span>
+        </button>
+
+        <!-- SMS -->
+        <button id="btn-modal-sms" onclick="enviarPresupuesto('sms')"
+          class="flex items-center gap-3 p-3 rounded-xl border border-yellow-200 hover:bg-yellow-50 transition text-left">
+          <div class="w-10 h-10 rounded-full bg-yellow-100 flex items-center justify-center flex-shrink-0">
+            <span class="material-symbols-outlined text-yellow-600 text-xl">sms</span>
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="font-medium text-gray-800">SMS</div>
+            <div class="text-xs text-gray-500 truncate" id="modal-pres-telefono">Sin teléfono registrado</div>
+          </div>
+          <span class="material-symbols-outlined text-gray-400">chevron_right</span>
+        </button>
+      </div>
+
+      <!-- Resultado del envío -->
+      <div id="modal-resultado" class="hidden mt-4"></div>
+
+      <button onclick="cerrarModalEnvio()"
+              class="mt-5 w-full py-2 text-center text-sm text-gray-400 hover:text-gray-600 transition">
+        Omitir por ahora
+      </button>
+    </div>
+  </div>
+</div>
 {% endblock %}
 
 {% block extra_filters %}
@@ -65,4 +172,171 @@
       <input id="fecha" name="fecha" type="date" value="{{ fecha }}" aria-label="Fecha" />
     </div>
   </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  var _pk    = null;
+  var _token = null;
+
+  function abrirModal(data) {
+    _pk    = data.pk;
+    _token = data.token || null;
+    document.getElementById('modal-pres-numero').textContent = 'Presupuesto ' + data.numero;
+    document.getElementById('modal-pres-cliente').textContent = data.cliente;
+    var total = parseFloat(data.total);
+    document.getElementById('modal-pres-total').textContent = isNaN(total)
+      ? '$' + data.total
+      : '$' + total.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    document.getElementById('modal-pres-email').textContent = data.email || 'Sin email registrado';
+    document.getElementById('modal-pres-celular').textContent = data.celular || data.telefono || 'Sin celular registrado';
+    document.getElementById('modal-pres-telefono').textContent = data.telefono || data.celular || 'Sin teléfono registrado';
+
+    // Resetear estado
+    var res = document.getElementById('modal-resultado');
+    res.classList.add('hidden');
+    res.innerHTML = '';
+    document.getElementById('modal-opciones').classList.remove('hidden');
+    ['btn-modal-email', 'btn-modal-wa', 'btn-modal-sms'].forEach(function (id) {
+      var b = document.getElementById(id);
+      b.disabled = false;
+      b.classList.remove('opacity-50');
+    });
+
+    var modal = document.getElementById('modal-envio-presupuesto');
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+  }
+
+  window.cerrarModalEnvio = function () {
+    var modal = document.getElementById('modal-envio-presupuesto');
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+    var url = new URL(window.location.href);
+    url.searchParams.delete('nuevo');
+    window.history.replaceState({}, '', url.toString());
+  };
+
+  window.enviarPresupuesto = async function (metodo) {
+    var btnId = metodo === 'email' ? 'btn-modal-email'
+                : metodo === 'whatsapp' ? 'btn-modal-wa' : 'btn-modal-sms';
+    var btn = document.getElementById(btnId);
+    btn.disabled = true;
+    btn.classList.add('opacity-50');
+
+    var csrfMatch = document.cookie.match(/csrftoken=([^;]+)/);
+    var csrfToken = csrfMatch ? csrfMatch[1] : '';
+    var resultDiv = document.getElementById('modal-resultado');
+
+    try {
+      var resp = await fetch('/presupuestos/enviar/' + _pk + '/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'X-CSRFToken': csrfToken,
+        },
+        body: 'metodo=' + encodeURIComponent(metodo),
+      });
+      var data = await resp.json();
+      resultDiv.classList.remove('hidden');
+
+      if (data.status === 'ok') {
+        if (metodo === 'whatsapp' && data.url) {
+          document.getElementById('modal-opciones').classList.add('hidden');
+          var imgUrl       = _token ? '/presupuestos/imagen/' + _token + '/' : '';
+          var urlAceptar   = _token ? '/presupuestos/ok/' + _token + '/aceptado/' : '';
+          var urlRechazar  = _token ? '/presupuestos/ok/' + _token + '/rechazado/' : '';
+          var waUrl        = data.url;
+          var waIcon = '<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>';
+
+          resultDiv.innerHTML =
+            '<div class="flex flex-col gap-3">' +
+            // Imagen del presupuesto
+            (imgUrl
+              ? '<div class="rounded-xl overflow-hidden border border-gray-200 shadow-sm">' +
+                '<img src="' + imgUrl + '" alt="Presupuesto" class="w-full h-auto block">' +
+                '</div>'
+              : '') +
+            // Botones Aceptar / Rechazar
+            '<p class="text-xs text-gray-500 text-center">El cliente puede responder con un solo clic:</p>' +
+            '<div class="grid grid-cols-2 gap-2">' +
+            '<a href="' + urlAceptar + '" target="_blank" rel="noopener"' +
+            '   class="flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-bold transition shadow">' +
+            '✅ Aceptar</a>' +
+            '<a href="' + urlRechazar + '" target="_blank" rel="noopener"' +
+            '   class="flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-bold transition shadow">' +
+            '❌ Rechazar</a>' +
+            '</div>' +
+            // Botón abrir WhatsApp
+            '<a href="' + waUrl + '" target="_blank" rel="noopener"' +
+            '   class="flex items-center justify-center gap-2 py-2 px-4 rounded-xl bg-green-500 hover:bg-green-600 text-white text-sm font-medium transition">' +
+            waIcon + 'Enviar por WhatsApp</a>' +
+            '</div>';
+        } else if (data.url) {
+          window.open(data.url, '_blank');
+          resultDiv.innerHTML =
+            '<div class="p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-800">' +
+            '✅ Enlace abierto. Si no se abrió, <a href="' + data.url + '" target="_blank" rel="noopener" class="underline font-medium">haga clic aquí</a>.' +
+            '</div>';
+        } else {
+          resultDiv.innerHTML =
+            '<div class="p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-800">' +
+            '✅ ' + (data.mensaje || 'Enviado correctamente') + '</div>';
+        }
+      } else {
+        resultDiv.innerHTML =
+          '<div class="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-800">' +
+          '❌ ' + (data.error || 'Error al enviar') + '</div>';
+        btn.disabled = false;
+        btn.classList.remove('opacity-50');
+      }
+    } catch (e) {
+      resultDiv.classList.remove('hidden');
+      resultDiv.innerHTML =
+        '<div class="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-800">' +
+        '❌ Error de conexión. Intente nuevamente.</div>';
+      btn.disabled = false;
+      btn.classList.remove('opacity-50');
+    }
+  };
+
+  document.addEventListener('DOMContentLoaded', function () {
+    // Botones "Enviar" por fila
+    document.querySelectorAll('.btn-enviar-presupuesto').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        abrirModal({
+          pk: this.dataset.pk,
+          token: this.dataset.token,
+          numero: this.dataset.numero,
+          cliente: this.dataset.cliente,
+          total: this.dataset.total,
+          email: this.dataset.email,
+          celular: this.dataset.celular,
+          telefono: this.dataset.telefono,
+        });
+      });
+    });
+
+    // Auto-abrir si se acaba de crear un presupuesto
+    {% if nuevo_presupuesto %}
+    abrirModal({
+      pk: {{ nuevo_presupuesto.pk }},
+      token: "{{ nuevo_presupuesto.token|escapejs }}",
+      numero: "{{ nuevo_presupuesto.numero|escapejs }}",
+      cliente: "{{ nuevo_presupuesto.cliente|escapejs }}",
+      total: "{{ nuevo_presupuesto.total }}",
+      email: "{{ nuevo_presupuesto.cliente.email|default:''|escapejs }}",
+      celular: "{{ nuevo_presupuesto.cliente.celular|default:''|escapejs }}",
+      telefono: "{{ nuevo_presupuesto.cliente.telefono|default:''|escapejs }}",
+    });
+    {% endif %}
+
+    // Cerrar modal al hacer clic en el overlay
+    document.getElementById('modal-envio-presupuesto').addEventListener('click', function (e) {
+      if (e.target === this) cerrarModalEnvio();
+    });
+  });
+}());
+</script>
 {% endblock %}

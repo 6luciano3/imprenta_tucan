@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Presupuesto {{ presupuesto.numero }} – Imprenta Tucán</title>
+  <!-- Open Graph: WhatsApp / redes sociales mostrarán la imagen del presupuesto -->
+  <meta property="og:type"        content="website">
+  <meta property="og:title"       content="Presupuesto {{ presupuesto.numero }} – Imprenta Tucán">
+  <meta property="og:description" content="Presupuesto para {{ presupuesto.cliente.nombre }} {{ presupuesto.cliente.apellido }} por un total de ${{ presupuesto.total }}. Válido hasta {{ presupuesto.validez|date:'d/m/Y'|default:'Sin fecha límite' }}.">
+  <meta property="og:image"       content="{% url 'presupuestos:imagen' presupuesto.token %}">
+  <meta property="og:image:width"  content="800">
+  <meta property="og:image:type"   content="image/png">
+  <meta name="twitter:card"        content="summary_large_image">
+  <meta name="twitter:image"       content="{% url 'presupuestos:imagen' presupuesto.token %}">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+  <style>
+    body { background: #f0f4f8; font-family: 'Segoe UI', system-ui, sans-serif; }
+    .brand-header {
+      background: linear-gradient(135deg, #1e3a5f 0%, #2563eb 100%);
+      padding: 1.25rem 0;
+    }
+    .card { border: none; }
+    .badge-pendiente { background: #f3f4f6; color: #6b7280; }
+    .badge-aceptado  { background: #dcfce7; color: #15803d; }
+    .badge-rechazado { background: #fee2e2; color: #dc2626; }
+    .btn-aceptar {
+      background: #16a34a; color: #fff;
+      border: none; border-radius: 0.75rem;
+      padding: 0.85rem; font-size: 1rem; font-weight: 600;
+      transition: background 0.15s;
+    }
+    .btn-aceptar:hover { background: #15803d; color: #fff; }
+    .btn-rechazar {
+      background: #fff; color: #dc2626;
+      border: 2px solid #dc2626; border-radius: 0.75rem;
+      padding: 0.85rem; font-size: 1rem; font-weight: 600;
+      transition: background 0.15s, color 0.15s;
+    }
+    .btn-rechazar:hover { background: #dc2626; color: #fff; }
+    .result-icon { font-size: 4rem; line-height: 1; }
+    @media (max-width: 576px) {
+      .brand-header h1 { font-size: 1.25rem; }
+    }
+  </style>
+</head>
+<body>
+  <!-- Cabecera de la empresa -->
+  <header class="brand-header text-white mb-4">
+    <div class="container" style="max-width: 700px;">
+      <h1 class="mb-0 fw-bold" style="font-size:1.4rem;">🖨️ Imprenta Tucán</h1>
+      <p class="mb-0 small opacity-75">Presupuesto para su revisión</p>
+    </div>
+  </header>
+
+  <div class="container pb-5" style="max-width: 700px;">
+
+    {% if respuesta_registrada %}
+    <!-- ─── Confirmación tras responder ─── -->
+    <div class="card shadow-sm mb-4">
+      <div class="card-body text-center py-5 px-4">
+        {% if presupuesto.respuesta_cliente == 'aceptado' %}
+          <div class="result-icon mb-3">✅</div>
+          <h2 class="fw-bold text-success mb-2">¡Presupuesto Aceptado!</h2>
+          <p class="text-muted mb-1">Ha aceptado el presupuesto <strong>{{ presupuesto.numero }}</strong>.</p>
+          <p class="text-muted">Nos pondremos en contacto a la brevedad para coordinar los detalles.</p>
+        {% else %}
+          <div class="result-icon mb-3">❌</div>
+          <h2 class="fw-bold text-danger mb-2">Presupuesto Rechazado</h2>
+          <p class="text-muted mb-1">Ha rechazado el presupuesto <strong>{{ presupuesto.numero }}</strong>.</p>
+          <p class="text-muted">Gracias por informarnos. Si desea consultar otras opciones, contáctenos.</p>
+        {% endif %}
+      </div>
+    </div>
+
+    {% elif ya_respondido %}
+    <!-- ─── Ya fue respondido antes ─── -->
+    <div class="card shadow-sm mb-4">
+      <div class="card-body text-center py-4 px-4">
+        {% if presupuesto.respuesta_cliente == 'aceptado' %}
+          <p class="mb-0 fw-semibold text-success">✅ Este presupuesto ya fue <strong>Aceptado</strong> previamente.</p>
+        {% else %}
+          <p class="mb-0 fw-semibold text-danger">❌ Este presupuesto ya fue <strong>Rechazado</strong> previamente.</p>
+        {% endif %}
+      </div>
+    </div>
+
+    {% else %}
+    <!-- ─── Vista principal: detalle + botones ─── -->
+
+    <!-- Datos del presupuesto -->
+    <div class="card shadow-sm mb-3">
+      <div class="card-body py-3 px-4">
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+          <div>
+            <h5 class="fw-bold mb-0">
+              Presupuesto <span class="text-primary">{{ presupuesto.numero }}</span>
+            </h5>
+            <p class="mb-0 text-muted small">
+              Fecha: {{ presupuesto.fecha|date:'d/m/Y' }}
+              {% if presupuesto.validez %}
+                &nbsp;·&nbsp; Válido hasta: <strong>{{ presupuesto.validez|date:'d/m/Y' }}</strong>
+              {% endif %}
+            </p>
+          </div>
+          <span class="badge rounded-pill px-3 py-2
+            {% if presupuesto.estado == 'Activo' %}bg-success {% else %}bg-secondary{% endif %}">
+            {{ presupuesto.estado }}
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Datos del cliente -->
+    <div class="card shadow-sm mb-3">
+      <div class="card-body py-3 px-4">
+        <p class="text-muted small text-uppercase fw-semibold mb-1" style="letter-spacing:.05em;">Cliente</p>
+        <p class="fw-semibold mb-0">{{ presupuesto.cliente.nombre }} {{ presupuesto.cliente.apellido }}</p>
+        {% if presupuesto.cliente.razon_social %}
+          <p class="text-muted small mb-0">{{ presupuesto.cliente.razon_social }}</p>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Líneas del presupuesto -->
+    <div class="card shadow-sm mb-3">
+      <div class="card-body py-3 px-0">
+        <p class="text-muted small text-uppercase fw-semibold mb-2 px-4" style="letter-spacing:.05em;">Detalle</p>
+        <div class="table-responsive">
+          <table class="table table-sm table-hover mb-0">
+            <thead class="table-light">
+              <tr>
+                <th class="ps-4">Producto</th>
+                <th class="text-center">Cant.</th>
+                <th class="text-end">P. Unit.</th>
+                <th class="text-end">Desc.</th>
+                <th class="text-end pe-4">Subtotal</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for det in detalles %}
+              <tr>
+                <td class="ps-4">{{ det.producto.nombreProducto }}</td>
+                <td class="text-center">{{ det.cantidad }}</td>
+                <td class="text-end">${{ det.precio_unitario }}</td>
+                <td class="text-end">{{ det.descuento }}%</td>
+                <td class="text-end pe-4">${{ det.subtotal }}</td>
+              </tr>
+              {% empty %}
+              <tr>
+                <td colspan="5" class="text-center text-muted py-3">Sin detalles</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+            <tfoot class="table-light">
+              <tr>
+                <td colspan="4" class="text-end fw-bold ps-4">Total:</td>
+                <td class="text-end pe-4 fw-bold text-primary" style="font-size:1.05rem;">
+                  ${{ presupuesto.total }}
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    {% if presupuesto.observaciones %}
+    <div class="card shadow-sm mb-3">
+      <div class="card-body py-3 px-4">
+        <p class="text-muted small text-uppercase fw-semibold mb-1" style="letter-spacing:.05em;">Observaciones</p>
+        <p class="mb-0 small">{{ presupuesto.observaciones }}</p>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Botones Aceptar / Rechazar -->
+    <div class="card shadow-sm mb-4">
+      <div class="card-body p-4">
+        <h6 class="fw-semibold text-center mb-4">¿Desea aceptar este presupuesto?</h6>
+        <div class="row g-3">
+          <div class="col-12 col-sm-6">
+            <form method="post"
+                  action="{% url 'presupuestos:procesar_respuesta' presupuesto.token 'aceptado' %}">
+              {% csrf_token %}
+              <button type="submit" class="btn-aceptar w-100">
+                ✅ Aceptar presupuesto
+              </button>
+            </form>
+          </div>
+          <div class="col-12 col-sm-6">
+            <form method="post"
+                  action="{% url 'presupuestos:procesar_respuesta' presupuesto.token 'rechazado' %}">
+              {% csrf_token %}
+              <button type="submit" class="btn-rechazar w-100">
+                ❌ Rechazar presupuesto
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {% endif %}
+
+    <footer class="text-center text-muted small pt-2">
+      Imprenta Tucán &middot; Misiones, Argentina
+    </footer>
+  </div>
+</body>
+</html>

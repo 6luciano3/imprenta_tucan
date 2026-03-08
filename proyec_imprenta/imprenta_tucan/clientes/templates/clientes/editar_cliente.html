@@ -102,7 +102,7 @@
             <!-- Teléfono -->
             <div>
               <label for="{{ form.telefono.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
-                Teléfono *
+                Teléfono
               </label>
               {{ form.telefono|add_class:"w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" }}
               {% if form.telefono.errors %}
@@ -267,4 +267,28 @@
     </div>
   </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  const telefonoInput = document.querySelector('[name="telefono"]');
+  const celularInput  = document.querySelector('[name="celular"]');
+
+  function copiarTelefono() {
+    if (telefonoInput && celularInput && !celularInput.value.trim() && telefonoInput.value.trim()) {
+      celularInput.value = telefonoInput.value.trim();
+    }
+  }
+
+  // Al cargar la página: si celular vacío y teléfono tiene valor, copiar
+  copiarTelefono();
+
+  // También al salir del campo teléfono
+  if (telefonoInput) {
+    telefonoInput.addEventListener('blur', copiarTelefono);
+    telefonoInput.addEventListener('input', copiarTelefono);
+  }
+})();
+</script>
 {% endblock %}

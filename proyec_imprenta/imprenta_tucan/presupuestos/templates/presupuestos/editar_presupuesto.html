@@ -1,22 +1,467 @@
 {% extends 'base.html' %}
-{% block title %}Editar Presupuesto{% endblock %}
+{% load l10n %}
+{% block title %}Editar Presupuesto {{ presupuesto.numero }}{% endblock %}
+
+{% block extra_head %}
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<style>
+  .section-card { border: 1px solid #dee2e6; border-radius: .75rem; background: #fff; }
+  .section-header { background: #f8f9fa; border-bottom: 1px solid #dee2e6; border-radius: .75rem .75rem 0 0; padding: .75rem 1.25rem; font-weight: 600; display: flex; align-items: center; gap: .5rem; }
+  .section-body { padding: 1.25rem; }
+  #tablaDetalles thead th { white-space: nowrap; background: #f8f9fa; font-size: .85rem; }
+  .total-row td { font-size: 1.05rem; font-weight: 700; }
+  .form-label { font-weight: 500; }
+</style>
+{% endblock %}
 
 {% block content %}
-<div class="px-4 md:px-10 lg:px-20 xl:px-40 py-5">
-  <div class="max-w-3xl mx-auto bg-white rounded-xl shadow p-6">
-    <div class="flex justify-between items-center mb-6">
-      <h1 class="text-3xl font-black text-[#111418] dark:text-white">✏️ Editar Presupuesto</h1>
-      <a href="{% url 'presupuestos:lista' %}" class="flex items-center gap-2 bg-gray-500 text-white px-4 py-2 rounded-lg shadow hover:bg-gray-600">
-        <span class="material-symbols-outlined">arrow_back</span>
-        Volver
-      </a>
+<div class="container py-4" style="max-width: 960px;">
+
+  <!-- Encabezado -->
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div class="d-flex align-items-center gap-3">
+      <span class="material-symbols-outlined fs-2 text-primary">description</span>
+      <div>
+        <h1 class="h4 fw-bold mb-0">Editar Presupuesto</h1>
+        <span class="badge bg-secondary fs-6">{{ presupuesto.numero }}</span>
+      </div>
+    </div>
+    <a href="{% url 'presupuestos:lista' %}" class="btn btn-outline-secondary d-flex align-items-center gap-1">
+      <span class="material-symbols-outlined" style="font-size:1.1rem;">arrow_back</span> Volver
+    </a>
+  </div>
+
+  {% if messages %}
+    {% for message in messages %}
+      <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} alert-dismissible fade show mb-3" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+    {% endfor %}
+  {% endif %}
+
+  <form method="post" novalidate>
+    {% csrf_token %}
+
+    <!-- Bloque 1: Datos del presupuesto -->
+    <div class="section-card mb-4">
+      <div class="section-header">
+        <span class="material-symbols-outlined text-secondary">info</span>
+        Datos del presupuesto
+      </div>
+      <div class="section-body">
+        <div class="row g-3">
+          <div class="col-md-3">
+            <label class="form-label">N° Presupuesto</label>
+            <input type="text" class="form-control bg-light" value="{{ presupuesto.numero }}" readonly>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Fecha de emisión</label>
+            <input type="text" class="form-control bg-light" value="{% now "d/m/Y" %}" readonly>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label" for="{{ form.validez.id_for_label }}">{{ form.validez.label }}</label>
+            <input type="date" name="validez" id="{{ form.validez.id_for_label }}" class="form-control" value="{{ validez_default }}">
+            {% for e in form.validez.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+          </div>
+          <div class="col-md-3">
+            <label class="form-label" for="{{ form.estado.id_for_label }}">{{ form.estado.label }}</label>
+            {{ form.estado }}
+            {% for e in form.estado.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+          </div>
+        </div>
+      </div>
     </div>
 
-    {% if form %}
-      {% include 'components/form_base.html' with return_url=return_url|default:'dashboard' %}
-    {% else %}
-      <p class="text-gray-600">Formulario no disponible. Cree la vista y el formulario para continuar.</p>
-    {% endif %}
-  </div>
+    <!-- Bloque 2: Cliente -->
+    <div class="section-card mb-4">
+      <div class="section-header">
+        <span class="material-symbols-outlined text-primary">person</span>
+        Cliente
+      </div>
+      <div class="section-body">
+        <div class="row g-3 mb-3">
+          <div class="col-md-6">
+            <label class="form-label" for="{{ form.cliente.id_for_label }}">
+              {{ form.cliente.label }} <span class="text-danger">*</span>
+            </label>
+            {{ form.cliente }}
+            {% for e in form.cliente.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Tipo de cliente</label>
+            <input type="text" id="info_tipo_cliente" class="form-control bg-light" readonly>
+          </div>
+        </div>
+        <div class="row g-3 mb-3">
+          <div class="col-md-6">
+            <label class="form-label">CUIT</label>
+            <input type="text" id="info_cuit" class="form-control bg-light" readonly>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Email</label>
+            <input type="text" id="info_email" class="form-control bg-light" readonly>
+          </div>
+        </div>
+        <div class="row g-3 mb-3">
+          <div class="col-md-4">
+            <label class="form-label">Teléfono</label>
+            <input type="text" id="info_telefono" class="form-control bg-light" readonly>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Celular</label>
+            <input type="text" id="info_celular" class="form-control bg-light" readonly>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Dirección</label>
+            <input type="text" id="info_direccion" class="form-control bg-light" readonly>
+          </div>
+        </div>
+        <div class="row g-3 mb-3">
+          <div class="col-md-4">
+            <label class="form-label">Ciudad</label>
+            <input type="text" id="info_ciudad" class="form-control bg-light" readonly>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Provincia</label>
+            <input type="text" id="info_provincia" class="form-control bg-light" readonly>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">País</label>
+            <input type="text" id="info_pais" class="form-control bg-light" readonly>
+          </div>
+        </div>
+        <hr class="my-3">
+        <div class="row g-3">
+          <div class="col-md-12">
+            <label class="form-label" for="{{ form.razon_social.id_for_label }}">{{ form.razon_social.label }} <small class="text-muted">(del presupuesto, editable)</small></label>
+            {{ form.razon_social }}
+            {% for e in form.razon_social.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bloque 3: Líneas del presupuesto -->
+    <div class="section-card mb-4">
+      <div class="section-header">
+        <span class="material-symbols-outlined text-success">shopping_cart</span>
+        Líneas del presupuesto
+      </div>
+      <div class="section-body">
+        <div class="table-responsive">
+          <table class="table table-bordered align-middle mb-3" id="tablaDetalles">
+            <thead>
+              <tr>
+                <th style="min-width:220px;">Producto</th>
+                <th class="text-center" style="width:100px;">Cantidad</th>
+                <th class="text-end" style="width:130px;">Precio unit.</th>
+                <th class="text-end" style="width:140px;">Subtotal</th>
+                <th class="text-center" style="width:60px;"></th>
+              </tr>
+            </thead>
+            <tbody id="detallesTbody"></tbody>
+            <tfoot>
+              <tr class="table-light">
+                <td colspan="2" class="text-end pe-3 text-muted">Subtotal</td>
+                <td class="text-end text-muted" id="pres_subtotal">$ 0,00</td>
+                <td></td>
+              </tr>
+              <tr id="pres_rowDescuento" class="d-none text-danger">
+                <td colspan="2" class="text-end pe-3" id="pres_labelDescuento">Descuento (0%)</td>
+                <td class="text-end" id="pres_montoDescuento">- $ 0,00</td>
+                <td></td>
+              </tr>
+              <tr id="pres_rowIVA" class="d-none text-primary">
+                <td colspan="2" class="text-end pe-3">IVA (21%)</td>
+                <td class="text-end" id="pres_montoIVA">$ 0,00</td>
+                <td></td>
+              </tr>
+              <tr class="table-light total-row fw-bold border-top">
+                <td colspan="2" class="text-end pe-3">Total</td>
+                <td class="text-end" id="totalGeneral">$ 0,00</td>
+                <td></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+        <div class="d-flex align-items-end gap-4 mb-3 mt-2">
+          <div>
+            <label class="form-label mb-1 fw-semibold">Descuento global</label>
+            <select id="pres_descuento" class="form-select form-select-sm" style="width:170px;">
+              <option value="0" {% if global_descuento == 0 %}selected{% endif %}>Sin descuento (0%)</option>
+              <option value="5" {% if global_descuento == 5 %}selected{% endif %}>5%</option>
+              <option value="10" {% if global_descuento == 10 %}selected{% endif %}>10%</option>
+              <option value="15" {% if global_descuento == 15 %}selected{% endif %}>15%</option>
+              <option value="20" {% if global_descuento == 20 %}selected{% endif %}>20%</option>
+              <option value="25" {% if global_descuento == 25 %}selected{% endif %}>25%</option>
+              <option value="30" {% if global_descuento == 30 %}selected{% endif %}>30%</option>
+            </select>
+          </div>
+          <div class="form-check mb-1">
+            <input type="checkbox" class="form-check-input" id="pres_aplicar_iva" {% if global_iva_aplicada %}checked{% endif %}>
+            <label class="form-check-label fw-semibold" for="pres_aplicar_iva">IVA 21%</label>
+          </div>
+        </div>
+        <button type="button" id="btnAgregarLinea" class="btn btn-outline-primary btn-sm">
+          <span class="material-symbols-outlined" style="font-size:1rem;vertical-align:-.15em;">add</span>
+          Agregar producto
+        </button>
+      </div>
+    </div>
+
+    <!-- Bloque 4: Total y observaciones -->
+    <div class="section-card mb-4">
+      <div class="section-header">
+        <span class="material-symbols-outlined text-warning">receipt_long</span>
+        Resumen y observaciones
+      </div>
+      <div class="section-body">
+        <div class="row g-3 align-items-start">
+          <div class="col-md-4">
+            <label class="form-label" for="{{ form.total.id_for_label }}">
+              {{ form.total.label }} <span class="text-danger">*</span>
+            </label>
+            {{ form.total }}
+            <small class="text-muted">Se actualiza automáticamente al modificar productos.</small>
+            {% for e in form.total.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+          </div>
+          <div class="col-md-8">
+            <label class="form-label" for="{{ form.observaciones.id_for_label }}">{{ form.observaciones.label }}</label>
+            {{ form.observaciones }}
+            {% for e in form.observaciones.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Botones de acción -->
+    <div class="d-flex justify-content-end gap-2">
+      <a href="{% url 'presupuestos:lista' %}" class="btn btn-outline-secondary">Cancelar</a>
+      <button type="submit" class="btn btn-primary px-4">
+        <span class="material-symbols-outlined" style="font-size:1rem;vertical-align:-.15em;">save</span>
+        Guardar cambios
+      </button>
+    </div>
+
+  </form>
 </div>
+
+<script>
+(function () {
+  const PRODUCTOS = [
+    {% for p in productos_lista %}{ pk: {{ p.pk }}, nombre: "{{ p.nombreProducto|escapejs }}", precio: "{{ p.precioUnitario|default:'0'|unlocalize }}" },
+    {% endfor %}
+  ];
+
+  const DETALLES = [
+    {% for d in detalles %}{ productoPk: {{ d.producto.pk }}, cantidad: {{ d.cantidad }}, precio: "{{ d.precio_unitario|unlocalize }}" },
+    {% endfor %}
+  ];
+
+  const tbody = document.getElementById('detallesTbody');
+  const totalInput = document.getElementById('{{ form.total.id_for_label }}');
+  const totalCell = document.getElementById('totalGeneral');
+  const subtotalCell = document.getElementById('pres_subtotal');
+  const rowDescuentoEl = document.getElementById('pres_rowDescuento');
+  const labelDescuentoEl = document.getElementById('pres_labelDescuento');
+  const montoDescuentoEl = document.getElementById('pres_montoDescuento');
+  const rowIVAEl = document.getElementById('pres_rowIVA');
+  const montoIVAEl = document.getElementById('pres_montoIVA');
+  const ivaCheckbox = document.getElementById('pres_aplicar_iva');
+  const descuentoSelect = document.getElementById('pres_descuento');
+  let rowIdx = 0;
+
+  function fmt(n) {
+    return '$ ' + parseFloat(n).toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  }
+
+  function buildProductSelect(selectedPk) {
+    let html = '<select class="form-select form-select-sm producto-select">';
+    html += '<option value="">-- Seleccionar --</option>';
+    PRODUCTOS.forEach(p => {
+      const sel = String(p.pk) === String(selectedPk) ? ' selected' : '';
+      html += `<option value="${p.pk}" data-precio="${p.precio}"${sel}>${p.nombre}</option>`;
+    });
+    return html + '</select>';
+  }
+
+  // Descuento por defecto según tipo de cliente
+  const DESCUENTOS_POR_TIPO = { 'nuevo': 0, 'estandar': 5, 'estrategico': 15, 'premium': 25 };
+
+  function recalcAll() {
+    let subtotal = 0;
+    tbody.querySelectorAll('tr').forEach(tr => {
+      const c   = parseFloat(tr.querySelector('.cantidad-input').value) || 0;
+      const p   = parseFloat(tr.querySelector('.precio-input').value) || 0;
+      const neto = c * p;
+      tr.querySelector('.subtotal-cell').textContent = fmt(neto);
+      subtotal += neto;
+    });
+    subtotalCell.textContent = fmt(subtotal);
+    recalcGrandTotal();
+  }
+
+  function recalcGrandTotal() {
+    const subtotalStr = subtotalCell.textContent.replace(/[^0-9,]/g, '').replace(',', '.');
+    const subtotal = parseFloat(subtotalStr) || 0;
+    const descPct = parseFloat(descuentoSelect.value) || 0;
+    const montoDesc = subtotal * (descPct / 100);
+    const subtotalConDesc = subtotal - montoDesc;
+    const aplicaIVA = ivaCheckbox.checked;
+    const montoIVA = aplicaIVA ? subtotalConDesc * 0.21 : 0;
+    const total = subtotalConDesc + montoIVA;
+
+    if (descPct > 0) {
+      labelDescuentoEl.textContent = `Descuento (${descPct}%)`;
+      montoDescuentoEl.textContent = `- ${fmt(montoDesc)}`;
+      rowDescuentoEl.classList.remove('d-none');
+    } else {
+      rowDescuentoEl.classList.add('d-none');
+    }
+
+    if (aplicaIVA) {
+      montoIVAEl.textContent = fmt(montoIVA);
+      rowIVAEl.classList.remove('d-none');
+    } else {
+      rowIVAEl.classList.add('d-none');
+    }
+
+    totalCell.textContent = fmt(total);
+    if (totalInput) totalInput.value = total.toFixed(2);
+  }
+
+  function addRow(productoPk, cantidad, precio) {
+    productoPk = productoPk || '';
+    cantidad   = cantidad   != null ? cantidad   : 1;
+    precio     = precio     != null ? precio     : '';
+    const tr = document.createElement('tr');
+    tr.dataset.idx = rowIdx++;
+    tr.innerHTML = `
+      <td>${buildProductSelect(productoPk)}</td>
+      <td class="text-center">
+        <input type="number" min="1" value="${cantidad}" class="form-control form-control-sm text-center cantidad-input" style="max-width:90px;margin:auto;">
+      </td>
+      <td class="text-end">
+        <input type="number" min="0" step="0.01" value="${precio}" class="form-control form-control-sm text-end precio-input" style="max-width:110px;margin-left:auto;">
+      </td>
+      <td class="text-end subtotal-cell fw-semibold">$ 0,00</td>
+      <td class="text-center">
+        <button type="button" class="btn btn-outline-danger btn-sm btn-quitar" title="Quitar línea">
+          <span class="material-symbols-outlined" style="font-size:.9rem;vertical-align:-.1em;">delete</span>
+        </button>
+      </td>`;
+
+    tr.querySelector('.producto-select').addEventListener('change', function () {
+      const opt = this.options[this.selectedIndex];
+      tr.querySelector('.precio-input').value = opt.dataset.precio || '';
+      recalcAll();
+    });
+    tr.querySelector('.cantidad-input').addEventListener('input', recalcAll);
+    tr.querySelector('.precio-input').addEventListener('input', recalcAll);
+    tr.querySelector('.btn-quitar').addEventListener('click', function () {
+      tr.remove(); recalcAll();
+    });
+
+    tbody.appendChild(tr);
+    recalcAll();
+  }
+
+  // Inicializar con detalles existentes
+  if (DETALLES.length > 0) {
+    DETALLES.forEach(d => addRow(d.productoPk, d.cantidad, d.precio));
+  } else {
+    addRow();
+  }
+
+  document.getElementById('btnAgregarLinea').addEventListener('click', () => addRow());
+  descuentoSelect.addEventListener('change', recalcGrandTotal);
+  ivaCheckbox.addEventListener('change', recalcGrandTotal);
+
+  // Serializar filas antes de enviar
+  document.querySelector('form').addEventListener('submit', function () {
+    document.querySelectorAll('input[name^="det-"]').forEach(el => el.remove());
+    // Campos globales
+    const descGlobal = descuentoSelect.value;
+    const ivaVal = ivaCheckbox.checked ? '21' : '0';
+    [['descuento_global', descGlobal], ['iva_aplicada', ivaVal]].forEach(([n, v]) => {
+      const inp = document.createElement('input');
+      inp.type = 'hidden'; inp.name = n; inp.value = v;
+      this.appendChild(inp);
+    }, this);
+    // Campos por línea
+    tbody.querySelectorAll('tr').forEach(function (tr, i) {
+      const prod   = tr.querySelector('.producto-select').value;
+      const cant   = tr.querySelector('.cantidad-input').value;
+      const precio = tr.querySelector('.precio-input').value;
+      if (!prod) return;
+      [['producto', prod], ['cantidad', cant], ['precio_unitario', precio]].forEach(([n, v]) => {
+        const inp = document.createElement('input');
+        inp.type = 'hidden'; inp.name = `det-${i}-${n}`; inp.value = v;
+        this.appendChild(inp);
+      }, this);
+    }, this);
+    recalcAll();
+  });
+  // Datos de clientes para autocompletar
+  const CLIENTES_DATA = {
+    {% for c in clientes_data %}
+    {{ c.pk }}: {
+      razon_social: "{{ c.razon_social|default:''|escapejs }}",
+      nombre:       "{{ c.nombre|default:''|escapejs }}",
+      apellido:     "{{ c.apellido|default:''|escapejs }}",
+      cuit:         "{{ c.cuit|escapejs }}",
+      email:        "{{ c.email|escapejs }}",
+      telefono:     "{{ c.telefono|escapejs }}",
+      celular:      "{{ c.celular|default:''|escapejs }}",
+      direccion:    "{{ c.direccion|escapejs }}",
+      ciudad:       "{{ c.ciudad|escapejs }}",
+      provincia:    "{{ c.provincia|escapejs }}",
+      pais:         "{{ c.pais|escapejs }}",
+      tipo_cliente: "{{ c.tipo_cliente|escapejs }}",
+      estado:       "{{ c.estado|default:''|escapejs }}",
+    },
+    {% endfor %}
+  };
+
+  // Rellena solo los campos informativos readonly (sin tocar descuento ni razón social)
+  function fillClienteInfoFields(pk) {
+    const d = CLIENTES_DATA[pk] || {};
+    document.getElementById('info_cuit').value         = d.cuit         || '-';
+    document.getElementById('info_email').value        = d.email        || '-';
+    document.getElementById('info_telefono').value     = d.telefono     || '-';
+    document.getElementById('info_celular').value      = d.celular || d.telefono || '-';
+    document.getElementById('info_direccion').value    = d.direccion    || '-';
+    document.getElementById('info_ciudad').value       = d.ciudad       || '-';
+    document.getElementById('info_provincia').value    = d.provincia    || '-';
+    document.getElementById('info_pais').value         = d.pais         || '-';
+    document.getElementById('info_tipo_cliente').value = d.tipo_cliente || '-';
+  }
+
+  // Rellena los campos informativos Y aplica los valores por defecto del cliente
+  // (descuento según tipo, razón social). Solo se llama cuando el usuario cambia de cliente.
+  function fillClienteInfo(pk) {
+    fillClienteInfoFields(pk);
+    const d = CLIENTES_DATA[pk] || {};
+    // Aplicar descuento automático según tipo de cliente
+    const descPct = DESCUENTOS_POR_TIPO[d.tipo_cliente] ?? 0;
+    descuentoSelect.value = String(descPct);
+    recalcGrandTotal();
+    // Sincronizar razón social del presupuesto con la del cliente seleccionado
+    const rsField = document.getElementById('{{ form.razon_social.id_for_label }}');
+    if (rsField) {
+      rsField.value = d.razon_social || 'Sin Razón Social';
+    }
+  }
+
+  const clienteSelect = document.getElementById('{{ form.cliente.id_for_label }}');
+  clienteSelect?.addEventListener('change', function () {
+    fillClienteInfo(parseInt(this.value) || 0);
+  });
+  // Al cargar: solo actualizar los campos informativos readonly con datos frescos del cliente,
+  // pero conservar el descuento y razón social guardados en el presupuesto.
+  if (clienteSelect?.value) fillClienteInfoFields(parseInt(clienteSelect.value));
+})();
+</script>
 {% endblock %}
