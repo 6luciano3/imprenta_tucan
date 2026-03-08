@@ -1,62 +1,170 @@
-{% extends 'base.html' %}
+﻿{% extends 'base.html' %}
 {% block content %}
-<h1 class="text-2xl font-bold mb-6">Panel de Configuración</h1>
-<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-  <div class="bg-white rounded-xl shadow p-6 flex flex-col items-start">
-    <div class="flex items-center gap-3 mb-2">
-      <span class="material-symbols-outlined text-primary text-3xl">straighten</span>
-      <span class="text-lg font-semibold">Unidades de Medida</span>
+
+<div class="max-w-5xl mx-auto">
+
+  <!-- Encabezado -->
+  <div class="mb-8">
+    <div class="flex items-center gap-3 mb-1">
+      <span class="material-symbols-outlined text-3xl text-primary">settings</span>
+      <h1 class="text-2xl font-bold text-gray-800">Panel de Configuración</h1>
     </div>
-    <p class="text-gray-600 mb-4">Gestiona las unidades de medida utilizadas en el sistema.</p>
-    <a href="{% url 'unidad_list' %}" class="px-4 py-2 bg-primary text-white rounded hover:bg-primary-dark transition">Ir a Unidades</a>
+    <p class="text-sm text-gray-500 ml-10">Administrá los parámetros del sistema, reglas de negocio y configuraciones operativas.</p>
   </div>
-  <div class="bg-white rounded-xl shadow p-6 flex flex-col items-start">
-    <div class="flex items-center gap-3 mb-2">
-      <span class="material-symbols-outlined text-primary text-3xl">settings</span>
-      <span class="text-lg font-semibold">Fórmulas</span>
+
+  <!-- Sección: Datos base -->
+  <div class="mb-8">
+    <div class="flex items-center gap-2 mb-4">
+      <span class="material-symbols-outlined text-lg text-gray-400">database</span>
+      <h2 class="text-xs font-semibold tracking-widest text-gray-400 uppercase">Datos base</h2>
     </div>
-    <p class="text-gray-600 mb-4">Administra las fórmulas configurables del sistema.</p>
-    <a href="{% url 'lista_formulas' %}" class="px-4 py-2 bg-primary text-white rounded hover:bg-primary-dark transition">Ir a Fórmulas</a>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+
+      <!-- Unidades de Medida -->
+      <a href="{% url 'unidad_list' %}"
+        class="group bg-white rounded-xl shadow-sm border border-gray-100 p-5 flex flex-col hover:shadow-md hover:border-primary/30 transition-all duration-200">
+        <div class="flex items-start gap-3">
+          <span class="material-symbols-outlined text-2xl text-primary bg-primary/10 rounded-lg p-2">straighten</span>
+          <div class="min-w-0">
+            <p class="font-semibold text-gray-800 group-hover:text-primary transition text-base">Unidades de Medida</p>
+            <p class="text-sm text-gray-500 mt-1 leading-snug">Unidades usadas en insumos, productos y recetas.</p>
+          </div>
+        </div>
+        <div class="mt-4 flex items-center justify-end">
+          <span class="text-sm text-primary font-medium group-hover:underline flex items-center gap-1">
+            Gestionar <span class="material-symbols-outlined text-sm">arrow_forward</span>
+          </span>
+        </div>
+      </a>
+
+      <!-- Fórmulas -->
+      <a href="{% url 'lista_formulas' %}"
+        class="group bg-white rounded-xl shadow-sm border border-gray-100 p-5 flex flex-col hover:shadow-md hover:border-primary/30 transition-all duration-200">
+        <div class="flex items-start gap-3">
+          <span class="material-symbols-outlined text-2xl text-primary bg-primary/10 rounded-lg p-2">functions</span>
+          <div class="min-w-0">
+            <p class="font-semibold text-gray-800 group-hover:text-primary transition text-base">Fórmulas</p>
+            <p class="text-sm text-gray-500 mt-1 leading-snug">Expresiones configurables para cálculo de costos y precios.</p>
+          </div>
+        </div>
+        <div class="mt-4 flex items-center justify-end">
+          <span class="text-sm text-primary font-medium group-hover:underline flex items-center gap-1">
+            Gestionar <span class="material-symbols-outlined text-sm">arrow_forward</span>
+          </span>
+        </div>
+      </a>
+
+      <!-- Recetas de Productos -->
+      <a href="{% url 'receta_producto_list' %}"
+        class="group bg-white rounded-xl shadow-sm border border-gray-100 p-5 flex flex-col hover:shadow-md hover:border-primary/30 transition-all duration-200">
+        <div class="flex items-start gap-3">
+          <span class="material-symbols-outlined text-2xl text-primary bg-primary/10 rounded-lg p-2">receipt_long</span>
+          <div class="min-w-0">
+            <p class="font-semibold text-gray-800 group-hover:text-primary transition text-base">Recetas de Productos</p>
+            <p class="text-sm text-gray-500 mt-1 leading-snug">Vínculos entre productos, fórmulas e insumos productivos.</p>
+          </div>
+        </div>
+        <div class="mt-4 flex items-center justify-end">
+          <span class="text-sm text-primary font-medium group-hover:underline flex items-center gap-1">
+            Gestionar <span class="material-symbols-outlined text-sm">arrow_forward</span>
+          </span>
+        </div>
+      </a>
+
+      <!-- Datos de la Empresa -->
+      <a href="{% url 'empresa_config' %}"
+        class="group bg-white rounded-xl shadow-sm border border-gray-100 p-5 flex flex-col hover:shadow-md hover:border-primary/30 transition-all duration-200">
+        <div class="flex items-start gap-3">
+          <span class="material-symbols-outlined text-2xl text-primary bg-primary/10 rounded-lg p-2">business</span>
+          <div class="min-w-0">
+            <p class="font-semibold text-gray-800 group-hover:text-primary transition text-base">Datos de la Empresa</p>
+            <p class="text-sm text-gray-500 mt-1 leading-snug">Razón social, CUIT, domicilio, teléfono y email.</p>
+          </div>
+        </div>
+        <div class="mt-4 flex items-center justify-end">
+          <span class="text-sm text-primary font-medium group-hover:underline flex items-center gap-1">
+            Editar <span class="material-symbols-outlined text-sm">arrow_forward</span>
+          </span>
+        </div>
+      </a>
+
+    </div>
   </div>
+
+  <!-- Separador -->
+  <div class="border-t border-gray-100 mb-8"></div>
+
+  <!-- Sección: Inteligencia y automatización -->
+  <div class="mb-8">
+    <div class="flex items-center gap-2 mb-4">
+      <span class="material-symbols-outlined text-lg text-indigo-400">auto_awesome</span>
+      <h2 class="text-xs font-semibold tracking-widest text-indigo-400 uppercase">Inteligencia y automatización</h2>
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+
+      <!-- Motor de Demanda -->
+      <a href="{% url 'motor_demanda_config' %}"
+        class="group bg-white rounded-xl shadow-sm border border-gray-100 p-5 flex flex-col hover:shadow-md hover:border-indigo-200 transition-all duration-200">
+        <div class="flex items-start gap-3">
+          <span class="material-symbols-outlined text-2xl text-indigo-500 bg-indigo-50 rounded-lg p-2">rule_settings</span>
+          <div class="min-w-0">
+            <p class="font-semibold text-gray-800 group-hover:text-indigo-600 transition text-base">Motor de Demanda</p>
+            <p class="text-sm text-gray-500 mt-1 leading-snug">Umbrales R1, R2 y R3 que disparan alertas de stock en el dashboard.</p>
+          </div>
+        </div>
+        <div class="mt-4 flex items-center justify-between">
+          <span class="inline-flex items-center gap-1 text-xs bg-orange-50 text-orange-600 rounded-full px-2 py-0.5 font-medium">
+            <span class="material-symbols-outlined text-xs">inventory_2</span> Stock
+          </span>
+          <span class="text-sm text-indigo-500 font-medium group-hover:underline flex items-center gap-1">
+            Configurar <span class="material-symbols-outlined text-sm">arrow_forward</span>
+          </span>
+        </div>
+      </a>
+
+      <!-- Proyección de Demanda -->
+      <a href="{% url 'proyeccion_demanda_config' %}"
+        class="group bg-white rounded-xl shadow-sm border border-gray-100 p-5 flex flex-col hover:shadow-md hover:border-indigo-200 transition-all duration-200">
+        <div class="flex items-start gap-3">
+          <span class="material-symbols-outlined text-2xl text-indigo-500 bg-indigo-50 rounded-lg p-2">bar_chart</span>
+          <div class="min-w-0">
+            <p class="font-semibold text-gray-800 group-hover:text-indigo-600 transition text-base">Proyección de Demanda</p>
+            <p class="text-sm text-gray-500 mt-1 leading-snug">Cantidad de insumos y ventana de meses para la media móvil en el dashboard.</p>
+          </div>
+        </div>
+        <div class="mt-4 flex items-center justify-between">
+          <span class="inline-flex items-center gap-1 text-xs bg-blue-50 text-blue-600 rounded-full px-2 py-0.5 font-medium">
+            <span class="material-symbols-outlined text-xs">analytics</span> Análisis
+          </span>
+          <span class="text-sm text-indigo-500 font-medium group-hover:underline flex items-center gap-1">
+            Configurar <span class="material-symbols-outlined text-sm">arrow_forward</span>
+          </span>
+        </div>
+      </a>
+
+      <!-- Ofertas Segmentadas -->
+      <a href="{% url 'ofertas_hub' %}"
+        class="group bg-white rounded-xl shadow-sm border border-gray-100 p-5 flex flex-col hover:shadow-md hover:border-indigo-200 transition-all duration-200">
+        <div class="flex items-start gap-3">
+          <span class="material-symbols-outlined text-2xl text-indigo-500 bg-indigo-50 rounded-lg p-2">local_offer</span>
+          <div class="min-w-0">
+            <p class="font-semibold text-gray-800 group-hover:text-indigo-600 transition text-base">Ofertas Segmentadas</p>
+            <p class="text-sm text-gray-500 mt-1 leading-snug">Parámetros generales, niveles de cliente y reglas de generación automática de ofertas.</p>
+          </div>
+        </div>
+        <div class="mt-4 flex items-center justify-between">
+          <span class="inline-flex items-center gap-1 text-xs bg-purple-50 text-purple-600 rounded-full px-2 py-0.5 font-medium">
+            <span class="material-symbols-outlined text-xs">auto_awesome</span> IA
+          </span>
+          <span class="text-sm text-indigo-500 font-medium group-hover:underline flex items-center gap-1">
+            Configurar <span class="material-symbols-outlined text-sm">arrow_forward</span>
+          </span>
+        </div>
+      </a>
+
+    </div>
+  </div>
+
 </div>
-  <div class="bg-white rounded-xl shadow p-6 flex flex-col items-start">
-    <div class="flex items-center gap-3 mb-2">
-      <span class="material-symbols-outlined text-primary text-3xl">receipt_long</span>
-      <span class="text-lg font-semibold">Recetas de Productos</span>
-    </div>
-    <p class="text-gray-600 mb-4">Gestiona las recetas que vinculan productos, fórmulas e insumos.</p>
-    <a href="{% url 'receta_producto_list' %}" class="px-4 py-2 bg-primary text-white rounded hover:bg-primary-dark transition">Ir a Recetas</a>
-  </div>
-  <div class="bg-white rounded-xl shadow p-6 flex flex-col items-start mt-6">
-    <div class="flex items-center gap-3 mb-2">
-      <span class="material-symbols-outlined text-primary text-3xl">business</span>
-      <span class="text-lg font-semibold">Datos de la Empresa</span>
-    </div>
-    <p class="text-gray-600 mb-4">Edit? raz?n social, CUIT, domicilio, tel?fono y email de la empresa.</p>
-    <a href="{% url 'empresa_config' %}" class="px-4 py-2 bg-primary text-white rounded hover:bg-primary-dark transition">Editar Empresa</a>
-  </div>
-  <div class="bg-white rounded-xl shadow p-6 flex flex-col items-start mt-6">
-    <div class="flex items-center gap-3 mb-2">
-      <span class="material-symbols-outlined text-primary text-3xl">rule_settings</span>
-      <span class="text-lg font-semibold">Motor de Demanda — Reglas de Alerta</span>
-    </div>
-    <p class="text-gray-600 mb-4">Configura los umbrales R1, R2 y R3 que disparan alertas en "Insumos con Acción Urgente".</p>
-    <a href="{% url 'motor_demanda_config' %}" class="px-4 py-2 bg-primary text-white rounded hover:bg-primary-dark transition">Configurar Reglas</a>
-  </div>
-  <div class="bg-white rounded-xl shadow p-6 flex flex-col items-start mt-6">
-    <div class="flex items-center gap-3 mb-2">
-      <span class="material-symbols-outlined text-primary text-3xl">bar_chart</span>
-      <span class="text-lg font-semibold">Proyección Demanda — Visualización</span>
-    </div>
-    <p class="text-gray-600 mb-4">Ajusta la cantidad de insumos en la tabla del dashboard y la ventana de meses para la media móvil.</p>
-    <a href="{% url 'proyeccion_demanda_config' %}" class="px-4 py-2 bg-primary text-white rounded hover:bg-primary-dark transition">Configurar Proyección</a>
-  </div>
-  <div class="bg-white rounded-xl shadow p-6 flex flex-col items-start mt-6">
-    <div class="flex items-center gap-3 mb-2">
-      <span class="material-symbols-outlined text-primary text-3xl">local_offer</span>
-      <span class="text-lg font-semibold">Ofertas Segmentadas</span>
-    </div>
-    <p class="text-gray-600 mb-4">Configurá la generación automática de ofertas: parámetros generales, niveles de cliente y reglas avanzadas.</p>
-    <a href="{% url 'ofertas_hub' %}" class="px-4 py-2 bg-primary text-white rounded hover:bg-primary-dark transition">Configurar Ofertas</a>
-  </div>
+
 {% endblock %}

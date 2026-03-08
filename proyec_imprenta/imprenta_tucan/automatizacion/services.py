@@ -33,17 +33,22 @@ def enviar_oferta_email(oferta, request=None):
     combo = generar_combo_para_cliente(cliente)
     if combo and combo.comboofertaproducto_set.exists():
         filas, subtotal, descuento, desc_valor, total = _html_tabla_combo(combo)
-        bloque = (f'<div style="background:#f9fafc;border-radius:12px;border:1px solid #e3eaf2;padding:24px;margin-bottom:24px;">'
-                  f'<div style="font-family:Georgia,serif;font-size:22px;font-weight:700;color:#1a237e;margin-bottom:6px;">{combo.nombre}</div>'
-                  f'<div style="font-size:12px;color:#607d8b;margin-bottom:16px;">{combo.descripcion}</div>'
-                  f'<table style="width:100%;border-collapse:collapse;font-size:12px;">'
-                  f'<thead><tr style="background:#1565c0;color:#fff;"><th style="padding:10px 12px;text-align:left;">Producto</th><th style="padding:10px 12px;text-align:center;">Cant.</th><th style="padding:10px 12px;text-align:right;">P.Unit.</th><th style="padding:10px 12px;text-align:right;">Subtotal</th></tr></thead>'
-                  f'<tbody>{filas}</tbody></table>'
-                  f'<div style="margin-top:14px;font-size:12px;">'
-                   f'<div style="display:flex;justify-content:space-between;color:#546e7a;margin-bottom:4px;">' + '<span>Subtotal</span><span>$' + "{:,.0f}".format(subtotal).replace(",",".") + '</span></div>',
-                   f'<div style="display:flex;justify-content:space-between;color:#c62828;font-weight:600;margin-bottom:4px;">' + f'<span>Descuento ({descuento:.0f}%)</span><span>-$' + "{:,.0f}".format(desc_valor).replace(",",".") + '</span></div>',
-                   f'<div style="display:flex;justify-content:space-between;color:#2e7d32;font-weight:700;font-size:14px;padding-top:6px;border-top:1px solid #e3eaf2;">' + '<span>Total Final</span><span>$' + "{:,.0f}".format(total).replace(",",".") + '</span></div>'
-                  f'</div></div>')
+        subtotal_str  = '${}'.format("{:,.0f}".format(subtotal).replace(',', '.'))
+        desc_val_str = '${}'.format("{:,.0f}".format(desc_valor).replace(',', '.'))
+        total_str    = '${}'.format("{:,.0f}".format(total).replace(',', '.'))
+        bloque = (
+            f'<div style="background:#f9fafc;border-radius:12px;border:1px solid #e3eaf2;padding:24px;margin-bottom:24px;">'
+            f'<div style="font-family:Georgia,serif;font-size:22px;font-weight:700;color:#1a237e;margin-bottom:6px;">{combo.nombre}</div>'
+            f'<div style="font-size:12px;color:#607d8b;margin-bottom:16px;">{combo.descripcion}</div>'
+            f'<table style="width:100%;border-collapse:collapse;font-size:12px;">'
+            f'<thead><tr style="background:#1565c0;color:#fff;"><th style="padding:10px 12px;text-align:left;">Producto</th><th style="padding:10px 12px;text-align:center;">Cant.</th><th style="padding:10px 12px;text-align:right;">P.Unit.</th><th style="padding:10px 12px;text-align:right;">Subtotal</th></tr></thead>'
+            f'<tbody>{filas}</tbody></table>'
+            f'<div style="margin-top:14px;font-size:12px;">'
+            f'<div style="display:flex;justify-content:space-between;color:#546e7a;margin-bottom:4px;"><span>Subtotal</span><span>{subtotal_str}</span></div>'
+            f'<div style="display:flex;justify-content:space-between;color:#c62828;font-weight:600;margin-bottom:4px;"><span>Descuento ({descuento:.0f}%)</span><span>-{desc_val_str}</span></div>'
+            f'<div style="display:flex;justify-content:space-between;color:#2e7d32;font-weight:700;font-size:14px;padding-top:6px;border-top:1px solid #e3eaf2;"><span>Total Final</span><span>{total_str}</span></div>'
+            f'</div></div>'
+        )
     else:
         bloque = f'<div style="background:#f0f4ff;border-left:4px solid #1565c0;border-radius:8px;padding:20px;margin-bottom:24px;"><div style="font-size:14px;font-weight:700;color:#1a237e;margin-bottom:8px;">{oferta.titulo}</div><div style="font-size:12px;color:#37474f;">{oferta.descripcion}</div></div>'
     html_body = f'''<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Oferta Imprenta Tucan</title></head>

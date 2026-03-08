@@ -9,6 +9,17 @@
     </h1>
     <p class="text-gray-600 mb-4">Aprueba, ajusta o rechaza propuestas antes de enviarlas al cliente.</p>
 
+    {% if email_modo == 'local' %}
+    <div class="mb-4 px-4 py-3 rounded-lg border border-yellow-300 bg-yellow-50 text-yellow-900 text-sm flex items-start gap-2">
+        <span class="material-symbols-outlined text-yellow-600 flex-none mt-0.5">warning</span>
+        <div>
+            <strong>Modo desarrollo:</strong> los emails <strong>no se envían</strong>, se guardan como archivos en <code>sent_emails/</code>.
+            Para habilitar el envío real, configurá la variable de entorno <code>EMAIL_HOST_PASSWORD</code> con una
+            <a href="https://myaccount.google.com/apppasswords" target="_blank" class="underline text-yellow-700 hover:text-yellow-900">Contraseña de App de Gmail</a>.
+        </div>
+    </div>
+    {% endif %}
+
     {% if msg %}
     <div class="mb-4 px-4 py-3 rounded-lg shadow text-white text-sm
                 {% if ok == '1' %}bg-green-600{% elif ok == '0' %}bg-red-600{% else %}bg-gray-600{% endif %}">

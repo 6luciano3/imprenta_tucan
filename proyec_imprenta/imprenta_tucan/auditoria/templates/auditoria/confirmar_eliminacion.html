@@ -19,7 +19,7 @@
       <div class="bg-gray-50 rounded-lg p-3 text-sm text-gray-600 mb-6 space-y-1">
         <div><span class="text-gray-400">Registro:</span> {{ auditoria.object_repr|truncatechars:60 }}</div>
         <div><span class="text-gray-400">Evento:</span> {{ auditoria.get_action_display }}</div>
-        <div><span class="text-gray-400">Fecha:</span> {{ auditoria.timestamp|date:'d/m/Y H:i:s' }}</div>
+        <div><span class="text-gray-400">Fecha:</span> {{ auditoria.timestamp|date:'d/m/Y H:i' }}</div>
         <div><span class="text-gray-400">Usuario:</span> {{ auditoria.user.email|default:"—" }}</div>
       </div>
       <form method="post" class="flex gap-3">

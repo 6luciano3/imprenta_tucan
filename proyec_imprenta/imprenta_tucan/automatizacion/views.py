@@ -376,7 +376,14 @@ def ofertas_propuestas_admin(request):
     ofertas = paginator.get_page(page)
     msg = request.GET.get('msg')
     ok = request.GET.get('ok')
-    return render(request, 'automatizacion/ofertas_propuestas.html', {'ofertas': ofertas, 'msg': msg, 'ok': ok})
+    from django.conf import settings as dj_settings
+    email_modo = 'smtp' if 'smtp' in dj_settings.EMAIL_BACKEND.lower() else 'local'
+    return render(request, 'automatizacion/ofertas_propuestas.html', {
+        'ofertas': ofertas,
+        'msg': msg,
+        'ok': ok,
+        'email_modo': email_modo,
+    })
 
 
 class OfertaManualForm(forms.Form):
@@ -478,6 +485,7 @@ def aprobar_oferta(request, oferta_id):
     oferta.administrador = request.user
     oferta.save()
     # Enviar email al cliente y registrar estado de mensaje
+    ok, err = False, 'Error inesperado'
     try:
         from .models import MensajeOferta
         ok, err = enviar_oferta_email(oferta, request=request)
@@ -487,9 +495,18 @@ def aprobar_oferta(request, oferta_id):
             estado='enviado' if ok else 'fallido',
             detalle='Oferta enviada automáticamente' if ok else f'Error al enviar: {err}',
         )
-    except Exception:
-        pass
-    return redirect('ofertas_propuestas')
+    except Exception as e:
+        err = str(e)
+    from urllib.parse import urlencode
+    from django.conf import settings as dj_settings
+    es_local = 'smtp' not in dj_settings.EMAIL_BACKEND.lower()
+    if ok and es_local:
+        params = urlencode({'ok': '0', 'msg': 'Email guardado localmente (no enviado). Configurá EMAIL_HOST_PASSWORD para envíos reales.'})
+    elif ok:
+        params = urlencode({'ok': '1', 'msg': 'Email enviado correctamente.'})
+    else:
+        params = urlencode({'ok': '0', 'msg': f'Oferta aprobada pero el email falló: {err}'})
+    return redirect(f'/automatizacion/propuestas/?{params}')
 
 
 @login_required

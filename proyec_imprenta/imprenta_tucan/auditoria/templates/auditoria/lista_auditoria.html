@@ -143,7 +143,7 @@
     <tbody class="divide-y divide-gray-100">
       {% for a in auditorias %}
       <tr class="hover:bg-gray-50 transition-colors">
-        <td class="px-4 py-3 text-gray-500 whitespace-nowrap text-xs">{{ a.timestamp|date:'d/m/Y H:i:s' }}</td>
+        <td class="px-4 py-3 text-gray-500 whitespace-nowrap text-xs">{{ a.timestamp|date:'d/m/Y H:i' }}</td>
         <td class="px-4 py-3">
           {% if a.action == 'create' %}
             <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700">

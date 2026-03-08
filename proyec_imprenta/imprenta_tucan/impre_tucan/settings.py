@@ -214,14 +214,18 @@ __all__ = ('celery_app',)
 # Se fuerza el uso de Amazon SES sin permitir SendGrid/Mailgun.
 ANYMAIL_PROVIDER = 'ses'
 
-# Backend de email: SES únicamente
-
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = 'smtp.gmail.com'
-EMAIL_PORT = 587
-EMAIL_USE_TLS = True
+# Backend de email: SMTP si hay contraseña configurada, filebased en local/dev
 EMAIL_HOST_USER     = os.environ.get('EMAIL_HOST_USER', '6luciano10@gmail.com')
 EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
+
+if EMAIL_HOST_PASSWORD:
+    EMAIL_BACKEND  = 'django.core.mail.backends.smtp.EmailBackend'
+    EMAIL_HOST     = 'smtp.gmail.com'
+    EMAIL_PORT     = 587
+    EMAIL_USE_TLS  = True
+else:
+    # Sin contraseña SMTP → escribe los emails como archivos en sent_emails/
+    EMAIL_BACKEND  = 'django.core.mail.backends.filebased.EmailBackend'
 
 
 # Configuración Anymail para SES. Las credenciales provienen de AWS SSO/IAM (boto3).
