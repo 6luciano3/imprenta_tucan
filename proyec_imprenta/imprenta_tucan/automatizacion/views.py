@@ -728,7 +728,7 @@ def generar_propuestas(request):
         return redirect(f"/automatizacion/propuestas/?ok=0&msg=Error%20al%20generar:%20{e}")
 
 
-@csrf_exempt
+@login_required
 def generar_demo(request):
     """Genera datos de demo para órdenes sugeridas y ofertas automáticas."""
     if request.method not in ('POST', 'GET'):

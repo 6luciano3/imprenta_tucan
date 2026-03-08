@@ -4,7 +4,6 @@ from django.conf import settings
 from django.conf.urls.static import static
 from impre_tucan.views import dashboard, privacidad
 from usuarios.views import inicio
-from impre_tucan.views import confirmar_eliminacion_cliente
 from . import views
 
 urlpatterns = [

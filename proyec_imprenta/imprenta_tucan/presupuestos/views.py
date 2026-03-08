@@ -63,6 +63,7 @@ def lista_presupuestos(request):
     })
 
 
+@require_perm('Presupuestos', 'Crear')
 def crear_presupuesto(request):
     from decimal import Decimal
     from datetime import date, timedelta
@@ -145,6 +146,7 @@ def crear_presupuesto(request):
     })
 
 
+@require_perm('Presupuestos', 'Editar')
 def editar_presupuesto(request, pk):
     from decimal import Decimal
     from datetime import date, timedelta
@@ -226,6 +228,7 @@ def editar_presupuesto(request, pk):
     })
 
 
+@require_perm('Presupuestos', 'Eliminar')
 def eliminar_presupuesto(request, pk):
     presupuesto = get_object_or_404(Presupuesto, pk=pk)
     if request.method == 'POST':

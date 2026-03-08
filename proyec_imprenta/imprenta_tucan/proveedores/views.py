@@ -15,6 +15,7 @@ def index(request):
     return HttpResponse("Página de ejemplo de la app")
 
 
+@login_required
 def lista_proveedores(request):
     """Lista de proveedores unificada con búsqueda y ordenamiento (reemplaza "buscar")."""
     # Parámetros unificados: usar 'q' y aceptar 'criterio' como alias de compatibilidad
@@ -55,15 +56,24 @@ def lista_proveedores(request):
     scores_qs = ScoreProveedor.objects.filter(proveedor_id__in=proveedor_ids)
     scores_map = {s.proveedor_id: s.score for s in scores_qs}
 
+    # Top 10 ranking completo para la tabla de ranking
+    scores_ranking = (
+        ScoreProveedor.objects
+        .select_related('proveedor', 'proveedor__rubro_fk')
+        .order_by('-score')[:10]
+    )
+
     return render(request, 'proveedores/lista_proveedores.html', {
         'proveedores': proveedores,
         'query': query,
         'order_by': order_by,
         'direction': direction,
         'scores_map': scores_map,
+        'scores_ranking': scores_ranking,
     })
 
 
+@login_required
 def crear_proveedor(request):
     """Crear nuevo proveedor"""
     if request.method == 'POST':
@@ -111,6 +121,7 @@ def crear_proveedor(request):
     return render(request, 'proveedores/crear_proveedor.html', {'rubros': rubros})
 
 
+@login_required
 def editar_proveedor(request, id):
     """Editar proveedor existente"""
     proveedor = get_object_or_404(Proveedor, id=id)
@@ -145,6 +156,7 @@ def editar_proveedor(request, id):
     return render(request, 'proveedores/editar_proveedor.html', {'proveedor': proveedor, 'rubros': rubros})
 
 
+@login_required
 def eliminar_proveedor(request, id):
     """Eliminar proveedor con confirmación"""
     proveedor = get_object_or_404(Proveedor, id=id)
@@ -160,12 +172,14 @@ def eliminar_proveedor(request, id):
     return render(request, 'proveedores/confirmar_eliminacion.html', {'proveedor': proveedor})
 
 
+@login_required
 def detalle_proveedor(request, id):
     """Ver detalles completos del proveedor"""
     proveedor = get_object_or_404(Proveedor, id=id)
     return render(request, 'proveedores/detalle_proveedor.html', {'proveedor': proveedor})
 
 
+@login_required
 def activar_proveedor(request, id):
     """Activar/desactivar proveedor"""
     proveedor = get_object_or_404(Proveedor, id=id)
@@ -197,6 +211,7 @@ def seed_proveedores_ui(request):
     return redirect('lista_proveedores')
 
 
+@login_required
 def alta_proveedor(request):
     if request.method == 'POST':
         form = ProveedorForm(request.POST)
@@ -212,6 +227,7 @@ def alta_proveedor(request):
 # =============================
 
 
+@login_required
 def lista_rubros(request):
     # Si la petición es AJAX, devolver solo la tabla paginada
     query = request.GET.get('q', '').strip()
@@ -247,6 +263,7 @@ def lista_rubros(request):
     })
 
 
+@login_required
 def crear_rubro(request):
     if request.method == 'POST':
         form = RubroForm(request.POST)
@@ -260,6 +277,7 @@ def crear_rubro(request):
     return render(request, 'proveedores/rubro_form.html', {'form': form, 'modo': 'crear'})
 
 
+@login_required
 def editar_rubro(request, pk):
     rubro = get_object_or_404(Rubro, pk=pk)
     if request.method == 'POST':
@@ -273,6 +291,7 @@ def editar_rubro(request, pk):
     return render(request, 'proveedores/rubro_form.html', {'form': form, 'modo': 'editar', 'rubro': rubro})
 
 
+@login_required
 def eliminar_rubro(request, pk):
     rubro = get_object_or_404(Rubro, pk=pk)
     if request.method == 'POST':

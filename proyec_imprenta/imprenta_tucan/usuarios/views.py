@@ -7,6 +7,15 @@ from django.core.paginator import Paginator
 from django.db.models import Q
 from .forms import UsuarioForm
 
+USER_STATES = ['Activo', 'Inactivo']
+MESSAGES = {
+    'user_login_error': 'Usuario o contraseña incorrectos.',
+    'user_registered': 'El usuario {nombre} {apellido} fue registrado exitosamente.',
+    'user_modified': 'El usuario {nombre} {apellido} fue modificado exitosamente.',
+    'user_deactivated': 'El usuario {nombre} {apellido} fue desactivado.',
+    'user_reactivated': 'El usuario {nombre} {apellido} fue reactivado.',
+}
+
 # Redirección inicial
 
 
@@ -35,9 +44,10 @@ def cerrar_sesion(request):
     logout(request)
     return redirect('login')
 
-# Alta de usuario (público, sin login)
+# Alta de usuario
 
 
+@login_required
 def alta_usuario(request):
     form = UsuarioForm(request.POST or None)
     if request.method == 'POST' and form.is_valid():
@@ -47,9 +57,10 @@ def alta_usuario(request):
         return redirect('lista_usuarios')
     return render(request, 'usuarios/alta_usuario.html', {'form': form})
 
-# Modificación de usuario (público, sin login)
+# Modificación de usuario
 
 
+@login_required
 def modificar_usuario(request, idUsuario):
     usuario = get_object_or_404(Usuario, id=idUsuario)
     form = UsuarioForm(request.POST or None, instance=usuario)
@@ -67,9 +78,10 @@ def detalle_usuario(request, idUsuario):
     usuario = get_object_or_404(Usuario, id=idUsuario)
     return render(request, 'usuarios/detalle_usuario.html', {'usuario': usuario})
 
-# Baja lógica (público, sin login)
+# Baja lógica
 
 
+@login_required
 def baja_usuario(request, idUsuario):
     usuario = get_object_or_404(Usuario, id=idUsuario)
     usuario.estado = USER_STATES[1]  # 'Inactivo'
@@ -77,9 +89,10 @@ def baja_usuario(request, idUsuario):
     messages.success(request, MESSAGES['user_deactivated'].format(nombre=usuario.nombre, apellido=usuario.apellido))
     return redirect('lista_usuarios')
 
-# Reactivación (público, sin login)
+# Reactivación
 
 
+@login_required
 def reactivar_usuario(request, idUsuario):
     usuario = get_object_or_404(Usuario, id=idUsuario)
     usuario.estado = USER_STATES[0]  # 'Activo'
@@ -87,9 +100,10 @@ def reactivar_usuario(request, idUsuario):
     messages.success(request, MESSAGES['user_reactivated'].format(nombre=usuario.nombre, apellido=usuario.apellido))
     return redirect('lista_usuarios')
 
-# Listado y búsqueda (público, sin login)
+# Listado y búsqueda
 
 
+@login_required
 def lista_usuarios(request):
     # Unificar parámetros: 'q' principal, 'criterio' como alias
     query = request.GET.get('q', '') or request.GET.get('criterio', '')

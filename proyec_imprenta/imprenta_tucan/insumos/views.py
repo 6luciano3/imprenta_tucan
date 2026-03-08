@@ -4,31 +4,16 @@ from django.core.paginator import Paginator
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.db.models import Q
-
-@login_required
-def rechazar_proyeccion(request, pk):
-    proyeccion = get_object_or_404(ProyeccionInsumo, pk=pk)
-    proyeccion.estado = 'rechazada'
-    proyeccion.save(update_fields=['estado'])
-    messages.success(request, 'Proyección rechazada correctamente.')
-    return redirect('lista_proyecciones')
-
-@login_required
-def eliminar_proyeccion(request, pk):
-    proyeccion = get_object_or_404(ProyeccionInsumo, pk=pk)
-    proyeccion.delete()
-    messages.success(request, 'Proyección eliminada correctamente.')
-    return redirect('lista_proyecciones')
-from django.contrib import messages
-from django.contrib.auth.decorators import login_required, user_passes_test
-from django.core.paginator import Paginator
-from django.shortcuts import get_object_or_404, redirect, render
-from django.utils import timezone
-from django.db.models import Q
+from django.core.mail import send_mail
 
 from .forms import InsumoForm, AltaInsumoForm, BuscarInsumoForm, ModificarInsumoForm, ConsumoRealInsumoForm
 from configuracion.permissions import require_perm
 from .models import Insumo, ProyeccionInsumo, ConsumoRealInsumo
+from usuarios.models import Usuario, Notificacion
+from roles.models import Rol
+from proveedores.models import Proveedor
+from pedidos.models import OrdenCompra
+
 # --- FUNCION PARA ENVIAR REPORTE DE PROYECCIONES ---
 @login_required
 def registrar_consumo_real(request):
@@ -46,9 +31,7 @@ def registrar_consumo_real(request):
     else:
         form = ConsumoRealInsumoForm()
     return render(request, 'insumos/registrar_consumo_real.html', {'form': form})
-from usuarios.models import Usuario, Notificacion
-from roles.models import Rol
-from django.core.mail import send_mail
+
 
 # --- FUNCION PARA ENVIAR REPORTE DE PROYECCIONES ---
 def enviar_reporte_proyecciones(mensaje):
@@ -66,9 +49,6 @@ def enviar_reporte_proyecciones(mensaje):
     # Mensaje interno
     for usuario in destinatarios:
         Notificacion.objects.create(usuario=usuario, mensaje=mensaje)
-from proveedores.models import Proveedor
-from insumos.models import ProyeccionInsumo
-from pedidos.models import OrdenCompra
 
 
 @require_perm('Insumos', 'Listar')
@@ -436,3 +416,20 @@ def validar_proyeccion(request, pk):
         return redirect('lista_proyecciones')
     proveedores = Proveedor.objects.all()
     return render(request, 'insumos/validar_proyeccion.html', {'proyeccion': proyeccion, 'proveedores': proveedores})
+
+
+@login_required
+def rechazar_proyeccion(request, pk):
+    proyeccion = get_object_or_404(ProyeccionInsumo, pk=pk)
+    proyeccion.estado = 'rechazada'
+    proyeccion.save(update_fields=['estado'])
+    messages.success(request, 'Proyección rechazada correctamente.')
+    return redirect('lista_proyecciones')
+
+
+@login_required
+def eliminar_proyeccion(request, pk):
+    proyeccion = get_object_or_404(ProyeccionInsumo, pk=pk)
+    proyeccion.delete()
+    messages.success(request, 'Proyección eliminada correctamente.')
+    return redirect('lista_proyecciones')

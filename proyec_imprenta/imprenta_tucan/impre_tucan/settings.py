@@ -221,7 +221,7 @@ EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
 EMAIL_HOST_USER     = os.environ.get('EMAIL_HOST_USER', '6luciano10@gmail.com')
-EMAIL_HOST_PASSWORD = 'hpmybzczlzuksshb'  # Contraseña de aplicación de Google para envío real
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
 
 
 # Configuración Anymail para SES. Las credenciales provienen de AWS SSO/IAM (boto3).

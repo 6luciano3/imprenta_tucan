@@ -115,6 +115,7 @@ def eliminar_rol(request, idRol):
     rol = get_object_or_404(Rol, idRol=idRol)
     if request.method == 'POST':
         rol.delete()
+        messages.success(request, 'El rol ha sido eliminado correctamente.')
         return redirect('lista_roles')
     return render(request, 'roles/eliminar_rol.html', {'rol': rol})
 
@@ -125,6 +126,7 @@ def desactivar_rol(request, idRol):
     if request.method == 'POST':
         rol.estado = 'Inactivo'
         rol.save()
+        messages.success(request, f'El rol {rol.nombreRol} ha sido desactivado.')
         return redirect('lista_roles')
     return render(request, 'roles/desactivar_rol.html', {'rol': rol})
 
@@ -135,5 +137,6 @@ def reactivar_rol(request, idRol):
     if request.method == 'POST':
         rol.estado = 'Activo'
         rol.save()
+        messages.success(request, f'El rol {rol.nombreRol} ha sido reactivado.')
         return redirect('lista_roles')
     return render(request, 'roles/reactivar_rol.html', {'rol': rol})

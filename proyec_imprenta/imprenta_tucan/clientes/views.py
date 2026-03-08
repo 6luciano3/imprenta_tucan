@@ -148,16 +148,4 @@ def confirmar_eliminacion_cliente(request, id):
     return render(request, 'clientes/confirmar_eliminacion.html', {'cliente': cliente})
 
 
-@require_perm('Clientes', 'Activar')
-def activar_cliente(request, id):
-    """Activar/desactivar cliente para igualar funcionalidad de proveedores"""
-    cliente = get_object_or_404(Cliente, id=id)
 
-    if request.method == 'POST':
-        cliente.estado = 'Inactivo' if cliente.estado == 'Activo' else 'Activo'
-        cliente.save()
-        estado = 'activado' if cliente.estado == 'Activo' else 'desactivado'
-        messages.success(request, f'El cliente {cliente.nombre} {cliente.apellido} ha sido {estado}.')
-        return redirect('lista_clientes')
-
-    return redirect('lista_clientes')

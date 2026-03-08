@@ -45,9 +45,12 @@ class Pedido(models.Model):
         except Exception:
             pass
         estado_proceso = None
+        _should_reserve_new = False
         if not self.pk:
             from .models import EstadoPedido
             estado_proceso = EstadoPedido.objects.filter(nombre__icontains='proceso').first()
+            if estado_proceso and self.estado == estado_proceso:
+                _should_reserve_new = True
         else:
             old = type(self).objects.get(pk=self.pk)
             estado_proceso = self.estado if 'proceso' in self.estado.nombre.lower() else None
@@ -56,6 +59,8 @@ class Pedido(models.Model):
             if 'proceso' not in old_estado and 'proceso' in new_estado:
                 reservar_insumos_para_pedido(self)
         super().save(*args, **kwargs)
+        if _should_reserve_new:
+            reservar_insumos_para_pedido(self)
         try:
             if oferta_aceptada:
                 oferta_aceptada.estado = 'aplicada'

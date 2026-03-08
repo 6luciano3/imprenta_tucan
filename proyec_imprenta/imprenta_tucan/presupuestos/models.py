@@ -49,6 +49,3 @@ class PresupuestoDetalle(models.Model):
 
     class Meta:
         ordering = ['-id']
-
-    def __str__(self):
-        return f"Presupuesto {self.presupuesto.numero} - {self.presupuesto.cliente}"

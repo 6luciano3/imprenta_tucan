@@ -33,37 +33,49 @@
 <!-- Botón para mostrar el ranking de scores de proveedores -->
 <div class="flex justify-end mb-4">
   <button id="btnRankingProveedores" type="button" class="bg-yellow-400 hover:bg-yellow-500 text-gray-900 font-semibold px-4 py-2 rounded shadow flex items-center gap-2">
-    <span class="material-symbols-outlined">star</span>
-    Mostrar Ranking de Proveedores
+    <span class="material-symbols-outlined" id="btnRankingIcon">star</span>
+    <span id="btnRankingLabel">Mostrar Ranking de Proveedores</span>
   </button>
 </div>
 
-<!-- Tabla de ranking de scores (se muestra dinámicamente) -->
+<!-- Tabla de ranking de scores (se muestra/oculta con el botón) -->
 <div id="rankingProveedoresContainer" class="mb-6 hidden">
-  <!-- Encabezado del ranking -->
   <div class="flex items-center mb-2">
     <h2 class="text-sm md:text-base font-semibold text-gray-700 flex items-center gap-2">
       <span class="material-symbols-outlined text-base md:text-lg">star</span>
-      Ranking de Proveedores
+      Ranking de Proveedores (Top 10)
     </h2>
   </div>
   <div class="bg-white shadow rounded-xl overflow-hidden table-responsive">
     <table class="w-full min-w-[900px] text-left text-sm">
       <thead class="bg-yellow-100 text-gray-700">
         <tr>
+          <th class="py-3 px-5">#</th>
           <th class="py-3 px-5">Proveedor</th>
           <th class="py-3 px-5 w-56 whitespace-nowrap">CUIT</th>
           <th class="py-3 px-5">Rubro</th>
           <th class="py-3 px-5">Score</th>
-          <th class="py-3 px-5">Cumplimiento (%)</th>
-          <th class="py-3 px-5">Incidencias (%)</th>
-          <th class="py-3 px-5">Órdenes 90d</th>
-          <th class="py-3 px-5">Volumen 90d</th>
-          <th class="py-3 px-5">Última actividad</th>
         </tr>
       </thead>
-      <tbody id="rankingProveedoresBody">
-        <!-- JS insertará filas aquí -->
+      <tbody>
+        {% for s in scores_ranking %}
+        <tr class="border-b hover:bg-yellow-50">
+          <td class="py-3 px-5 text-gray-400 font-bold">{{ forloop.counter }}</td>
+          <td class="py-3 px-5 font-medium">{{ s.proveedor.nombre }}</td>
+          <td class="py-3 px-5 w-56 whitespace-nowrap">{{ s.proveedor.cuit|default:"-" }}</td>
+          <td class="py-3 px-5">{{ s.proveedor.rubro|default:"-" }}</td>
+          <td class="py-3 px-5">
+            <span class="inline-flex items-center gap-1 text-yellow-700 font-semibold">
+              <span class="material-symbols-outlined text-sm">star</span>
+              {{ s.score|floatformat:2 }}
+            </span>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="5" class="text-center py-6 text-gray-400">No hay scores calculados aún.</td>
+        </tr>
+        {% endfor %}
       </tbody>
     </table>
   </div>
@@ -176,62 +188,23 @@ function confirmarEliminacion(id, nombre) {
 function cerrarModal() {
   document.getElementById('modalConfirmacion').classList.add('hidden');
 }
-// Mostrar ranking de proveedores desde la API inteligente
+
+// Mostrar/ocultar ranking (los datos ya vienen renderizados desde el servidor)
 document.addEventListener('DOMContentLoaded', function() {
-  const btnRanking = document.getElementById('btnRankingProveedores');
-  const container = document.getElementById('rankingProveedoresContainer');
-  const tbody = document.getElementById('rankingProveedoresBody');
-  if (btnRanking && container && tbody) {
-    btnRanking.addEventListener('click', function() {
-      // Toggle: si está visible, ocultar y restaurar el texto del botón
-      if (!container.classList.contains('hidden')) {
-        container.classList.add('hidden');
-        btnRanking.textContent = 'Mostrar Ranking de Proveedores';
-        btnRanking.disabled = false;
-        return;
-      }
-      // Si está oculto, cargar (una vez) y mostrar
-      const originalLabel = 'Mostrar Ranking de Proveedores';
-      fetch('/api/score-proveedores/')
-        .then(response => response.json())
-        .then(data => {
-          const scores = Array.isArray(data) ? data : (Array.isArray(data.results) ? data.results : []);
-          tbody.innerHTML = '';
-          if (scores.length === 0) {
-            const row = document.createElement('tr');
-            row.innerHTML = `<td colspan="9" class="text-center py-6 text-gray-500">No hay scores registrados.</td>`;
-            tbody.appendChild(row);
-          } else {
-            scores.sort((a, b) => (b.score || 0) - (a.score || 0));
-            scores.slice(0, 10).forEach(item => {
-              const row = document.createElement('tr');
-              row.innerHTML = `
-                <td class="py-3 px-5 font-medium">${item.proveedor_nombre || item.proveedor || ''}</td>
-                <td class="py-3 px-5 w-56 whitespace-nowrap">${item.proveedor_cuit || '-'}</td>
-                <td class="py-3 px-5">${item.proveedor_rubro || '-'}</td>
-                <td class="py-3 px-5">${item.score != null ? item.score : '-'}</td>
-                <td class="py-3 px-5">${item.cumplimiento != null ? item.cumplimiento : '-'}</td>
-                <td class="py-3 px-5">${item.incidencias != null ? item.incidencias : '-'}</td>
-                <td class="py-3 px-5">${item.ordenes_90d != null ? item.ordenes_90d : '-'}</td>
-                <td class="py-3 px-5">${item.volumen_90d != null ? item.volumen_90d : '-'}</td>
-                <td class="py-3 px-5">${item.ultima_actividad ? item.ultima_actividad.split('T')[0] : '-'}</td>
-              `;
-              tbody.appendChild(row);
-            });
-          }
-          container.classList.remove('hidden');
-          // Cambiar texto para permitir ocultar nuevamente
-          btnRanking.textContent = 'Ocultar Ranking';
-          btnRanking.disabled = false;
-        })
-        .catch(error => {
-          alert('Error al obtener ranking de proveedores.');
-          console.error('Error al obtener ranking de proveedores:', error);
-          btnRanking.textContent = originalLabel;
-          btnRanking.disabled = false;
-        });
-    });
-  }
+  var btnRanking = document.getElementById('btnRankingProveedores');
+  var btnLabel = document.getElementById('btnRankingLabel');
+  var container = document.getElementById('rankingProveedoresContainer');
+  if (!btnRanking || !container) return;
+
+  btnRanking.addEventListener('click', function() {
+    if (container.classList.contains('hidden')) {
+      container.classList.remove('hidden');
+      btnLabel.textContent = 'Ocultar Ranking';
+    } else {
+      container.classList.add('hidden');
+      btnLabel.textContent = 'Mostrar Ranking de Proveedores';
+    }
+  });
 });
 </script>
 {% endblock %}
