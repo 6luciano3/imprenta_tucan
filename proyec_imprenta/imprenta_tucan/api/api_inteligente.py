@@ -66,41 +66,27 @@ class ScoreProveedorSerializer(serializers.ModelSerializer):
     def get_proveedor_rubro(self, obj):
         return getattr(obj.proveedor, 'rubro', None)
 
-    def _ordenes_ventana(self, obj):
-        from django.utils import timezone
-        from datetime import timedelta
-        desde = timezone.now() - timedelta(days=90)
-        from pedidos.models import OrdenCompra
-        return OrdenCompra.objects.filter(proveedor=obj.proveedor, fecha_creacion__gte=desde)
-
     def get_cumplimiento(self, obj):
-        qs = self._ordenes_ventana(obj)
-        total = qs.count()
-        if total == 0:
+        total = getattr(obj, '_ordenes_90d', None) or 0
+        if not total:
             return 0.0
-        confirmadas = qs.filter(estado='confirmada').count()
-        return round((confirmadas / total) * 100.0, 2)
+        return round((getattr(obj, '_confirmadas_90d', 0) or 0) / total * 100.0, 2)
 
     def get_incidencias(self, obj):
-        qs = self._ordenes_ventana(obj)
-        total = qs.count()
-        if total == 0:
+        total = getattr(obj, '_ordenes_90d', None) or 0
+        if not total:
             return 0.0
-        rechazadas = qs.filter(estado='rechazada').count()
-        return round((rechazadas / total) * 100.0, 2)
+        return round((getattr(obj, '_rechazadas_90d', 0) or 0) / total * 100.0, 2)
 
     def get_ordenes_90d(self, obj):
-        return self._ordenes_ventana(obj).count()
+        return getattr(obj, '_ordenes_90d', 0) or 0
 
     def get_volumen_90d(self, obj):
-        from django.db.models import Sum
-        agg = self._ordenes_ventana(obj).aggregate(volumen=Sum('cantidad'))
-        return agg.get('volumen') or 0
+        return getattr(obj, '_volumen_90d', 0) or 0
 
     def get_ultima_actividad(self, obj):
-        qs = self._ordenes_ventana(obj)
-        last = qs.order_by('-fecha_creacion').values_list('fecha_creacion', flat=True).first()
-        return last.isoformat() if last else None
+        val = getattr(obj, '_ultima_actividad_90d', None)
+        return val.isoformat() if val else None
 
 
 class OrdenSugeridaSerializer(serializers.ModelSerializer):
@@ -135,61 +121,25 @@ class RankingClienteViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     queryset = RankingCliente.objects.all()  # Necesario para DRF router
 
     def get_queryset(self):
-        # Intentar obtener top 10 clientes con score calculado
-        destacados = list(
+        # Solo lectura: retorna el ranking precalculado por la tarea Celery.
+        # Si la tabla está vacía se devuelve un queryset vacío; el seed se realiza
+        # llamando a POST /api/.../ranking/seed/ o ejecutando tarea_ranking_clientes.
+        return (
             RankingCliente.objects.select_related('cliente')
             .order_by('-score')[:10]
         )
-        if destacados:
-            return destacados
 
-        # Si la tabla está vacía, calcular y persistir ranking basado en actividad de pedidos últimos 90 días
-        from django.utils import timezone
-        from datetime import timedelta
-        from django.db.models import Sum, Count
-
+    @action(detail=False, methods=['post'])
+    def seed(self, request):
+        """Dispara el recálculo inicial del ranking (solo si la tabla está vacía)."""
+        if RankingCliente.objects.exists():
+            return Response({'detail': 'El ranking ya tiene datos.'}, status=200)
         try:
-            desde = timezone.now().date() - timedelta(days=90)
-            agregados = (
-                Pedido.objects.filter(fecha_pedido__gte=desde)
-                .values('cliente_id')
-                .annotate(total=Sum('monto_total'), cantidad=Count('id'))
-            )
-
-            if agregados:
-                max_total = max(a['total'] or 0 for a in agregados) or 1
-                max_cant = max(a['cantidad'] or 0 for a in agregados) or 1
-
-                for a in agregados:
-                    total_norm = (a['total'] or 0) / max_total
-                    cant_norm = (a['cantidad'] or 0) / max_cant
-                    score = round(0.7 * total_norm + 0.3 * cant_norm, 4) * 100
-                    RankingCliente.objects.update_or_create(
-                        cliente_id=a['cliente_id'],
-                        defaults={'score': score}
-                    )
-
-                return list(
-                    RankingCliente.objects.select_related('cliente')
-                    .order_by('-score')[:10]
-                )
-
-        except Exception:
-            # Si falla el cálculo, continuar con un fallback mínimo
-            pass
-
-        # Fallback: crear entradas con score 0 para clientes con pedidos recientes
-        clientes_ids = (
-            Pedido.objects.order_by('-fecha_pedido')
-            .values_list('cliente_id', flat=True)
-            .distinct()[:10]
-        )
-        for cid in clientes_ids:
-            RankingCliente.objects.update_or_create(
-                cliente_id=cid,
-                defaults={'score': 0}
-            )
-        return RankingCliente.objects.filter(cliente_id__in=clientes_ids).select_related('cliente').order_by('-score')
+            from core.ai_ml.ranking import calcular_ranking_clientes
+            resultado = calcular_ranking_clientes()
+            return Response(resultado, status=201)
+        except Exception as e:
+            return Response({'error': str(e)}, status=500)
 
 
 class ScoreProveedorViewSet(viewsets.ModelViewSet):
@@ -198,9 +148,12 @@ class ScoreProveedorViewSet(viewsets.ModelViewSet):
     http_method_names = ['get', 'head', 'options']  # Solo lectura
 
     def get_queryset(self):
-        qs = ScoreProveedor.objects.select_related('proveedor').all()
-        if not qs.exists():
-            # Fallback: calcular y persistir scores usando el motor PI-2 actualizado
+        from django.db.models import Count, Sum, Max, Q
+        from django.utils import timezone
+        from datetime import timedelta
+
+        # Seeding inicial: solo si la tabla está completamente vacía (seed único)
+        if not ScoreProveedor.objects.exists():
             from proveedores.models import Proveedor
             from core.motor.proveedor_engine import ProveedorInteligenteEngine
             engine = ProveedorInteligenteEngine()
@@ -210,8 +163,41 @@ class ScoreProveedorViewSet(viewsets.ModelViewSet):
                     proveedor=proveedor,
                     defaults={'score': score}
                 )
-            qs = ScoreProveedor.objects.select_related('proveedor').all()
-        return qs
+
+        desde = timezone.now() - timedelta(days=90)
+        return (
+            ScoreProveedor.objects
+            .select_related('proveedor')
+            .annotate(
+                _ordenes_90d=Count(
+                    'proveedor__ordencompra',
+                    filter=Q(proveedor__ordencompra__fecha_creacion__gte=desde),
+                ),
+                _confirmadas_90d=Count(
+                    'proveedor__ordencompra',
+                    filter=Q(
+                        proveedor__ordencompra__fecha_creacion__gte=desde,
+                        proveedor__ordencompra__estado='confirmada',
+                    ),
+                ),
+                _rechazadas_90d=Count(
+                    'proveedor__ordencompra',
+                    filter=Q(
+                        proveedor__ordencompra__fecha_creacion__gte=desde,
+                        proveedor__ordencompra__estado='rechazada',
+                    ),
+                ),
+                _volumen_90d=Sum(
+                    'proveedor__ordencompra__cantidad',
+                    filter=Q(proveedor__ordencompra__fecha_creacion__gte=desde),
+                    default=0,
+                ),
+                _ultima_actividad_90d=Max(
+                    'proveedor__ordencompra__fecha_creacion',
+                    filter=Q(proveedor__ordencompra__fecha_creacion__gte=desde),
+                ),
+            )
+        )
 
 
 class OrdenSugeridaViewSet(viewsets.ModelViewSet):

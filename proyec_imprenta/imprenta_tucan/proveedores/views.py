@@ -56,9 +56,16 @@ def lista_proveedores(request):
     scores_qs = ScoreProveedor.objects.filter(proveedor_id__in=proveedor_ids)
     scores_map = {s.proveedor_id: s.score for s in scores_qs}
 
-    # Top 10 ranking completo para la tabla de ranking
+    # Top 10 ranking: solo proveedores cuyos insumos sean todos "directos"
+    # (tienen al menos 1 directo y ningún indirecto)
+    from django.db.models import Count, Q as DQ
     scores_ranking = (
         ScoreProveedor.objects
+        .annotate(
+            n_directos=Count('proveedor__insumos', filter=DQ(proveedor__insumos__tipo='directo')),
+            n_indirectos=Count('proveedor__insumos', filter=DQ(proveedor__insumos__tipo='indirecto')),
+        )
+        .filter(n_directos__gt=0, n_indirectos=0)
         .select_related('proveedor', 'proveedor__rubro_fk')
         .order_by('-score')[:10]
     )

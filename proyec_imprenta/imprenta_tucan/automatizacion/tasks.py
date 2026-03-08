@@ -48,7 +48,7 @@ def tarea_anticipacion_compras():
 
         periodo = timezone.now().strftime('%Y-%m')
         insumos_data = []
-        for insumo in Insumo.objects.filter(activo=True):
+        for insumo in Insumo.objects.filter(activo=True, tipo=Insumo.TIPO_DIRECTO):
             demanda = predecir_demanda_media_movil(insumo, periodo, meses=3) or 0
             insumos_data.append({
                 'id': insumo.idInsumo,
@@ -135,7 +135,7 @@ def tarea_recalcular_scores_proveedores():
             score = engine.calcular_score(proveedor, insumo=None)
             ScoreProveedor.objects.update_or_create(
                 proveedor=proveedor,
-                defaults={'score': score},
+                defaults={'score': score, 'actualizado': timezone.now()},
             )
             count += 1
         return f"scores_proveedores: {count} proveedores actualizados"
@@ -160,7 +160,7 @@ def tarea_alertas_retraso():
         from core.automation.alertas import revisar_pedidos_retrasados
         resultado = revisar_pedidos_retrasados()
         return (
-            f"alertas_retraso: {resultado['pedidos_revisados']} revisados, "
+            f"alertas_retraso: {resultado['revisados']} revisados, "
             f"{resultado['retrasados']} retrasados, {resultado['alertas_enviadas']} alertas enviadas"
         )
     except Exception as e:
@@ -191,7 +191,7 @@ def tarea_automatizacion_presupuestos_ponderada():
         # 1) Revisar pedidos recientes (últimos 7 días) y/o parametrizable
         ventana_dias = int(Parametro.get('AUTOPRESUPUESTO_VENTANA_DIAS', 7))
         desde = timezone.now().date() - timedelta(days=ventana_dias)
-        pedidos_recientes = Pedido.objects.filter(fecha_pedido__gte=desde).select_related('producto')
+        pedidos_recientes = Pedido.objects.filter(fecha_pedido__gte=desde)
 
         propuestas_creadas = 0
 
@@ -247,17 +247,27 @@ def tarea_automatizacion_presupuestos_ponderada():
                             consulta.estado = 'error'
                             consulta.respuesta = {'detalle': str(e)}
                             consulta.save()
-                    # 5) Crear propuesta consolidada
-                    CompraPropuesta.objects.create(
-                        insumo=insumo,
-                        cantidad_requerida=cantidad_req,
-                        proveedor_recomendado=proveedor,
-                        pesos_usados=CRITERIOS_PESOS,
-                        motivo_trigger='pedido_mayor_stock',
-                        estado='consultado',
-                        borrador_oc=oc,
-                        consulta_stock=consulta,
-                    )
+                    # 5) Actualizar propuesta existente sin consulta, o crear nueva
+                    propuesta_existente = CompraPropuesta.objects.filter(
+                        insumo=insumo, consulta_stock__isnull=True
+                    ).order_by('-creada').first()
+                    if propuesta_existente:
+                        propuesta_existente.consulta_stock = consulta
+                        propuesta_existente.borrador_oc = oc
+                        propuesta_existente.proveedor_recomendado = proveedor
+                        propuesta_existente.estado = 'consultado'
+                        propuesta_existente.save()
+                    else:
+                        CompraPropuesta.objects.create(
+                            insumo=insumo,
+                            cantidad_requerida=cantidad_req,
+                            proveedor_recomendado=proveedor,
+                            pesos_usados=CRITERIOS_PESOS,
+                            motivo_trigger='pedido_mayor_stock',
+                            estado='consultado',
+                            borrador_oc=oc,
+                            consulta_stock=consulta,
+                        )
                     propuestas_creadas += 1
                     # 6) Notificar al proveedor por email
                     try:
@@ -270,8 +280,8 @@ def tarea_automatizacion_presupuestos_ponderada():
         stock_minimo = int(Parametro.get('STOCK_MINIMO_GLOBAL', 10))
         bajos = Insumo.objects.filter(stock__lte=stock_minimo, activo=True)
         for insumo in bajos:
-            # evitar duplicar si ya hay propuesta reciente del mismo insumo
-            ya = CompraPropuesta.objects.filter(insumo=insumo, creada__gte=timezone.now()-timedelta(days=3)).exists()
+                # evitar duplicar si ya hay propuesta con consulta de stock registrada
+            ya = CompraPropuesta.objects.filter(insumo=insumo, consulta_stock__isnull=False).exists()
             if ya:
                 continue
             proveedor = ProveedorInteligenteService.recomendar_proveedor(insumo)
@@ -313,16 +323,27 @@ def tarea_automatizacion_presupuestos_ponderada():
                         consulta.estado = 'error'
                         consulta.respuesta = {'detalle': str(e)}
                         consulta.save()
-                CompraPropuesta.objects.create(
-                    insumo=insumo,
-                    cantidad_requerida=cantidad_req,
-                    proveedor_recomendado=proveedor,
-                    pesos_usados=CRITERIOS_PESOS,
-                    motivo_trigger='stock_minimo_vencido',
-                    estado='consultado',
-                    borrador_oc=oc,
-                    consulta_stock=consulta,
-                )
+                # Actualizar propuesta existente sin consulta, o crear nueva
+                propuesta_existente = CompraPropuesta.objects.filter(
+                    insumo=insumo, consulta_stock__isnull=True
+                ).order_by('-creada').first()
+                if propuesta_existente:
+                    propuesta_existente.consulta_stock = consulta
+                    propuesta_existente.borrador_oc = oc
+                    propuesta_existente.proveedor_recomendado = proveedor
+                    propuesta_existente.estado = 'consultado'
+                    propuesta_existente.save()
+                else:
+                    CompraPropuesta.objects.create(
+                        insumo=insumo,
+                        cantidad_requerida=cantidad_req,
+                        proveedor_recomendado=proveedor,
+                        pesos_usados=CRITERIOS_PESOS,
+                        motivo_trigger='stock_minimo_vencido',
+                        estado='consultado',
+                        borrador_oc=oc,
+                        consulta_stock=consulta,
+                    )
                 propuestas_creadas += 1
                 # Notificar al proveedor por email
                 try:
@@ -340,7 +361,8 @@ def tarea_automatizacion_presupuestos_ponderada():
             from automatizacion.models import CompraPropuesta
             from automatizacion.models import ScoreProveedor
             propuestas = CompraPropuesta.objects.select_related('insumo', 'proveedor_recomendado', 'consulta_stock', 'borrador_oc')\
-                .filter(estado__in=['consultado', 'respuesta_disponible'])
+                .filter(estado__in=['consultado', 'respuesta_disponible'],
+                        creada__gte=timezone.now() - timedelta(days=3))
             for p in propuestas:
                 try:
                     consulta_ok = p.consulta_stock and p.consulta_stock.estado == 'disponible'
@@ -368,7 +390,33 @@ def tarea_automatizacion_presupuestos_ponderada():
                     # seguir con las demás
                     pass
 
-        return f"auto_presupuesto: {propuestas_creadas} propuestas generadas; {aceptadas_auto} aceptadas automáticamente"
+        # 8) Relleno: crear ConsultaStockProveedor para propuestas que aún no tienen ninguna
+        huerfanas = CompraPropuesta.objects.filter(
+            consulta_stock__isnull=True,
+            proveedor_recomendado__isnull=False,
+        ).select_related('insumo', 'proveedor_recomendado')
+        rellenadas = 0
+        for p in huerfanas:
+            try:
+                with transaction.atomic():
+                    consulta = ConsultaStockProveedor.objects.create(
+                        proveedor=p.proveedor_recomendado,
+                        insumo=p.insumo,
+                        cantidad=int(p.cantidad_requerida or 1),
+                        estado='pendiente',
+                        respuesta={}
+                    )
+                    p.consulta_stock = consulta
+                    p.save(update_fields=['consulta_stock'])
+                    rellenadas += 1
+            except Exception:
+                pass
+
+        return (
+            f"auto_presupuesto: {propuestas_creadas} propuestas generadas; "
+            f"{aceptadas_auto} aceptadas automáticamente; "
+            f"{rellenadas} consultas de stock rellenadas"
+        )
     except Exception as e:
         return f"auto_presupuesto: error {e}"
 

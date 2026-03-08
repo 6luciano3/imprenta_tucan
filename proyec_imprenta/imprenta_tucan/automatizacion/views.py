@@ -907,42 +907,7 @@ def compras_propuestas_admin(request):
         .exclude(insumo__categoria__icontains='instrumento') \
         .exclude(insumo__categoria__icontains='calibrador')
 
-    # Build a dict: insumo_id -> propuesta
-    propuestas_dict = {p.insumo.pk: p for p in propuestas_qs}
-
-    # Compose all insumos to show: union of (tintas + papeles) and ALL insumos de propuestas
-    all_insumos = {i.pk: i for i in tintas + papeles}
-    for p in propuestas_qs:
-        all_insumos[p.insumo.pk] = p.insumo
-
-    # Crear propuestas mínimas automáticamente para insumos sin propuesta
-    from automatizacion.models import CompraPropuesta
-    from django.db import transaction
-    from proveedores.models import Proveedor
-    nuevos = []
-    with transaction.atomic():
-        for insumo in all_insumos.values():
-            if insumo.pk not in propuestas_dict:
-                proveedor = None
-                # Asignar solo si el insumo tiene proveedor relacionado directamente
-                if hasattr(insumo, 'proveedor') and insumo.proveedor and getattr(insumo.proveedor, 'activo', True):
-                    proveedor = insumo.proveedor
-                propuesta = CompraPropuesta.objects.create(
-                    insumo=insumo,
-                    cantidad_requerida=1,
-                    motivo_trigger='faltante_stock',
-                    estado='pendiente',
-                    proveedor_recomendado=proveedor
-                )
-                nuevos.append(propuesta)
-                propuestas_dict[insumo.pk] = propuesta
-
-    # Volver a obtener todas las propuestas (incluyendo las recién creadas)
-    propuestas_qs = CompraPropuesta.objects.select_related('insumo', 'proveedor_recomendado', 'borrador_oc', 'consulta_stock') \
-        .exclude(insumo__categoria__icontains='instrumento') \
-        .exclude(insumo__categoria__icontains='calibrador')
-
-    # Build rows: solo propuestas reales
+    # Build rows: solo propuestas reales (creadas únicamente por la tarea de generación)
     rows = list(propuestas_qs)
     # Sort: propuestas por nombre de insumo
     rows.sort(key=lambda x: str(x.insumo.nombre))

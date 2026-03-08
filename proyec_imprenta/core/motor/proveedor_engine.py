@@ -90,19 +90,22 @@ class ProveedorInteligenteEngine(ProcesoInteligenteBase):
         except Exception:
             return 0.5
 
-    def _cumplimiento(self, proveedor) -> float:
+    def _cumplimiento(self, proveedor, ordenes=None) -> float:
         """
         Proporción PONDERADA de órdenes confirmadas con decaimiento temporal exponencial.
         Órdenes recientes tienen mayor peso; órdenes antiguas impactan menos.
         Lambda (por día) configurable desde BD (CUMPLIMIENTO_DECAY_LAMBDA).
         Sin historial → 1.0 (beneficio de la duda).
+
+        ordenes: lista pre-fetched (compartida con _incidencias para evitar 2 queries).
         """
         import math
         from django.utils import timezone
-        from pedidos.models import OrdenCompra
-        ordenes = list(
-            OrdenCompra.objects.filter(proveedor=proveedor).order_by('-fecha_creacion')[:100]
-        )
+        if ordenes is None:
+            from pedidos.models import OrdenCompra
+            ordenes = list(
+                OrdenCompra.objects.filter(proveedor=proveedor).order_by('-fecha_creacion')[:100]
+            )
         if not ordenes:
             return 1.0
         lam = MotorConfig.get('CUMPLIMIENTO_DECAY_LAMBDA', cast=float) or 0.01
@@ -116,18 +119,21 @@ class ProveedorInteligenteEngine(ProcesoInteligenteBase):
                 peso_confirmadas += w
         return peso_confirmadas / peso_total if peso_total > 0 else 1.0
 
-    def _incidencias(self, proveedor) -> float:
+    def _incidencias(self, proveedor, ordenes=None) -> float:
         """
         Proporción PONDERADA de órdenes rechazadas con decaimiento temporal exponencial.
         Órdenes recientes tienen mayor peso; órdenes antiguas impactan menos.
         Sin historial → 0.0 (sin incidencias conocidas).
+
+        ordenes: lista pre-fetched (compartida con _cumplimiento para evitar 2 queries).
         """
         import math
         from django.utils import timezone
-        from pedidos.models import OrdenCompra
-        ordenes = list(
-            OrdenCompra.objects.filter(proveedor=proveedor).order_by('-fecha_creacion')[:100]
-        )
+        if ordenes is None:
+            from pedidos.models import OrdenCompra
+            ordenes = list(
+                OrdenCompra.objects.filter(proveedor=proveedor).order_by('-fecha_creacion')[:100]
+            )
         if not ordenes:
             return 0.0
         lam = MotorConfig.get('CUMPLIMIENTO_DECAY_LAMBDA', cast=float) or 0.01
@@ -197,12 +203,18 @@ class ProveedorInteligenteEngine(ProcesoInteligenteBase):
         incidencias (ponderado temporal), disponibilidad (ventana reciente), latencia.
         Los pesos se normalizan por su suma para mantener la escala 0-100.
         """
+        from pedidos.models import OrdenCompra
         pesos = self._get_pesos()
         peso_latencia = MotorConfig.get('PESO_LATENCIA', cast=float) or 0.1
 
+        # Pre-fetch orders once to avoid duplicate queries in _cumplimiento and _incidencias
+        ordenes = list(
+            OrdenCompra.objects.filter(proveedor=proveedor).order_by('-fecha_creacion')[:100]
+        )
+
         precio        = self._precio_relativo(proveedor, insumo)
-        cumplimiento  = self._cumplimiento(proveedor)
-        incidencias   = self._incidencias(proveedor)
+        cumplimiento  = self._cumplimiento(proveedor, ordenes=ordenes)
+        incidencias   = self._incidencias(proveedor, ordenes=ordenes)
         disponibilidad = self._disponibilidad(proveedor, insumo)
         latencia      = self._latencia_promedio_dias(proveedor)
 

@@ -27,9 +27,22 @@ Uso rápido:
 
 from .base import ProcesoInteligenteBase
 from .config import MotorConfig
-from .cliente_engine import ClienteInteligenteEngine
-from .proveedor_engine import ProveedorInteligenteEngine
-from .demanda_engine import DemandaInteligenteEngine
+
+# Los engines se cargan de forma perezosa para evitar que el __init__.py del paquete
+# tome el _ModuleLock de un submódulo mientras otro hilo intenta importarlo directamente,
+# lo que produciría un deadlock ("deadlock detected by _ModuleLock('core.motor.demanda_engine')").
+
+
+def _load_engines() -> dict:
+    """Importa y retorna las clases de los tres engines. Llamar solo cuando se necesiten."""
+    from .cliente_engine import ClienteInteligenteEngine
+    from .proveedor_engine import ProveedorInteligenteEngine
+    from .demanda_engine import DemandaInteligenteEngine
+    return {
+        'clientes': ClienteInteligenteEngine,
+        'proveedores': ProveedorInteligenteEngine,
+        'demanda': DemandaInteligenteEngine,
+    }
 
 
 class MotorProcesosInteligentes:
@@ -38,12 +51,6 @@ class MotorProcesosInteligentes:
 
     Todos los métodos son classmethod para uso conveniente sin instanciar.
     """
-
-    ENGINES: dict = {
-        'clientes': ClienteInteligenteEngine,
-        'proveedores': ProveedorInteligenteEngine,
-        'demanda': DemandaInteligenteEngine,
-    }
 
     @classmethod
     def ejecutar(cls, proceso: str, **kwargs) -> dict:
@@ -56,11 +63,12 @@ class MotorProcesosInteligentes:
 
         Retorna dict con 'estado': 'ok' | 'error'.
         """
-        engine_cls = cls.ENGINES.get(proceso)
+        engines = _load_engines()
+        engine_cls = engines.get(proceso)
         if engine_cls is None:
             return {
                 'estado': 'error',
-                'detalle': f"Proceso '{proceso}' no encontrado. Opciones: {list(cls.ENGINES)}",
+                'detalle': f"Proceso '{proceso}' no encontrado. Opciones: {list(engines)}",
             }
         return engine_cls().ejecutar(**kwargs)
 
@@ -77,7 +85,7 @@ class MotorProcesosInteligentes:
             }
         """
         resultados = {}
-        for nombre, engine_cls in cls.ENGINES.items():
+        for nombre, engine_cls in _load_engines().items():
             try:
                 resultados[nombre] = engine_cls().ejecutar()
             except Exception as e:
@@ -93,7 +101,7 @@ class MotorProcesosInteligentes:
             proceso: 'clientes' | 'proveedores' | 'demanda'
             feedback: dict específico para cada motor (ver docstring de cada engine)
         """
-        engine_cls = cls.ENGINES.get(proceso)
+        engine_cls = _load_engines().get(proceso)
         if engine_cls:
             engine_cls().retroalimentar(feedback)
 
@@ -103,6 +111,7 @@ class MotorProcesosInteligentes:
         Retorna un resumen de la configuración actual de cada motor
         (pesos, parámetros activos).
         """
+        from .proveedor_engine import ProveedorInteligenteEngine
         return {
             'proveedores': {
                 'pesos': ProveedorInteligenteEngine()._get_pesos(),
