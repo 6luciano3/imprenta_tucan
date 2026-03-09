@@ -37,7 +37,7 @@ AWS_REGION = os.environ.get('AWS_REGION', 'us-east-1').strip()
 
 # Seguridad y entorno
 DEBUG = os.environ.get('DEBUG', 'False').lower() in ('true', '1', 'yes')
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost').split(',')
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,192.168.100.41').split(',')
 
 # SECRET_KEY: falla ruidosamente en producción si no está definida en el entorno.
 if not DEBUG:

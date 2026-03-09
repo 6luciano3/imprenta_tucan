@@ -97,7 +97,7 @@ def aceptar_oferta_token(request, token):
             'error': 'Esta oferta ha vencido y ya no puede ser aceptada.',
         })
 
-    if request.method == 'POST' and oferta.estado not in ('aceptada', 'aplicada', 'aceptada_sin_stock'):
+    if request.method in ('GET', 'POST') and oferta.estado not in ('aceptada', 'aplicada', 'aceptada_sin_stock'):
         oferta.estado = 'aceptada'
         oferta.fecha_validacion = timezone.now()
         oferta.save()
@@ -153,7 +153,7 @@ def aceptar_oferta_token(request, token):
 @csrf_exempt
 def rechazar_oferta_token(request, token):
     oferta = get_object_or_404(OfertaPropuesta, token_email=token)
-    if request.method == 'POST' and oferta.estado != 'rechazada':
+    if request.method in ('GET', 'POST') and oferta.estado != 'rechazada':
         oferta.estado = 'rechazada'
         oferta.fecha_validacion = timezone.now()
         oferta.save()
