@@ -32,6 +32,18 @@ DEFAULTS = {
     'DEMANDA_UMBRAL_CRITICO': 0,
     # Factor para R3: stock < demanda × factor → compra_preventiva (media)
     'DEMANDA_FACTOR_PREVENTIVO': 1.0,
+    # Umbral para R4: pedidos retrasados > este valor → alerta_retraso (alta)
+    'DEMANDA_UMBRAL_RETRASO': 3,
+
+    # --- Caps de sanity para imprenta PYME (evitan que datos de semilla inflen sugerencias) ---
+    # Techo de consumo mensual por insumo cuando no hay historial real
+    'DEMANDA_CAP_MENSUAL_MAX': 100,
+    # Piso mínimo de referencia mensual cuando stock_actual es 0
+    'DEMANDA_CAP_MENSUAL_PISO': 5,
+    # La demanda ajustada cap = ref_mensual × este factor (default 2 = 2 meses de stock)
+    'DEMANDA_CAP_FACTOR_DEMANDA': 2,
+    # stock_minimo_efectivo cap = demanda_ajustada × este factor (default 1.5 = 6 semanas)
+    'DEMANDA_CAP_FACTOR_STOCK_MIN': 1.5,
 
     # --- Tabla de Proyección Demanda (dashboard) ---
     'PROYECCION_N_INSUMOS': 8,   # cantidad de insumos a mostrar en la tabla

@@ -143,10 +143,11 @@
           <th class="pb-1 text-center">Stock</th>
           <th class="pb-1 text-center">Proyectado</th>
           <th class="pb-1 text-center">Diferencia</th>
+          <th class="pb-1 text-center">Fuente</th>
         </tr>
       </thead>
       <tbody id="bodyProyeccion">
-        <tr><td colspan="4" class="text-gray-400 py-2">Cargando...</td></tr>
+        <tr><td colspan="5" class="text-gray-400 py-2">Cargando...</td></tr>
       </tbody>
     </table>
   </div>
@@ -317,29 +318,39 @@ async function cargarProyeccionDemanda() {
 
     const tbody = document.getElementById('bodyProyeccion');
     if (!d.proyecciones.length) {
-      tbody.innerHTML = '<tr><td colspan="4" class="text-gray-400 py-2">Sin datos</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="5" class="text-gray-400 py-2">Sin datos</td></tr>';
       return;
     }
+    const FUENTE_LABEL = {
+      'proyeccion':  '<span class="px-1.5 py-0.5 rounded text-xs bg-blue-100 text-blue-700" title="Dato oficial del motor de demanda">oficial</span>',
+      'media_movil': '<span class="px-1.5 py-0.5 rounded text-xs bg-green-100 text-green-700" title="Media móvil de consumos reales">historial</span>',
+      'ordenes':     '<span class="px-1.5 py-0.5 rounded text-xs bg-yellow-100 text-yellow-700" title="Promedio de órdenes de compra. Verificar si son datos de prueba.">ordenes</span>',
+      'catalogo':    '<span class="px-1.5 py-0.5 rounded text-xs bg-gray-100 text-gray-500" title="Cantidad típica del catálogo">catálogo</span>',
+      'stock_minimo':'<span class="px-1.5 py-0.5 rounded text-xs bg-orange-100 text-orange-600" title="Stock mínimo manual usado como estimación">estimado</span>',
+    };
     tbody.innerHTML = d.proyecciones.map(p => {
       const difClass = p.diferencia < 0 ? 'text-red-600 font-bold' : 'text-green-600';
       const difText  = p.diferencia < 0 ? `▼ ${Math.abs(p.diferencia)}` : `▲ ${p.diferencia}`;
+      const fuenteHtml = FUENTE_LABEL[p.fuente] || p.fuente;
       return `<tr class="border-b last:border-0">
         <td class="py-1 pr-2 truncate max-w-32" title="${p.nombre}">${p.nombre}</td>
         <td class="py-1 text-center font-mono">${p.stock_actual}</td>
         <td class="py-1 text-center font-mono">${p.demanda_proyectada}</td>
         <td class="py-1 text-center font-mono ${difClass}">${difText}</td>
+        <td class="py-1 text-center">${fuenteHtml}</td>
       </tr>`;
     }).join('');
   } catch (e) {
     document.getElementById('bodyProyeccion').innerHTML =
-      `<tr><td colspan="4" class="text-red-400 py-2">Error: ${e.message}</td></tr>`;
+      `<tr><td colspan="5" class="text-red-400 py-2">Error: ${e.message}</td></tr>`;
   }
 }
 
 async function cargarInsumosUrgentes() {
   const el = document.getElementById('listaUrgentes');
   try {
-    const r = await fetch('/estadisticas/api/insumos-urgentes/');
+    // ?refresh=1 invalida la caché del servidor y recalcula cón el código actual
+    const r = await fetch('/estadisticas/api/insumos-urgentes/?refresh=1');
     const d = await r.json();
     if (d.error) throw new Error(d.error);
 

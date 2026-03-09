@@ -148,7 +148,7 @@
                     </div>
                     <div>
                         <p class="text-sm text-gray-500">Estadísticas</p>
-                        <p class="text-lg font-bold group-hover:text-sky-700">Dashboard de métricas</p>
+                        <p class="text-lg font-bold group-hover:text-sky-700">Ver Estadísticas</p>
                     </div>
                 </div>
             </a>
@@ -171,7 +171,7 @@
                     </div>
                     <div>
                         <p class="text-sm text-gray-500">Presupuestos</p>
-                        <p class="text-lg font-bold group-hover:text-orange-700">Ver lista</p>
+                        <p class="text-lg font-bold group-hover:text-orange-700">Ver Presupuesto</p>
                     </div>
                 </div>
             </a>
@@ -248,6 +248,7 @@
                 </div>
             </a>
         </section>
+        {% block extra_panels %}{% endblock %}
         {% block notificaciones %}{% endblock %}
         <!-- RECENT SECTION ELIMINADO: Últimos registros -->
             <!-- Acciones rápidas ELIMINADAS -->

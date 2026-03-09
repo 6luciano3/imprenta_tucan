@@ -1,23 +1,33 @@
 import datetime
 
 def predecir_demanda_media_movil(insumo, periodo_actual, meses=3):
-    """Predice la demanda del insumo usando media móvil de los últimos N meses previos al periodo_actual (YYYY-MM)."""
+    """
+    Predice la demanda usando media móvil ponderada de los últimos N meses.
+
+    Los meses más recientes reciben mayor peso:
+        mes-1 → peso N,  mes-2 → peso N-1, ..., mes-N → peso 1.
+
+    Si no hay dato para un período, ese período simplemente no aporta peso,
+    evitando que promedios bajen artificialmente por datos faltantes.
+    """
     from insumos.models import ConsumoRealInsumo
-    # Calcular los N meses previos
     año, mes = map(int, periodo_actual.split('-'))
     periodos = []
-    for i in range(1, meses+1):
+    for i in range(1, meses + 1):
         m = mes - i
         y = año
         if m <= 0:
             m += 12
             y -= 1
         periodos.append(f"{y:04d}-{m:02d}")
+    # peso_por_periodo: el período más reciente (periodos[0]) obtiene el mayor peso
+    peso_por_periodo = {p: meses - i for i, p in enumerate(periodos)}
     consumos = ConsumoRealInsumo.objects.filter(insumo=insumo, periodo__in=periodos)
-    if consumos.exists():
-        total = sum(c.cantidad_consumida for c in consumos)
-        return round(total / meses)
-    return None
+    if not consumos.exists():
+        return None
+    suma_ponderada = sum(c.cantidad_consumida * peso_por_periodo[c.periodo] for c in consumos)
+    suma_pesos     = sum(peso_por_periodo[c.periodo] for c in consumos)
+    return round(suma_ponderada / suma_pesos) if suma_pesos > 0 else None
 from django.db import models
 from proveedores.models import Proveedor
 from usuarios.models import Usuario

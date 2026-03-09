@@ -6,7 +6,7 @@ from django.db.models import Count, Sum
 from django.db.models.functions import TruncMonth
 from datetime import timedelta
 
-from pedidos.models import Pedido
+from pedidos.models import Pedido, LineaPedido
 from productos.models import Producto
 from clientes.models import Cliente
 
@@ -130,14 +130,14 @@ def api_ingresos_por_mes(request):
 
 def api_top_productos(request):
     desde, hasta = _get_date_range(request)
-    qs = Pedido.objects.all()
+    qs = LineaPedido.objects.all()
     if desde:
-        qs = qs.filter(fecha_pedido__gte=desde)
+        qs = qs.filter(pedido__fecha_pedido__gte=desde)
     if hasta:
-        qs = qs.filter(fecha_pedido__lte=hasta)
+        qs = qs.filter(pedido__fecha_pedido__lte=hasta)
     data = (
         qs.values('producto__nombreProducto')
-        .annotate(total=Sum('monto_total'))
+        .annotate(total=Sum('precio_unitario'))
         .order_by('-total')[:5]
     )
     labels = [d['producto__nombreProducto'] or 'Desconocido' for d in data]
@@ -191,14 +191,28 @@ def api_top_clientes_score(request):
 
 def api_insumos_urgentes(request):
     """
-    Ejecuta el motor de demanda y devuelve únicamente las acciones de prioridad alta.
-    Respuesta rápida: usa datos ya calculados en el último ciclo si están disponibles.
+    Ejecuta el motor de demanda y devuelve acciones de prioridad alta y crítica.
+    Usa caché de 2 minutos para evitar recalcular en cada carga del dashboard.
+    Param ?refresh=1  → invalida la caché y recalcula de inmediato.
     """
+    from django.core.cache import cache
+    _CACHE_KEY = 'insumos_urgentes_resultado'
+    _CACHE_TTL = 2 * 60  # 2 minutos
+
     try:
         from core.motor.demanda_engine import DemandaInteligenteEngine
-        engine = DemandaInteligenteEngine()
-        resultado = engine.ejecutar()
-        urgentes = [a for a in resultado.get('detalle', []) if a.get('prioridad') == 'alta']
+        if request.GET.get('refresh'):
+            cache.delete(_CACHE_KEY)
+        resultado = cache.get(_CACHE_KEY)
+        if resultado is None:
+            engine = DemandaInteligenteEngine()
+            resultado = engine.ejecutar()
+            cache.set(_CACHE_KEY, resultado, _CACHE_TTL)
+        # Incluir prioridad 'critica' (R1: sin stock) además de 'alta' (R2/R4)
+        urgentes = [
+            a for a in resultado.get('detalle', [])
+            if a.get('prioridad') in ('alta', 'critica')
+        ]
     except Exception as e:
         return JsonResponse({'error': str(e), 'urgentes': []}, status=500)
 
@@ -216,10 +230,14 @@ def api_proyeccion_demanda(request):
 
     Jerarquía de fuentes por insumo:
         1. ProyeccionInsumo del período actual (dato oficial del motor de demanda).
-        2. Media móvil de ConsumoRealInsumo de los últimos MESES meses.
-        3. Media mensual de OrdenCompra de los últimos 6 meses (proxy real).
+        2. Media móvil ponderada de ConsumoRealInsumo de los últimos MESES meses.
+        3. Media mensual de OrdenCompra de los últimos 6 meses (divide por meses reales
+           con actividad, no siempre por 6).
         4. insumo.cantidad (cantidad típica de compra definida en el catálogo).
         5. stock_minimo_manual como proxy de consumo mensual PYME.
+
+    Aplica factor estacional (mismo mes vs. promedio histórico ponderado por año)
+    a las fuentes 2–5 para ajustar la proyección al período actual.
 
     Query params: n (default 8), meses (default 3).
     """
@@ -228,8 +246,10 @@ def api_proyeccion_demanda(request):
         from pedidos.models import OrdenCompra
         from django.utils import timezone
         from django.db.models import Sum
+        from django.db.models.functions import TruncMonth
         from datetime import timedelta
         from core.motor.config import MotorConfig
+        from core.motor.demanda_engine import DemandaInteligenteEngine
 
         _n_default = MotorConfig.get('PROYECCION_N_INSUMOS', cast=int)
         _m_default = MotorConfig.get('PROYECCION_MESES', cast=int)
@@ -241,6 +261,8 @@ def api_proyeccion_demanda(request):
     try:
         hoy = timezone.now()
         periodo_actual = hoy.strftime('%Y-%m')
+        mes_actual = hoy.month
+        engine = DemandaInteligenteEngine()
 
         # Pre-cargar proyecciones del período actual para evitar N queries
         proyecciones_bd = {
@@ -248,16 +270,33 @@ def api_proyeccion_demanda(request):
             for p in ProyeccionInsumo.objects.filter(periodo=periodo_actual)
         }
 
-        # Pre-cargar media mensual de ordenes de compra (últimos 6 meses) por insumo
+        # Pre-cargar media mensual de órdenes de compra (últimos 6 meses) por insumo.
+        # Divide por los meses reales con actividad, no siempre por 6.
         hace_6m = hoy - timedelta(days=180)
         ordenes_por_insumo = {}
+        meses_activos_por_insumo = {}
         for row in (
             OrdenCompra.objects
             .filter(fecha_creacion__gte=hace_6m)
             .values('insumo_id')
             .annotate(total=Sum('cantidad'))
         ):
-            ordenes_por_insumo[row['insumo_id']] = row['total'] / 6.0  # promedio mensual
+            ordenes_por_insumo[row['insumo_id']] = row['total']
+        for row in (
+            OrdenCompra.objects
+            .filter(fecha_creacion__gte=hace_6m)
+            .annotate(mes=TruncMonth('fecha_creacion'))
+            .values('insumo_id', 'mes')
+            .distinct()
+        ):
+            meses_activos_por_insumo[row['insumo_id']] = (
+                meses_activos_por_insumo.get(row['insumo_id'], 0) + 1
+            )
+        # Calcular promedio mensual real para cada insumo
+        ordenes_promedio_por_insumo = {
+            iid: total / meses_activos_por_insumo.get(iid, 1)
+            for iid, total in ordenes_por_insumo.items()
+        }
 
         # Solo insumos directos (se incorporan al producto final)
         # Insumos con proyección explícita primero, luego por stock (más críticos)
@@ -273,26 +312,57 @@ def api_proyeccion_demanda(request):
 
         proyecciones = []
         for insumo in insumos:
-            # 1) ProyeccionInsumo oficial
-            demanda = proyecciones_bd.get(insumo.idInsumo)
+            fuente = 'catalogo'
 
-            # 2) Media móvil de ConsumoRealInsumo
+            # 1) ProyeccionInsumo oficial — ya incluye ajuste estacional del motor
+            demanda = proyecciones_bd.get(insumo.idInsumo)
+            if demanda is not None:
+                fuente = 'proyeccion'
+
+            # 2) Media móvil ponderada de ConsumoRealInsumo + factor estacional
             if demanda is None:
                 demanda = predecir_demanda_media_movil(insumo, periodo_actual, meses=meses)
+                if demanda is not None and demanda > 0:
+                    fuente = 'media_movil'
 
-            # 3) Media de OrdenCompra
+            # 3) Media de OrdenCompra por meses reales + factor estacional
             if demanda is None or demanda == 0:
-                demanda = ordenes_por_insumo.get(insumo.idInsumo)
+                prom = ordenes_promedio_por_insumo.get(insumo.idInsumo)
+                if prom:
+                    demanda = prom
+                    fuente = 'ordenes'
 
-            # 4) cantidad típica del catálogo
+            # 4) Cantidad típica del catálogo
             if demanda is None or demanda == 0:
                 demanda = float(insumo.cantidad or 0)
+                if demanda > 0:
+                    fuente = 'catalogo'
 
-            # 5) stock mínimo manual como proxy de consumo mensual PYME
+            # 5) Stock mínimo manual como proxy de consumo mensual PYME
             if demanda is None or demanda == 0:
                 demanda = float(insumo.stock_minimo_manual or 0)
+                if demanda > 0:
+                    fuente = 'stock_minimo'
 
             demanda = float(demanda or 0)
+
+            # Aplicar factor estacional a fuentes que no son la proyección oficial
+            # (la proyección oficial ya lo incorpora en el motor de demanda)
+            if fuente != 'proyeccion' and demanda > 0:
+                factor = engine._factor_estacional(insumo, mes_actual)
+                demanda = max(0.0, demanda * factor)
+
+            # Cap de sanity: fuentes sin historial real (ordenes/catalogo/stock_minimo)
+            # no deben superar un máximo razonable. Se usa el mayor entre:
+            #   - stock_minimo_sugerido * 10  (estimación conservadora mensual)
+            #   - stock_actual * 5            (5 veces el stock disponible)
+            # Esto evita que datos de prueba o packs inflados dominen la proyección.
+            if fuente in ('ordenes', 'catalogo', 'stock_minimo'):
+                stock_min = float(insumo.stock_minimo_sugerido or 0)
+                stock_act = float(insumo.stock or 0)
+                cap = max(stock_min * 10, stock_act * 5, 50.0)
+                demanda = min(demanda, cap)
+
             proyecciones.append({
                 'insumo_id':          insumo.idInsumo,
                 'nombre':             insumo.nombre,
@@ -301,11 +371,7 @@ def api_proyeccion_demanda(request):
                 'stock_minimo':       float(insumo.stock_minimo_sugerido or 0),
                 'demanda_proyectada': round(demanda, 1),
                 'diferencia':         round(float(insumo.stock or 0) - demanda, 1),
-                'fuente':             (
-                    'proyeccion' if insumo.idInsumo in proyecciones_bd else
-                    'ordenes'    if insumo.idInsumo in ordenes_por_insumo else
-                    'catalogo'
-                ),
+                'fuente':             fuente,
             })
 
         # Más críticos primero (menor diferencia stock - demanda)
