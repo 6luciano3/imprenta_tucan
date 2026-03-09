@@ -4,7 +4,6 @@ from django.core.paginator import Paginator
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.db.models import Q
-from django.core.mail import send_mail
 
 from .forms import InsumoForm, AltaInsumoForm, BuscarInsumoForm, ModificarInsumoForm, ConsumoRealInsumoForm
 from configuracion.permissions import require_perm
@@ -35,19 +34,17 @@ def registrar_consumo_real(request):
 
 # --- FUNCION PARA ENVIAR REPORTE DE PROYECCIONES ---
 def enviar_reporte_proyecciones(mensaje):
+    from core.notifications.engine import enviar_notificacion
     roles = ['Administrador', 'Personal de Administración']
     destinatarios = Usuario.objects.filter(rol__nombreRol__in=roles, estado='Activo')
-    emails = destinatarios.values_list('email', flat=True)
-    # Email
-    send_mail(
-        'Reporte de Proyecciones de Insumos',
-        mensaje,
-        'no-reply@tusistema.com',
-        list(emails),
-        fail_silently=False,
-    )
-    # Mensaje interno
     for usuario in destinatarios:
+        if usuario.email:
+            enviar_notificacion(
+                destinatario=usuario.email,
+                mensaje=mensaje,
+                canal='email',
+                asunto='Reporte de Proyecciones de Insumos',
+            )
         Notificacion.objects.create(usuario=usuario, mensaje=mensaje)
 
 

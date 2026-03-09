@@ -268,19 +268,25 @@ def enviar_presupuesto(request, pk):
         )
         from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', 'no-reply@imprenta.local')
         try:
-            from django.core.mail import EmailMultiAlternatives
+            from core.notifications.engine import enviar_notificacion
             from .utils import generar_pdf_presupuesto
-            msg = EmailMultiAlternatives(asunto, texto_plano, from_email, [cliente.email])
-            msg.attach_alternative(html_body, 'text/html')
             pdf_bytes = generar_pdf_presupuesto(presupuesto, link)
+            attachments = []
             if pdf_bytes:
-                msg.attach(
-                    f'presupuesto_{presupuesto.numero}.pdf',
-                    pdf_bytes,
-                    'application/pdf',
-                )
-            msg.send(fail_silently=False)
-            return JsonResponse({'status': 'ok', 'mensaje': f'Email enviado a {cliente.email}'})
+                attachments.append((f'presupuesto_{presupuesto.numero}.pdf', pdf_bytes, 'application/pdf'))
+            resultado = enviar_notificacion(
+                destinatario=cliente.email,
+                mensaje=texto_plano,
+                canal='email',
+                asunto=asunto,
+                html=html_body,
+                metadata={'presupuesto_id': presupuesto.pk},
+                attachments=attachments or None,
+            )
+            if resultado['ok']:
+                return JsonResponse({'status': 'ok', 'mensaje': f'Email enviado a {cliente.email}'})
+            else:
+                return JsonResponse({'error': f'Error al enviar: {resultado.get("error")}'}, status=500)
         except Exception as e:
             return JsonResponse({'error': f'Error al enviar: {e}'}, status=500)
 

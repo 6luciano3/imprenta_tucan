@@ -1,6 +1,5 @@
 import os
 import sys
-from django.core.mail import send_mail
 
 
 def main():

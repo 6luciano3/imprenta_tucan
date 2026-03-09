@@ -50,6 +50,7 @@ class AltaInsumoForm(forms.ModelForm):
         if q:
             qs = qs.filter(q)
         self.fields["proveedor"].queryset = qs.order_by("nombre")
+        self.fields["proveedor"].label_from_instance = lambda obj: obj.nombre
 
     def clean_cantidad(self):
         cantidad = self.cleaned_data.get("cantidad")

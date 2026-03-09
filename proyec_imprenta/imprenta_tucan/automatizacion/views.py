@@ -176,7 +176,6 @@ def actualizar_titulo_oferta(request):
     except Exception as e:
         return JsonResponse({'ok': False, 'error': str(e)})
 
-from django.core.mail import send_mail
 from django.template.loader import render_to_string
 from django.conf import settings
 # --- Importaciones necesarias ---
@@ -975,7 +974,6 @@ def consultar_stock_propuesta(request, propuesta_id):
     return redirect('compras_propuestas')
 
 
-from django.core.mail import send_mail
 from django.template.loader import render_to_string
 from django.conf import settings
 @login_required
@@ -1021,7 +1019,6 @@ def aceptar_compra_propuesta(request, propuesta_id):
     # --- Enviar orden de compra al proveedor por email ---
     if oc and oc.proveedor and oc.proveedor.email:
         try:
-            # Renderizar el cuerpo del email usando el mismo template de orden de compra
             context = {
                 'orden': oc,
                 'proveedor': oc.proveedor,
@@ -1038,13 +1035,14 @@ def aceptar_compra_propuesta(request, propuesta_id):
                 'total': '{:.2f}'.format(float(oc.insumo.precio_unitario) * oc.cantidad * 1.21),
             }
             html_message = render_to_string('pedidos/orden_compra_detalle.html', context)
-            send_mail(
-                subject=f"Orden de Compra #{oc.id:06d} - {Parametro.get('EMPRESA_RAZON_SOCIAL', 'Imprenta Tucán')}",
-                message="Adjuntamos la orden de compra generada.",
-                from_email=getattr(settings, 'DEFAULT_FROM_EMAIL', 'info@imprentatucan.com'),
-                recipient_list=[oc.proveedor.email],
-                html_message=html_message,
-                fail_silently=True,
+            from core.notifications.engine import enviar_notificacion
+            enviar_notificacion(
+                destinatario=oc.proveedor.email,
+                mensaje='Adjuntamos la orden de compra generada.',
+                canal='email',
+                asunto=f"Orden de Compra #{oc.id:06d} - {Parametro.get('EMPRESA_RAZON_SOCIAL', 'Imprenta Tucán')}",
+                html=html_message,
+                metadata={'orden_compra_id': oc.id},
             )
         except Exception as e:
             messages.warning(request, f"No se pudo enviar el email al proveedor: {e}")

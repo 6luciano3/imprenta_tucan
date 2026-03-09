@@ -32,6 +32,7 @@ def enviar_notificacion(
     asunto: str | None = None,
     html: str | None = None,
     metadata: dict | None = None,
+    attachments: list | None = None,
 ) -> dict:
     """
     Despacha una notificación al canal indicado.
@@ -65,7 +66,7 @@ def enviar_notificacion(
         return {'ok': False, 'error': err}
 
     try:
-        resultado = handler(destinatario, mensaje, asunto=asunto, html=html, metadata=metadata)
+        resultado = handler(destinatario, mensaje, asunto=asunto, html=html, metadata=metadata, attachments=attachments)
         _registrar_log(destinatario, canal, mensaje, metadata, exito=resultado.get('ok', False))
         return resultado
     except Exception as exc:
@@ -76,16 +77,19 @@ def enviar_notificacion(
 
 # ── Canal: email ─────────────────────────────────────────────────────────────
 
-def _enviar_email(destinatario, mensaje, *, asunto=None, html=None, metadata=None):
+def _enviar_email(destinatario, mensaje, *, asunto=None, html=None, metadata=None, attachments=None):
     from django.core.mail import send_mail, EmailMultiAlternatives
     from django.conf import settings
 
     remitente = getattr(settings, 'DEFAULT_FROM_EMAIL', 'noreply@imprentatucan.com')
     asunto = asunto or 'Notificación — Imprenta Tucán'
 
-    if html:
+    if html or attachments:
         msg = EmailMultiAlternatives(asunto, mensaje, remitente, [destinatario])
-        msg.attach_alternative(html, 'text/html')
+        if html:
+            msg.attach_alternative(html, 'text/html')
+        for att in (attachments or []):
+            msg.attach(*att)
         msg.send()
     else:
         send_mail(asunto, mensaje, remitente, [destinatario], fail_silently=False)
@@ -96,103 +100,321 @@ def _enviar_email(destinatario, mensaje, *, asunto=None, html=None, metadata=Non
 
 # ── Canal: SMS (Twilio) ───────────────────────────────────────────────────────
 
-def _enviar_sms(destinatario, mensaje, *, asunto=None, html=None, metadata=None):
+_E164_RE = None  # compilado la primera vez que se necesita
+
+
+def _validar_e164(numero: str) -> bool:
+    """Valida que el número esté en formato E.164: +<código de país><número>, 8–15 dígitos."""
+    import re
+    global _E164_RE
+    if _E164_RE is None:
+        _E164_RE = re.compile(r'^\+[1-9]\d{7,14}$')
+    return bool(_E164_RE.match(numero))
+
+
+def _enviar_sms(destinatario, mensaje, *, asunto=None, html=None, metadata=None, attachments=None):
     """
-    Envía SMS vía Twilio si las credenciales están configuradas en BD (Parametro).
-    Si no están configuradas, registra advertencia y retorna error gracioso.
+    Envía SMS vía SDK oficial de Twilio.
+
+    Requiere en BD (Configuración > Parámetros):
+        TWILIO_ACCOUNT_SID  — Account SID de la consola Twilio
+        TWILIO_AUTH_TOKEN   — Auth Token de la consola Twilio
+        TWILIO_FROM_NUMBER  — Número remitente en formato E.164 (+1415XXXXXXX)
+
+    El número destinatario también debe estar en formato E.164.
     """
+    # ── 1. Validar formato del destinatario ───────────────────────────────────
+    if not _validar_e164(destinatario):
+        err = (
+            f'Número de teléfono inválido: {destinatario!r}. '
+            'Debe estar en formato E.164 (ej: +5493816123456).'
+        )
+        logger.warning('SMS rechazado: %s', err)
+        return {'ok': False, 'error': err}
+
+    # ── 2. Leer credenciales: BD primero, variables de entorno como fallback ──
     try:
         from configuracion.models import Parametro
         account_sid = Parametro.get('TWILIO_ACCOUNT_SID', '')
         auth_token  = Parametro.get('TWILIO_AUTH_TOKEN', '')
         from_number = Parametro.get('TWILIO_FROM_NUMBER', '')
     except Exception as e:
-        return {'ok': False, 'error': f'No se pudo leer la config de Twilio: {e}'}
+        logger.warning('SMS: no se pudo leer config de BD (%s), usando variables de entorno.', e)
+        account_sid = auth_token = from_number = ''
+
+    # Variables de entorno como fallback (útil en CI, Docker, entornos sin BD lista)
+    import os
+    account_sid = account_sid or os.environ.get('TWILIO_ACCOUNT_SID', '')
+    auth_token  = auth_token  or os.environ.get('TWILIO_AUTH_TOKEN', '')
+    from_number = from_number or os.environ.get('TWILIO_FROM_NUMBER', '')
 
     if not account_sid or not auth_token or not from_number:
+        # ── Modo desarrollo: simular el envío sin fallar ───────────────────────
+        from django.conf import settings
+        if getattr(settings, 'DEBUG', False):
+            logger.warning(
+                '[SMS SIMULADO] Credenciales Twilio no configuradas. '
+                'Destinatario: %s | Mensaje: %.80s',
+                destinatario, mensaje,
+            )
+            return {
+                'ok': True,
+                'simulated': True,
+                'warning': 'SMS simulado — credenciales Twilio no configuradas (DEBUG=True).',
+            }
+        # Producción: informar claramente sin lanzar excepción
         logger.warning(
-            'SMS no enviado a %s: credenciales Twilio no configuradas '
-            '(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM_NUMBER en Parametro).',
+            'SMS no enviado a %s: credenciales Twilio ausentes '
+            '(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM_NUMBER).',
             destinatario,
         )
         return {
             'ok': False,
-            'error': 'Credenciales Twilio no configuradas. Configura TWILIO_ACCOUNT_SID, '
-                     'TWILIO_AUTH_TOKEN y TWILIO_FROM_NUMBER en Configuración > Parámetros.',
+            'error': (
+                'Credenciales Twilio no configuradas. '
+                'Agrega TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN y TWILIO_FROM_NUMBER '
+                'en Configuración > Parámetros o como variables de entorno.'
+            ),
         }
 
+    if not _validar_e164(from_number):
+        logger.error('SMS: TWILIO_FROM_NUMBER no está en formato E.164: %s', from_number)
+        return {
+            'ok': False,
+            'error': f'TWILIO_FROM_NUMBER tiene formato inválido: {from_number!r}. Usa E.164.',
+        }
+
+    # ── 3. Enviar con el SDK oficial de Twilio ────────────────────────────────
     try:
-        import requests
-        url = f'https://api.twilio.com/2010-04-01/Accounts/{account_sid}/Messages.json'
-        response = requests.post(
-            url,
-            data={'From': from_number, 'To': destinatario, 'Body': mensaje},
-            auth=(account_sid, auth_token),
-            timeout=15,
+        from twilio.rest import Client
+        from twilio.base.exceptions import TwilioRestException
+
+        client = Client(account_sid, auth_token)
+        message = client.messages.create(
+            body=mensaje,
+            from_=from_number,
+            to=destinatario,
         )
-        response.raise_for_status()
-        sid = response.json().get('sid', '')
-        logger.info('SMS enviado a %s (SID: %s)', destinatario, sid)
-        return {'ok': True, 'sid': sid}
+        logger.info(
+            'SMS enviado a %s — SID: %s, estado: %s',
+            destinatario, message.sid, message.status,
+        )
+        return {'ok': True, 'sid': message.sid, 'status': message.status}
+
+    except TwilioRestException as exc:
+        # Errores de autenticación (20003), número inválido (21211), etc.
+        logger.error(
+            'SMS Twilio error %s a %s: %s',
+            exc.code, destinatario, exc.msg,
+        )
+        return {
+            'ok': False,
+            'error': f'Twilio error {exc.code}: {exc.msg}',
+            'twilio_code': exc.code,
+        }
+
+    except ConnectionError as exc:
+        logger.error('SMS: error de red al conectar con Twilio: %s', exc)
+        return {'ok': False, 'error': f'Error de red: {exc}'}
+
     except Exception as exc:
-        logger.error('SMS Twilio falló para %s: %s', destinatario, exc)
+        logger.exception('SMS: excepción inesperada para %s', destinatario)
         return {'ok': False, 'error': str(exc)}
 
 
-# ── Canal: WhatsApp (API configurable) ───────────────────────────────────────
+# ── Canal: WhatsApp (Meta Cloud API / Twilio WhatsApp) ───────────────────────
+#
+# Proveedor seleccionado con el parámetro WHATSAPP_PROVIDER en BD:
+#   'meta'   → Meta Cloud API (graph.facebook.com) — recomendado para producción
+#   'twilio' → Twilio WhatsApp sandbox o número aprobado (usa el SDK ya instalado)
+#
+# Parámetros comunes (Configuración > Parámetros):
+#   WHATSAPP_PROVIDER        'meta' | 'twilio'  (por defecto 'meta')
+#   WHATSAPP_API_TOKEN       Bearer token (Meta) o Auth Token (Twilio)
+#
+# Parámetros exclusivos Meta:
+#   WHATSAPP_PHONE_NUMBER_ID  Phone Number ID de la app Meta (no el número visible)
+#
+# Parámetros exclusivos Twilio:
+#   TWILIO_ACCOUNT_SID        (se reutiliza del canal SMS)
+#   TWILIO_WHATSAPP_FROM      número remitente con prefijo  whatsapp:+1415XXXXXXX
 
-def _enviar_whatsapp(destinatario, mensaje, *, asunto=None, html=None, metadata=None):
-    """
-    Envía mensaje WhatsApp vía API HTTP configurable.
-    Compatible con providers como:
-      - Twilio WhatsApp (agrega prefijo 'whatsapp:' automáticamente)
-      - 360dialog, MessageBird, Meta Cloud API, etc.
 
-    Parámetros requeridos en BD (Parametro):
-        WHATSAPP_API_URL   → endpoint HTTP al que se hace POST
-        WHATSAPP_API_TOKEN → bearer token o API key
+def _build_payload_meta(destinatario: str, mensaje: str) -> dict:
+    """Payload para Meta Cloud API (messages endpoint v17+)."""
+    return {
+        'messaging_product': 'whatsapp',
+        'recipient_type': 'individual',
+        'to': destinatario,
+        'type': 'text',
+        'text': {'preview_url': False, 'body': mensaje},
+    }
+
+
+def _enviar_whatsapp_meta(destinatario: str, mensaje: str, phone_number_id: str, token: str) -> dict:
+    import requests
+
+    url = f'https://graph.facebook.com/v19.0/{phone_number_id}/messages'
+    headers = {
+        'Authorization': f'Bearer {token}',
+        'Content-Type': 'application/json',
+    }
+    payload = _build_payload_meta(destinatario, mensaje)
+
+    try:
+        resp = requests.post(url, json=payload, headers=headers, timeout=15)
+    except ConnectionError as exc:
+        logger.error('WhatsApp Meta: error de red: %s', exc)
+        return {'ok': False, 'error': f'Error de red: {exc}'}
+
+    if not resp.ok:
+        # Meta devuelve detalles de error en JSON
+        try:
+            err_data = resp.json().get('error', {})
+            err_msg = err_data.get('message', resp.text)
+            err_code = err_data.get('code', resp.status_code)
+        except Exception:
+            err_msg, err_code = resp.text, resp.status_code
+        logger.error('WhatsApp Meta HTTP %s a %s: %s', err_code, destinatario, err_msg)
+        return {'ok': False, 'error': f'Meta API error {err_code}: {err_msg}'}
+
+    try:
+        msg_id = resp.json().get('messages', [{}])[0].get('id', '')
+    except Exception:
+        msg_id = ''
+
+    logger.info('WhatsApp Meta enviado a %s — message_id: %s', destinatario, msg_id)
+    return {'ok': True, 'message_id': msg_id}
+
+
+def _enviar_whatsapp_twilio(destinatario: str, mensaje: str, account_sid: str, auth_token: str, from_number: str) -> dict:
+    try:
+        from twilio.rest import Client
+        from twilio.base.exceptions import TwilioRestException
+    except ImportError:
+        return {'ok': False, 'error': 'SDK twilio no instalado. Ejecuta: pip install "twilio>=9.0,<10"'}
+
+    # Twilio WhatsApp requiere el prefijo 'whatsapp:' en ambos extremos
+    to_wa   = destinatario if destinatario.startswith('whatsapp:') else f'whatsapp:{destinatario}'
+    from_wa = from_number  if from_number.startswith('whatsapp:')  else f'whatsapp:{from_number}'
+
+    try:
+        client  = Client(account_sid, auth_token)
+        message = client.messages.create(body=mensaje, from_=from_wa, to=to_wa)
+        logger.info('WhatsApp Twilio enviado a %s — SID: %s, estado: %s',
+                    destinatario, message.sid, message.status)
+        return {'ok': True, 'sid': message.sid, 'status': message.status}
+
+    except TwilioRestException as exc:
+        logger.error('WhatsApp Twilio error %s a %s: %s', exc.code, destinatario, exc.msg)
+        return {'ok': False, 'error': f'Twilio error {exc.code}: {exc.msg}', 'twilio_code': exc.code}
+
+    except ConnectionError as exc:
+        logger.error('WhatsApp Twilio: error de red: %s', exc)
+        return {'ok': False, 'error': f'Error de red: {exc}'}
+
+    except Exception as exc:
+        logger.exception('WhatsApp Twilio: excepción inesperada para %s', destinatario)
+        return {'ok': False, 'error': str(exc)}
+
+
+def _whatsapp_sin_credenciales(destinatario: str, mensaje: str, *, faltantes: str, proveedor: str) -> dict:
     """
+    Maneja el caso de credenciales incompletas.
+    En DEBUG simula el envío; en producción retorna error descriptivo sin lanzar excepción.
+    """
+    from django.conf import settings
+    if getattr(settings, 'DEBUG', False):
+        logger.warning(
+            '[WhatsApp SIMULADO — %s] Credenciales no configuradas. '
+            'Destinatario: %s | Mensaje: %.80s',
+            proveedor, destinatario, mensaje,
+        )
+        return {
+            'ok': True,
+            'simulated': True,
+            'warning': f'WhatsApp simulado — {faltantes} no configurados (DEBUG=True).',
+        }
+    logger.warning(
+        'WhatsApp %s no enviado a %s: faltan %s.',
+        proveedor, destinatario, faltantes,
+    )
+    return {
+        'ok': False,
+        'error': (
+            f'WhatsApp {proveedor} no configurado. '
+            f'Agrega {faltantes} en Configuración > Parámetros '
+            'o como variables de entorno.'
+        ),
+    }
+
+
+def _enviar_whatsapp(destinatario, mensaje, *, asunto=None, html=None, metadata=None, attachments=None):
+    """
+    Envía mensaje de WhatsApp Business.
+
+    Proveedores soportados (WHATSAPP_PROVIDER en BD):
+        'meta'   → Meta Cloud API  (por defecto)
+        'twilio' → Twilio WhatsApp Business
+    """
+    # ── 1. Validar formato del destinatario ─────────────────────────────────
+    numero_limpio = destinatario.removeprefix('whatsapp:')
+    if not _validar_e164(numero_limpio):
+        err = (
+            f'Número de teléfono inválido: {destinatario!r}. '
+            'Debe estar en formato E.164 (ej: +5493816123456).'
+        )
+        logger.warning('WhatsApp rechazado: %s', err)
+        return {'ok': False, 'error': err}
+
+    # ── 2. Leer configuración: BD primero, variables de entorno como fallback ─
+    import os
     try:
         from configuracion.models import Parametro
-        api_url   = Parametro.get('WHATSAPP_API_URL', '')
-        api_token = Parametro.get('WHATSAPP_API_TOKEN', '')
+        proveedor       = Parametro.get('WHATSAPP_PROVIDER', '')
+        api_token       = Parametro.get('WHATSAPP_API_TOKEN', '')
+        phone_number_id = Parametro.get('WHATSAPP_PHONE_NUMBER_ID', '')   # Meta
+        account_sid     = Parametro.get('TWILIO_ACCOUNT_SID', '')         # Twilio
+        from_number     = Parametro.get('TWILIO_WHATSAPP_FROM', '')       # Twilio
     except Exception as e:
-        return {'ok': False, 'error': f'No se pudo leer la config de WhatsApp: {e}'}
+        logger.warning('WhatsApp: no se pudo leer config de BD (%s), usando variables de entorno.', e)
+        proveedor = api_token = phone_number_id = account_sid = from_number = ''
 
-    if not api_url:
-        logger.warning(
-            'WhatsApp no enviado a %s: WHATSAPP_API_URL no configurada.',
-            destinatario,
-        )
-        return {
-            'ok': False,
-            'error': 'WHATSAPP_API_URL no configurada. '
-                     'Configura WHATSAPP_API_URL y WHATSAPP_API_TOKEN en Configuración > Parámetros.',
-        }
+    # Variables de entorno como fallback
+    proveedor       = (proveedor       or os.environ.get('WHATSAPP_PROVIDER', 'meta')).lower().strip()
+    api_token       = api_token        or os.environ.get('WHATSAPP_API_TOKEN', '')
+    phone_number_id = phone_number_id  or os.environ.get('WHATSAPP_PHONE_NUMBER_ID', '')
+    account_sid     = account_sid      or os.environ.get('TWILIO_ACCOUNT_SID', '')
+    from_number     = from_number      or os.environ.get('TWILIO_WHATSAPP_FROM', '')
 
-    try:
-        import requests
-        headers = {'Content-Type': 'application/json'}
-        if api_token:
-            headers['Authorization'] = f'Bearer {api_token}'
+    # ── 3. Delegar al proveedor seleccionado ─────────────────────────────────
+    if proveedor == 'meta':
+        if not api_token or not phone_number_id:
+            return _whatsapp_sin_credenciales(
+                destinatario, mensaje,
+                faltantes='WHATSAPP_API_TOKEN y WHATSAPP_PHONE_NUMBER_ID',
+                proveedor='Meta',
+            )
+        return _enviar_whatsapp_meta(numero_limpio, mensaje, phone_number_id, api_token)
 
-        payload = {
-            'to':      destinatario,
-            'message': mensaje,
-            'type':    'text',
-        }
-        response = requests.post(api_url, json=payload, headers=headers, timeout=15)
-        response.raise_for_status()
-        logger.info('WhatsApp enviado a %s', destinatario)
-        return {'ok': True}
-    except Exception as exc:
-        logger.error('WhatsApp API falló para %s: %s', destinatario, exc)
-        return {'ok': False, 'error': str(exc)}
+    elif proveedor == 'twilio':
+        if not account_sid or not api_token or not from_number:
+            return _whatsapp_sin_credenciales(
+                destinatario, mensaje,
+                faltantes='TWILIO_ACCOUNT_SID, WHATSAPP_API_TOKEN y TWILIO_WHATSAPP_FROM',
+                proveedor='Twilio',
+            )
+        return _enviar_whatsapp_twilio(numero_limpio, mensaje, account_sid, api_token, from_number)
+
+    else:
+        err = f'Proveedor WhatsApp desconocido: {proveedor!r}. Valores válidos: "meta", "twilio".'
+        logger.error('WhatsApp: %s', err)
+        return {'ok': False, 'error': err}
 
 
 # ── Canal: Portal (notificación interna) ─────────────────────────────────────
 
-def _enviar_portal(destinatario, mensaje, *, asunto=None, html=None, metadata=None):
+def _enviar_portal(destinatario, mensaje, *, asunto=None, html=None, metadata=None, attachments=None):
     """
     Registra la notificación en AutomationLog (visible en el panel interno).
     'destinatario' puede ser un user_id, username o cualquier identificador.
