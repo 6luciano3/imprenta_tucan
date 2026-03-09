@@ -75,8 +75,8 @@ class Proveedor(models.Model):
     activo = models.BooleanField(default=True)
 
     def __str__(self):
-        # Mostrar nombre y CUIT si está disponible
-        return f"{self.nombre}{f' ({self.cuit})' if self.cuit else ''}"
+        # Mostrar solo el nombre (sin CUIT)
+        return self.nombre
 
     @property
     def numero_whatsapp(self) -> str | None:

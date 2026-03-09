@@ -807,20 +807,7 @@ def accion_callback(request):
 
 
 # --- Acción manual: generar propuestas de ofertas ---
-@login_required
-def generar_propuestas(request):
-    # Solo staff o grupo Comercial
-    if request.method != 'POST':
-        return redirect('ofertas_propuestas')
-    permitido = request.user.is_staff or request.user.groups.filter(name='Comercial').exists()
-    if not permitido:
-        return redirect('ofertas_propuestas')
-    try:
-        from automatizacion.tasks import tarea_generar_ofertas
-        resultado = tarea_generar_ofertas()
-        return redirect(f"/automatizacion/propuestas/?ok=1&msg={resultado}")
-    except Exception as e:
-        return redirect(f"/automatizacion/propuestas/?ok=0&msg=Error%20al%20generar:%20{e}")
+
 
 
 @login_required

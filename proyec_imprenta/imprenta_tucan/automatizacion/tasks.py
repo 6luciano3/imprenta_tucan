@@ -195,7 +195,32 @@ def tarea_verificar_generacion_ofertas():
         )
     except Exception:
         pass
-    return f"generar_ofertas: {count} propuestas generadas ({periodo})"
+    # Auto-enviar segun umbral de score
+    try:
+        from automatizacion.services import enviar_oferta_email
+        umbral = int(Parametro.get('UMBRAL_AUTO_ENVIO_SCORE', 0))
+        pendientes = OfertaPropuesta.objects.filter(estado='pendiente').select_related('cliente')
+        enviadas_auto = 0
+        for oferta in pendientes:
+            score = oferta.score_al_generar or 0
+            if score >= umbral:
+                ok, _ = enviar_oferta_email(oferta)
+                if ok:
+                    oferta.estado = 'enviada'
+                    oferta.fecha_validacion = ahora
+                    oferta.save(update_fields=['estado', 'fecha_validacion'])
+                    enviadas_auto += 1
+        if enviadas_auto:
+            AutomationLog.objects.create(
+                evento='ofertas_enviadas_auto',
+                descripcion=f'{enviadas_auto} ofertas enviadas automaticamente (umbral score={umbral}).',
+                datos={'enviadas': enviadas_auto, 'umbral': umbral},
+            )
+    except Exception as e:
+        logger.warning('Auto-envio de ofertas fallo: %s', e)
+        enviadas_auto = 0
+
+    return f"generar_ofertas: {count} propuestas generadas, {enviadas_auto} enviadas ({periodo})"
 
 
 @shared_task
