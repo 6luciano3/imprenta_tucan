@@ -4,7 +4,7 @@ from datetime import timedelta
 from django.utils import timezone
 from automatizacion.models import ScoreProveedor, OfertaPropuesta
 import requests
-from configuracion.models import Parametro
+from configuracion.models import Parametro, GrupoParametro
 from pedidos.models import Pedido
 from proveedores.models import Proveedor
 
@@ -141,27 +141,61 @@ def tarea_recalcular_scores_proveedores():
         return f"scores_proveedores: error {e}"
 
 
+
+# Tarea que se ejecuta cada hora y decide si corresponde generar ofertas
 @shared_task
-def tarea_generar_ofertas():
-    """Thin wrapper: delega toda la lógica a core/ai_ml/ofertas.py."""
+def tarea_verificar_generacion_ofertas():
+    """
+    Verifica si corresponde generar ofertas según el intervalo configurado.
+    Crea el parámetro OFERTAS_INTERVALO_HORAS si no existe.
+    """
+    from django.utils import timezone
+    from automatizacion.models import AutomationLog
+    from core.ai_ml.ofertas import generar_ofertas_segmentadas
+    from django.db import transaction
+
+    # Buscar o crear parámetro
+    grupo = GrupoParametro.objects.filter(codigo="AUTOMATIZACION").first()
+    if not grupo:
+        grupo = GrupoParametro.objects.first()
+    intervalo = Parametro.get("OFERTAS_INTERVALO_HORAS")
+    if intervalo is None:
+        Parametro.set(
+            "OFERTAS_INTERVALO_HORAS",
+            24,
+            tipo=Parametro.TIPO_INT,
+            grupo=grupo,
+            nombre="Intervalo de generación de ofertas (horas)",
+            descripcion="Frecuencia en horas para la generación automática de ofertas.",
+        )
+        intervalo = 24
     try:
-        from core.ai_ml.ofertas import generar_ofertas_segmentadas
-        resultado = generar_ofertas_segmentadas()
-        count = resultado['generadas']
-        periodo = resultado['periodo']
-        # Registrar en AutomationLog cuántas y en qué período
-        try:
-            from automatizacion.models import AutomationLog
-            AutomationLog.objects.create(
-                evento='ofertas_generadas',
-                descripcion=f'{count} ofertas generadas automáticamente (período: {periodo}).',
-                datos={'generadas': count, 'periodo': periodo},
-            )
-        except Exception:
-            pass
-        return f"generar_ofertas: {count} propuestas generadas ({periodo})"
-    except Exception as e:
-        return f"generar_ofertas: error {e}"
+        intervalo = int(intervalo)
+    except Exception:
+        intervalo = 24
+
+    # Buscar última ejecución
+    ultimo_log = AutomationLog.objects.filter(evento="ofertas_generadas").order_by("-fecha").first()
+    ahora = timezone.now()
+    if ultimo_log:
+        delta = ahora - ultimo_log.fecha
+        horas = delta.total_seconds() / 3600
+        if horas < intervalo:
+            return f"No corresponde generar ofertas: solo han pasado {horas:.1f}h (intervalo={intervalo}h)"
+
+    # Generar ofertas
+    resultado = generar_ofertas_segmentadas()
+    count = resultado['generadas']
+    periodo = resultado['periodo']
+    try:
+        AutomationLog.objects.create(
+            evento='ofertas_generadas',
+            descripcion=f'{count} ofertas generadas automáticamente (período: {periodo}).',
+            datos={'generadas': count, 'periodo': periodo},
+        )
+    except Exception:
+        pass
+    return f"generar_ofertas: {count} propuestas generadas ({periodo})"
 
 
 @shared_task

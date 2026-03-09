@@ -18,7 +18,7 @@
       <span class="material-symbols-outlined text-lg text-gray-400">database</span>
       <h2 class="text-xs font-semibold tracking-widest text-gray-400 uppercase">Datos base</h2>
     </div>
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
 
       <!-- Unidades de Medida -->
       <a href="{% url 'unidad_list' %}"
@@ -84,6 +84,23 @@
         <div class="mt-4 flex items-center justify-end">
           <span class="text-sm text-primary font-medium group-hover:underline flex items-center gap-1">
             Editar <span class="material-symbols-outlined text-sm">arrow_forward</span>
+          </span>
+        </div>
+      </a>
+
+      <!-- Parámetros -->
+      <a href="/configuracion/parametros/"
+        class="group bg-white rounded-xl shadow-sm border border-gray-100 p-5 flex flex-col hover:shadow-md hover:border-primary/30 transition-all duration-200">
+        <div class="flex items-start gap-3">
+          <span class="material-symbols-outlined text-2xl text-primary bg-primary/10 rounded-lg p-2">tune</span>
+          <div class="min-w-0">
+            <p class="font-semibold text-gray-800 group-hover:text-primary transition text-base">Parámetros</p>
+            <p class="text-sm text-gray-500 mt-1 leading-snug">Configuración avanzada y reglas de negocio editables.</p>
+          </div>
+        </div>
+        <div class="mt-4 flex items-center justify-end">
+          <span class="text-sm text-primary font-medium group-hover:underline flex items-center gap-1">
+            Gestionar <span class="material-symbols-outlined text-sm">arrow_forward</span>
           </span>
         </div>
       </a>

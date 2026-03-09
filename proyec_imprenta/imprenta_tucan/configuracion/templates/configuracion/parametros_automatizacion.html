@@ -1,0 +1,49 @@
+{% extends 'base.html' %}
+{% block title %}Parámetros de Automatización{% endblock %}
+{% block content %}
+<div class="max-w-3xl mx-auto">
+  <div class="mb-8">
+    <div class="flex items-center gap-3 mb-1">
+      <span class="material-symbols-outlined text-3xl text-primary">tune</span>
+      <h1 class="text-2xl font-bold text-gray-800">Parámetros de Automatización</h1>
+    </div>
+    <p class="text-sm text-gray-500 ml-10">Modifica los parámetros clave para la automatización del sistema.</p>
+  </div>
+
+  <form method="post" class="space-y-6">
+    {% csrf_token %}
+    {% for p in parametros %}
+    <div class="bg-white rounded-xl shadow border border-gray-100 p-5">
+      <div class="flex items-center gap-3 mb-2">
+        <span class="material-symbols-outlined text-xl text-primary">settings</span>
+        <div>
+          <p class="font-semibold text-gray-800">{{ p.nombre }}</p>
+          <p class="text-xs text-gray-500">{{ p.descripcion }}</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-4">
+        <label for="valor_{{ p.codigo }}" class="text-sm font-medium">Valor actual:</label>
+        {% if p.tipo == 'bool' %}
+          <select name="valor_{{ p.codigo }}" id="valor_{{ p.codigo }}" class="border rounded px-3 py-2 text-sm w-40">
+            <option value="True" {% if p.valor|lower == 'true' or p.valor|lower == '1' %}selected{% endif %}>Sí</option>
+            <option value="False" {% if p.valor|lower == 'false' or p.valor|lower == '0' %}selected{% endif %}>No</option>
+          </select>
+        {% elif p.tipo == 'int' or p.tipo == 'float' %}
+          <input type="number" name="valor_{{ p.codigo }}" id="valor_{{ p.codigo }}" value="{{ p.valor }}" class="border rounded px-3 py-2 text-sm w-40">
+        {% elif p.tipo == 'json' %}
+          <textarea name="valor_{{ p.codigo }}" id="valor_{{ p.codigo }}" class="border rounded px-3 py-2 text-sm w-40">{{ p.valor }}</textarea>
+        {% else %}
+          <input type="text" name="valor_{{ p.codigo }}" id="valor_{{ p.codigo }}" value="{{ p.valor }}" class="border rounded px-3 py-2 text-sm w-40">
+        {% endif %}
+        <span class="text-xs text-gray-400">Tipo: {{ p.get_tipo_display }}</span>
+      </div>
+    </div>
+    {% empty %}
+    <div class="text-center text-gray-500">No hay parámetros configurados para este grupo.</div>
+    {% endfor %}
+    <div class="flex justify-end">
+      <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-6 rounded shadow">Guardar cambios</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

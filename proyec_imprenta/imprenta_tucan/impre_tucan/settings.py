@@ -188,9 +188,9 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'automatizacion.tasks.tarea_recalcular_scores_proveedores',
         'schedule': 6 * 60 * 60,
     },
-    'generar-ofertas-diario': {
-        'task': 'automatizacion.tasks.tarea_generar_ofertas',
-        'schedule': 24 * 60 * 60,
+    'verificar-generacion-ofertas-cada-hora': {
+        'task': 'automatizacion.tasks.tarea_verificar_generacion_ofertas',
+        'schedule': 60 * 60,
     },
     'expirar-ofertas-diario': {
         'task': 'automatizacion.tasks.tarea_expirar_ofertas',

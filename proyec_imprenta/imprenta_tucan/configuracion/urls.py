@@ -2,6 +2,7 @@
 from django.urls import path
 from . import views
 from .views_api import formula_validate_api
+from .views_parametros import parametros_automatizacion
 
 urlpatterns = [
     path('empresa/', views.empresa_config, name='empresa_config'),
@@ -26,4 +27,5 @@ urlpatterns = [
     path('recetas/<int:pk>/editar/', views.receta_producto_update, name='receta_producto_update'),
     path('recetas/<int:pk>/eliminar/', views.receta_producto_delete, name='receta_producto_delete'),
     path('recetas/<int:pk>/editar_formula/', views.receta_producto_update_formula, name='receta_producto_update_formula'),
+    path('parametros/', parametros_automatizacion, name='parametros_automatizacion'),
 ]
