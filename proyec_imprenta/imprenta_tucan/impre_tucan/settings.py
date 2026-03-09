@@ -192,6 +192,10 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'automatizacion.tasks.tarea_generar_ofertas',
         'schedule': 24 * 60 * 60,
     },
+    'expirar-ofertas-diario': {
+        'task': 'automatizacion.tasks.tarea_expirar_ofertas',
+        'schedule': 24 * 60 * 60,  # cada día a las 2 AM (ajustable con crontab)
+    },
     'alertas-retraso-cada-30min': {
         'task': 'automatizacion.tasks.tarea_alertas_retraso',
         'schedule': 30 * 60,
@@ -217,6 +221,10 @@ ANYMAIL_PROVIDER = 'ses'
 # Backend de email: SMTP si hay contraseña configurada, filebased en local/dev
 EMAIL_HOST_USER     = os.environ.get('EMAIL_HOST_USER', '6luciano10@gmail.com')
 EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
+
+# Token secreto para autenticar webhooks internos (callbacks de automatización).
+# Setear en producción vía variable de entorno AUTOMATION_WEBHOOK_SECRET.
+AUTOMATION_WEBHOOK_SECRET = os.environ.get('AUTOMATION_WEBHOOK_SECRET', '')
 
 if EMAIL_HOST_PASSWORD:
     EMAIL_BACKEND  = 'django.core.mail.backends.smtp.EmailBackend'

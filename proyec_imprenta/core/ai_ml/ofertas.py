@@ -156,6 +156,11 @@ def descuento_por_score(score: float) -> int:
 # Lógica de generación de OfertaPropuesta
 # ---------------------------------------------------------------------------
 
+# Días mínimos entre una oferta enviada y la siguiente para el mismo cliente.
+# Configurable via Parametro('OFERTA_CADENCIA_MINIMA_DIAS'); defecto: 15.
+_CADENCIA_MINIMA_DIAS_DEFAULT = 15
+
+
 def generar_ofertas_segmentadas() -> dict:
     """
     Genera una OfertaPropuesta por cliente según su categoría de score.
@@ -174,6 +179,13 @@ def generar_ofertas_segmentadas() -> dict:
         else f"{now.year}-Q{(now.month - 1) // 3 + 1}"
     )
 
+    try:
+        cadencia = int(Parametro.get('OFERTA_CADENCIA_MINIMA_DIAS', _CADENCIA_MINIMA_DIAS_DEFAULT))
+    except Exception:
+        cadencia = _CADENCIA_MINIMA_DIAS_DEFAULT
+
+    hoy = now.date()
+
     generadas = 0
     for rc in RankingCliente.objects.select_related('cliente').iterator(chunk_size=500):
         cliente = rc.cliente
@@ -190,6 +202,19 @@ def generar_ofertas_segmentadas() -> dict:
         ).exists()
         if ya_existe:
             continue
+
+        # Cadencia mínima: no enviar si la última oferta enviada fue hace menos de N días
+        ultima_enviada = (
+            OfertaPropuesta.objects
+            .filter(cliente=cliente, estado='enviada')
+            .order_by('-creada')
+            .values_list('creada', flat=True)
+            .first()
+        )
+        if ultima_enviada is not None:
+            dias_desde_ultimo = (hoy - ultima_enviada.date()).days
+            if dias_desde_ultimo < cadencia:
+                continue
 
         try:
             combo = generar_combo_para_cliente(cliente)

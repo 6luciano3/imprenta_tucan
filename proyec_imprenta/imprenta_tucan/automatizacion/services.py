@@ -1,4 +1,4 @@
-﻿# automatizacion/services.py
+# automatizacion/services.py
 from django.conf import settings
 
 def _html_tabla_combo(combo):
@@ -73,17 +73,47 @@ def enviar_oferta_email(oferta, request=None):
   <p style="font-size:11px;color:#90a4ae;margin:0;">Imprenta Tucan - {getattr(settings, "EMAIL_HOST_USER", "info@imprenta.com.ar")}</p>
 </td></tr>
 </table></td></tr></table>{pixel}</body></html>'''
+    asunto = f'Tu oferta personalizada - {oferta.titulo}'
+    mensaje_texto = f'Hola {nombre}, tenés una oferta personalizada de Imprenta Tucan. Visitá: {link_ver}'
     try:
         from core.notifications.engine import enviar_notificacion
-        resultado = enviar_notificacion(
-            destinatario=cliente.email,
-            mensaje='',
-            canal='email',
-            asunto=f'Tu oferta personalizada - {oferta.titulo}',
-            html=html_body,
-            metadata={'oferta_id': oferta.id},
-        )
-        return resultado['ok'], resultado.get('error')
+        from automatizacion.models import MensajeOferta
+
+        # Canal principal: email
+        canales: list[tuple[str, str]] = [('email', cliente.email)]
+
+        # Canales adicionales si el cliente tiene datos de contacto
+        wa = getattr(cliente, 'numero_whatsapp', None)
+        if wa:
+            canales.append(('whatsapp', wa))
+        tel_e164 = getattr(cliente, 'telefono_e164', None)
+        if tel_e164:
+            canales.append(('sms', tel_e164))
+
+        ultimo_ok, ultimo_err = False, 'Sin canales configurados'
+        for canal, destinatario in canales:
+            try:
+                res = enviar_notificacion(
+                    destinatario=destinatario,
+                    mensaje=mensaje_texto,
+                    canal=canal,
+                    asunto=asunto,
+                    html=html_body if canal == 'email' else None,
+                    metadata={'oferta_id': oferta.id},
+                )
+                MensajeOferta.objects.create(
+                    oferta=oferta,
+                    cliente=cliente,
+                    estado='enviado' if res.get('ok') else 'fallido',
+                    canal=canal,
+                    detalle='Enviado por enviar_oferta_email()' if res.get('ok') else (res.get('error') or ''),
+                )
+                if res.get('ok'):
+                    ultimo_ok, ultimo_err = True, None
+            except Exception as exc:
+                ultimo_err = str(exc)
+
+        return ultimo_ok, ultimo_err
     except Exception as e:
         return False, str(e)
 

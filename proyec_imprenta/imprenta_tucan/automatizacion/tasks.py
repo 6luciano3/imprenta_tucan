@@ -147,9 +147,43 @@ def tarea_generar_ofertas():
     try:
         from core.ai_ml.ofertas import generar_ofertas_segmentadas
         resultado = generar_ofertas_segmentadas()
-        return f"generar_ofertas: {resultado['generadas']} propuestas generadas ({resultado['periodo']})"
+        count = resultado['generadas']
+        periodo = resultado['periodo']
+        # Registrar en AutomationLog cuántas y en qué período
+        try:
+            from automatizacion.models import AutomationLog
+            AutomationLog.objects.create(
+                evento='ofertas_generadas',
+                descripcion=f'{count} ofertas generadas automáticamente (período: {periodo}).',
+                datos={'generadas': count, 'periodo': periodo},
+            )
+        except Exception:
+            pass
+        return f"generar_ofertas: {count} propuestas generadas ({periodo})"
     except Exception as e:
         return f"generar_ofertas: error {e}"
+
+
+@shared_task
+def tarea_expirar_ofertas():
+    """Marca como 'vencidas' todas las ofertas enviadas/pendientes cuya fecha_expiracion ya pasó."""
+    try:
+        from automatizacion.models import OfertaPropuesta, AutomationLog
+        expiradas = OfertaPropuesta.objects.filter(
+            estado__in=['pendiente', 'enviada'],
+            fecha_expiracion__lt=timezone.now(),
+        )
+        count = expiradas.count()
+        expiradas.update(estado='vencida')
+        if count:
+            AutomationLog.objects.create(
+                evento='ofertas_expiradas',
+                descripcion=f'{count} ofertas marcadas como vencidas automáticamente.',
+                datos={'expiradas': count},
+            )
+        return f"expirar_ofertas: {count} ofertas vencidas"
+    except Exception as e:
+        return f"expirar_ofertas: error {e}"
 
 @shared_task
 def tarea_alertas_retraso():

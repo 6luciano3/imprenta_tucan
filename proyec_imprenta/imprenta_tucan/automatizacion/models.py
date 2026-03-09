@@ -76,6 +76,7 @@ class OfertaPropuesta(models.Model):
         ('rechazada', 'Rechazada por el cliente'),
         ('aplicada', 'Aplicada en pedido'),
         ('vencida', 'Vencida (no respondida a tiempo)'),
+        ('aceptada_sin_stock', 'Aceptada – sin stock para pedido automático'),
     ]
 
     TIPOS = [

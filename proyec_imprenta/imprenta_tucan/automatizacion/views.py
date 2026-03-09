@@ -89,7 +89,15 @@ def _crear_pedido_desde_oferta(oferta):
 @csrf_exempt
 def aceptar_oferta_token(request, token):
     oferta = get_object_or_404(OfertaPropuesta, token_email=token)
-    if request.method == 'POST' and oferta.estado != 'aceptada':
+
+    # Bloquear si la oferta ya venció
+    if oferta.esta_vencida or oferta.estado == 'vencida':
+        return render(request, 'automatizacion/oferta_individual.html', {
+            'oferta': oferta,
+            'error': 'Esta oferta ha vencido y ya no puede ser aceptada.',
+        })
+
+    if request.method == 'POST' and oferta.estado not in ('aceptada', 'aplicada', 'aceptada_sin_stock'):
         oferta.estado = 'aceptada'
         oferta.fecha_validacion = timezone.now()
         oferta.save()
@@ -102,6 +110,39 @@ def aceptar_oferta_token(request, token):
         )
         _ajustar_score_por_feedback(oferta.cliente, 'aceptar')
         pedido = _crear_pedido_desde_oferta(oferta)
+
+        if pedido is None:
+            # El pedido no pudo crearse (sin combo/stock): registrar y notificar
+            oferta.estado = 'aceptada_sin_stock'
+            oferta.save(update_fields=['estado'])
+            try:
+                from .models import AutomationLog
+                from core.notifications.engine import enviar_notificacion
+                from django.conf import settings as _s
+                AutomationLog.objects.create(
+                    evento='oferta_aceptada_sin_stock',
+                    descripcion=(
+                        f'Oferta #{oferta.id} aceptada por {oferta.cliente} desde email '
+                        f'pero no pudo generarse pedido automático (sin combo/stock).'
+                    ),
+                    datos={'oferta_id': oferta.id, 'cliente_id': oferta.cliente_id},
+                )
+                managers = getattr(_s, 'MANAGERS', [])
+                staff_email = managers[0][1] if managers else getattr(_s, 'EMAIL_HOST_USER', '')
+                if staff_email:
+                    enviar_notificacion(
+                        destinatario=staff_email,
+                        canal='email',
+                        asunto=f'Oferta #{oferta.id} aceptada sin pedido generado',
+                        mensaje=(
+                            f'El cliente {oferta.cliente} aceptó la oferta "{oferta.titulo}" '
+                            f'pero no hay combo/stock disponible para generar el pedido automáticamente. '
+                            f'Por favor completarlo manualmente.'
+                        ),
+                    )
+            except Exception:
+                pass
+
         return render(request, 'automatizacion/oferta_individual.html', {
             'oferta': oferta,
             'accion_realizada': 'aceptada',
@@ -551,7 +592,13 @@ def mensaje_callback(request):
     """Webhook para actualizar estado de mensajes de ofertas.
     Espera JSON con: estado (enviado|entregado|leido|fallido), oferta_id, cliente_id,
     opcional: canal (email|sms|whatsapp), provider_id, detalle.
+    Requiere header X-Webhook-Token con el valor de settings.AUTOMATION_WEBHOOK_SECRET.
     """
+    from django.conf import settings as _s
+    secret = getattr(_s, 'AUTOMATION_WEBHOOK_SECRET', '')
+    if secret and request.headers.get('X-Webhook-Token') != secret:
+        return JsonResponse({'error': 'Unauthorized'}, status=401)
+
     if request.method != 'POST':
         return JsonResponse({'ok': False, 'error': 'Método inválido'}, status=405)
     try:
@@ -632,7 +679,37 @@ def confirmar_oferta_cliente(request, oferta_id):
     if pedido:
         messages.success(request, f'Oferta aceptada. Se generó automáticamente el Pedido #{pedido.id} con fecha de entrega {pedido.fecha_entrega}.')
     else:
-        messages.success(request, 'Oferta aceptada correctamente.')
+        # Pedido no pudo crearse: registrar y notificar staff
+        oferta.estado = 'aceptada_sin_stock'
+        oferta.save(update_fields=['estado'])
+        try:
+            from .models import AutomationLog
+            from core.notifications.engine import enviar_notificacion
+            from django.conf import settings as _s
+            AutomationLog.objects.create(
+                evento='oferta_aceptada_sin_stock',
+                descripcion=(
+                    f'Oferta #{oferta.id} aceptada por {oferta.cliente} desde portal '
+                    f'pero no pudo generarse pedido automático (sin combo/stock).'
+                ),
+                datos={'oferta_id': oferta.id, 'cliente_id': oferta.cliente_id},
+            )
+            managers = getattr(_s, 'MANAGERS', [])
+            staff_email = managers[0][1] if managers else getattr(_s, 'EMAIL_HOST_USER', '')
+            if staff_email:
+                enviar_notificacion(
+                    destinatario=staff_email,
+                    canal='email',
+                    asunto=f'Oferta #{oferta.id} aceptada sin pedido generado',
+                    mensaje=(
+                        f'El cliente {oferta.cliente} aceptó la oferta "{oferta.titulo}" desde el portal '
+                        f'pero no hay combo/stock disponible para generar el pedido automáticamente. '
+                        f'Por favor completarlo manualmente.'
+                    ),
+                )
+        except Exception:
+            pass
+        messages.warning(request, 'Oferta aceptada. No fue posible generar el pedido automáticamente; el equipo comercial lo completará en breve.')
     return redirect('mis_ofertas_cliente')
 
 
@@ -680,7 +757,13 @@ def accion_callback(request):
     """Webhook genérico para registrar acciones del cliente.
     Espera JSON con: cliente_id, oferta_id (opcional), tipo (vista|click|aceptar|rechazar|consulta|leido),
     opcional: canal (web|email|sms|whatsapp), detalle, metadata.
+    Requiere header X-Webhook-Token con el valor de settings.AUTOMATION_WEBHOOK_SECRET.
     """
+    from django.conf import settings as _s
+    secret = getattr(_s, 'AUTOMATION_WEBHOOK_SECRET', '')
+    if secret and request.headers.get('X-Webhook-Token') != secret:
+        return JsonResponse({'error': 'Unauthorized'}, status=401)
+
     if request.method != 'POST':
         return JsonResponse({'ok': False, 'error': 'Método inválido'}, status=405)
     try:
