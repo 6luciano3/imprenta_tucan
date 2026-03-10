@@ -189,6 +189,8 @@ def generar_ofertas_segmentadas() -> dict:
     generadas = 0
     for rc in RankingCliente.objects.select_related('cliente').iterator(chunk_size=500):
         cliente = rc.cliente
+            if not getattr(cliente, 'activo', True):
+            continue
         score = float(rc.score or 0)
 
         categoria = categoria_por_score(score)
