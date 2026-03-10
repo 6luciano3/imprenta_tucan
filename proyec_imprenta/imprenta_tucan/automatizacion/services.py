@@ -16,6 +16,10 @@ def _html_tabla_combo(combo):
 def enviar_oferta_email(oferta, request=None):
     if not oferta.cliente or not oferta.cliente.email:
         return False, 'Cliente sin email definido'
+    # Verificar que el email tiene formato valido
+    import re
+    if not re.match(r'^[^@]+@[^@]+\.[^@]+$', oferta.cliente.email):
+        return False, f'Email invalido: {oferta.cliente.email}'
     cliente = oferta.cliente
     if request:
         url_base = request.build_absolute_uri('/')[:-1]
@@ -78,6 +82,7 @@ def enviar_oferta_email(oferta, request=None):
     try:
         from core.notifications.engine import enviar_notificacion
         from automatizacion.models import MensajeOferta
+        import time
 
         # Canal principal: email
         canales: list[tuple[str, str]] = [('email', cliente.email)]
@@ -93,14 +98,23 @@ def enviar_oferta_email(oferta, request=None):
         ultimo_ok, ultimo_err = False, 'Sin canales configurados'
         for canal, destinatario in canales:
             try:
-                res = enviar_notificacion(
-                    destinatario=destinatario,
-                    mensaje=mensaje_texto,
-                    canal=canal,
-                    asunto=asunto,
-                    html=html_body if canal == 'email' else None,
-                    metadata={'oferta_id': oferta.id},
-                )
+                res = {'ok': False, 'error': 'Sin intentos'}
+                for intento in range(3):
+                    try:
+                        res = enviar_notificacion(
+                            destinatario=destinatario,
+                            mensaje=mensaje_texto,
+                            canal=canal,
+                            asunto=asunto,
+                            html=html_body if canal == 'email' else None,
+                            metadata={'oferta_id': oferta.id},
+                        )
+                        if res.get('ok'):
+                            break
+                    except Exception as e:
+                        res = {'ok': False, 'error': str(e)}
+                    if intento < 2:
+                        time.sleep(2)
                 MensajeOferta.objects.create(
                     oferta=oferta,
                     cliente=cliente,

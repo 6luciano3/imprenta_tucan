@@ -81,7 +81,16 @@ def _crear_pedido_desde_oferta(oferta):
         params_actualizados['aplicada_pedido_id'] = pedido.pk
         oferta.parametros = params_actualizados
         oferta.save(update_fields=['parametros'])
-
+        # Log de pedido creado automaticamente
+        try:
+            from .models import AutomationLog
+            AutomationLog.objects.create(
+                evento='pedido_creado_desde_oferta',
+                descripcion=f'Pedido #{pedido.pk} creado automaticamente desde oferta #{oferta.id} para {oferta.cliente}',
+                datos={'pedido_id': pedido.pk, 'oferta_id': oferta.id, 'cliente_id': oferta.cliente_id},
+            )
+        except Exception:
+            pass
         return pedido
     except Exception:
         return None
@@ -143,6 +152,28 @@ def aceptar_oferta_token(request, token):
             except Exception:
                 pass
 
+        # Email de confirmacion al cliente
+        try:
+            from core.notifications.engine import enviar_notificacion
+            from django.conf import settings as _s
+            enviar_notificacion(
+                destinatario=oferta.cliente.email,
+                canal='email',
+                asunto=f'Confirmacion: Oferta aceptada - {oferta.titulo}',
+                mensaje=f'Hola {oferta.cliente.nombre}, confirmamos que aceptaste la oferta "{oferta.titulo}".' + (f' Se genero automaticamente el Pedido #{pedido.id}.' if pedido else ''),
+            )
+            # Notificacion interna al staff
+            managers = getattr(_s, 'MANAGERS', [])
+            staff_email = managers[0][1] if managers else getattr(_s, 'EMAIL_HOST_USER', '')
+            if staff_email:
+                enviar_notificacion(
+                    destinatario=staff_email,
+                    canal='email',
+                    asunto=f'Oferta #{oferta.id} aceptada por {oferta.cliente}',
+                    mensaje=f'El cliente {oferta.cliente} acepto la oferta "{oferta.titulo}".' + (f' Pedido #{pedido.id} generado automaticamente.' if pedido else ' Sin pedido generado.'),
+                )
+        except Exception:
+            pass
         return render(request, 'automatizacion/oferta_individual.html', {
             'oferta': oferta,
             'accion_realizada': 'aceptada',
@@ -153,6 +184,8 @@ def aceptar_oferta_token(request, token):
 @csrf_exempt
 def rechazar_oferta_token(request, token):
     oferta = get_object_or_404(OfertaPropuesta, token_email=token)
+    if oferta.esta_vencida or oferta.estado == 'vencida':
+        return render(request, 'automatizacion/oferta_individual.html', {'oferta': oferta, 'error': 'Esta oferta ha vencido y ya no puede ser rechazada.'})
     if request.method in ('GET', 'POST') and oferta.estado != 'rechazada':
         oferta.estado = 'rechazada'
         oferta.fecha_validacion = timezone.now()
@@ -165,6 +198,17 @@ def rechazar_oferta_token(request, token):
             detalle='Cliente rechazó la oferta desde el email',
         )
         _ajustar_score_por_feedback(oferta.cliente, 'rechazar')
+        # Email de confirmacion al cliente
+        try:
+            from core.notifications.engine import enviar_notificacion
+            enviar_notificacion(
+                destinatario=oferta.cliente.email,
+                canal='email',
+                asunto=f'Confirmacion: Oferta rechazada - {oferta.titulo}',
+                mensaje=f'Hola {oferta.cliente.nombre}, confirmamos que rechazaste la oferta "{oferta.titulo}". Si cambiaste de opinion contactanos.',
+            )
+        except Exception:
+            pass
         return render(request, 'automatizacion/oferta_individual.html', {'oferta': oferta, 'accion_realizada': 'rechazada'})
     return render(request, 'automatizacion/oferta_individual.html', {'oferta': oferta})
 
@@ -172,6 +216,8 @@ def rechazar_oferta_token(request, token):
 @csrf_exempt
 def ver_oferta_token(request, token):
     oferta = get_object_or_404(OfertaPropuesta, token_email=token)
+    if oferta.esta_vencida or oferta.estado == 'vencida':
+        return render(request, 'automatizacion/oferta_individual.html', {'oferta': oferta, 'error': 'Esta oferta ha vencido.'})
     return render(request, 'automatizacion/oferta_individual.html', {'oferta': oferta})
 from django.views.decorators.http import require_POST
 from django.contrib.auth.decorators import login_required
@@ -525,6 +571,17 @@ def aprobar_oferta(request, oferta_id):
     oferta.administrador = request.user
     oferta.save()
     # Enviar email al cliente y registrar estado de mensaje
+    # Log de aprobacion del admin
+    try:
+        from .models import AutomationLog
+        AutomationLog.objects.create(
+            evento='oferta_aprobada_admin',
+            descripcion=f'Oferta #{oferta.id} aprobada y enviada por {request.user}',
+            usuario=request.user,
+            datos={'oferta_id': oferta.id, 'cliente_id': oferta.cliente_id},
+        )
+    except Exception:
+        pass
     ok, err = False, 'Error inesperado'
     try:
         from .models import MensajeOferta

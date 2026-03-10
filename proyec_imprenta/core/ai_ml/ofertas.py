@@ -189,7 +189,7 @@ def generar_ofertas_segmentadas() -> dict:
     generadas = 0
     for rc in RankingCliente.objects.select_related('cliente').iterator(chunk_size=500):
         cliente = rc.cliente
-            if not getattr(cliente, 'activo', True):
+        if not getattr(cliente, 'activo', True):
             continue
         score = float(rc.score or 0)
 
@@ -217,6 +217,18 @@ def generar_ofertas_segmentadas() -> dict:
             dias_desde_ultimo = (hoy - ultima_enviada.date()).days
             if dias_desde_ultimo < cadencia:
                 continue
+
+        # Evaluar reglas de contexto: rechazos consecutivos suprimen la oferta
+        try:
+            from core.ai_rules.rules_engine import evaluar_reglas
+            rechazos = OfertaPropuesta.objects.filter(
+                cliente=cliente, estado='rechazada'
+            ).order_by('-creada').values_list('estado', flat=True)[:3]
+            rechazos_consecutivos = len([r for r in rechazos if r == 'rechazada'])
+            if rechazos_consecutivos >= 3:
+                continue
+        except Exception:
+            pass
 
         try:
             combo = generar_combo_para_cliente(cliente)
@@ -251,7 +263,7 @@ def generar_ofertas_segmentadas() -> dict:
                 'categoria': categoria['nombre'],
             }
 
-        OfertaPropuesta.objects.create(
+        oferta = OfertaPropuesta.objects.create(
             cliente=cliente,
             titulo=titulo,
             descripcion=descripcion,
@@ -261,6 +273,32 @@ def generar_ofertas_segmentadas() -> dict:
             score_al_generar=min(float(rc.score or 0), 100.0),
             parametros=parametros_oferta,
         )
+        # Envio automatico sin aprobacion del admin
+        try:
+            from automatizacion.services import enviar_oferta_email
+            from automatizacion.models import MensajeOferta
+            oferta.estado = 'enviada'
+            oferta.fecha_validacion = timezone.now()
+            oferta.save(update_fields=['estado', 'fecha_validacion'])
+            ok, err = enviar_oferta_email(oferta)
+            MensajeOferta.objects.create(
+                oferta=oferta,
+                cliente=cliente,
+                estado='enviado' if ok else 'fallido',
+                detalle='Enviado automaticamente' if ok else f'Error: {err}',
+            )
+        except Exception:
+            pass
         generadas += 1
 
+    # Log de generacion automatica
+    try:
+        from automatizacion.models import AutomationLog
+        AutomationLog.objects.create(
+            evento='ofertas_generadas_auto',
+            descripcion=f'{generadas} ofertas generadas automaticamente para el periodo {periodo_str}',
+            datos={'generadas': generadas, 'periodo': periodo_str},
+        )
+    except Exception:
+        pass
     return {'generadas': generadas, 'periodo': periodo_str}

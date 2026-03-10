@@ -58,6 +58,23 @@ class Pedido(models.Model):
             new_estado = self.estado.nombre.lower() if self.estado else None
             if 'proceso' not in old_estado and 'proceso' in new_estado:
                 reservar_insumos_para_pedido(self)
+            # Detectar cancelacion y bajar score del cliente
+            if 'cancelad' in new_estado and 'cancelad' not in old_estado:
+                try:
+                    from automatizacion.models import OfertaPropuesta, AutomationLog
+                    from automatizacion.views import _ajustar_score_por_feedback
+                    oferta = OfertaPropuesta.objects.filter(
+                        parametros__aplicada_pedido_id=self.pk
+                    ).first()
+                    if oferta:
+                        _ajustar_score_por_feedback(self.cliente, 'rechazar')
+                        AutomationLog.objects.create(
+                            evento='pedido_cancelado_score_ajustado',
+                            descripcion=f'Pedido #{self.pk} cancelado. Score de {self.cliente} ajustado.',
+                            datos={'pedido_id': self.pk, 'cliente_id': self.cliente_id, 'oferta_id': oferta.id},
+                        )
+                except Exception:
+                    pass
         super().save(*args, **kwargs)
         if _should_reserve_new:
             reservar_insumos_para_pedido(self)
