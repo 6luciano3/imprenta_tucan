@@ -273,7 +273,10 @@ def generar_ofertas_segmentadas() -> dict:
             score_al_generar=min(float(rc.score or 0), 100.0),
             parametros=parametros_oferta,
         )
-        # Envio automatico sin aprobacion del admin
+        # Envio automatico solo si el email esta verificado
+        if not getattr(cliente, 'email_verificado', False):
+            generadas += 1
+            continue
         try:
             from automatizacion.services import enviar_oferta_email
             from automatizacion.models import MensajeOferta
