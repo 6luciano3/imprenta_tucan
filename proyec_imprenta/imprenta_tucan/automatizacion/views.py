@@ -1292,3 +1292,17 @@ def webhook_consulta_stock(request, propuesta_id):
         consulta.estado = 'pendiente'
         consulta.save()
         return JsonResponse({'ok': True, 'estado': 'pendiente'})
+
+@login_required
+@require_POST
+def generar_ofertas_ahora(request):
+    try:
+        from core.ai_ml.ofertas import generar_ofertas_segmentadas
+        result = generar_ofertas_segmentadas()
+        generadas = result.get("generadas", 0)
+        from urllib.parse import urlencode
+        params = urlencode({"ok": "1", "msg": f"{generadas} oferta(s) generada(s) y enviada(s) automaticamente."})
+    except Exception as e:
+        from urllib.parse import urlencode
+        params = urlencode({"ok": "0", "msg": f"Error al generar ofertas: {e}"})
+    return redirect(f"/automatizacion/propuestas/?{params}")
