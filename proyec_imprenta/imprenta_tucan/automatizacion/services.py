@@ -20,6 +20,9 @@ def enviar_oferta_email(oferta, request=None):
     import re
     if not re.match(r'^[^@]+@[^@]+\.[^@]+$', oferta.cliente.email):
         return False, f'Email invalido: {oferta.cliente.email}'
+    # Verificar que el email fue verificado
+    if not getattr(oferta.cliente, 'email_verificado', False):
+        return False, f'Email no verificado: {oferta.cliente.email}'
     cliente = oferta.cliente
     if request:
         url_base = request.build_absolute_uri('/')[:-1]

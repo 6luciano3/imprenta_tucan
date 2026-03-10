@@ -67,6 +67,7 @@ class Cliente(models.Model):
                   'Dejar en blanco si coincide con Teléfono (E.164).',
     )
     email = models.EmailField(unique=True)
+    email_verificado = models.BooleanField(default=False, help_text='Indica si el email del cliente fue verificado y es valido para envios')
     estado = models.CharField(max_length=10, choices=[('Activo', 'Activo'), ('Inactivo', 'Inactivo')], default='Activo', db_column='estadoCliente')
     puntaje_estrategico = models.FloatField(default=0)
     fecha_ultima_actualizacion = models.DateTimeField(blank=True, null=True)
