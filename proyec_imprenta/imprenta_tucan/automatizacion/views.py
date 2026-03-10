@@ -1298,11 +1298,17 @@ def webhook_consulta_stock(request, propuesta_id):
 def generar_ofertas_ahora(request):
     try:
         from core.ai_ml.ofertas import generar_ofertas_segmentadas
+        from automatizacion.models import MensajeOferta
+        from django.utils import timezone
+        antes = timezone.now()
         result = generar_ofertas_segmentadas()
-        generadas = result.get("generadas", 0)
+        generadas = result.get('generadas', 0)
+        enviados = MensajeOferta.objects.filter(estado='enviado', actualizado__gte=antes).select_related('oferta__cliente')
+        detalle = ', '.join([f"{m.oferta.cliente.nombre} ({m.oferta.cliente.email})" for m in enviados])
+        msg = f"{generadas} oferta(s) generada(s). Enviadas a: {detalle}" if detalle else f"{generadas} oferta(s) generada(s) pero ninguna enviada (sin clientes verificados o ya enviadas)."
         from urllib.parse import urlencode
-        params = urlencode({"ok": "1", "msg": f"{generadas} oferta(s) generada(s) y enviada(s) automaticamente."})
+        params = urlencode({'ok': '1', 'msg': msg})
     except Exception as e:
         from urllib.parse import urlencode
-        params = urlencode({"ok": "0", "msg": f"Error al generar ofertas: {e}"})
+        params = urlencode({'ok': '0', 'msg': f'Error al generar ofertas: {e}'})
     return redirect(f"/automatizacion/propuestas/?{params}")
