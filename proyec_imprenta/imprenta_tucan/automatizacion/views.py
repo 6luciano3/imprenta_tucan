@@ -74,7 +74,7 @@ def _crear_pedido_desde_oferta(oferta):
                 producto=cop.producto,
                 cantidad=cop.cantidad,
                 precio_unitario=Decimal(str(cop.producto.precioUnitario or 0)),
-                especificaciones=f'Generado automáticamente desde oferta #{oferta.id} – {oferta.titulo}',
+                especificaciones=cop.producto.nombreProducto,
             )
 
         # Guardar id del pedido creado en los parámetros de la oferta
