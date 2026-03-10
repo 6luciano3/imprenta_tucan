@@ -125,7 +125,7 @@ db_name = db_name_env if db_name_env else str(BASE_DIR / 'db.sqlite3')
 DATABASES = {
     'default': {
         'ENGINE': os.environ.get('DB_ENGINE', 'django.db.backends.sqlite3'),
-        'NAME': db_name,
+        'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
 
@@ -229,8 +229,9 @@ AUTOMATION_WEBHOOK_SECRET = os.environ.get('AUTOMATION_WEBHOOK_SECRET', '')
 if EMAIL_HOST_PASSWORD:
     EMAIL_BACKEND  = 'django.core.mail.backends.smtp.EmailBackend'
     EMAIL_HOST     = 'smtp.gmail.com'
-    EMAIL_PORT     = 587
-    EMAIL_USE_TLS  = True
+    EMAIL_PORT     = 465
+    EMAIL_USE_TLS  = False
+    EMAIL_USE_SSL  = True
 else:
     # Sin contraseña SMTP → escribe los emails como archivos en sent_emails/
     EMAIL_BACKEND  = 'django.core.mail.backends.filebased.EmailBackend'
