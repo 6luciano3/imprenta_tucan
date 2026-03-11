@@ -91,7 +91,11 @@ class Insumo(models.Model):
         # Si hay historial de consumo, calcularlo dinámicamente
         consumo_mensual = self.consumo_promedio_mensual
         if consumo_mensual > 0:
-            dias_reposicion = 15
+            try:
+                from configuracion.models import Parametro
+                dias_reposicion = int(Parametro.get('DIAS_REPOSICION_INSUMO', 15))
+            except Exception:
+                dias_reposicion = 15
             return round(consumo_mensual * dias_reposicion / 30)
         # Sin historial: usar el mínimo manual cargado
         if self.stock_minimo_manual is not None:

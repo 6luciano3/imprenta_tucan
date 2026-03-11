@@ -141,3 +141,59 @@ class OrdenCompra(models.Model):
 
     def __str__(self):
         return f"Orden de compra {self.id} - {self.insumo} ({self.cantidad})"
+
+
+# ─── Signal: registrar ConsumoRealInsumo al completar un pedido ───────────────
+from django.db.models.signals import post_save
+from django.dispatch import receiver
+
+@receiver(post_save, sender=Pedido)
+def registrar_consumo_real_al_completar(sender, instance, **kwargs):
+    """
+    Cuando un pedido pasa a estado 'completado', cruza LineaPedido con
+    ProductoInsumo (BOM) y registra el consumo real de cada insumo.
+    Evita duplicados: si ya existe un registro para ese pedido+insumo+periodo,
+    lo actualiza sumando la diferencia.
+    """
+    try:
+        estado_nombre = instance.estado.nombre.lower() if instance.estado else ""
+        if "complet" not in estado_nombre:
+            return
+
+        from django.utils import timezone
+        from insumos.models import ConsumoRealInsumo
+        from productos.models import ProductoInsumo
+
+        periodo = timezone.now().strftime("%Y-%m")
+        lineas = instance.lineas.select_related("producto").all()
+
+        for linea in lineas:
+            bom = ProductoInsumo.objects.filter(
+                producto=linea.producto
+            ).select_related("insumo")
+
+            for item in bom:
+                if item.es_costo_fijo:
+                    cantidad = int(item.cantidad_por_unidad)
+                else:
+                    cantidad = int(item.cantidad_por_unidad * linea.cantidad)
+
+                if cantidad <= 0:
+                    continue
+
+                obj, created = ConsumoRealInsumo.objects.get_or_create(
+                    insumo=item.insumo,
+                    periodo=periodo,
+                    comentario=f"pedido#{instance.pk}",
+                    defaults={"cantidad_consumida": cantidad},
+                )
+                if not created:
+                    # Ya existía para este pedido: actualizar
+                    obj.cantidad_consumida = cantidad
+                    obj.save(update_fields=["cantidad_consumida"])
+
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(
+            f"registrar_consumo_real_al_completar: error en pedido #{instance.pk}: {e}"
+        )
