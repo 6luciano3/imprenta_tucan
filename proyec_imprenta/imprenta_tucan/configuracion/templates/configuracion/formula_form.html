@@ -50,11 +50,27 @@
           {% if form.expresion.errors %}<p class="text-red-500 text-xs mt-1">{{ form.expresion.errors|join:", " }}</p>{% endif %}
         </div>
         <div class="bg-white rounded-xl shadow border border-gray-100 p-5">
-          <label class="block text-sm font-semibold text-gray-700 mb-1">Variables (JSON)</label>
-          <input name="variables_json" id="variables_json" value="{{ form.variables_json.value|default:'' }}"
-            class="w-full border rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-400"
-            placeholder='["tirada","desperdicio"]'>
-          <p class="text-xs text-gray-400 mt-1">Array con los nombres de las variables: <code>["var1","var2"]</code></p>
+          <div class="flex items-center justify-between mb-3">
+            <label class="text-sm font-semibold text-gray-700 flex items-center gap-1">
+              <span class="material-symbols-outlined text-base text-blue-500">data_table</span> Variables
+            </label>
+            <button type="button" id="btn-agregar-var"
+              class="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium border border-blue-300 rounded-lg px-2 py-1 hover:bg-blue-50">
+              <span class="material-symbols-outlined text-sm">add</span> Agregar variable
+            </button>
+          </div>
+          <table class="w-full text-xs mb-2" id="tabla-variables">
+            <thead>
+              <tr class="bg-gray-50 rounded">
+                <th class="text-left px-2 py-1 font-semibold text-gray-500 w-1/3">Variable</th>
+                <th class="text-left px-2 py-1 font-semibold text-gray-500">Descripción</th>
+                <th class="w-6"></th>
+              </tr>
+            </thead>
+            <tbody id="vars-tbody"></tbody>
+          </table>
+          <p class="text-xs text-gray-400">Las variables deben coincidir con los nombres usados en la expresión.</p>
+          <input type="hidden" name="variables_json" id="variables_json" value="{{ form.variables_json.value|default:'{}' }}">
         </div>
         <div class="bg-blue-50 rounded-xl border border-blue-200 p-5">
           <p class="text-sm font-semibold text-blue-700 mb-2 flex items-center gap-1">
@@ -180,39 +196,98 @@
 </div>
 <script>
 (function() {
-  function extraerVars() {
-    var raw = document.getElementById('variables_json').value.trim();
-    var expr = document.getElementById('expresion').value;
-    var vars = [];
+  // ── Tabla de variables ──────────────────────────────────────────
+  var hiddenField = document.getElementById('variables_json');
+  var tbody = document.getElementById('vars-tbody');
+
+  function leerDict() {
     try {
-      var parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) { vars = parsed; }
-      else if (parsed && typeof parsed === 'object') { vars = Object.keys(parsed); }
+      var v = JSON.parse(hiddenField.value);
+      if (Array.isArray(v)) {
+        var d = {};
+        v.forEach(function(k) { d[k] = ''; });
+        return d;
+      }
+      if (v && typeof v === 'object') return v;
     } catch(e) {}
-    if (!vars.length) {
-      var reserved = ['min','max','round','ceil','floor','abs'];
-      var matches = expr.match(/[a-zA-Z_][a-zA-Z0-9_]*/g) || [];
-      var seen = {};
-      matches.forEach(function(v) {
-        if (!seen[v] && reserved.indexOf(v) === -1) { seen[v] = true; vars.push(v); }
-      });
-    }
+    return {};
+  }
+
+  function sincronizar() {
+    var d = {};
+    tbody.querySelectorAll('tr').forEach(function(tr) {
+      var k = tr.querySelector('.var-key').value.trim();
+      var desc = tr.querySelector('.var-desc').value.trim();
+      if (k) d[k] = desc;
+    });
+    hiddenField.value = JSON.stringify(d);
+    actualizarInputsValidador();
+  }
+
+  function agregarFila(key, desc) {
+    var tr = document.createElement('tr');
+    tr.className = 'border-b border-gray-100';
+    tr.innerHTML =
+      '<td class="py-1 pr-1"><input class="var-key w-full border border-gray-200 rounded px-2 py-1 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-blue-400" value="' + (key||'') + '" placeholder="nombre_var"></td>' +
+      '<td class="py-1 pr-1"><input class="var-desc w-full border border-gray-200 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400" value="' + (desc||'') + '" placeholder="Descripción legible"></td>' +
+      '<td class="py-1 text-center"><button type="button" class="btn-del text-red-400 hover:text-red-600"><span class="material-symbols-outlined text-sm">delete</span></button></td>';
+    tr.querySelector('.var-key').addEventListener('input', sincronizar);
+    tr.querySelector('.var-desc').addEventListener('input', sincronizar);
+    tr.querySelector('.btn-del').addEventListener('click', function() { tr.remove(); sincronizar(); });
+    tbody.appendChild(tr);
+  }
+
+  function poblarTabla() {
+    tbody.innerHTML = '';
+    var d = leerDict();
+    Object.keys(d).forEach(function(k) { agregarFila(k, d[k]); });
+  }
+
+  document.getElementById('btn-agregar-var').addEventListener('click', function() {
+    agregarFila('', '');
+    sincronizar();
+  });
+
+  poblarTabla();
+
+  // ── Validador en línea ──────────────────────────────────────────
+  function extraerVars() {
+    try {
+      var v = JSON.parse(hiddenField.value);
+      if (Array.isArray(v)) return v;
+      if (v && typeof v === 'object') return Object.keys(v);
+    } catch(e) {}
+    // fallback: extraer de la expresion
+    var reserved = ['min','max','round','ceil','floor','abs'];
+    var matches = document.getElementById('expresion').value.match(/[a-zA-Z_][a-zA-Z0-9_]*/g) || [];
+    var seen = {}, vars = [];
+    matches.forEach(function(v) {
+      if (!seen[v] && reserved.indexOf(v) === -1) { seen[v] = true; vars.push(v); }
+    });
     return vars;
   }
-  function actualizarInputs() {
+
+  function actualizarInputsValidador() {
     var vars = extraerVars();
     var container = document.getElementById('variables-inputs');
+    var prevVals = {};
+    container.querySelectorAll('input').forEach(function(el) {
+      prevVals[el.id] = el.value;
+    });
     container.innerHTML = '';
     vars.forEach(function(v) {
       var div = document.createElement('div');
-      div.innerHTML = '<label style="display:block;font-size:11px;font-weight:500;color:#4b5563;margin-bottom:2px">' + v + '</label>'
-        + '<input id="var_' + v + '" type="number" step="any" value="1" style="width:100%;border:1px solid #d1d5db;border-radius:4px;padding:4px 8px;font-size:12px">';
+      var prevVal = prevVals['var_' + v] || '1';
+      div.innerHTML =
+        '<label style="display:block;font-size:11px;font-weight:500;color:#4b5563;margin-bottom:2px">' + v + '</label>' +
+        '<input id="var_' + v + '" type="number" step="any" value="' + prevVal + '" style="width:100%;border:1px solid #d1d5db;border-radius:4px;padding:4px 8px;font-size:12px">';
       container.appendChild(div);
     });
   }
-  document.getElementById('variables_json').addEventListener('input', actualizarInputs);
-  document.getElementById('expresion').addEventListener('input', actualizarInputs);
-  actualizarInputs();
+
+  document.getElementById('expresion').addEventListener('input', actualizarInputsValidador);
+  actualizarInputsValidador();
+
   document.getElementById('btn-validar').addEventListener('click', function() {
     var expr = document.getElementById('expresion').value.trim();
     var vars = extraerVars();
@@ -241,6 +316,7 @@
       resultDiv.innerHTML = '<span style="color:#dc2626">Error: ' + err.message + '</span>';
     });
   });
+
   window.copiarFormula = function() {
     var text = document.getElementById('formula-compacta').innerText;
     navigator.clipboard.writeText(text).then(function() {
