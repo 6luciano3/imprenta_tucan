@@ -1,4 +1,4 @@
-import datetime
+﻿import datetime
 
 def predecir_demanda_media_movil(insumo, periodo_actual, meses=3):
     """
@@ -164,3 +164,37 @@ class ConsumoRealInsumo(models.Model):
 
     def __str__(self):
         return f"{self.insumo} - {self.periodo}: {self.cantidad_consumida}"
+
+
+def predecir_demanda_ets(insumo, periodo_actual, alpha=None):
+    from insumos.models import ConsumoRealInsumo
+    if alpha is None:
+        try:
+            from configuracion.models import Parametro
+            alpha = float(Parametro.get('DEMANDA_ETS_ALPHA', 0.3))
+        except Exception:
+            alpha = 0.3
+    alpha = max(0.1, min(0.9, alpha))
+    anio, mes = map(int, periodo_actual.split('-'))
+    periodos = []
+    for i in range(12, 0, -1):
+        m = mes - i
+        y = anio
+        while m <= 0:
+            m += 12
+            y -= 1
+        periodos.append(f'{y:04d}-{m:02d}')
+    consumos_map = dict(
+        ConsumoRealInsumo.objects
+        .filter(insumo=insumo, periodo__in=periodos)
+        .values_list('periodo', 'cantidad_consumida')
+    )
+    valores = [float(consumos_map[p]) for p in periodos if p in consumos_map]
+    if not valores:
+        return None
+    if len(valores) == 1:
+        return round(valores[0])
+    nivel = valores[0]
+    for v in valores[1:]:
+        nivel = alpha * v + (1 - alpha) * nivel
+    return round(nivel)

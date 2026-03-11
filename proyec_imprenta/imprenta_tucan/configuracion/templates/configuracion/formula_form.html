@@ -1,62 +1,158 @@
-{% extends 'base.html' %}
+﻿{% extends 'base.html' %}
+{% block title %}{{ title|default:"Fórmula" }}{% endblock %}
 {% block content %}
-<div class="container mx-auto px-4 py-8 max-w-2xl">
-  <h2 class="text-2xl font-bold mb-6 text-blue-700">Alta / Edición de Fórmula</h2>
-  <form method="post" id="formula-form" class="bg-white rounded shadow p-6 space-y-4">
-    {% csrf_token %}
+<div class="max-w-3xl mx-auto">
+
+  <!-- Encabezado -->
+  <div class="flex items-center gap-3 mb-6">
+    <span class="material-symbols-outlined text-3xl text-primary">functions</span>
     <div>
-      <label class="block text-sm font-semibold mb-1 text-gray-700">Código</label>
-      <input name="codigo" value="{{ form.codigo.value }}" class="w-full border rounded px-3 py-2 focus:outline-none focus:ring focus:border-blue-400" required>
+      <h1 class="text-2xl font-bold text-gray-800">{{ title|default:"Alta / Edición de Fórmula" }}</h1>
+      <p class="text-sm text-gray-500">Definí la expresión matemática y las variables que usa.</p>
     </div>
-    <div>
-      <label class="block text-sm font-semibold mb-1 text-gray-700">Nombre</label>
-      <input name="nombre" value="{{ form.nombre.value }}" class="w-full border rounded px-3 py-2 focus:outline-none focus:ring focus:border-blue-400" required>
-    </div>
-    <div>
-      <label class="block text-sm font-semibold mb-1 text-gray-700">Descripción</label>
-      <textarea name="descripcion" class="w-full border rounded px-3 py-2 focus:outline-none focus:ring focus:border-blue-400">{{ form.descripcion.value }}</textarea>
-    </div>
-    <div>
-      <label class="block text-sm font-semibold mb-1 text-gray-700">Expresión</label>
-      <textarea name="expresion" id="expresion" class="w-full border rounded px-3 py-2 font-mono focus:outline-none focus:ring focus:border-blue-400" required>{{ form.expresion.value }}</textarea>
-      <div class="text-xs text-gray-500 mt-1">Ejemplo: (tiraje * area) / rendimiento</div>
-    </div>
-    <div>
-      <label class="block text-sm font-semibold mb-1 text-gray-700">Variables (JSON)</label>
-      <input name="variables_json" value="{{ form.variables_json.value }}" class="w-full border rounded px-3 py-2 font-mono focus:outline-none focus:ring focus:border-blue-400" placeholder='["tiraje","area","rendimiento"]'>
-      <div class="text-xs text-gray-500 mt-1">Ejemplo: ["tiraje","area","rendimiento"]</div>
-    </div>
-    <div class="flex gap-2 mt-4">
-      <button id="btn-validar" type="button" class="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded shadow">Validar</button>
-      <button type="submit" class="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded shadow">Guardar</button>
-      <a href="{% url 'lista_formulas' %}" class="bg-gray-400 hover:bg-gray-500 text-white font-semibold py-2 px-4 rounded shadow">Volver</a>
-    </div>
-    <div id="validacion-resultado" class="mt-4 text-sm"></div>
-  </form>
-  <div class="mt-6 text-xs text-gray-600">
-    <strong>Funciones permitidas:</strong> min, max, round, ceil, floor, abs<br>
-    <strong>Variables típicas:</strong> tiraje, area, rendimiento, perdida_percent<br>
-    <strong>Ayuda:</strong> Ejemplo de expresión: <span class="font-mono">(tiraje * area) / rendimiento</span>
   </div>
+
+  <!-- Mensajes -->
+  {% if messages %}
+    {% for message in messages %}
+      <div class="mb-4 px-4 py-3 rounded-lg text-sm font-medium
+        {% if message.tags == 'success' %}bg-green-100 text-green-800 border border-green-300
+        {% elif message.tags == 'error' %}bg-red-100 text-red-800 border border-red-300
+        {% else %}bg-blue-100 text-blue-800 border border-blue-300{% endif %}">
+        {{ message }}
+      </div>
+    {% endfor %}
+  {% endif %}
+
+  <form method="post" id="formula-form" class="space-y-5">
+    {% csrf_token %}
+
+    <!-- Código y Nombre -->
+    <div class="bg-white rounded-xl shadow border border-gray-100 p-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div>
+        <label class="block text-sm font-semibold text-gray-700 mb-1">Código <span class="text-red-500">*</span></label>
+        <input name="codigo" value="{{ form.codigo.value|default:'' }}"
+          class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" required maxlength="50">
+        {% if form.codigo.errors %}<p class="text-red-500 text-xs mt-1">{{ form.codigo.errors|join:", " }}</p>{% endif %}
+      </div>
+      <div>
+        <label class="block text-sm font-semibold text-gray-700 mb-1">Nombre <span class="text-red-500">*</span></label>
+        <input name="nombre" value="{{ form.nombre.value|default:'' }}"
+          class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" required maxlength="100">
+        {% if form.nombre.errors %}<p class="text-red-500 text-xs mt-1">{{ form.nombre.errors|join:", " }}</p>{% endif %}
+      </div>
+    </div>
+
+    <!-- Descripción -->
+    <div class="bg-white rounded-xl shadow border border-gray-100 p-5">
+      <label class="block text-sm font-semibold text-gray-700 mb-1">Descripción</label>
+      <textarea name="descripcion" rows="2"
+        class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">{{ form.descripcion.value|default:'' }}</textarea>
+    </div>
+
+    <!-- Expresión -->
+    <div class="bg-white rounded-xl shadow border border-gray-100 p-5">
+      <label class="block text-sm font-semibold text-gray-700 mb-1">Expresión matemática <span class="text-red-500">*</span></label>
+      <textarea name="expresion" id="expresion" rows="3"
+        class="w-full border rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-400" required>{{ form.expresion.value|default:'' }}</textarea>
+      <p class="text-xs text-gray-400 mt-1">Ejemplo: <code class="bg-gray-100 px-1 rounded">(tiraje * area) / rendimiento</code></p>
+      <p class="text-xs text-gray-400 mt-0.5">Funciones permitidas: <code class="bg-gray-100 px-1 rounded">min, max, round, ceil, floor, abs</code></p>
+      {% if form.expresion.errors %}<p class="text-red-500 text-xs mt-1">{{ form.expresion.errors|join:", " }}</p>{% endif %}
+    </div>
+
+    <!-- Variables JSON -->
+    <div class="bg-white rounded-xl shadow border border-gray-100 p-5">
+      <label class="block text-sm font-semibold text-gray-700 mb-1">Variables (JSON)</label>
+      <input name="variables_json" id="variables_json" value="{{ form.variables_json.value|default:'' }}"
+        class="w-full border rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-400"
+        placeholder='["tiraje","area","rendimiento"]'>
+      <p class="text-xs text-gray-400 mt-1">Listá los nombres de las variables usadas en la expresión.</p>
+      {% if form.variables_json.errors %}<p class="text-red-500 text-xs mt-1">{{ form.variables_json.errors|join:", " }}</p>{% endif %}
+    </div>
+
+    <!-- Validador en línea -->
+    <div class="bg-blue-50 rounded-xl border border-blue-200 p-5">
+      <p class="text-sm font-semibold text-blue-700 mb-2 flex items-center gap-1">
+        <span class="material-symbols-outlined text-base">science</span> Validador en línea
+      </p>
+      <div id="variables-inputs" class="grid grid-cols-2 md:grid-cols-3 gap-3 mb-3"></div>
+      <button id="btn-validar" type="button"
+        class="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold py-2 px-4 rounded-lg shadow">
+        <span class="material-symbols-outlined text-sm">calculate</span> Probar fórmula
+      </button>
+      <div id="validacion-resultado" class="mt-3 text-sm"></div>
+    </div>
+
+    <!-- Activo -->
+    <div class="bg-white rounded-xl shadow border border-gray-100 p-5 flex items-center gap-3">
+      <input type="checkbox" name="activo" id="activo"
+        {% if form.activo.value %}checked{% endif %}
+        class="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500">
+      <label for="activo" class="text-sm font-semibold text-gray-700">Fórmula activa</label>
+    </div>
+
+    <!-- Botones -->
+    <div class="flex justify-end gap-3 pb-6">
+      <a href="{% url 'lista_formulas' %}"
+        class="flex items-center gap-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold py-2 px-5 rounded-lg">
+        <span class="material-symbols-outlined text-sm">arrow_back</span> Volver
+      </a>
+      <button type="submit"
+        class="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-5 rounded-lg shadow">
+        <span class="material-symbols-outlined text-sm">save</span> Guardar
+      </button>
+    </div>
+  </form>
 </div>
+
 <script>
-document.getElementById('btn-validar').addEventListener('click', function(e){
-  let expr = document.getElementById('expresion').value;
-  let vars = prompt('Ingrese variables en formato JSON (ej: {"tiraje":100,"area":0.21,"rendimiento":5})');
-  if (!vars) return;
+// Generador dinámico de inputs para el validador
+function actualizarInputsValidador() {
+  const varsRaw = document.getElementById('variables_json').value.trim();
+  const container = document.getElementById('variables-inputs');
+  container.innerHTML = '';
+  let vars = [];
+  try { vars = JSON.parse(varsRaw); } catch(e) { return; }
+  if (!Array.isArray(vars)) return;
+  vars.forEach(v => {
+    const div = document.createElement('div');
+    div.innerHTML = `<label class="block text-xs font-medium text-gray-600 mb-0.5">${v}</label>
+      <input id="var_${v}" type="number" step="any" value="1"
+        class="w-full border rounded px-2 py-1 text-sm focus:ring-2 focus:ring-blue-400">`;
+    container.appendChild(div);
+  });
+}
+
+document.getElementById('variables_json').addEventListener('input', actualizarInputsValidador);
+document.getElementById('expresion').addEventListener('input', actualizarInputsValidador);
+actualizarInputsValidador();
+
+document.getElementById('btn-validar').addEventListener('click', function() {
+  const expr = document.getElementById('expresion').value.trim();
+  const varsRaw = document.getElementById('variables_json').value.trim();
+  let vars = [];
+  try { vars = JSON.parse(varsRaw); } catch(e) {}
+  const variables = {};
+  vars.forEach(v => {
+    const el = document.getElementById('var_' + v);
+    variables[v] = el ? parseFloat(el.value) || 0 : 0;
+  });
+  const div = document.getElementById('validacion-resultado');
+  div.innerHTML = '<span class="text-gray-500">Calculando...</span>';
   fetch('/api/configuracion/formula/validate/', {
     method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({expresion: expr, variables: JSON.parse(vars)})
+    headers: {'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}'},
+    body: JSON.stringify({expresion: expr, variables: variables})
   }).then(r => r.json()).then(data => {
-    let div = document.getElementById('validacion-resultado');
     if (data.ok) {
-      div.innerHTML = '<span class="text-green-700 font-semibold">Resultado: ' + data.resultado + '</span>';
+      div.innerHTML = `<span class="text-green-700 font-semibold flex items-center gap-1">
+        <span class="material-symbols-outlined text-base">check_circle</span> Resultado: ${data.resultado}</span>`;
     } else {
-      div.innerHTML = '<span class="text-red-700 font-semibold">Error: ' + data.error + '</span>';
+      div.innerHTML = `<span class="text-red-600 font-semibold flex items-center gap-1">
+        <span class="material-symbols-outlined text-base">error</span> Error: ${data.error}</span>`;
     }
-  }).catch(err => {
-    document.getElementById('validacion-resultado').innerHTML = '<span class="text-red-700">Error de red o sintaxis.</span>';
+  }).catch(() => {
+    div.innerHTML = '<span class="text-red-500">Error de conexión</span>';
   });
 });
 </script>

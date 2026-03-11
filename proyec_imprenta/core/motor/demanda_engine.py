@@ -1,4 +1,4 @@
-"""
+﻿"""
 PI-3 — Motor Inteligente de Demanda e Insumos.
 
 Pipeline:
@@ -412,4 +412,5 @@ class DemandaInteligenteEngine(ProcesoInteligenteBase):
                 )
         except Exception as e:
             logger.warning("retroalimentar [insumo=%s] error: %s", insumo_id, e)
+
 

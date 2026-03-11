@@ -119,13 +119,19 @@ class ModificarInsumoForm(forms.ModelForm):
 
     class Meta:
         model = Insumo
-        fields = ["nombre", "codigo", "proveedor", "cantidad", "precio_unitario"]
+        fields = ["nombre", "codigo", "descripcion", "categoria", "tipo", "proveedor", "cantidad", "precio_unitario", "stock_minimo_manual", "cantidad_compra_sugerida", "unidad_medida"]
         widgets = {
             "nombre": forms.TextInput(attrs={"class": "form-control", "required": True, "maxlength": 100}),
             "codigo": forms.TextInput(attrs={"class": "form-control", "required": True, "maxlength": 20}),
+            "descripcion": forms.Textarea(attrs={"class": "form-control", "rows": 2}),
+            "categoria": forms.TextInput(attrs={"class": "form-control", "maxlength": 100}),
+            "tipo": forms.Select(attrs={"class": "form-select"}),
             "proveedor": forms.Select(attrs={"class": "form-select", "required": True}),
             "cantidad": forms.NumberInput(attrs={"class": "form-control", "required": True, "min": 1, "step": 1}),
             "precio_unitario": forms.NumberInput(attrs={"class": "form-control", "required": True, "min": 0.01, "step": "0.01"}),
+            "stock_minimo_manual": forms.NumberInput(attrs={"class": "form-control", "min": 0, "step": 1, "placeholder": "Opcional"}),
+            "cantidad_compra_sugerida": forms.NumberInput(attrs={"class": "form-control", "min": 0, "step": 1, "placeholder": "Opcional"}),
+            "unidad_medida": forms.TextInput(attrs={"class": "form-control", "maxlength": 20}),
         }
 
     def __init__(self, *args, **kwargs):
