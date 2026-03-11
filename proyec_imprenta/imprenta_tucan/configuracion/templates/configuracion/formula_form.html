@@ -1,9 +1,7 @@
-﻿{% extends 'base.html' %}
+{% extends 'base.html' %}
 {% block title %}{{ title|default:"Fórmula" }}{% endblock %}
 {% block content %}
-<div class="max-w-3xl mx-auto">
-
-  <!-- Encabezado -->
+<div class="max-w-5xl mx-auto">
   <div class="flex items-center gap-3 mb-6">
     <span class="material-symbols-outlined text-3xl text-primary">functions</span>
     <div>
@@ -11,8 +9,6 @@
       <p class="text-sm text-gray-500">Definí la expresión matemática y las variables que usa.</p>
     </div>
   </div>
-
-  <!-- Mensajes -->
   {% if messages %}
     {% for message in messages %}
       <div class="mb-4 px-4 py-3 rounded-lg text-sm font-medium
@@ -23,137 +19,237 @@
       </div>
     {% endfor %}
   {% endif %}
-
-  <form method="post" id="formula-form" class="space-y-5">
-    {% csrf_token %}
-
-    <!-- Código y Nombre -->
-    <div class="bg-white rounded-xl shadow border border-gray-100 p-5 grid grid-cols-1 md:grid-cols-2 gap-4">
-      <div>
-        <label class="block text-sm font-semibold text-gray-700 mb-1">Código <span class="text-red-500">*</span></label>
-        <input name="codigo" value="{{ form.codigo.value|default:'' }}"
-          class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" required maxlength="50">
-        {% if form.codigo.errors %}<p class="text-red-500 text-xs mt-1">{{ form.codigo.errors|join:", " }}</p>{% endif %}
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div class="space-y-5">
+      <form method="post" id="formula-form" class="space-y-5">
+        {% csrf_token %}
+        <div class="bg-white rounded-xl shadow border border-gray-100 p-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-1">Código <span class="text-red-500">*</span></label>
+            <input name="codigo" value="{{ form.codigo.value|default:'' }}"
+              class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" required maxlength="50">
+            {% if form.codigo.errors %}<p class="text-red-500 text-xs mt-1">{{ form.codigo.errors|join:", " }}</p>{% endif %}
+          </div>
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-1">Nombre <span class="text-red-500">*</span></label>
+            <input name="nombre" value="{{ form.nombre.value|default:'' }}"
+              class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" required maxlength="100">
+            {% if form.nombre.errors %}<p class="text-red-500 text-xs mt-1">{{ form.nombre.errors|join:", " }}</p>{% endif %}
+          </div>
+        </div>
+        <div class="bg-white rounded-xl shadow border border-gray-100 p-5">
+          <label class="block text-sm font-semibold text-gray-700 mb-1">Descripción</label>
+          <textarea name="descripcion" rows="2"
+            class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">{{ form.descripcion.value|default:'' }}</textarea>
+        </div>
+        <div class="bg-white rounded-xl shadow border border-gray-100 p-5">
+          <label class="block text-sm font-semibold text-gray-700 mb-1">Expresión matemática <span class="text-red-500">*</span></label>
+          <textarea name="expresion" id="expresion" rows="4"
+            class="w-full border rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-400" required>{{ form.expresion.value|default:'' }}</textarea>
+          <p class="text-xs text-gray-400 mt-1">Funciones: <code class="bg-gray-100 px-1 rounded">min, max, round, ceil, floor, abs</code></p>
+          {% if form.expresion.errors %}<p class="text-red-500 text-xs mt-1">{{ form.expresion.errors|join:", " }}</p>{% endif %}
+        </div>
+        <div class="bg-white rounded-xl shadow border border-gray-100 p-5">
+          <label class="block text-sm font-semibold text-gray-700 mb-1">Variables (JSON)</label>
+          <input name="variables_json" id="variables_json" value="{{ form.variables_json.value|default:'' }}"
+            class="w-full border rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-400"
+            placeholder='["tirada","desperdicio"]'>
+          <p class="text-xs text-gray-400 mt-1">Array con los nombres de las variables: <code>["var1","var2"]</code></p>
+        </div>
+        <div class="bg-blue-50 rounded-xl border border-blue-200 p-5">
+          <p class="text-sm font-semibold text-blue-700 mb-2 flex items-center gap-1">
+            <span class="material-symbols-outlined text-base">science</span> Validador en línea
+          </p>
+          <div id="variables-inputs" class="grid grid-cols-2 gap-3 mb-3"></div>
+          <button id="btn-validar" type="button"
+            class="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold py-2 px-4 rounded-lg shadow">
+            <span class="material-symbols-outlined text-sm">calculate</span> Probar fórmula
+          </button>
+          <div id="validacion-resultado" class="mt-3 text-sm"></div>
+        </div>
+        <div class="bg-white rounded-xl shadow border border-gray-100 p-5 flex items-center gap-3">
+          <input type="checkbox" name="activo" id="activo"
+            {% if form.activo.value %}checked{% endif %}
+            class="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500">
+          <label for="activo" class="text-sm font-semibold text-gray-700">Fórmula activa</label>
+        </div>
+        <div class="flex justify-end gap-3 pb-6">
+          <a href="{% url 'lista_formulas' %}"
+            class="flex items-center gap-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold py-2 px-5 rounded-lg">
+            <span class="material-symbols-outlined text-sm">arrow_back</span> Volver
+          </a>
+          <button type="submit"
+            class="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-5 rounded-lg shadow">
+            <span class="material-symbols-outlined text-sm">save</span> Guardar
+          </button>
+        </div>
+      </form>
+    </div>
+    <div class="space-y-4">
+      <div class="bg-white rounded-xl shadow border border-gray-100 p-5">
+        <div class="flex items-center gap-2 mb-4">
+          <span class="material-symbols-outlined text-xl text-blue-500">menu_book</span>
+          <h2 class="text-base font-bold text-gray-700">Fórmulas del sistema — Referencia</h2>
+        </div>
+        <p class="text-xs text-gray-400 mb-4">Variables estándar disponibles para cualquier producto gráfico.</p>
+        <div class="mb-4">
+          <p class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Variables generales</p>
+          <div class="grid grid-cols-2 gap-1 text-xs">
+            <span class="bg-gray-50 rounded px-2 py-1"><code class="text-blue-600">Q</code> — Cantidad solicitada</span>
+            <span class="bg-gray-50 rounded px-2 py-1"><code class="text-blue-600">R</code> — Rendimiento por pliego</span>
+            <span class="bg-gray-50 rounded px-2 py-1"><code class="text-blue-600">M</code> — % Merma (ej: 0.05)</span>
+            <span class="bg-gray-50 rounded px-2 py-1"><code class="text-blue-600">C</code> — Cantidad de colores</span>
+            <span class="bg-gray-50 rounded px-2 py-1"><code class="text-blue-600">F</code> — Caras impresas (1 o 2)</span>
+            <span class="bg-gray-50 rounded px-2 py-1"><code class="text-blue-600">Formas</code> — Formas de impresión</span>
+            <span class="bg-gray-50 rounded px-2 py-1"><code class="text-blue-600">At</code> — Área impresa m²/unidad</span>
+            <span class="bg-gray-50 rounded px-2 py-1"><code class="text-blue-600">Ct</code> — Consumo tinta gr/m²/color</span>
+            <span class="bg-gray-50 rounded px-2 py-1"><code class="text-blue-600">Pp</code> — Precio por pliego</span>
+            <span class="bg-gray-50 rounded px-2 py-1"><code class="text-blue-600">Pt</code> — Precio por kg tinta</span>
+            <span class="bg-gray-50 rounded px-2 py-1"><code class="text-blue-600">Ppl</code> — Precio por plancha</span>
+            <span class="bg-gray-50 rounded px-2 py-1"><code class="text-blue-600">Pb</code> — Precio por kg barniz</span>
+            <span class="bg-gray-50 rounded px-2 py-1"><code class="text-blue-600">Cb</code> — Consumo barniz gr/m²</span>
+            <span class="bg-gray-50 rounded px-2 py-1"><code class="text-blue-600">Plam</code> — Precio por m² laminado</span>
+          </div>
+        </div>
+        <div class="mb-3 border-t pt-3">
+          <p class="text-xs font-bold text-green-700 uppercase tracking-wide mb-1 flex items-center gap-1">
+            <span class="material-symbols-outlined text-sm">layers</span> Papel
+          </p>
+          <div class="bg-green-50 rounded-lg p-3 space-y-1 text-xs font-mono text-gray-700">
+            <p>Pliegos = (Q / R) * (1 + M)</p>
+            <p>Costo_Papel = Pliegos * Pp</p>
+          </div>
+        </div>
+        <div class="mb-3 border-t pt-3">
+          <p class="text-xs font-bold text-yellow-700 uppercase tracking-wide mb-1 flex items-center gap-1">
+            <span class="material-symbols-outlined text-sm">water_drop</span> Tinta
+          </p>
+          <div class="bg-yellow-50 rounded-lg p-3 space-y-1 text-xs font-mono text-gray-700">
+            <p>Tinta_kg = (Q * At * Ct * C * F) / 1000</p>
+            <p>Costo_Tinta = Tinta_kg * Pt</p>
+          </div>
+        </div>
+        <div class="mb-3 border-t pt-3">
+          <p class="text-xs font-bold text-purple-700 uppercase tracking-wide mb-1 flex items-center gap-1">
+            <span class="material-symbols-outlined text-sm">view_array</span> Planchas
+          </p>
+          <div class="bg-purple-50 rounded-lg p-3 space-y-1 text-xs font-mono text-gray-700">
+            <p>Planchas = C * F * Formas</p>
+            <p>Costo_Planchas = Planchas * Ppl</p>
+          </div>
+        </div>
+        <div class="mb-3 border-t pt-3">
+          <p class="text-xs font-bold text-orange-700 uppercase tracking-wide mb-1 flex items-center gap-1">
+            <span class="material-symbols-outlined text-sm">opacity</span> Barniz (opcional)
+          </p>
+          <div class="bg-orange-50 rounded-lg p-3 space-y-1 text-xs font-mono text-gray-700">
+            <p>Barniz_kg = (Q * At * Cb) / 1000</p>
+            <p>Costo_Barniz = Barniz_kg * Pb</p>
+          </div>
+        </div>
+        <div class="mb-3 border-t pt-3">
+          <p class="text-xs font-bold text-blue-700 uppercase tracking-wide mb-1 flex items-center gap-1">
+            <span class="material-symbols-outlined text-sm">flip</span> Laminado (opcional)
+          </p>
+          <div class="bg-blue-50 rounded-lg p-3 text-xs font-mono text-gray-700">
+            <p>Costo_Laminado = Q * At * Plam</p>
+          </div>
+        </div>
+        <div class="border-t pt-3">
+          <p class="text-xs font-bold text-gray-700 uppercase tracking-wide mb-1 flex items-center gap-1">
+            <span class="material-symbols-outlined text-sm">calculate</span> Costo Directo Total
+          </p>
+          <div class="bg-gray-800 rounded-lg p-3 space-y-1 text-xs font-mono text-green-300">
+            <p>CD = Costo_Papel + Costo_Tinta</p>
+            <p>   + Costo_Planchas + Costo_Barniz</p>
+            <p>   + Costo_Laminado</p>
+            <p class="border-t border-gray-600 pt-1 mt-1 text-white">Costo_Unitario = CD / Q</p>
+          </div>
+        </div>
+        <div class="mt-4 border-t pt-3">
+          <p class="text-xs text-gray-500 mb-2">Fórmula compacta para copiar:</p>
+          <div class="bg-gray-100 rounded p-2 text-xs font-mono text-gray-600 break-all" id="formula-compacta">((Q/R)*(1+M)*Pp) + ((Q*At*Ct*C*F)/1000*Pt) + (C*F*Formas*Ppl) + ((Q*At*Cb)/1000*Pb) + (Q*At*Plam)</div>
+          <button onclick="copiarFormula()" type="button"
+            class="mt-2 flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium">
+            <span class="material-symbols-outlined text-sm">content_copy</span> Copiar al portapapeles
+          </button>
+        </div>
       </div>
-      <div>
-        <label class="block text-sm font-semibold text-gray-700 mb-1">Nombre <span class="text-red-500">*</span></label>
-        <input name="nombre" value="{{ form.nombre.value|default:'' }}"
-          class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" required maxlength="100">
-        {% if form.nombre.errors %}<p class="text-red-500 text-xs mt-1">{{ form.nombre.errors|join:", " }}</p>{% endif %}
-      </div>
     </div>
-
-    <!-- Descripción -->
-    <div class="bg-white rounded-xl shadow border border-gray-100 p-5">
-      <label class="block text-sm font-semibold text-gray-700 mb-1">Descripción</label>
-      <textarea name="descripcion" rows="2"
-        class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">{{ form.descripcion.value|default:'' }}</textarea>
-    </div>
-
-    <!-- Expresión -->
-    <div class="bg-white rounded-xl shadow border border-gray-100 p-5">
-      <label class="block text-sm font-semibold text-gray-700 mb-1">Expresión matemática <span class="text-red-500">*</span></label>
-      <textarea name="expresion" id="expresion" rows="3"
-        class="w-full border rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-400" required>{{ form.expresion.value|default:'' }}</textarea>
-      <p class="text-xs text-gray-400 mt-1">Ejemplo: <code class="bg-gray-100 px-1 rounded">(tiraje * area) / rendimiento</code></p>
-      <p class="text-xs text-gray-400 mt-0.5">Funciones permitidas: <code class="bg-gray-100 px-1 rounded">min, max, round, ceil, floor, abs</code></p>
-      {% if form.expresion.errors %}<p class="text-red-500 text-xs mt-1">{{ form.expresion.errors|join:", " }}</p>{% endif %}
-    </div>
-
-    <!-- Variables JSON -->
-    <div class="bg-white rounded-xl shadow border border-gray-100 p-5">
-      <label class="block text-sm font-semibold text-gray-700 mb-1">Variables (JSON)</label>
-      <input name="variables_json" id="variables_json" value="{{ form.variables_json.value|default:'' }}"
-        class="w-full border rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-400"
-        placeholder='["tiraje","area","rendimiento"]'>
-      <p class="text-xs text-gray-400 mt-1">Listá los nombres de las variables usadas en la expresión.</p>
-      {% if form.variables_json.errors %}<p class="text-red-500 text-xs mt-1">{{ form.variables_json.errors|join:", " }}</p>{% endif %}
-    </div>
-
-    <!-- Validador en línea -->
-    <div class="bg-blue-50 rounded-xl border border-blue-200 p-5">
-      <p class="text-sm font-semibold text-blue-700 mb-2 flex items-center gap-1">
-        <span class="material-symbols-outlined text-base">science</span> Validador en línea
-      </p>
-      <div id="variables-inputs" class="grid grid-cols-2 md:grid-cols-3 gap-3 mb-3"></div>
-      <button id="btn-validar" type="button"
-        class="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold py-2 px-4 rounded-lg shadow">
-        <span class="material-symbols-outlined text-sm">calculate</span> Probar fórmula
-      </button>
-      <div id="validacion-resultado" class="mt-3 text-sm"></div>
-    </div>
-
-    <!-- Activo -->
-    <div class="bg-white rounded-xl shadow border border-gray-100 p-5 flex items-center gap-3">
-      <input type="checkbox" name="activo" id="activo"
-        {% if form.activo.value %}checked{% endif %}
-        class="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500">
-      <label for="activo" class="text-sm font-semibold text-gray-700">Fórmula activa</label>
-    </div>
-
-    <!-- Botones -->
-    <div class="flex justify-end gap-3 pb-6">
-      <a href="{% url 'lista_formulas' %}"
-        class="flex items-center gap-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold py-2 px-5 rounded-lg">
-        <span class="material-symbols-outlined text-sm">arrow_back</span> Volver
-      </a>
-      <button type="submit"
-        class="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-5 rounded-lg shadow">
-        <span class="material-symbols-outlined text-sm">save</span> Guardar
-      </button>
-    </div>
-  </form>
+  </div>
 </div>
-
 <script>
-// Generador dinámico de inputs para el validador
-function actualizarInputsValidador() {
-  const varsRaw = document.getElementById('variables_json').value.trim();
-  const container = document.getElementById('variables-inputs');
-  container.innerHTML = '';
-  let vars = [];
-  try { vars = JSON.parse(varsRaw); } catch(e) { return; }
-  if (!Array.isArray(vars)) return;
-  vars.forEach(v => {
-    const div = document.createElement('div');
-    div.innerHTML = `<label class="block text-xs font-medium text-gray-600 mb-0.5">${v}</label>
-      <input id="var_${v}" type="number" step="any" value="1"
-        class="w-full border rounded px-2 py-1 text-sm focus:ring-2 focus:ring-blue-400">`;
-    container.appendChild(div);
-  });
-}
-
-document.getElementById('variables_json').addEventListener('input', actualizarInputsValidador);
-document.getElementById('expresion').addEventListener('input', actualizarInputsValidador);
-actualizarInputsValidador();
-
-document.getElementById('btn-validar').addEventListener('click', function() {
-  const expr = document.getElementById('expresion').value.trim();
-  const varsRaw = document.getElementById('variables_json').value.trim();
-  let vars = [];
-  try { vars = JSON.parse(varsRaw); } catch(e) {}
-  const variables = {};
-  vars.forEach(v => {
-    const el = document.getElementById('var_' + v);
-    variables[v] = el ? parseFloat(el.value) || 0 : 0;
-  });
-  const div = document.getElementById('validacion-resultado');
-  div.innerHTML = '<span class="text-gray-500">Calculando...</span>';
-  fetch('/api/configuracion/formula/validate/', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}'},
-    body: JSON.stringify({expresion: expr, variables: variables})
-  }).then(r => r.json()).then(data => {
-    if (data.ok) {
-      div.innerHTML = `<span class="text-green-700 font-semibold flex items-center gap-1">
-        <span class="material-symbols-outlined text-base">check_circle</span> Resultado: ${data.resultado}</span>`;
-    } else {
-      div.innerHTML = `<span class="text-red-600 font-semibold flex items-center gap-1">
-        <span class="material-symbols-outlined text-base">error</span> Error: ${data.error}</span>`;
+(function() {
+  function extraerVars() {
+    var raw = document.getElementById('variables_json').value.trim();
+    var expr = document.getElementById('expresion').value;
+    var vars = [];
+    try {
+      var parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) { vars = parsed; }
+      else if (parsed && typeof parsed === 'object') { vars = Object.keys(parsed); }
+    } catch(e) {}
+    if (!vars.length) {
+      var reserved = ['min','max','round','ceil','floor','abs'];
+      var matches = expr.match(/[a-zA-Z_][a-zA-Z0-9_]*/g) || [];
+      var seen = {};
+      matches.forEach(function(v) {
+        if (!seen[v] && reserved.indexOf(v) === -1) { seen[v] = true; vars.push(v); }
+      });
     }
-  }).catch(() => {
-    div.innerHTML = '<span class="text-red-500">Error de conexión</span>';
+    return vars;
+  }
+  function actualizarInputs() {
+    var vars = extraerVars();
+    var container = document.getElementById('variables-inputs');
+    container.innerHTML = '';
+    vars.forEach(function(v) {
+      var div = document.createElement('div');
+      div.innerHTML = '<label style="display:block;font-size:11px;font-weight:500;color:#4b5563;margin-bottom:2px">' + v + '</label>'
+        + '<input id="var_' + v + '" type="number" step="any" value="1" style="width:100%;border:1px solid #d1d5db;border-radius:4px;padding:4px 8px;font-size:12px">';
+      container.appendChild(div);
+    });
+  }
+  document.getElementById('variables_json').addEventListener('input', actualizarInputs);
+  document.getElementById('expresion').addEventListener('input', actualizarInputs);
+  actualizarInputs();
+  document.getElementById('btn-validar').addEventListener('click', function() {
+    var expr = document.getElementById('expresion').value.trim();
+    var vars = extraerVars();
+    var variables = {};
+    vars.forEach(function(v) {
+      var el = document.getElementById('var_' + v);
+      variables[v] = el ? (parseFloat(el.value) || 0) : 0;
+    });
+    var resultDiv = document.getElementById('validacion-resultado');
+    resultDiv.innerHTML = '<span style="color:#6b7280">Calculando...</span>';
+    var csrf = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    fetch('/configuracion/api/configuracion/formula/validate/', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrf},
+      body: JSON.stringify({expresion: expr, variables: variables})
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.ok) {
+        resultDiv.innerHTML = '<span style="color:#15803d;font-weight:600">Resultado: ' + data.resultado + '</span>';
+      } else {
+        resultDiv.innerHTML = '<span style="color:#dc2626;font-weight:600">Error: ' + data.error + '</span>';
+      }
+    })
+    .catch(function(err) {
+      resultDiv.innerHTML = '<span style="color:#dc2626">Error: ' + err.message + '</span>';
+    });
   });
-});
+  window.copiarFormula = function() {
+    var text = document.getElementById('formula-compacta').innerText;
+    navigator.clipboard.writeText(text).then(function() {
+      var btn = document.querySelector('[onclick="copiarFormula()"]');
+      var orig = btn.innerHTML;
+      btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:14px">check</span> Copiado';
+      setTimeout(function() { btn.innerHTML = orig; }, 2000);
+    });
+  };
+})();
 </script>
 {% endblock %}

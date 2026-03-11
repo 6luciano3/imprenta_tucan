@@ -1,4 +1,4 @@
-from django.http import HttpResponseRedirect
+﻿from django.http import HttpResponseRedirect
 from django.shortcuts import redirect
 from .models import RecetaProducto
 from .forms import FormulaForm
@@ -197,7 +197,7 @@ def lista_formulas(request):
     order_by = request.GET.get('order_by', 'insumo')
     direction = request.GET.get('direction', 'asc')
 
-    formulas_qs = Formula.objects.select_related('insumo').all()
+    formulas_qs = Formula.objects.select_related('insumo').filter(insumo__tipo='directo')
     if query:
         formulas_qs = formulas_qs.filter(
             Q(codigo__icontains=query) |
@@ -739,3 +739,4 @@ def ofertas_general_config(request):
         'params': params_con_valor,
         'saved': saved,
     })
+
