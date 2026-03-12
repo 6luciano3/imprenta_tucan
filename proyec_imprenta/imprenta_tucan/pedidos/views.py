@@ -535,25 +535,29 @@ def modificar_pedido(request, idPedido: int):
             iva_multiplier = Decimal("1.21") if aplicar_iva else Decimal("1")
             monto_total = subtotal_con_descuento * iva_multiplier
 
-            with transaction.atomic():
-                ajustar_insumos_por_diferencia(old_lineas, new_lineas)
-                # Reemplazar líneas del pedido
-                pedido.lineas.all().delete()
-                for f in formset.cleaned_data:
-                    if f and not f.get('DELETE', False):
-                        LineaPedido.objects.create(
-                            pedido=pedido,
-                            producto=f["producto"],
-                            cantidad=f["cantidad"],
-                            especificaciones=f.get("especificaciones", ""),
-                            precio_unitario=f["producto"].precio or Decimal("0"),
-                        )
-                pedido.estado = estado
-                pedido.fecha_entrega = fecha_entrega
-                pedido.descuento = descuento_val
-                pedido.aplicar_iva = aplicar_iva
-                pedido.monto_total = monto_total
-                pedido.save()
+            try:
+                with transaction.atomic():
+                    ajustar_insumos_por_diferencia(old_lineas, new_lineas)
+                    # Reemplazar líneas del pedido
+                    pedido.lineas.all().delete()
+                    for f in formset.cleaned_data:
+                        if f and not f.get('DELETE', False):
+                            LineaPedido.objects.create(
+                                pedido=pedido,
+                                producto=f["producto"],
+                                cantidad=f["cantidad"],
+                                especificaciones=f.get("especificaciones", ""),
+                                precio_unitario=f["producto"].precio or Decimal("0"),
+                            )
+                    pedido.estado = estado
+                    pedido.fecha_entrega = fecha_entrega
+                    pedido.descuento = descuento_val
+                    pedido.aplicar_iva = aplicar_iva
+                    pedido.monto_total = monto_total
+                    pedido.save()
+            except ValueError as e:
+                messages.error(request, f"No se pudo cambiar el estado: {e}")
+                return redirect(request.path)
 
             messages.success(request, "El pedido ha sido modificado correctamente.")
             return redirect("lista_pedidos")
