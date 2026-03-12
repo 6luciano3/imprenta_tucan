@@ -338,47 +338,28 @@ def eliminar_insumo(request, idInsumo: int):
 
 @login_required
 def lista_proyecciones(request):
+    # T-06: la generacion de proyecciones fue movida a insumos.tasks.generar_proyecciones_insumos
+    # que Celery ejecuta diariamente. Esta vista es solo lectura.
     from configuracion.services import get_page_size
     periodo_actual = timezone.now().strftime('%Y-%m')
     proyecciones_qs = ProyeccionInsumo.objects.filter(periodo=periodo_actual)
-    # Generar proyecciones automáticamente si no existen para el período actual
-    if not proyecciones_qs.exists():
-        proveedores_ids = _filtro_industria_grafica_queryset()
-        proveedores = list(Proveedor.objects.filter(id__in=proveedores_ids)) if proveedores_ids else list(Proveedor.objects.filter(activo=True))
-        from insumos.models import predecir_demanda_media_movil
-        for insumo in Insumo.objects.filter(activo=True):
-            prediccion = predecir_demanda_media_movil(insumo, periodo_actual, meses=3)
-            if prediccion is not None and prediccion > 0:
-                cantidad_proyectada = max(0, prediccion - (insumo.stock or 0))
-                if cantidad_proyectada == 0:
-                    cantidad_proyectada = 50  # mínimo sugerido si no hay faltante
-            else:
-                objetivo = 500
-                faltante = max(0, objetivo - (insumo.stock or 0))
-                cantidad_proyectada = faltante if faltante > 0 else 100
-            proveedor_sugerido = insumo.proveedor or (proveedores[0] if proveedores else None)
-            ProyeccionInsumo.objects.update_or_create(
-                insumo=insumo,
-                periodo=periodo_actual,
-                defaults={
-                    'cantidad_proyectada': cantidad_proyectada,
-                    'proveedor_sugerido': proveedor_sugerido,
-                    'estado': 'pendiente',
-                }
-            )
-        proyecciones_qs = ProyeccionInsumo.objects.filter(periodo=periodo_actual)
 
-    # Obtener predicción para cada proyección (solo para mostrar en la tabla)
+    # Obtener prediccion para cada proyeccion (solo lectura, sin escribir en BD)
     from insumos.models import predecir_demanda_media_movil
     proyecciones = []
     for p in proyecciones_qs.order_by('insumo__nombre'):
         prediccion = predecir_demanda_media_movil(p.insumo, p.periodo, meses=3)
         p.prediccion_media_movil = prediccion
         proyecciones.append(p)
+
     paginator = Paginator(proyecciones, get_page_size())
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
-    return render(request, 'insumos/lista_proyecciones.html', {'proyecciones': page_obj})
+    sin_proyecciones = not proyecciones_qs.exists()
+    return render(request, 'insumos/lista_proyecciones.html', {
+        'proyecciones': page_obj,
+        'sin_proyecciones': sin_proyecciones,
+    })
 
 
 @login_required

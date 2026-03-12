@@ -291,8 +291,6 @@ class Formula(models.Model):
 
     def __str__(self):
         return self.nombre
-    creado_en = models.DateTimeField(auto_now_add=True)
-    actualizado_en = models.DateTimeField(auto_now=True)
 
     def variables(self):
         return self.variables_json or []
