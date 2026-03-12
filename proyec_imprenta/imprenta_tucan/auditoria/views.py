@@ -103,6 +103,9 @@ def lista_auditoria(request):
         export_qs.pop('page')
     export_url_params = urlencode(export_qs)
 
+    for entry in page_obj:
+        entry.changes_dict = _parse_changes(entry.changes) or {}
+
     return render(request, 'auditoria/lista_auditoria.html', {
         'auditorias': page_obj,
         'export_params': export_url_params,

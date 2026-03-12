@@ -1,5 +1,19 @@
 {% extends 'base.html' %}
-{% block title %}Auditoría del Sistema{% endblock %}
+{% block title %}Auditoría del Sistema
+<script>
+function toggleDetalle(id) {
+  var row = document.getElementById(id);
+  var icon = document.getElementById('icon-' + id);
+  if (row.classList.contains('hidden')) {
+    row.classList.remove('hidden');
+    if (icon) icon.textContent = 'expand_less';
+  } else {
+    row.classList.add('hidden');
+    if (icon) icon.textContent = 'expand_more';
+  }
+}
+</script>
+{% endblock %}
 {% block content %}
 <div class="mb-6 flex items-center justify-between">
   <div>
@@ -175,12 +189,47 @@
           <span class="text-xs font-mono px-1.5 py-0.5 rounded bg-gray-100 text-gray-600">{{ a.method }}</span>
           {% else %}—{% endif %}
         </td>
-        <td class="px-4 py-3 text-right">
+        <td class="px-4 py-3 text-right flex items-center justify-end gap-2">
+          {% if a.changes %}
+          <button type="button" onclick="toggleDetalle('d{{ a.id }}')"
+            class="inline-flex items-center gap-1 text-gray-500 hover:text-blue-600 text-xs font-medium">
+            <span class="material-symbols-outlined text-sm" id="icon-d{{ a.id }}">expand_more</span>
+          </button>
+          {% endif %}
           <a href="{% url 'ver_auditoria' a.id %}" class="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 text-xs font-medium">
             <span class="material-symbols-outlined text-sm">open_in_new</span> Ver
           </a>
         </td>
       </tr>
+      {% if a.changes %}
+      <tr id="d{{ a.id }}" class="hidden bg-blue-50">
+        <td colspan="8" class="px-6 py-3">
+          <div class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Cambios detectados</div>
+          <table class="w-full text-xs">
+            <thead>
+              <tr class="border-b border-blue-100">
+                <th class="text-left py-1 px-2 text-gray-500 w-1/4">Campo</th>
+                <th class="text-left py-1 px-2 text-red-500 w-5/12">Antes</th>
+                <th class="text-left py-1 px-2 text-green-600 w-5/12">Después</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for campo, vals in a.changes_dict.items %}
+              <tr class="border-b border-blue-50">
+                <td class="py-1 px-2 font-mono text-gray-500 font-medium">{{ campo }}</td>
+                <td class="py-1 px-2">
+                  <span class="inline-block font-mono bg-red-50 text-red-700 px-2 py-0.5 rounded border border-red-100 break-all">{{ vals.before|default:"—" }}</span>
+                </td>
+                <td class="py-1 px-2">
+                  <span class="inline-block font-mono bg-green-50 text-green-700 px-2 py-0.5 rounded border border-green-100 break-all">{{ vals.after|default:"—" }}</span>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </td>
+      </tr>
+      {% endif %}
       {% empty %}
       <tr>
         <td colspan="8" class="px-4 py-12 text-center">
@@ -195,4 +244,18 @@
 <div class="mt-4">
   {% include 'layouts/pagination.html' with page_obj=auditorias %}
 </div>
+
+<script>
+function toggleDetalle(id) {
+  var row = document.getElementById(id);
+  var icon = document.getElementById('icon-' + id);
+  if (row.classList.contains('hidden')) {
+    row.classList.remove('hidden');
+    if (icon) icon.textContent = 'expand_less';
+  } else {
+    row.classList.add('hidden');
+    if (icon) icon.textContent = 'expand_more';
+  }
+}
+</script>
 {% endblock %}

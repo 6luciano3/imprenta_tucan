@@ -1,5 +1,12 @@
 {% extends 'base.html' %}
-{% block title %}Detalle de Auditoría #{{ auditoria.id }}{% endblock %}
+{% block title %}Detalle de Auditoría #{{ auditoria.id }}
+<script>
+window.addEventListener('load', function() {
+  var el = document.getElementById('cambios-detectados');
+  if (el) { setTimeout(function() { el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 200); }
+});
+</script>
+{% endblock %}
 {% block content %}
 
 <!-- Header -->
@@ -129,7 +136,7 @@
 
 <!-- Cambios -->
 {% if changes_parsed %}
-<div class="mt-6 bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+<div id="cambios-detectados" class="mt-6 bg-white rounded-xl shadow-sm border border-gray-200 p-5">
   <h3 class="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-4 flex items-center gap-1.5">
     <span class="material-symbols-outlined text-base">compare_arrows</span> Cambios detectados
     <span class="ml-1 text-xs font-normal text-gray-400">({{ changes_parsed|length }} campo{{ changes_parsed|length|pluralize:",s" }})</span>
@@ -176,4 +183,11 @@
 </div>
 {% endif %}
 
+
+<script>
+window.addEventListener('load', function() {
+  var el = document.getElementById('cambios-detectados');
+  if (el) { setTimeout(function() { el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 200); }
+});
+</script>
 {% endblock %}
