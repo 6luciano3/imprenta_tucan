@@ -1,3 +1,6 @@
+import logging
+logger = logging.getLogger(__name__)
+
 from django.views.decorators.csrf import csrf_exempt
 
 # --- Helper: retroalimentación del ranking — delega a ClienteInteligenteEngine.retroalimentar() ---
@@ -10,8 +13,8 @@ def _ajustar_score_por_feedback(cliente, accion):
     try:
         from core.motor.cliente_engine import ClienteInteligenteEngine
         ClienteInteligenteEngine().retroalimentar({'cliente_id': cliente.pk, 'accion': accion})
-    except Exception:
-        pass
+    except Exception as e:
+        logger.error(f"_ajustar_score_por_feedback: error ajustando score de cliente {cliente.pk} (accion={accion}): {e}")
 
 # --- Helper: crea un Pedido automáticamente cuando el cliente acepta una oferta ---
 def _crear_pedido_desde_oferta(oferta):
@@ -46,8 +49,8 @@ def _crear_pedido_desde_oferta(oferta):
                     subtotal += precio * cop.cantidad
                 factor = (Decimal('100') - descuento_pct) / Decimal('100')
                 monto_final = (subtotal * factor).quantize(Decimal('0.01'))
-        except Exception:
-            pass  # Sin combo → pedido borrador con monto 0
+        except Exception as e:
+            logger.warning(f"_crear_pedido_desde_oferta: no se pudo obtener combo para cliente {cliente.pk}: {e}")
 
         # Marcar oferta como 'aplicada' ANTES de crear el Pedido
         # para que Pedido.save() no intente aplicar el descuento de nuevo
@@ -89,10 +92,11 @@ def _crear_pedido_desde_oferta(oferta):
                 descripcion=f'Pedido #{pedido.pk} creado automaticamente desde oferta #{oferta.id} para {oferta.cliente}',
                 datos={'pedido_id': pedido.pk, 'oferta_id': oferta.id, 'cliente_id': oferta.cliente_id},
             )
-        except Exception:
-            pass
+        except Exception as e:
+            logger.error(f"_crear_pedido_desde_oferta: error al crear AutomationLog para oferta {oferta.id}: {e}")
         return pedido
-    except Exception:
+    except Exception as e:
+        logger.error(f"_crear_pedido_desde_oferta: error inesperado creando pedido desde oferta {oferta.id}: {e}")
         return None
 
 @csrf_exempt
@@ -172,8 +176,8 @@ def aceptar_oferta_token(request, token):
                     asunto=f'Oferta #{oferta.id} aceptada por {oferta.cliente}',
                     mensaje=f'El cliente {oferta.cliente} acepto la oferta "{oferta.titulo}".' + (f' Pedido #{pedido.id} generado automaticamente.' if pedido else ' Sin pedido generado.'),
                 )
-        except Exception:
-            pass
+        except Exception as e:
+            logger.error(f"aceptar_oferta_token: error enviando email de confirmacion para oferta {oferta.id}: {e}")
         return render(request, 'automatizacion/oferta_individual.html', {
             'oferta': oferta,
             'accion_realizada': 'aceptada',
@@ -207,8 +211,8 @@ def rechazar_oferta_token(request, token):
                 asunto=f'Confirmacion: Oferta rechazada - {oferta.titulo}',
                 mensaje=f'Hola {oferta.cliente.nombre}, confirmamos que rechazaste la oferta "{oferta.titulo}". Si cambiaste de opinion contactanos.',
             )
-        except Exception:
-            pass
+        except Exception as e:
+            logger.error(f"rechazar_oferta_token: error enviando email de confirmacion para oferta {oferta.id}: {e}")
         return render(request, 'automatizacion/oferta_individual.html', {'oferta': oferta, 'accion_realizada': 'rechazada'})
     return render(request, 'automatizacion/oferta_individual.html', {'oferta': oferta})
 
@@ -653,7 +657,7 @@ def mensaje_callback(request):
     """
     from django.conf import settings as _s
     secret = getattr(_s, 'AUTOMATION_WEBHOOK_SECRET', '')
-    if secret and request.headers.get('X-Webhook-Token') != secret:
+    if not secret or request.headers.get('X-Webhook-Token') != secret:
         return JsonResponse({'error': 'Unauthorized'}, status=401)
 
     if request.method != 'POST':
@@ -764,8 +768,8 @@ def confirmar_oferta_cliente(request, oferta_id):
                         f'Por favor completarlo manualmente.'
                     ),
                 )
-        except Exception:
-            pass
+        except Exception as e:
+            logger.error(f"confirmar_oferta_cliente: error en notificacion sin stock para oferta {oferta.id}: {e}")
         messages.warning(request, 'Oferta aceptada. No fue posible generar el pedido automáticamente; el equipo comercial lo completará en breve.')
     return redirect('mis_ofertas_cliente')
 
@@ -818,7 +822,7 @@ def accion_callback(request):
     """
     from django.conf import settings as _s
     secret = getattr(_s, 'AUTOMATION_WEBHOOK_SECRET', '')
-    if secret and request.headers.get('X-Webhook-Token') != secret:
+    if not secret or request.headers.get('X-Webhook-Token') != secret:
         return JsonResponse({'error': 'Unauthorized'}, status=401)
 
     if request.method != 'POST':

@@ -102,3 +102,68 @@ def verificar_stock_consumo(consumo: dict) -> tuple[bool, dict]:
         if disp < req_dec:
             faltantes[iid] = float(req_dec - disp)
     return (len(faltantes) == 0), faltantes
+
+
+def aplicar_descuento_oferta(pedido):
+    """
+    T-05: Si el cliente tiene una oferta de descuento aceptada, aplica el porcentaje
+    al monto_total del pedido. Retorna la oferta encontrada o None.
+    Solo debe llamarse en pedidos nuevos (sin pk).
+    """
+    try:
+        from automatizacion.models import OfertaPropuesta
+        oferta = (
+            OfertaPropuesta.objects
+            .filter(cliente=pedido.cliente, tipo="descuento", estado="aceptada")
+            .order_by("-creada")
+            .first()
+        )
+        if oferta:
+            porcentaje = Decimal(str(oferta.parametros.get("descuento", 10)))
+            factor = (Decimal("100") - porcentaje) / Decimal("100")
+            try:
+                pedido.monto_total = (pedido.monto_total * factor).quantize(pedido.monto_total)
+            except Exception:
+                pedido.monto_total = pedido.monto_total * factor
+        return oferta
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error(f"aplicar_descuento_oferta: error para cliente {pedido.cliente_id}: {e}")
+        return None
+
+
+def ajustar_score_cancelacion(pedido):
+    """
+    T-05: Al cancelar un pedido, ajusta el score del cliente y registra en AutomationLog.
+    """
+    try:
+        from automatizacion.models import OfertaPropuesta, AutomationLog
+        from automatizacion.views import _ajustar_score_por_feedback
+        oferta = OfertaPropuesta.objects.filter(
+            parametros__aplicada_pedido_id=pedido.pk
+        ).first()
+        if oferta:
+            _ajustar_score_por_feedback(pedido.cliente, "rechazar")
+            AutomationLog.objects.create(
+                evento="pedido_cancelado_score_ajustado",
+                descripcion=f"Pedido #{pedido.pk} cancelado. Score de {pedido.cliente} ajustado.",
+                datos={"pedido_id": pedido.pk, "cliente_id": pedido.cliente_id, "oferta_id": oferta.id},
+            )
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error(f"ajustar_score_cancelacion: error en pedido {pedido.pk}: {e}")
+
+
+def marcar_oferta_aplicada(pedido, oferta):
+    """
+    T-05: Marca la oferta como aplicada y guarda el id del pedido en sus parametros.
+    """
+    try:
+        oferta.estado = "aplicada"
+        params = oferta.parametros or {}
+        params["aplicada_pedido_id"] = pedido.pk
+        oferta.parametros = params
+        oferta.save()
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error(f"marcar_oferta_aplicada: error para oferta {oferta.id}: {e}")

@@ -22,71 +22,38 @@ class Pedido(models.Model):
         return f"Pedido {self.id} - {self.cliente}"
 
     def save(self, *args, **kwargs):
-        # Detectar cambio de estado a 'proceso' y descontar stock
-        from .services import reservar_insumos_para_pedido
+        # T-05: lógica de negocio delegada a services.py
+        from .services import (
+            reservar_insumos_para_pedido,
+            aplicar_descuento_oferta,
+            ajustar_score_cancelacion,
+            marcar_oferta_aplicada,
+        )
         oferta_aceptada = None
-        try:
-            from automatizacion.models import OfertaPropuesta
-            from decimal import Decimal
-            if not self.pk:
-                oferta_aceptada = (
-                    OfertaPropuesta.objects
-                    .filter(cliente=self.cliente, tipo='descuento', estado='aceptada')
-                    .order_by('-creada')
-                    .first()
-                )
-                if oferta_aceptada:
-                    porcentaje = Decimal(str(oferta_aceptada.parametros.get('descuento', 10)))
-                    factor = (Decimal('100') - porcentaje) / Decimal('100')
-                    try:
-                        self.monto_total = (self.monto_total * factor).quantize(self.monto_total)
-                    except Exception:
-                        self.monto_total = self.monto_total * factor
-        except Exception:
-            pass
-        estado_proceso = None
         _should_reserve_new = False
+
         if not self.pk:
-            from .models import EstadoPedido
-            estado_proceso = EstadoPedido.objects.filter(nombre__icontains='proceso').first()
+            # Pedido nuevo: aplicar descuento de oferta si existe
+            oferta_aceptada = aplicar_descuento_oferta(self)
+            # Si ya nace en estado "proceso", reservar después del super().save()
+            estado_proceso = EstadoPedido.objects.filter(nombre__icontains="proceso").first()
             if estado_proceso and self.estado == estado_proceso:
                 _should_reserve_new = True
         else:
             old = type(self).objects.get(pk=self.pk)
-            estado_proceso = self.estado if 'proceso' in self.estado.nombre.lower() else None
-            old_estado = old.estado.nombre.lower() if old.estado else None
-            new_estado = self.estado.nombre.lower() if self.estado else None
-            if 'proceso' not in old_estado and 'proceso' in new_estado:
+            old_estado = old.estado.nombre.lower() if old.estado else ""
+            new_estado = self.estado.nombre.lower() if self.estado else ""
+            if "proceso" not in old_estado and "proceso" in new_estado:
                 reservar_insumos_para_pedido(self)
-            # Detectar cancelacion y bajar score del cliente
-            if 'cancelad' in new_estado and 'cancelad' not in old_estado:
-                try:
-                    from automatizacion.models import OfertaPropuesta, AutomationLog
-                    from automatizacion.views import _ajustar_score_por_feedback
-                    oferta = OfertaPropuesta.objects.filter(
-                        parametros__aplicada_pedido_id=self.pk
-                    ).first()
-                    if oferta:
-                        _ajustar_score_por_feedback(self.cliente, 'rechazar')
-                        AutomationLog.objects.create(
-                            evento='pedido_cancelado_score_ajustado',
-                            descripcion=f'Pedido #{self.pk} cancelado. Score de {self.cliente} ajustado.',
-                            datos={'pedido_id': self.pk, 'cliente_id': self.cliente_id, 'oferta_id': oferta.id},
-                        )
-                except Exception:
-                    pass
+            if "cancelad" in new_estado and "cancelad" not in old_estado:
+                ajustar_score_cancelacion(self)
+
         super().save(*args, **kwargs)
+
         if _should_reserve_new:
             reservar_insumos_para_pedido(self)
-        try:
-            if oferta_aceptada:
-                oferta_aceptada.estado = 'aplicada'
-                params = oferta_aceptada.parametros or {}
-                params['aplicada_pedido_id'] = self.pk
-                oferta_aceptada.parametros = params
-                oferta_aceptada.save()
-        except Exception:
-            pass
+        if oferta_aceptada:
+            marcar_oferta_aplicada(self, oferta_aceptada)
 
 
 # NUEVO: Soporte para múltiples productos por pedido

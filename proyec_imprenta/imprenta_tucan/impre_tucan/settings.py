@@ -38,7 +38,7 @@ AWS_REGION = os.environ.get('AWS_REGION', 'us-east-1').strip()
 # Seguridad y entorno
 DEBUG = os.environ.get('DEBUG', 'False').lower() in ('true', '1', 'yes')
 ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,192.168.100.41').split(',') + ['.ngrok-free.dev', '.ngrok.io']
-CSRF_TRUSTED_ORIGINS = ['https://inductile-oversqueamishly-sylvie.ngrok-free.dev']
+CSRF_TRUSTED_ORIGINS = [o for o in os.environ.get('CSRF_TRUSTED_ORIGINS', 'https://inductile-oversqueamishly-sylvie.ngrok-free.dev').split(',') if o.strip()]
 
 # SECRET_KEY: falla ruidosamente en producción si no está definida en el entorno.
 if not DEBUG:
@@ -126,7 +126,7 @@ db_name = db_name_env if db_name_env else str(BASE_DIR / 'db.sqlite3')
 DATABASES = {
     'default': {
         'ENGINE': os.environ.get('DB_ENGINE', 'django.db.backends.sqlite3'),
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'NAME': db_name,
     }
 }
 
