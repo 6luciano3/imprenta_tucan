@@ -353,6 +353,112 @@ def _crear_propuesta_compra(insumo, cantidad_req, comentario_oc, motivo_trigger,
     return proveedor, oc, consulta
 
 
+
+
+def _enviar_cotizacion_multiples_proveedores(insumo, cantidad_req, comentario, motivo_trigger, criterios_pesos):
+    """
+    Envia solicitud de cotizacion automaticamente a los top N proveedores
+    con email real (no .local). Crea una OrdenCompra por cada proveedor.
+    Notifica al admin con el resumen de envios.
+    """
+    from automatizacion.models import CompraPropuesta, ConsultaStockProveedor, ScoreProveedor
+    from pedidos.models import OrdenCompra
+    from automatizacion.services import enviar_email_orden_compra_proveedor
+    from proveedores.models import Proveedor
+    from django.conf import settings as dj_settings
+    from core.notifications.engine import enviar_notificacion
+
+    try:
+        top_n = int(Parametro.get('TOP_N_PROVEEDORES_COTIZACION', 5))
+    except Exception:
+        top_n = 5
+
+    # Top N proveedores activos con email real (excluir .local)
+    scores = (
+        ScoreProveedor.objects
+        .select_related('proveedor')
+        .filter(proveedor__activo=True)
+        .exclude(proveedor__email__isnull=True)
+        .exclude(proveedor__email='')
+        .exclude(proveedor__email__endswith='.local')
+        .order_by('-score')[:top_n]
+    )
+
+    proveedores_seleccionados = [s.proveedor for s in scores]
+    if not proveedores_seleccionados:
+        logger.warning('_enviar_cotizacion_multiples_proveedores: sin proveedores con email real')
+        return 0
+
+    enviados = 0
+    nombres_enviados = []
+
+    for proveedor in proveedores_seleccionados:
+        try:
+            from django.db import transaction
+            with transaction.atomic():
+                oc = OrdenCompra.objects.create(
+                    insumo=insumo,
+                    cantidad=cantidad_req,
+                    proveedor=proveedor,
+                    estado='sugerida',
+                    comentario=comentario,
+                )
+                consulta = ConsultaStockProveedor.objects.create(
+                    proveedor=proveedor,
+                    insumo=insumo,
+                    cantidad=cantidad_req,
+                    estado='pendiente',
+                    respuesta={},
+                )
+                CompraPropuesta.objects.create(
+                    insumo=insumo,
+                    cantidad_requerida=cantidad_req,
+                    proveedor_recomendado=proveedor,
+                    pesos_usados=criterios_pesos,
+                    motivo_trigger=motivo_trigger,
+                    estado='consultado',
+                    borrador_oc=oc,
+                    consulta_stock=consulta,
+                )
+            # Enviar email fuera del atomic
+            ok, err = enviar_email_orden_compra_proveedor(oc)
+            if ok:
+                enviados += 1
+                nombres_enviados.append(proveedor.nombre)
+                logger.info('Cotizacion enviada a %s para insumo %s', proveedor.email, insumo.nombre)
+            else:
+                logger.warning('Error enviando cotizacion a %s: %s', proveedor.email, err)
+        except Exception as e:
+            logger.error('Error creando OC para proveedor %s: %s', proveedor.nombre, e)
+
+    # Notificar al admin con resumen
+    if enviados > 0:
+        try:
+            from usuarios.models import Usuario, Notificacion
+            from django.conf import settings as _s
+            resumen = (
+                f'Solicitud de cotizacion enviada automaticamente para "{insumo.nombre}" '
+                f'({cantidad_req} unidades) a {enviados} proveedor(es): '
+                f'{", ".join(nombres_enviados)}. '
+                f'Revisa las respuestas en el panel de Compras.'
+            )
+            for u in Usuario.objects.filter(is_staff=True):
+                Notificacion.objects.create(usuario=u, mensaje=resumen)
+            # Email al admin
+            managers = getattr(_s, 'MANAGERS', [])
+            admin_email = managers[0][1] if managers else getattr(_s, 'EMAIL_HOST_USER', '')
+            if admin_email:
+                enviar_notificacion(
+                    destinatario=admin_email,
+                    canal='email',
+                    asunto=f'Cotizacion automatica enviada: {insumo.nombre}',
+                    mensaje=resumen,
+                )
+        except Exception as e:
+            logger.warning('Error notificando admin sobre cotizacion: %s', e)
+
+    return enviados
+
 @shared_task
 def tarea_automatizacion_presupuestos_ponderada():
     """Detecta necesidades de compra y genera propuestas automáticas:
@@ -388,10 +494,10 @@ def tarea_automatizacion_presupuestos_ponderada():
                 except Insumo.DoesNotExist:
                     continue
                 cantidad_req = insumo.cantidad_compra_sugerida or int(Decimal(str(faltan)))
-                _crear_propuesta_compra(
+                _enviar_cotizacion_multiples_proveedores(
                     insumo=insumo,
                     cantidad_req=cantidad_req,
-                    comentario_oc=f"Auto por pedido {pedido.id}: faltante {cantidad_req}",
+                    comentario=f"Solicitud de cotizacion automatica por pedido {pedido.id}: faltante {cantidad_req} unidades",
                     motivo_trigger='pedido_mayor_stock',
                     criterios_pesos=CRITERIOS_PESOS,
                 )
@@ -405,10 +511,10 @@ def tarea_automatizacion_presupuestos_ponderada():
             if ya:
                 continue
             cantidad_req = insumo.cantidad_compra_sugerida or max(1, stock_minimo * 2)
-            _crear_propuesta_compra(
+            _enviar_cotizacion_multiples_proveedores(
                 insumo=insumo,
                 cantidad_req=cantidad_req,
-                comentario_oc=f"Auto stock mínimo: sugerido {cantidad_req}",
+                comentario=f"Solicitud de cotizacion automatica por stock minimo: {cantidad_req} unidades requeridas",
                 motivo_trigger='stock_minimo_vencido',
                 criterios_pesos=CRITERIOS_PESOS,
             )
@@ -526,6 +632,27 @@ def tarea_vencer_ofertas():
         except Exception:
             pass
 
+        # Notificar al cliente por email
+        try:
+            from core.notifications.engine import enviar_notificacion
+            from automatizacion.models import OfertaPropuesta as OP
+            for oferta in OP.objects.filter(id__in=vencidas_ids).select_related('cliente'):
+                cliente = oferta.cliente
+                if not getattr(cliente, 'email_verificado', False):
+                    continue
+                enviar_notificacion(
+                    destinatario=cliente.email,
+                    canal='email',
+                    asunto=f'Tu oferta "{oferta.titulo}" ha vencido',
+                    mensaje=(
+                        f'Hola {cliente.nombre}, '
+                        f'la oferta "{oferta.titulo}" que preparamos especialmente para vos '
+                        f'ha vencido sin ser respondida. '
+                        f'Comunicate con nosotros si queres que generemos una nueva propuesta.'
+                    ),
+                )
+        except Exception:
+            pass
         # Notificar al staff
         try:
             from usuarios.models import Usuario, Notificacion
