@@ -35,6 +35,7 @@
           <th class="px-4 py-2 text-left">Estado</th>
           <th class="px-4 py-2 text-left">Orden de Cotización</th>
           <th class="px-4 py-2 text-left">Consulta Stock</th>
+          <th class="px-4 py-2 text-left">Respuesta SC</th>
           <th class="px-4 py-2 text-center w-40">Acciones</th>
         </tr>
       </thead>
@@ -68,6 +69,23 @@
               {{ p.consulta_stock.estado }}
             {% else %}
               <span class="text-slate-400">—</span>
+            {% endif %}
+          </td>
+          <td class="px-4 py-2">
+            {% if p.proveedor_recomendado and sc_por_proveedor %}
+              {% for sc_id, sc_obj in sc_por_proveedor.items %}
+                {% if sc_id == p.proveedor_recomendado.id %}
+                  {% if sc_obj.estado == "confirmada" %}
+                    <span class="inline-flex items-center gap-1 px-2 py-1 rounded bg-green-100 text-green-700 text-xs font-medium"><span class="material-symbols-outlined text-sm">thumb_up</span> Confirmada</span>
+                  {% elif sc_obj.estado == "rechazada" %}
+                    <span class="inline-flex items-center gap-1 px-2 py-1 rounded bg-red-100 text-red-700 text-xs font-medium"><span class="material-symbols-outlined text-sm">thumb_down</span> Rechazada</span>
+                  {% else %}
+                    <span class="inline-flex items-center gap-1 px-2 py-1 rounded bg-amber-100 text-amber-700 text-xs font-medium"><span class="material-symbols-outlined text-sm">hourglass_empty</span> Pendiente</span>
+                  {% endif %}
+                {% endif %}
+              {% endfor %}
+            {% else %}
+              <span class="text-slate-400">-</span>
             {% endif %}
           </td>
           <td class="px-4 py-2 w-40 text-center">

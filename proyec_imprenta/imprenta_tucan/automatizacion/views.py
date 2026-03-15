@@ -1053,7 +1053,15 @@ def compras_propuestas_admin(request):
     # Build rows: solo propuestas reales (creadas únicamente por la tarea de generación)
     rows = list(propuestas_qs)
     # Sort: propuestas por nombre de insumo
-    rows.sort(key=lambda x: str(x.insumo.nombre))
+    # Ordenar: primero los que tienen SC confirmada, luego por nombre de insumo
+    from automatizacion.models import SolicitudCotizacion
+    sc_confirmadas = set(
+        SolicitudCotizacion.objects.filter(estado='confirmada').values_list('proveedor_id', flat=True)
+    )
+    def sort_key(p):
+        tiene_confirmada = 0 if (p.proveedor_recomendado and p.proveedor_recomendado.id in sc_confirmadas) else 1
+        return (tiene_confirmada, str(p.insumo.nombre))
+    rows.sort(key=sort_key)
 
     # Agrupar por proveedor para modales de cotizacion
     from collections import defaultdict
@@ -1066,9 +1074,16 @@ def compras_propuestas_admin(request):
     paginator = Paginator(rows, page_size)
     page = request.GET.get('page')
     propuestas = paginator.get_page(page)
+    from automatizacion.models import SolicitudCotizacion
+    sc_por_proveedor = {}
+    for sc in SolicitudCotizacion.objects.select_related('proveedor').order_by('-creada'):
+        if sc.proveedor_id not in sc_por_proveedor:
+            sc_por_proveedor[sc.proveedor_id] = sc
+
     return render(request, 'automatizacion/compras_propuestas.html', {
         'propuestas': propuestas,
         'cotizaciones': dict(cotizaciones),
+        'sc_por_proveedor': sc_por_proveedor,
     })
 
 
