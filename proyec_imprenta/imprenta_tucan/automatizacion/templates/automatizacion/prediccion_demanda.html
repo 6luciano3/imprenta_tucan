@@ -95,19 +95,16 @@
           <td class="px-4 py-2 text-center">
             {% if p.estado == 'pendiente' %}
             <div class="flex gap-1 justify-center">
-              <!-- Aceptar -->
               <form method="post" action="{% url 'prediccion_aceptar' p.id %}">
                 {% csrf_token %}
                 <button type="submit" class="p-1 rounded hover:bg-slate-100 text-emerald-600" title="Aceptar proyeccion">
                   <span class="material-symbols-outlined text-sm">check_circle</span>
                 </button>
               </form>
-              <!-- Ajustar -->
               <button type="button" class="p-1 rounded hover:bg-slate-100 text-sky-600" title="Ajustar cantidad"
                 onclick="document.getElementById('modal-ajustar-{{ p.id }}').classList.remove('hidden')">
                 <span class="material-symbols-outlined text-sm">edit</span>
               </button>
-              <!-- Rechazar -->
               <form method="post" action="{% url 'prediccion_rechazar' p.id %}">
                 {% csrf_token %}
                 <button type="submit" class="p-1 rounded hover:bg-slate-100 text-rose-600" title="Rechazar proyeccion">
@@ -120,31 +117,6 @@
             {% endif %}
           </td>
         </tr>
-
-        <!-- Modal ajustar -->
-        <div id="modal-ajustar-{{ p.id }}" class="fixed inset-0 bg-black/40 z-50 hidden">
-          <div class="bg-white rounded-xl shadow-xl w-full max-w-md mx-auto mt-32 p-6">
-            <h2 class="text-lg font-semibold mb-4">Ajustar proyeccion: {{ p.insumo.nombre }}</h2>
-            <form method="post" action="{% url 'prediccion_ajustar' p.id %}">
-              {% csrf_token %}
-              <div class="mb-3">
-                <label class="block text-sm font-medium mb-1">Cantidad validada</label>
-                <input type="number" name="cantidad_validada" value="{{ p.cantidad_proyectada }}"
-                  class="w-full border rounded px-3 py-2 text-sm" min="1" required>
-              </div>
-              <div class="mb-4">
-                <label class="block text-sm font-medium mb-1">Comentario</label>
-                <textarea name="comentario" class="w-full border rounded px-3 py-2 text-sm" rows="2"
-                  placeholder="Motivo del ajuste..."></textarea>
-              </div>
-              <div class="flex justify-end gap-2">
-                <button type="button" class="px-3 py-2 rounded bg-slate-200 text-slate-700 text-sm"
-                  onclick="document.getElementById('modal-ajustar-{{ p.id }}').classList.add('hidden')">Cancelar</button>
-                <button type="submit" class="px-3 py-2 rounded bg-sky-600 text-white text-sm">Guardar ajuste</button>
-              </div>
-            </form>
-          </div>
-        </div>
         {% endfor %}
       </tbody>
     </table>
@@ -170,4 +142,33 @@
   </div>
   {% endif %}
 </div>
+
+{% for p in proyecciones %}
+{% if p.estado == 'pendiente' %}
+<div id="modal-ajustar-{{ p.id }}" class="fixed inset-0 bg-black/40 z-50 hidden">
+  <div class="bg-white rounded-xl shadow-xl w-full max-w-md mx-auto mt-32 p-6">
+    <h2 class="text-lg font-semibold mb-4">Ajustar proyeccion: {{ p.insumo.nombre }}</h2>
+    <form method="post" action="{% url 'prediccion_ajustar' p.id %}">
+      {% csrf_token %}
+      <div class="mb-3">
+        <label class="block text-sm font-medium mb-1">Cantidad validada</label>
+        <input type="number" name="cantidad_validada" value="{{ p.cantidad_proyectada }}"
+          class="w-full border rounded px-3 py-2 text-sm" min="1" required>
+      </div>
+      <div class="mb-4">
+        <label class="block text-sm font-medium mb-1">Comentario</label>
+        <textarea name="comentario" class="w-full border rounded px-3 py-2 text-sm" rows="2"
+          placeholder="Motivo del ajuste..."></textarea>
+      </div>
+      <div class="flex justify-end gap-2">
+        <button type="button" class="px-3 py-2 rounded bg-slate-200 text-slate-700 text-sm"
+          onclick="document.getElementById('modal-ajustar-{{ p.id }}').classList.add('hidden')">Cancelar</button>
+        <button type="submit" class="px-3 py-2 rounded bg-sky-600 text-white text-sm">Guardar ajuste</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
+{% endfor %}
+
 {% endblock %}
