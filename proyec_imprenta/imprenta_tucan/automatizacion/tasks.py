@@ -503,22 +503,48 @@ def tarea_automatizacion_presupuestos_ponderada():
                 )
                 propuestas_creadas += 1
 
-        # 6) Revisar insumos bajo stock mínimo global
+        # 6) Agrupar insumos directos bajo stock minimo y enviar UNA SolicitudCotizacion por proveedor
+        from automatizacion.models import ScoreProveedor
+        from automatizacion.services import enviar_solicitud_cotizacion
         stock_minimo = int(Parametro.get('STOCK_MINIMO_GLOBAL', 10))
-        bajos = Insumo.objects.filter(stock__lte=stock_minimo, activo=True)
+        top_n = int(Parametro.get('TOP_N_PROVEEDORES_COTIZACION', 5))
+        hace_7dias = timezone.now() - timedelta(days=7)
+        bajos = Insumo.objects.filter(stock__lte=stock_minimo, activo=True, tipo='directo')
+        insumos_libres = []
         for insumo in bajos:
-            ya = CompraPropuesta.objects.filter(insumo=insumo, consulta_stock__isnull=False).exists()
-            if ya:
-                continue
-            cantidad_req = insumo.cantidad_compra_sugerida or max(1, stock_minimo * 2)
-            _enviar_cotizacion_multiples_proveedores(
+            ya = CompraPropuesta.objects.filter(
                 insumo=insumo,
-                cantidad_req=cantidad_req,
-                comentario=f"Solicitud de cotizacion automatica por stock minimo: {cantidad_req} unidades requeridas",
-                motivo_trigger='stock_minimo_vencido',
-                criterios_pesos=CRITERIOS_PESOS,
+                consulta_stock__isnull=False,
+                creada__gte=hace_7dias
+            ).exists()
+            if not ya:
+                cantidad_req = insumo.cantidad_compra_sugerida or max(1, stock_minimo * 2)
+                insumos_libres.append((insumo, cantidad_req))
+        if insumos_libres:
+            scores = (
+                ScoreProveedor.objects
+                .select_related('proveedor')
+                .filter(proveedor__activo=True)
+                .exclude(proveedor__email__isnull=True)
+                .exclude(proveedor__email='')
+                .exclude(proveedor__email__endswith='.local')
+                .order_by('-score')[:top_n]
             )
-            propuestas_creadas += 1
+            proveedores = [s.proveedor for s in scores]
+            for proveedor in proveedores:
+                try:
+                    sc, ok, err = enviar_solicitud_cotizacion(
+                        proveedor=proveedor,
+                        insumos_cantidades=insumos_libres,
+                        comentario='Solicitud automatica por stock minimo detectado',
+                    )
+                    if ok:
+                        propuestas_creadas += 1
+                        logger.info('SC-%s enviada a %s con %s insumos', sc.id, proveedor.email, len(insumos_libres))
+                    else:
+                        logger.warning('Error enviando SC a %s: %s', proveedor.email, err)
+                except Exception as e:
+                    logger.error('Error creando SC para proveedor %s: %s', proveedor.nombre, e)
 
         # 7) Auto-aceptación según parámetros si hay respuesta disponible y el proveedor cumple umbral
         auto_aprobar = bool(Parametro.get('AUTO_APROBAR_PROPUESTAS', False))

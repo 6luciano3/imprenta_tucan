@@ -383,3 +383,151 @@ def enviar_email_orden_compra_proveedor(orden_compra):
         return resultado['ok'], resultado.get('error')
     except Exception as e:
         return False, str(e)
+
+def enviar_solicitud_cotizacion(proveedor, insumos_cantidades, comentario=''):
+    """
+    Crea una SolicitudCotizacion agrupando multiples insumos y envia un solo email al proveedor.
+    insumos_cantidades: lista de tuplas (insumo, cantidad)
+    Retorna (SolicitudCotizacion, ok, err)
+    """
+    from automatizacion.models import SolicitudCotizacion, SolicitudCotizacionItem
+    from configuracion.models import Parametro
+    from django.conf import settings as dj_settings
+
+    if not proveedor.email or proveedor.email.endswith('.local'):
+        return None, False, 'Proveedor sin email real'
+
+    from_email = getattr(dj_settings, 'EMAIL_HOST_USER', getattr(dj_settings, 'DEFAULT_FROM_EMAIL', 'no-reply@imprenta.local'))
+    url_base = Parametro.get('SITE_URL', 'http://localhost:8000').rstrip('/')
+
+    try:
+        sc = SolicitudCotizacion.objects.create(
+            proveedor=proveedor,
+            comentario=comentario,
+        )
+        for insumo, cantidad in insumos_cantidades:
+            SolicitudCotizacionItem.objects.create(
+                solicitud=sc,
+                insumo=insumo,
+                cantidad=cantidad,
+            )
+
+        link_confirmar = f'{url_base}/automatizacion/solicitud-cotizacion/{sc.token}/confirmar/'
+        link_rechazar  = f'{url_base}/automatizacion/solicitud-cotizacion/{sc.token}/rechazar/'
+
+        # Construir filas de la tabla
+        filas_html = ''
+        for idx, item in enumerate(sc.items.select_related('insumo').all()):
+            bg = '#f0f9ff' if idx % 2 == 0 else '#fff'
+            insumo = item.insumo
+            codigo = getattr(insumo, 'codigo', '') or ''
+            nombre = getattr(insumo, 'nombre', str(insumo))
+            unidad_raw = getattr(insumo, 'unidad_medida', None)
+            if unidad_raw and hasattr(unidad_raw, 'abreviatura'):
+                unidad = unidad_raw.abreviatura or 'unidad'
+            elif unidad_raw:
+                unidad = str(unidad_raw)
+            else:
+                unidad = 'unidad'
+            filas_html += (
+                f'<tr style="background:{bg};">'
+                f'<td style="border:1px solid #e2e8f0;padding:8px 10px;">{codigo}</td>'
+                f'<td style="border:1px solid #e2e8f0;padding:8px 10px;">{nombre}</td>'
+                f'<td style="border:1px solid #e2e8f0;padding:8px 10px;text-align:center;">{item.cantidad}</td>'
+                f'<td style="border:1px solid #e2e8f0;padding:8px 10px;text-align:center;">{unidad}</td>'
+                f'</tr>'
+            )
+
+        from django.utils import timezone
+        fecha_str = timezone.now().strftime('%d/%m/%Y')
+
+        html_body = (
+            '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">'
+            '<title>Solicitud de Cotizacion - Imprenta Tucan</title></head>'
+            '<body style="margin:0;padding:0;background:#f0f4f8;font-family:Segoe UI,Arial,sans-serif;">'
+            '<table width="100%" cellpadding="0" cellspacing="0" style="background:#f0f4f8;padding:32px 0;">'
+            '<tr><td align="center">'
+            '<table width="620" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.09);max-width:620px;width:100%;">'
+            '<tr><td style="background:#334155;padding:20px 28px;">'
+            '<div style="font-size:11px;font-weight:600;color:rgba(255,255,255,.6);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;">Solicitud de Cotización de Insumos</div>'
+            f'<div style="font-size:22px;font-weight:700;color:#fff;">Nº {sc.id:06d}</div>'
+            '</td></tr>'
+            '<tr><td style="padding:20px 28px;border-bottom:1px solid #e2e8f0;">'
+            '<table width="100%" cellpadding="0" cellspacing="0"><tr>'
+            '<td style="vertical-align:top;width:50%;">'
+            '<div style="font-size:15px;font-weight:700;color:#1e293b;">Imprenta Tucán S.A.</div>'
+            '<div style="font-size:12px;color:#64748b;margin-top:2px;">Av. Principal 123, Misiones</div>'
+            '<div style="font-size:12px;color:#64748b;">IVA: Responsable Inscripto</div>'
+            '</td>'
+            '<td style="vertical-align:top;text-align:right;width:50%;">'
+            '<div style="font-size:12px;color:#64748b;">Proveedor:</div>'
+            f'<div style="font-size:14px;font-weight:700;color:#1e293b;">{proveedor.nombre}</div>'
+            f'<div style="font-size:12px;color:#64748b;">CUIT: {proveedor.cuit or "-"}</div>'
+            f'<div style="font-size:12px;color:#64748b;">{proveedor.direccion or "Dirección no especificada"}</div>'
+            f'<div style="font-size:12px;color:#64748b;">{proveedor.email}</div>'
+            '</td></tr></table></td></tr>'
+            '<tr><td style="padding:10px 28px;border-bottom:1px solid #e2e8f0;background:#f8fafc;">'
+            '<table width="100%" cellpadding="0" cellspacing="0"><tr>'
+            f'<td style="font-size:12px;color:#475569;"><strong>Fecha:</strong> {fecha_str}</td>'
+            '<td style="font-size:12px;color:#475569;"><strong>Moneda:</strong> ARS</td>'
+            f'<td style="font-size:12px;color:#475569;"><strong>Proveedor:</strong> {proveedor.nombre}</td>'
+            '</tr></table></td></tr>'
+            '<tr><td style="padding:20px 28px;">'
+            '<div style="font-size:13px;font-weight:600;color:#1e293b;margin-bottom:10px;">Detalle de Productos</div>'
+            '<table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;font-size:12px;">'
+            '<thead><tr style="background:#334155;color:#fff;">'
+            '<th style="padding:8px 10px;text-align:left;border-right:1px solid #475569;">Código</th>'
+            '<th style="padding:8px 10px;text-align:left;border-right:1px solid #475569;">Descripción</th>'
+            '<th style="padding:8px 10px;text-align:center;border-right:1px solid #475569;">Cantidad solicitada</th>'
+            '<th style="padding:8px 10px;text-align:center;">Unidad</th>'
+            '</tr></thead><tbody>'
+            + filas_html +
+            '</tbody></table></td></tr>'
+            '<tr><td style="padding:16px 28px;border-top:1px solid #e2e8f0;">'
+            '<table width="100%" cellpadding="0" cellspacing="0"><tr>'
+            '<td style="vertical-align:top;width:50%;">'
+            '<div style="font-size:13px;font-weight:600;margin-bottom:6px;">Entrega a:</div>'
+            '<div style="font-size:12px;color:#475569;">Imprenta Tucán S.A.</div>'
+            '<div style="font-size:12px;color:#475569;">Av. Principal 123, Misiones</div>'
+            '<div style="font-size:12px;color:#475569;">Tel: 381-4000000</div>'
+            '</td>'
+            '<td style="vertical-align:top;text-align:right;width:50%;">'
+            f'<div style="font-size:12px;color:#475569;"><strong>Generado por:</strong> Sistema automático</div>'
+            f'<div style="font-size:12px;color:#475569;"><strong>Fecha:</strong> {fecha_str}</div>'
+            '</td></tr></table></td></tr>'
+            '<tr><td style="padding:16px 28px;border-top:1px solid #e2e8f0;">'
+            '<table cellpadding="0" cellspacing="0"><tr>'
+            '<td style="padding-right:40px;"><div style="height:32px;border-bottom:1px solid #94a3b8;width:120px;"></div>'
+            '<div style="font-size:11px;color:#94a3b8;margin-top:4px;">Firma autorizada</div></td>'
+            '<td><div style="height:32px;border-bottom:1px solid #94a3b8;width:120px;"></div>'
+            '<div style="font-size:11px;color:#94a3b8;margin-top:4px;">Cargo</div></td>'
+            '</tr></table></td></tr>'
+            '<tr><td style="padding:20px 28px;border-top:1px solid #e2e8f0;text-align:center;">'
+            '<div style="font-size:12px;color:#64748b;margin-bottom:14px;">Por favor confirme o rechace esta solicitud:</div>'
+            f'<a href="{link_confirmar}" style="display:inline-block;background:#22c55e;color:#fff;font-size:13px;font-weight:700;padding:12px 28px;border-radius:8px;text-decoration:none;margin-right:12px;">✓ Confirmar</a>'
+            f'<a href="{link_rechazar}" style="display:inline-block;background:#ef4444;color:#fff;font-size:13px;font-weight:700;padding:12px 28px;border-radius:8px;text-decoration:none;">✗ Rechazar</a>'
+            '</td></tr>'
+            '<tr><td style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:14px 28px;text-align:center;">'
+            f'<div style="font-size:11px;color:#94a3b8;">Imprenta Tucán — {from_email}</div>'
+            '</td></tr>'
+            '</table></td></tr></table></body></html>'
+        )
+
+        texto_plano = (
+            f'Solicitud de Cotizacion SC-{sc.id:04d} - Imprenta Tucan\n'
+            f'Proveedor: {proveedor.nombre}\n'
+            f'Confirmar: {link_confirmar}\n'
+            f'Rechazar: {link_rechazar}'
+        )
+
+        asunto = f'Solicitud de Cotizacion SC-{sc.id:04d} - Imprenta Tucan'
+
+        from django.core.mail import EmailMultiAlternatives
+        msg = EmailMultiAlternatives(asunto, texto_plano, from_email, [proveedor.email])
+        msg.attach_alternative(html_body, "text/html")
+        msg.send()
+        return sc, True, None
+
+    except Exception as e:
+        import traceback
+        return None, False, str(e) + '\n' + traceback.format_exc()

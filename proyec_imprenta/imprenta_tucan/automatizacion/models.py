@@ -274,3 +274,41 @@ class CompraPropuesta(models.Model):
 
     def __str__(self):
         return f"Propuesta {self.insumo} x {self.cantidad_requerida} - {self.estado}"
+
+
+class SolicitudCotizacion(models.Model):
+    ESTADOS = [
+        ('pendiente', 'Pendiente de respuesta'),
+        ('respondida', 'Respondida por proveedor'),
+        ('confirmada', 'Confirmada'),
+        ('rechazada', 'Rechazada'),
+        ('vencida', 'Vencida'),
+    ]
+    proveedor = models.ForeignKey('proveedores.Proveedor', on_delete=models.CASCADE, related_name='solicitudes_cotizacion')
+    estado = models.CharField(max_length=20, choices=ESTADOS, default='pendiente', db_index=True)
+    token = models.CharField(max_length=64, unique=True, blank=True)
+    comentario = models.TextField(blank=True)
+    creada = models.DateTimeField(auto_now_add=True)
+    actualizada = models.DateTimeField(auto_now=True)
+    fecha_respuesta = models.DateTimeField(null=True, blank=True)
+
+    def save(self, *args, **kwargs):
+        if not self.token:
+            import uuid
+            self.token = uuid.uuid4().hex + uuid.uuid4().hex[:32]
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"SC-{self.id:04d} | {self.proveedor.nombre} | {self.estado}"
+
+
+class SolicitudCotizacionItem(models.Model):
+    solicitud = models.ForeignKey(SolicitudCotizacion, on_delete=models.CASCADE, related_name='items')
+    insumo = models.ForeignKey('insumos.Insumo', on_delete=models.CASCADE)
+    cantidad = models.PositiveIntegerField()
+    precio_unitario_respuesta = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    disponible = models.BooleanField(null=True, blank=True)
+    observacion = models.TextField(blank=True)
+
+    def __str__(self):
+        return f"{self.insumo.nombre} x {self.cantidad}"

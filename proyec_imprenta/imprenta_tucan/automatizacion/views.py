@@ -1124,8 +1124,8 @@ def aceptar_compra_propuesta(request, propuesta_id):
         if proveedor:
             insumo.proveedor = proveedor
         # Incrementa stock como compromiso asegurado (pendiente de recepción)
-        insumo.stock = (insumo.stock or 0) + int(propuesta.cantidad_requerida or 0)
-        insumo.save(update_fields=['proveedor', 'stock'])
+        # Solicitud de Cotizacion: no modifica stock hasta recepcion real
+        insumo.save(update_fields=['proveedor'])
     except Exception:
         pass
     propuesta.estado = 'aceptada'
@@ -1316,3 +1316,67 @@ def generar_ofertas_ahora(request):
         from urllib.parse import urlencode
         params = urlencode({'ok': '0', 'msg': f'Error al generar ofertas: {e}'})
     return redirect(f"/automatizacion/propuestas/?{params}")
+
+
+@csrf_exempt
+def solicitud_cotizacion_confirmar(request, token):
+    from automatizacion.models import SolicitudCotizacion
+    sc = get_object_or_404(SolicitudCotizacion, token=token)
+    ya_respondida = sc.estado in ('confirmada', 'rechazada')
+    if not ya_respondida:
+        sc.estado = 'confirmada'
+        sc.fecha_respuesta = timezone.now()
+        sc.save()
+        try:
+            from django.conf import settings as _s
+            from core.notifications.engine import enviar_notificacion
+            from usuarios.models import Notificacion
+            resumen = f'Proveedor {sc.proveedor.nombre} CONFIRMO SC-{sc.id:04d} con {sc.items.count()} insumo(s).'
+            for u in get_user_model().objects.filter(is_staff=True):
+                Notificacion.objects.create(usuario=u, mensaje=resumen)
+            admin_email = getattr(_s, 'EMAIL_HOST_USER', '')
+            if admin_email:
+                enviar_notificacion(
+                    destinatario=admin_email,
+                    canal='email',
+                    asunto=f'SC-{sc.id:04d} Confirmada por {sc.proveedor.nombre}',
+                    mensaje=resumen,
+                )
+        except Exception:
+            pass
+    return render(request, 'automatizacion/solicitud_cotizacion_respuesta.html', {
+        'sc': sc, 'accion': 'confirmada', 'ya_respondida': ya_respondida,
+    })
+
+
+@csrf_exempt
+def solicitud_cotizacion_rechazar(request, token):
+    from automatizacion.models import SolicitudCotizacion
+    sc = get_object_or_404(SolicitudCotizacion, token=token)
+    ya_respondida = sc.estado in ('confirmada', 'rechazada')
+    if not ya_respondida:
+        motivo = request.POST.get('motivo', '')
+        sc.estado = 'rechazada'
+        sc.fecha_respuesta = timezone.now()
+        sc.comentario = (sc.comentario + ' | ' if sc.comentario else '') + f'Rechazada: {motivo or "Sin motivo"}'
+        sc.save()
+        try:
+            from django.conf import settings as _s
+            from core.notifications.engine import enviar_notificacion
+            from usuarios.models import Notificacion
+            resumen = f'Proveedor {sc.proveedor.nombre} RECHAZO SC-{sc.id:04d}. Motivo: {motivo or "Sin motivo"}'
+            for u in get_user_model().objects.filter(is_staff=True):
+                Notificacion.objects.create(usuario=u, mensaje=resumen)
+            admin_email = getattr(_s, 'EMAIL_HOST_USER', '')
+            if admin_email:
+                enviar_notificacion(
+                    destinatario=admin_email,
+                    canal='email',
+                    asunto=f'SC-{sc.id:04d} Rechazada por {sc.proveedor.nombre}',
+                    mensaje=resumen,
+                )
+        except Exception:
+            pass
+    return render(request, 'automatizacion/solicitud_cotizacion_respuesta.html', {
+        'sc': sc, 'accion': 'rechazada', 'ya_respondida': ya_respondida,
+    })

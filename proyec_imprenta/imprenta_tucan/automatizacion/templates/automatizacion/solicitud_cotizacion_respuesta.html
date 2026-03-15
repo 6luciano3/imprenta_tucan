@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><title>Respuesta registrada - Imprenta Tucan</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #f0f4f8; font-family: Segoe UI, Arial, sans-serif; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
+.card { background: #fff; border-radius: 16px; box-shadow: 0 4px 24px rgba(0,0,0,.1); max-width: 520px; width: 100%; overflow: hidden; text-align: center; }
+.header-confirmada { background: linear-gradient(135deg, #14532d, #22c55e); padding: 40px 36px 32px; }
+.header-rechazada { background: linear-gradient(135deg, #7f1d1d, #ef4444); padding: 40px 36px 32px; }
+.icono { font-size: 56px; margin-bottom: 12px; }
+.header-title { font-size: 26px; font-weight: 700; color: #fff; }
+.header-sub { font-size: 13px; color: rgba(255,255,255,.75); margin-top: 6px; }
+.body { padding: 32px 36px; }
+.mensaje { font-size: 14px; color: #37474f; line-height: 1.7; margin-bottom: 20px; }
+.detalle { background: #f8fafc; border-radius: 10px; border: 1px solid #e3eaf2; padding: 16px 20px; font-size: 13px; color: #546e7a; text-align: left; }
+.footer { background: #f8fafc; border-top: 1px solid #e8edf2; padding: 16px 36px; text-align: center; font-size: 11px; color: #90a4ae; }
+table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 12px; }
+th { background: #334155; color: #fff; padding: 8px 10px; text-align: left; }
+td { border: 1px solid #e2e8f0; padding: 7px 10px; }
+tr:nth-child(even) { background: #f0f9ff; }
+</style>
+</head>
+<body>
+<div class="card">
+  {% if accion == 'confirmada' %}
+  <div class="header-confirmada">
+    <div class="icono">&#10003;</div>
+    <div class="header-title">{% if ya_respondida %}Ya respondida{% else %}Solicitud Confirmada{% endif %}</div>
+    <div class="header-sub">Su respuesta fue registrada correctamente</div>
+  </div>
+  {% else %}
+  <div class="header-rechazada">
+    <div class="icono">&#10007;</div>
+    <div class="header-title">{% if ya_respondida %}Ya respondida{% else %}Solicitud Rechazada{% endif %}</div>
+    <div class="header-sub">Su respuesta fue registrada correctamente</div>
+  </div>
+  {% endif %}
+  <div class="body">
+    <p class="mensaje">
+      Gracias, <strong>{{ sc.proveedor.nombre }}</strong>.
+      {% if ya_respondida %}
+        Esta solicitud ya fue respondida anteriormente.
+      {% else %}
+        Hemos registrado su respuesta para la <strong>Solicitud SC-{{ sc.id|stringformat:"04d" }}</strong>.
+        Nuestro equipo de compras fue notificado.
+      {% endif %}
+    </p>
+    <div class="detalle">
+      <strong>SC-{{ sc.id|stringformat:"04d" }}</strong> &mdash; Estado: <strong>{{ sc.get_estado_display }}</strong>
+      <table>
+        <thead><tr><th>Insumo</th><th>Cantidad</th></tr></thead>
+        <tbody>
+          {% for item in sc.items.all %}
+          <tr><td>{{ item.insumo.nombre }}</td><td>{{ item.cantidad }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="footer">Imprenta Tuc&aacute;n &mdash; Puede cerrar esta ventana</div>
+</div>
+</body>
+</html>
