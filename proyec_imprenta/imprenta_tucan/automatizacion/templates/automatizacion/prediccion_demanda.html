@@ -112,6 +112,26 @@
                 </button>
               </form>
             </div>
+            {% elif p.estado == 'aceptada' %}
+              {% if p.proveedor_validado %}
+                <span class="inline-flex items-center gap-1 px-2 py-1 rounded bg-emerald-50 text-emerald-700 text-xs">
+                  <span class="material-symbols-outlined text-sm">store</span>
+                  {{ p.proveedor_validado.nombre }}
+                </span>
+              {% elif p.administrador %}
+                <span class="text-xs text-slate-600">{{ p.administrador.get_full_name|default:p.administrador.username }}</span>
+              {% else %}
+                <span class="text-xs text-emerald-600">Confirmado</span>
+              {% endif %}
+            {% elif p.estado == 'rechazada' %}
+              {% if p.proveedor_validado %}
+                <span class="inline-flex items-center gap-1 px-2 py-1 rounded bg-rose-50 text-rose-700 text-xs">
+                  <span class="material-symbols-outlined text-sm">store</span>
+                  {{ p.proveedor_validado.nombre }}
+                </span>
+              {% else %}
+                <span class="text-xs text-rose-600">Rechazado</span>
+              {% endif %}
             {% else %}
               <span class="text-xs text-slate-400">{{ p.administrador|default:"Sistema" }}</span>
             {% endif %}

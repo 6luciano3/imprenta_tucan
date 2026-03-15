@@ -117,6 +117,33 @@ def proyeccion_demanda_config(request):
             'step': '1',
             'min': '1',
         },
+        {
+            'clave': 'TOP_N_PROVEEDORES_COTIZACION',
+            'nombre': 'Top N proveedores para SC automática',
+            'descripcion': 'Cantidad de proveedores rankeados que reciben la Solicitud de Cotización automáticamente al generar proyecciones.',
+            'tipo': Parametro.TIPO_INT,
+            'step': '1',
+            'min': '1',
+            'max': '10',
+        },
+        {
+            'clave': 'PREDICCION_DIA_SEMANA',
+            'nombre': 'Día de ejecución semanal',
+            'descripcion': 'Día de la semana en que se ejecuta automáticamente la predicción (0=Lunes, 6=Domingo).',
+            'tipo': Parametro.TIPO_INT,
+            'step': '1',
+            'min': '0',
+            'max': '6',
+        },
+        {
+            'clave': 'PREDICCION_HORA',
+            'nombre': 'Hora de ejecución automática',
+            'descripcion': 'Hora del día (0-23) en que se ejecuta automáticamente la predicción semanal.',
+            'tipo': Parametro.TIPO_INT,
+            'step': '1',
+            'min': '0',
+            'max': '23',
+        },
     ]
 
     if request.method == 'POST':

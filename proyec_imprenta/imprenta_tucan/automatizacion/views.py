@@ -1342,6 +1342,16 @@ def solicitud_cotizacion_confirmar(request, token):
         sc.estado = 'confirmada'
         sc.fecha_respuesta = timezone.now()
         sc.save()
+        # Actualizar proyecciones relacionadas: estado aceptada + proveedor validado
+        try:
+            from insumos.models import ProyeccionInsumo
+            insumo_ids = list(sc.items.values_list('insumo_id', flat=True))
+            ProyeccionInsumo.objects.filter(
+                insumo_id__in=insumo_ids,
+                estado='pendiente'
+            ).update(estado='aceptada', proveedor_validado=sc.proveedor)
+        except Exception:
+            pass
         try:
             from django.conf import settings as _s
             from core.notifications.engine import enviar_notificacion
@@ -1548,8 +1558,53 @@ def prediccion_rechazar(request, proyeccion_id):
 def prediccion_generar(request):
     try:
         from automatizacion.tasks import tarea_prediccion_demanda
+        from insumos.models import ProyeccionInsumo
+        from automatizacion.models import ScoreProveedor
+        from automatizacion.services import enviar_solicitud_cotizacion
+        from configuracion.models import Parametro
+
+        # 1. Generar proyecciones
         resultado = tarea_prediccion_demanda()
-        messages.success(request, f'Proyecciones generadas: {resultado}')
+
+        # 2. Obtener top 5 proveedores con email real
+        top_n = int(Parametro.get('TOP_N_PROVEEDORES_COTIZACION', 5))
+        scores = (
+            ScoreProveedor.objects
+            .select_related('proveedor')
+            .filter(proveedor__activo=True)
+            .exclude(proveedor__email__endswith='.local')
+            .exclude(proveedor__email__isnull=True)
+            .exclude(proveedor__email='')
+            .order_by('-score')[:top_n]
+        )
+        proveedores = [s.proveedor for s in scores]
+
+        # 3. Agrupar todas las proyecciones pendientes en una sola SC por proveedor
+        proyecciones = ProyeccionInsumo.objects.filter(
+            estado='pendiente'
+        ).select_related('insumo')
+
+        insumos_cantidades = [
+            (p.insumo, p.cantidad_proyectada)
+            for p in proyecciones
+        ]
+
+        # 4. Enviar SC a cada proveedor - sin cambiar estado de proyecciones
+        enviados = []
+        if insumos_cantidades and proveedores:
+            for proveedor in proveedores:
+                sc, ok, err = enviar_solicitud_cotizacion(
+                    proveedor=proveedor,
+                    insumos_cantidades=insumos_cantidades,
+                    comentario='SC automatica generada desde prediccion de demanda.',
+                )
+                if ok:
+                    enviados.append(proveedor.nombre)
+
+        if enviados:
+            messages.success(request, f'{resultado} — SC enviada a: {", ".join(enviados)}.')
+        else:
+            messages.warning(request, f'{resultado} — No se pudieron enviar SC.')
     except Exception as e:
-        messages.warning(request, f'Error al generar proyecciones: {e}')
+        messages.warning(request, f'Error: {e}')
     return redirect('prediccion_demanda_panel')
