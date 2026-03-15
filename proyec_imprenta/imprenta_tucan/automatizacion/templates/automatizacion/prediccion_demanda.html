@@ -1,0 +1,173 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block content %}
+<div class="px-6 py-4">
+  {% if messages %}
+  <div class="mb-3">
+    {% for message in messages %}
+    <div class="px-3 py-2 rounded text-sm {% if message.tags == 'success' %}bg-emerald-50 text-emerald-700 border border-emerald-200{% elif message.tags == 'warning' %}bg-amber-50 text-amber-700 border border-amber-200{% else %}bg-slate-50 text-slate-700 border border-slate-200{% endif %}">
+      {{ message }}
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <div class="flex items-center gap-3 mb-4">
+    <span class="material-symbols-outlined text-3xl text-violet-600">query_stats</span>
+    <div>
+      <h1 class="text-xl font-semibold">Prediccion de Demanda de Insumos</h1>
+      <div class="text-sm text-slate-500">Periodo proyectado: <strong>{{ periodo }}</strong> &mdash; {{ total }} insumos directos</div>
+    </div>
+  </div>
+
+  <div class="flex items-center justify-between mb-4">
+    <div class="flex gap-2">
+      <span class="inline-flex items-center gap-1 px-2 py-1 rounded bg-amber-100 text-amber-700 text-xs">
+        <span class="material-symbols-outlined text-sm">warning</span> Pendientes de revision
+      </span>
+    </div>
+    <form method="post" action="{% url 'prediccion_generar' %}">
+      {% csrf_token %}
+      <button type="submit" class="px-3 py-2 rounded bg-violet-600 text-white text-sm hover:bg-violet-700">
+        <span class="material-symbols-outlined text-sm align-middle">refresh</span> Generar proyecciones
+      </button>
+    </form>
+  </div>
+
+  {% if proyecciones %}
+  <div class="bg-white shadow rounded-xl overflow-hidden">
+    <table class="min-w-full text-sm">
+      <thead class="bg-slate-50 border-b">
+        <tr>
+          <th class="px-4 py-2 text-left">Insumo</th>
+          <th class="px-4 py-2 text-center">Stock actual</th>
+          <th class="px-4 py-2 text-center">Demanda proyectada</th>
+          <th class="px-4 py-2 text-center">Cantidad validada</th>
+          <th class="px-4 py-2 text-left">Proveedor sugerido</th>
+          <th class="px-4 py-2 text-left">Estado</th>
+          <th class="px-4 py-2 text-center">Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in proyecciones %}
+        <tr class="border-t hover:bg-slate-50">
+          <td class="px-4 py-2">
+            <div class="font-medium">{{ p.insumo.nombre }}</div>
+            <div class="text-xs text-slate-500">{{ p.insumo.codigo }}</div>
+          </td>
+          <td class="px-4 py-2 text-center">
+            {% if p.insumo.stock < p.cantidad_proyectada %}
+              <span class="text-rose-600 font-semibold">{{ p.insumo.stock }}</span>
+            {% else %}
+              <span class="text-emerald-600">{{ p.insumo.stock }}</span>
+            {% endif %}
+          </td>
+          <td class="px-4 py-2 text-center font-semibold">{{ p.cantidad_proyectada }}</td>
+          <td class="px-4 py-2 text-center">
+            {% if p.cantidad_validada %}
+              <span class="text-sky-700 font-semibold">{{ p.cantidad_validada }}</span>
+            {% else %}
+              <span class="text-slate-400">-</span>
+            {% endif %}
+          </td>
+          <td class="px-4 py-2">
+            {% if p.proveedor_sugerido %}{{ p.proveedor_sugerido.nombre }}{% else %}<span class="text-slate-400">-</span>{% endif %}
+          </td>
+          <td class="px-4 py-2">
+            {% if p.estado == 'pendiente' %}
+              <span class="inline-flex items-center gap-1 px-2 py-1 rounded bg-amber-100 text-amber-700 text-xs">
+                <span class="material-symbols-outlined text-sm">hourglass_empty</span> Pendiente
+              </span>
+            {% elif p.estado == 'aceptada' %}
+              <span class="inline-flex items-center gap-1 px-2 py-1 rounded bg-emerald-100 text-emerald-700 text-xs">
+                <span class="material-symbols-outlined text-sm">check_circle</span> Aceptada
+              </span>
+            {% elif p.estado == 'ajustada' %}
+              <span class="inline-flex items-center gap-1 px-2 py-1 rounded bg-sky-100 text-sky-700 text-xs">
+                <span class="material-symbols-outlined text-sm">edit</span> Ajustada
+              </span>
+            {% elif p.estado == 'rechazada' %}
+              <span class="inline-flex items-center gap-1 px-2 py-1 rounded bg-rose-100 text-rose-700 text-xs">
+                <span class="material-symbols-outlined text-sm">cancel</span> Rechazada
+              </span>
+            {% endif %}
+          </td>
+          <td class="px-4 py-2 text-center">
+            {% if p.estado == 'pendiente' %}
+            <div class="flex gap-1 justify-center">
+              <!-- Aceptar -->
+              <form method="post" action="{% url 'prediccion_aceptar' p.id %}">
+                {% csrf_token %}
+                <button type="submit" class="p-1 rounded hover:bg-slate-100 text-emerald-600" title="Aceptar proyeccion">
+                  <span class="material-symbols-outlined text-sm">check_circle</span>
+                </button>
+              </form>
+              <!-- Ajustar -->
+              <button type="button" class="p-1 rounded hover:bg-slate-100 text-sky-600" title="Ajustar cantidad"
+                onclick="document.getElementById('modal-ajustar-{{ p.id }}').classList.remove('hidden')">
+                <span class="material-symbols-outlined text-sm">edit</span>
+              </button>
+              <!-- Rechazar -->
+              <form method="post" action="{% url 'prediccion_rechazar' p.id %}">
+                {% csrf_token %}
+                <button type="submit" class="p-1 rounded hover:bg-slate-100 text-rose-600" title="Rechazar proyeccion">
+                  <span class="material-symbols-outlined text-sm">cancel</span>
+                </button>
+              </form>
+            </div>
+            {% else %}
+              <span class="text-xs text-slate-400">{{ p.administrador|default:"Sistema" }}</span>
+            {% endif %}
+          </td>
+        </tr>
+
+        <!-- Modal ajustar -->
+        <div id="modal-ajustar-{{ p.id }}" class="fixed inset-0 bg-black/40 z-50 hidden">
+          <div class="bg-white rounded-xl shadow-xl w-full max-w-md mx-auto mt-32 p-6">
+            <h2 class="text-lg font-semibold mb-4">Ajustar proyeccion: {{ p.insumo.nombre }}</h2>
+            <form method="post" action="{% url 'prediccion_ajustar' p.id %}">
+              {% csrf_token %}
+              <div class="mb-3">
+                <label class="block text-sm font-medium mb-1">Cantidad validada</label>
+                <input type="number" name="cantidad_validada" value="{{ p.cantidad_proyectada }}"
+                  class="w-full border rounded px-3 py-2 text-sm" min="1" required>
+              </div>
+              <div class="mb-4">
+                <label class="block text-sm font-medium mb-1">Comentario</label>
+                <textarea name="comentario" class="w-full border rounded px-3 py-2 text-sm" rows="2"
+                  placeholder="Motivo del ajuste..."></textarea>
+              </div>
+              <div class="flex justify-end gap-2">
+                <button type="button" class="px-3 py-2 rounded bg-slate-200 text-slate-700 text-sm"
+                  onclick="document.getElementById('modal-ajustar-{{ p.id }}').classList.add('hidden')">Cancelar</button>
+                <button type="submit" class="px-3 py-2 rounded bg-sky-600 text-white text-sm">Guardar ajuste</button>
+              </div>
+            </form>
+          </div>
+        </div>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="mt-4 flex items-center justify-between">
+    <div class="text-sm text-slate-600">Pagina {{ proyecciones.number }} de {{ proyecciones.paginator.num_pages }}</div>
+    <div class="flex gap-2">
+      {% if proyecciones.has_previous %}
+      <a href="?page={{ proyecciones.previous_page_number }}" class="px-3 py-1 border rounded text-sm">Anterior</a>
+      {% endif %}
+      {% if proyecciones.has_next %}
+      <a href="?page={{ proyecciones.next_page_number }}" class="px-3 py-1 border rounded text-sm">Siguiente</a>
+      {% endif %}
+    </div>
+  </div>
+
+  {% else %}
+  <div class="bg-white shadow rounded-xl p-12 text-center text-slate-500">
+    <span class="material-symbols-outlined text-5xl text-slate-300 block mb-3">query_stats</span>
+    <p class="text-lg font-medium mb-2">Sin proyecciones para {{ periodo }}</p>
+    <p class="text-sm mb-4">Hace clic en "Generar proyecciones" para calcular la demanda del proximo periodo.</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

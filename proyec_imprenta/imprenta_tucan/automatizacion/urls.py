@@ -42,4 +42,9 @@ urlpatterns = [
         path('webhook/consulta-stock/<int:propuesta_id>/', views.webhook_consulta_stock, name='webhook_consulta_stock'),
     path('solicitud-cotizacion/<str:token>/confirmar/', views.solicitud_cotizacion_confirmar, name='sc_confirmar'),
     path('solicitud-cotizacion/<str:token>/rechazar/', views.solicitud_cotizacion_rechazar, name='sc_rechazar'),
+    path('prediccion/', views.prediccion_demanda_panel, name='prediccion_demanda_panel'),
+    path('prediccion/generar/', views.prediccion_generar, name='prediccion_generar'),
+    path('prediccion/<int:proyeccion_id>/aceptar/', views.prediccion_aceptar, name='prediccion_aceptar'),
+    path('prediccion/<int:proyeccion_id>/ajustar/', views.prediccion_ajustar, name='prediccion_ajustar'),
+    path('prediccion/<int:proyeccion_id>/rechazar/', views.prediccion_rechazar, name='prediccion_rechazar'),
 ]

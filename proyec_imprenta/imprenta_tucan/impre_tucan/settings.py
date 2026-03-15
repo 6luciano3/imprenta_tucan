@@ -244,3 +244,16 @@ ANYMAIL = {
         'region_name': AWS_REGION,
     }
 }
+
+# Celery Beat - Prediccion de demanda semanal (cada domingo a las 6am)
+from celery.schedules import crontab
+CELERY_BEAT_SCHEDULE_EXTRA = {
+    'prediccion-demanda-semanal': {
+        'task': 'automatizacion.tasks.tarea_prediccion_demanda_semanal',
+        'schedule': crontab(hour=6, minute=0, day_of_week=0),  # Domingo 6:00am
+    },
+}
+if 'CELERY_BEAT_SCHEDULE' in dir():
+    CELERY_BEAT_SCHEDULE.update(CELERY_BEAT_SCHEDULE_EXTRA)
+else:
+    CELERY_BEAT_SCHEDULE = CELERY_BEAT_SCHEDULE_EXTRA

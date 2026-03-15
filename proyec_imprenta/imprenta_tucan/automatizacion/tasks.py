@@ -25,18 +25,102 @@ except Exception:
 @shared_task
 def tarea_prediccion_demanda():
     """
-    Ejecuta PI-3 (DemandaInteligenteEngine): predice demanda con media móvil
-    y aplica reglas de stock para todos los insumos activos.
+    PI - Prediccion de demanda de insumos directos.
+    Genera ProyeccionInsumo para el proximo periodo usando media movil ponderada.
+    Solo procesa insumos de tipo directo.
     """
     try:
-        from core.motor import MotorProcesosInteligentes
-        resultado = MotorProcesosInteligentes.ejecutar('demanda')
-        procesados = resultado.get('insumos_procesados', 0)
-        acciones = resultado.get('acciones_sugeridas', 0)
-        urgentes = resultado.get('urgentes', 0)
-        return f"prediccion_demanda: {procesados} insumos, {acciones} acciones sugeridas ({urgentes} urgentes)"
+        from insumos.models import Insumo, ProyeccionInsumo, predecir_demanda_media_movil
+        from automatizacion.models import ScoreProveedor
+        from django.utils import timezone
+        from datetime import timedelta
+
+        # Calcular periodo actual y siguiente
+        now = timezone.now()
+        if now.month == 12:
+            periodo_siguiente = f'{now.year + 1}-01'
+        else:
+            periodo_siguiente = f'{now.year}-{now.month + 1:02d}'
+
+        insumos = Insumo.objects.filter(activo=True, tipo='directo')
+        procesados = 0
+        urgentes = 0
+
+        for insumo in insumos:
+            try:
+                cantidad_proyectada = predecir_demanda_media_movil(insumo, periodo_siguiente, meses=3) or 0
+                if cantidad_proyectada <= 0:
+                    # Si no hay historial usar stock_minimo * 2 como base
+                    cantidad_proyectada = int(insumo.stock_minimo_sugerido or 0) * 2 or 10
+
+                # Proveedor sugerido: el de mayor score
+                score = ScoreProveedor.objects.filter(
+                    proveedor__activo=True
+                ).exclude(
+                    proveedor__email__endswith='.local'
+                ).order_by('-score').first()
+                proveedor_sugerido = score.proveedor if score else None
+
+                # Crear o actualizar proyeccion
+                proj, created = ProyeccionInsumo.objects.update_or_create(
+                    insumo=insumo,
+                    periodo=periodo_siguiente,
+                    defaults={
+                        'cantidad_proyectada': int(cantidad_proyectada),
+                        'proveedor_sugerido': proveedor_sugerido,
+                        'fecha_generacion': now,
+                        'estado': 'pendiente',
+                    }
+                )
+                procesados += 1
+
+                # Detectar urgencia: stock actual menor que proyeccion
+                stock_actual = int(insumo.stock or 0)
+                if stock_actual < int(cantidad_proyectada):
+                    urgentes += 1
+
+            except Exception as e:
+                logger.warning(f'tarea_prediccion_demanda: error en insumo {insumo.nombre}: {e}')
+
+        # Notificar al admin con detalle de urgentes
+        try:
+            from django.conf import settings as _s
+            from core.notifications.engine import enviar_notificacion
+            from usuarios.models import Notificacion
+            from django.contrib.auth import get_user_model
+            admin_email = getattr(_s, 'EMAIL_HOST_USER', '')
+            # Obtener insumos urgentes para el reporte
+            urgentes_lista = ProyeccionInsumo.objects.filter(
+                periodo=periodo_siguiente,
+                estado='pendiente'
+            ).select_related('insumo').order_by('insumo__stock')
+            urgentes_detalle = '\n'.join([
+                f'- {p.insumo.nombre}: stock={p.insumo.stock}, proyectado={p.cantidad_proyectada}'
+                for p in urgentes_lista[:10]
+            ])
+            asunto = f'[Imprenta Tucan] Prediccion {periodo_siguiente}: {procesados} proyecciones ({urgentes} urgentes)'
+            mensaje = (
+                f'Se generaron {procesados} proyecciones de demanda para {periodo_siguiente}.\n\n'
+                f'Insumos con stock insuficiente ({urgentes}):\n{urgentes_detalle}\n\n'
+                f'Ingrese al panel para revisar y validar las proyecciones:\n'
+                f'/automatizacion/prediccion/'
+            )
+            # Notificacion interna a staff
+            for u in get_user_model().objects.filter(is_staff=True):
+                Notificacion.objects.create(usuario=u, mensaje=f'Prediccion {periodo_siguiente}: {procesados} proyecciones, {urgentes} urgentes.')
+            if admin_email:
+                enviar_notificacion(
+                    destinatario=admin_email,
+                    canal='email',
+                    asunto=asunto,
+                    mensaje=mensaje,
+                )
+        except Exception as e:
+            logger.warning(f'tarea_prediccion_demanda: error notificando admin: {e}')
+
+        return f"prediccion_demanda: {procesados} insumos directos proyectados para {periodo_siguiente} ({urgentes} urgentes)"
     except Exception as e:
-        return f"prediccion_demanda: error {e}"
+        return f"prediccion_demanda: error {e}" 
 
 
 @shared_task
@@ -691,3 +775,12 @@ def tarea_vencer_ofertas():
         return f'vencer_ofertas: {total} oferta(s) marcadas como vencidas'
     except Exception as e:
         return f'vencer_ofertas: error {e}'
+
+
+@shared_task
+def tarea_prediccion_demanda_semanal():
+    """
+    Disparador semanal (cada domingo) para ejecutar la prediccion de demanda
+    y notificar al administrador con el reporte de proyecciones.
+    """
+    return tarea_prediccion_demanda()

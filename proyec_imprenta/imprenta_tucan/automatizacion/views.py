@@ -1395,3 +1395,161 @@ def solicitud_cotizacion_rechazar(request, token):
     return render(request, 'automatizacion/solicitud_cotizacion_respuesta.html', {
         'sc': sc, 'accion': 'rechazada', 'ya_respondida': ya_respondida,
     })
+
+
+@login_required
+def prediccion_demanda_panel(request):
+    from insumos.models import ProyeccionInsumo
+    from django.utils import timezone
+    now = timezone.now()
+    if now.month == 12:
+        periodo = f'{now.year + 1}-01'
+    else:
+        periodo = f'{now.year}-{now.month + 1:02d}'
+    from django.db.models import Case, When, Value, IntegerField
+    qs = ProyeccionInsumo.objects.filter(periodo=periodo).select_related(
+        'insumo', 'proveedor_sugerido', 'proveedor_validado', 'administrador'
+    ).annotate(
+        orden_estado=Case(
+            When(estado='aceptada', then=Value(0)),
+            When(estado='ajustada', then=Value(1)),
+            When(estado='pendiente', then=Value(2)),
+            When(estado='rechazada', then=Value(3)),
+            default=Value(4),
+            output_field=IntegerField(),
+        )
+    ).order_by('orden_estado', '-insumo__stock')
+    try:
+        from configuracion.services import get_page_size
+        page_size = get_page_size()
+    except Exception:
+        page_size = 15
+    from django.core.paginator import Paginator
+    paginator = Paginator(qs, page_size)
+    page = request.GET.get('page')
+    proyecciones = paginator.get_page(page)
+    return render(request, 'automatizacion/prediccion_demanda.html', {
+        'proyecciones': proyecciones,
+        'periodo': periodo,
+        'total': qs.count(),
+        'urgentes': qs.filter(estado='pendiente').exclude(insumo__stock__gte=0).count(),
+    })
+
+
+@login_required
+@require_POST
+def prediccion_aceptar(request, proyeccion_id):
+    from insumos.models import ProyeccionInsumo
+    proj = get_object_or_404(ProyeccionInsumo, pk=proyeccion_id)
+    proj.estado = 'aceptada'
+    proj.administrador = request.user
+    proj.fecha_validacion = timezone.now()
+    proj.cantidad_validada = proj.cantidad_validada or proj.cantidad_proyectada
+    proj.proveedor_validado = proj.proveedor_validado or proj.proveedor_sugerido
+    proj.save()
+    # Generar SC a top 5 proveedores con email real
+    try:
+        from automatizacion.models import ScoreProveedor
+        from automatizacion.services import enviar_solicitud_cotizacion
+        from configuracion.models import Parametro
+        top_n = int(Parametro.get('TOP_N_PROVEEDORES_COTIZACION', 5))
+        scores = (
+            ScoreProveedor.objects
+            .select_related('proveedor')
+            .filter(proveedor__activo=True)
+            .exclude(proveedor__email__endswith='.local')
+            .exclude(proveedor__email__isnull=True)
+            .exclude(proveedor__email='')
+            .order_by('-score')[:top_n]
+        )
+        cantidad = proj.cantidad_validada or proj.cantidad_proyectada
+        enviados = []
+        for s in scores:
+            sc, ok, err = enviar_solicitud_cotizacion(
+                proveedor=s.proveedor,
+                insumos_cantidades=[(proj.insumo, cantidad)],
+                comentario=f'Generada desde prediccion de demanda periodo {proj.periodo}. Validada por {request.user}.',
+            )
+            if ok:
+                enviados.append(s.proveedor.nombre)
+        if enviados:
+            messages.success(request, f'Proyeccion aceptada. SC enviada a: {", ".join(enviados)}.')
+        else:
+            messages.warning(request, 'Proyeccion aceptada pero no se pudieron enviar SC.')
+    except Exception as e:
+        messages.warning(request, f'Proyeccion aceptada pero error al enviar SC: {e}')
+    return redirect('prediccion_demanda_panel')
+
+
+@login_required
+@require_POST
+def prediccion_ajustar(request, proyeccion_id):
+    from insumos.models import ProyeccionInsumo
+    proj = get_object_or_404(ProyeccionInsumo, pk=proyeccion_id)
+    cantidad = request.POST.get('cantidad_validada')
+    comentario = request.POST.get('comentario', '')
+    if cantidad:
+        proj.cantidad_validada = int(cantidad)
+    proj.comentario_admin = comentario
+    proj.estado = 'ajustada'
+    proj.administrador = request.user
+    proj.fecha_validacion = timezone.now()
+    proj.save()
+    # Generar SC a top 5 proveedores con cantidad ajustada
+    try:
+        from automatizacion.models import ScoreProveedor
+        from automatizacion.services import enviar_solicitud_cotizacion
+        from configuracion.models import Parametro
+        top_n = int(Parametro.get('TOP_N_PROVEEDORES_COTIZACION', 5))
+        scores = (
+            ScoreProveedor.objects
+            .select_related('proveedor')
+            .filter(proveedor__activo=True)
+            .exclude(proveedor__email__endswith='.local')
+            .exclude(proveedor__email__isnull=True)
+            .exclude(proveedor__email='')
+            .order_by('-score')[:top_n]
+        )
+        enviados = []
+        for s in scores:
+            sc, ok, err = enviar_solicitud_cotizacion(
+                proveedor=s.proveedor,
+                insumos_cantidades=[(proj.insumo, proj.cantidad_validada)],
+                comentario=f'Generada desde prediccion ajustada por {request.user}. Motivo: {comentario}',
+            )
+            if ok:
+                enviados.append(s.proveedor.nombre)
+        if enviados:
+            messages.success(request, f'Proyeccion ajustada a {proj.cantidad_validada} unidades. SC enviada a: {", ".join(enviados)}.')
+        else:
+            messages.warning(request, 'Proyeccion ajustada pero no se pudieron enviar SC.')
+    except Exception as e:
+        messages.warning(request, f'Proyeccion ajustada pero error al enviar SC: {e}')
+    return redirect('prediccion_demanda_panel')
+
+
+@login_required
+@require_POST
+def prediccion_rechazar(request, proyeccion_id):
+    from insumos.models import ProyeccionInsumo
+    proj = get_object_or_404(ProyeccionInsumo, pk=proyeccion_id)
+    comentario = request.POST.get('comentario', '')
+    proj.estado = 'rechazada'
+    proj.comentario_admin = comentario
+    proj.administrador = request.user
+    proj.fecha_validacion = timezone.now()
+    proj.save()
+    messages.success(request, f'Proyeccion de {proj.insumo.nombre} rechazada.')
+    return redirect('prediccion_demanda_panel')
+
+
+@login_required
+@require_POST
+def prediccion_generar(request):
+    try:
+        from automatizacion.tasks import tarea_prediccion_demanda
+        resultado = tarea_prediccion_demanda()
+        messages.success(request, f'Proyecciones generadas: {resultado}')
+    except Exception as e:
+        messages.warning(request, f'Error al generar proyecciones: {e}')
+    return redirect('prediccion_demanda_panel')
