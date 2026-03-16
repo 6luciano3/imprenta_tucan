@@ -28,4 +28,5 @@ urlpatterns = [
     path('recetas/<int:pk>/eliminar/', views.receta_producto_delete, name='receta_producto_delete'),
     path('recetas/<int:pk>/editar_formula/', views.receta_producto_update_formula, name='receta_producto_update_formula'),
     path('parametros/', parametros_automatizacion, name='parametros_automatizacion'),
+    path('automatizacion-compras/', views.automatizacion_compras_config, name='automatizacion_compras_config'),
 ]

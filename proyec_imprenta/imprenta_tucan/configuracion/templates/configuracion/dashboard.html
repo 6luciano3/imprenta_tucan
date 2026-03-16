@@ -158,6 +158,22 @@
           </span>
         </div>
       </a>
+      <!-- Automatizacion Compras -->
+      <a href="{% url 'automatizacion_compras_config' %}"
+        class="group bg-white rounded-xl shadow-sm border border-gray-100 p-5 flex flex-col hover:shadow-md hover:border-emerald-200 transition-all duration-200">
+        <div class="flex items-start gap-3">
+          <span class="material-symbols-outlined text-2xl text-emerald-600 bg-emerald-50 rounded-lg p-2">shopping_cart_checkout</span>
+          <div class="min-w-0">
+            <p class="font-semibold text-gray-800 group-hover:text-emerald-600 transition text-base">Automatizacion de Compras</p>
+            <p class="text-sm text-gray-500 mt-1 leading-snug">Stock minimo, top N proveedores, ventana de dias y auto-aprobacion de propuestas.</p>
+          </div>
+        </div>
+        <div class="mt-4 flex items-center justify-end">
+          <span class="text-sm text-emerald-600 font-medium group-hover:underline flex items-center gap-1">
+            Gestionar <span class="material-symbols-outlined text-sm">arrow_forward</span>
+          </span>
+        </div>
+      </a>
 
       <!-- Ofertas Segmentadas -->
       <a href="{% url 'ofertas_hub' %}"

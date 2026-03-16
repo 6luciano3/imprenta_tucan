@@ -767,3 +767,92 @@ def ofertas_general_config(request):
         'saved': saved,
     })
 
+
+
+@login_required
+def automatizacion_compras_config(request):
+    """Parametros de Automatizacion de Compras con criterios ponderados."""
+    from configuracion.models import Parametro, GrupoParametro
+    try:
+        from core.motor.config import MotorConfig, DEFAULTS
+    except Exception:
+        MotorConfig = None
+        DEFAULTS = {}
+
+    PARAMS = [
+        {
+            'clave': 'AUTOPRESUPUESTO_VENTANA_DIAS',
+            'nombre': 'Ventana de dias para pedidos recientes',
+            'descripcion': 'Cantidad de dias hacia atras que se revisan pedidos para detectar faltantes de insumos.',
+            'tipo': Parametro.TIPO_INT,
+            'step': '1',
+            'min': '1',
+            'default': '7',
+        },
+        {
+            'clave': 'STOCK_MINIMO_GLOBAL',
+            'nombre': 'Stock minimo global',
+            'descripcion': 'Nivel de stock por debajo del cual se genera automaticamente una Solicitud de Cotizacion al proveedor.',
+            'tipo': Parametro.TIPO_INT,
+            'step': '1',
+            'min': '0',
+            'default': '20',
+        },
+        {
+            'clave': 'TOP_N_PROVEEDORES_COTIZACION',
+            'nombre': 'Top N proveedores para SC automatica',
+            'descripcion': 'Cantidad de proveedores rankeados que reciben la Solicitud de Cotizacion automaticamente.',
+            'tipo': Parametro.TIPO_INT,
+            'step': '1',
+            'min': '1',
+            'max': '10',
+            'default': '5',
+        },
+        {
+            'clave': 'AUTO_APROBAR_PROPUESTAS',
+            'nombre': 'Auto-aprobar propuestas',
+            'descripcion': 'Si esta activo, el sistema aprueba automaticamente las propuestas cuyo proveedor supera el umbral de score.',
+            'tipo': Parametro.TIPO_BOOL,
+            'default': 'False',
+        },
+        {
+            'clave': 'UMBRAL_SCORE_PROVEEDOR',
+            'nombre': 'Umbral de score para auto-aprobacion',
+            'descripcion': 'Score minimo del proveedor (0-100) requerido para la auto-aprobacion de propuestas.',
+            'tipo': Parametro.TIPO_FLOAT,
+            'step': '0.5',
+            'min': '0',
+            'max': '100',
+            'default': '70',
+        },
+    ]
+
+    if request.method == 'POST':
+        grupo, _ = GrupoParametro.objects.get_or_create(
+            codigo='AUTOMATIZACION_COMPRAS',
+            defaults={'nombre': 'Automatizacion Compras'},
+        )
+        for p in PARAMS:
+            raw = request.POST.get(p['clave'], '').strip()
+            if raw:
+                Parametro.set(p['clave'], raw, tipo=p['tipo'], grupo=grupo, nombre=p['nombre'])
+        return redirect(request.path + '?saved=1')
+
+    saved = request.GET.get('saved') == '1'
+    params_render = []
+    for p in PARAMS:
+        try:
+            valor = Parametro.objects.get(clave=p['clave']).valor
+        except Exception:
+            valor = p.get('default', '')
+        params_render.append({**p, 'valor': valor})
+
+    return render(request, 'configuracion/parametros_genericos.html', {
+        'titulo': 'Automatizacion de Compras',
+        'subtitulo': 'Parametros que controlan el flujo automatico de cotizaciones y propuestas de compra.',
+        'icono': 'shopping_cart_checkout',
+        'color': 'emerald',
+        'params': params_render,
+        'saved': saved,
+        'back_url': '/configuracion/',
+    })
