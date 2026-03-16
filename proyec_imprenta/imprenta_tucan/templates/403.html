@@ -1,0 +1,59 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="min-h-[60vh] flex items-center justify-center px-4">
+  <div class="max-w-md w-full text-center">
+
+    <div class="mb-6">
+      <div class="inline-flex items-center justify-center w-24 h-24 rounded-full bg-red-100 mb-4">
+        <span class="material-symbols-outlined text-5xl text-red-500">lock</span>
+      </div>
+      <h1 class="text-6xl font-black text-red-500 mb-2">403</h1>
+      <h2 class="text-2xl font-bold text-gray-800 mb-2">Acceso Denegado</h2>
+      <p class="text-gray-500 text-sm">
+        No tenés permisos para acceder a este recurso.<br>
+        Si creés que esto es un error, contactá al administrador del sistema.
+      </p>
+    </div>
+
+    {% if messages %}
+    <div class="mb-6">
+      {% for message in messages %}
+      <div class="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm">
+        <div class="flex items-center gap-2">
+          <span class="material-symbols-outlined text-sm">info</span>
+          {{ message }}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6 text-left">
+      <div class="flex items-start gap-3">
+        <span class="material-symbols-outlined text-amber-500 mt-0.5">account_circle</span>
+        <div>
+          <p class="text-sm font-medium text-gray-700">Usuario actual</p>
+          <p class="text-sm text-gray-500">{{ request.user.get_full_name|default:request.user.email }}</p>
+          {% if request.user.rol %}
+          <p class="text-xs text-gray-400 mt-1">Rol: {{ request.user.rol }}</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="flex flex-col sm:flex-row gap-3 justify-center">
+      <a href="{% url 'dashboard' %}"
+         class="flex items-center justify-center gap-2 bg-primary text-white px-5 py-2.5 rounded-lg hover:bg-primary-dark transition shadow-sm">
+        <span class="material-symbols-outlined text-sm">home</span>
+        Volver al inicio
+      </a>
+      <a href="javascript:history.back()"
+         class="flex items-center justify-center gap-2 bg-gray-100 text-gray-700 px-5 py-2.5 rounded-lg hover:bg-gray-200 transition">
+        <span class="material-symbols-outlined text-sm">arrow_back</span>
+        Página anterior
+      </a>
+    </div>
+
+  </div>
+</div>
+{% endblock %}

@@ -1,3 +1,5 @@
+from permisos.decorators import requiere_permiso
+from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect, get_object_or_404
 from django.db.models import Q
 from django.core.paginator import Paginator
@@ -10,6 +12,8 @@ from configuracion.permissions import require_perm
 
 
 @require_perm('Clientes', 'Crear')
+@login_required
+@requiere_permiso("Clientes", "Crear")
 def alta_cliente(request):
     if request.method == 'POST':
         form = ClienteForm(request.POST)
@@ -28,6 +32,8 @@ def alta_cliente(request):
 
 
 @require_perm('Clientes', 'Listar')
+@login_required
+@requiere_permiso("Clientes")
 def lista_clientes(request):
     # Parámetros unificados: usamos 'q' para búsqueda; mantenemos 'criterio' como alias por compatibilidad
     query = request.GET.get('q', '') or request.GET.get('criterio', '')
@@ -74,6 +80,8 @@ def lista_clientes(request):
 
 
 @require_perm('Clientes', 'Ver')
+@login_required
+@requiere_permiso("Clientes")
 def detalle_cliente(request, id):
     cliente = get_object_or_404(Cliente, id=id)
     return render(request, 'clientes/detalle_cliente.html', {'cliente': cliente})
@@ -82,6 +90,8 @@ def detalle_cliente(request, id):
 
 
 @require_perm('Clientes', 'Editar')
+@login_required
+@requiere_permiso("Clientes", "Editar")
 def editar_cliente(request, id):
     cliente = get_object_or_404(Cliente, id=id)
     if request.method == 'POST':
@@ -101,6 +111,8 @@ def editar_cliente(request, id):
 
 
 @require_perm('Clientes', 'Eliminar')
+@login_required
+@requiere_permiso("Clientes", "Eliminar")
 def eliminar_cliente(request, id):
     cliente = get_object_or_404(Cliente, id=id)
     if request.method == 'POST':
@@ -113,6 +125,8 @@ def eliminar_cliente(request, id):
 
 # Activar/desactivar cliente (toggle)
 @require_perm('Clientes', 'Activar')
+@login_required
+@requiere_permiso("Clientes")
 def activar_cliente(request, id):
     cliente = get_object_or_404(Cliente, id=id)
     if request.method == 'POST':
@@ -125,6 +139,8 @@ def activar_cliente(request, id):
 
 # Buscar cliente
 @require_perm('Clientes', 'Listar')
+@login_required
+@requiere_permiso("Clientes")
 def buscar_cliente(request):
     """Vista legacy: redirige a la lista unificada preservando querystring."""
     params = request.GET.urlencode()
@@ -137,6 +153,8 @@ def buscar_cliente(request):
 
 
 @require_perm('Clientes', 'Eliminar')
+@login_required
+@requiere_permiso("Clientes")
 def confirmar_eliminacion_cliente(request, id):
     cliente = get_object_or_404(Cliente, id=id)
 

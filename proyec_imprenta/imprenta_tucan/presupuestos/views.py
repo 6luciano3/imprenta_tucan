@@ -1,3 +1,5 @@
+from permisos.decorators import requiere_permiso
+from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect, get_object_or_404
 from django.core.paginator import Paginator
 from django.db.models import Q
@@ -8,11 +10,15 @@ from .utils import _fmt_ars
 from configuracion.permissions import require_perm
 
 
+@login_required
+@requiere_permiso("Comercial")
 def index(request):
     return redirect('lista_presupuestos')
 
 
 @require_perm('Presupuestos', 'Listar')
+@login_required
+@requiere_permiso("Comercial")
 def lista_presupuestos(request):
     query = request.GET.get('q', '') or request.GET.get('criterio', '')
     order_by = request.GET.get('order_by', 'fecha')
@@ -64,6 +70,8 @@ def lista_presupuestos(request):
 
 
 @require_perm('Presupuestos', 'Crear')
+@login_required
+@requiere_permiso("Comercial")
 def crear_presupuesto(request):
     from decimal import Decimal
     from datetime import date, timedelta
@@ -147,6 +155,8 @@ def crear_presupuesto(request):
 
 
 @require_perm('Presupuestos', 'Editar')
+@login_required
+@requiere_permiso("Comercial")
 def editar_presupuesto(request, pk):
     from decimal import Decimal
     from datetime import date, timedelta
@@ -229,6 +239,8 @@ def editar_presupuesto(request, pk):
 
 
 @require_perm('Presupuestos', 'Eliminar')
+@login_required
+@requiere_permiso("Comercial")
 def eliminar_presupuesto(request, pk):
     presupuesto = get_object_or_404(Presupuesto, pk=pk)
     if request.method == 'POST':
@@ -238,6 +250,8 @@ def eliminar_presupuesto(request, pk):
 
 
 @require_perm('Presupuestos', 'Listar')
+@login_required
+@requiere_permiso("Comercial")
 def enviar_presupuesto(request, pk):
     import urllib.parse
     from django.conf import settings
@@ -326,6 +340,8 @@ def enviar_presupuesto(request, pk):
     return JsonResponse({'error': 'Método de envío inválido'}, status=400)
 
 
+@login_required
+@requiere_permiso("Comercial")
 def respuesta_cliente_view(request, token):
     presupuesto = get_object_or_404(Presupuesto, token=token)
     detalles = presupuesto.detalles.select_related('producto').all()
@@ -335,6 +351,8 @@ def respuesta_cliente_view(request, token):
     })
 
 
+@login_required
+@requiere_permiso("Comercial")
 def procesar_respuesta(request, token, accion):
     from django.http import HttpResponseBadRequest
     presupuesto = get_object_or_404(Presupuesto, token=token)
@@ -359,6 +377,8 @@ def procesar_respuesta(request, token, accion):
     return HttpResponseBadRequest('Acción inválida')
 
 
+@login_required
+@requiere_permiso("Comercial")
 def accion_directa(request, token, accion):
     """Acepta o rechaza un presupuesto via GET (enlace directo desde WhatsApp/email)."""
     presupuesto = get_object_or_404(Presupuesto, token=token)
@@ -384,6 +404,8 @@ def accion_directa(request, token, accion):
     })
 
 
+@login_required
+@requiere_permiso("Comercial")
 def descargar_pdf_presupuesto(request, token):
     """Vista pública (acceso por token) para descargar el PDF de un presupuesto."""
     from django.http import HttpResponse
@@ -400,6 +422,8 @@ def descargar_pdf_presupuesto(request, token):
     return response
 
 
+@login_required
+@requiere_permiso("Comercial")
 def imagen_presupuesto(request, token):
     """Vista pública: devuelve el presupuesto como imagen PNG (og:image / WhatsApp preview)."""
     from django.http import HttpResponse

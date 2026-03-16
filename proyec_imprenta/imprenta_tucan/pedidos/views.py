@@ -1,3 +1,5 @@
+from permisos.decorators import requiere_permiso
+from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect
 from django.contrib import messages
 from django.utils import timezone
@@ -34,6 +36,8 @@ from configuracion.permissions import require_perm
 
 
 @require_perm('Pedidos', 'Listar')
+@login_required
+@requiere_permiso("Pedidos")
 def lista_pedidos(request):
     """Lista unificada con búsqueda, orden y paginación para Pedidos."""
     query = (request.GET.get("q", "") or request.GET.get("criterio", "")).strip()
@@ -87,6 +91,8 @@ def lista_pedidos(request):
 
 
 @require_perm('Pedidos', 'Crear')
+@login_required
+@requiere_permiso("Pedidos", "Crear")
 def alta_pedido(request):
     # Permitir precargar cliente vía querystring ?cliente=<id>
     initial = {}
@@ -305,6 +311,8 @@ def alta_pedido(request):
 
 
 @require_POST
+@login_required
+@requiere_permiso("Pedidos")
 def verificar_stock(request):
     """Endpoint AJAX: valida stock para las líneas de un pedido antes de enviar.
     Espera JSON: { "lineas": [{"producto": <id>, "cantidad": <int>}, ...] }
@@ -352,6 +360,8 @@ def verificar_stock(request):
 
 
 @require_POST
+@login_required
+@requiere_permiso("Pedidos")
 def verificar_stock_modificar(request, idPedido: int):
     """Endpoint AJAX: valida stock para el ajuste neto de un pedido existente.
     Espera JSON: { "producto": <id>, "cantidad": <int> }
@@ -398,6 +408,8 @@ def verificar_stock_modificar(request, idPedido: int):
 
 
 @require_perm('Pedidos', 'Ver')
+@login_required
+@requiere_permiso("Pedidos")
 def buscar_pedido(request):
     cliente_context = None
     pedidos = None
@@ -421,6 +433,8 @@ def buscar_pedido(request):
 
 
 @require_perm('Pedidos', 'Ver')
+@login_required
+@requiere_permiso("Pedidos")
 def detalle_pedido(request, pk: int):
     from django.shortcuts import get_object_or_404
 
@@ -461,6 +475,8 @@ def detalle_pedido(request, pk: int):
 
 
 @require_perm('Pedidos', 'Editar')
+@login_required
+@requiere_permiso("Pedidos", "Editar")
 def modificar_pedido(request, idPedido: int):
     """Permite modificar un pedido existente.
 
@@ -632,6 +648,8 @@ def modificar_pedido(request, idPedido: int):
 
 
 @require_perm('Pedidos', 'Eliminar')
+@login_required
+@requiere_permiso("Pedidos", "Eliminar")
 def eliminar_pedido(request, idPedido: int):
     """Eliminar Pedido con confirmación (POST). Visible para todos; el servidor valida permisos."""
     from django.shortcuts import get_object_or_404
@@ -666,6 +684,8 @@ def eliminar_pedido(request, idPedido: int):
 
 
 @require_perm('Pedidos', 'Ver')
+@login_required
+@requiere_permiso("Pedidos")
 def orden_compra_detalle(request, pk):
     orden = OrdenCompra.objects.select_related('proveedor', 'insumo').get(pk=pk)
     proveedor = orden.proveedor

@@ -1,4 +1,6 @@
 ﻿from django.http import HttpResponseRedirect
+from permisos.decorators import requiere_permiso
+
 from django.shortcuts import redirect
 from .models import RecetaProducto
 from .forms import FormulaForm
@@ -43,6 +45,7 @@ def configuracion_home(request):
 
 
 @login_required
+@requiere_permiso("Parametrizar el Sistema")
 def motor_demanda_config(request):
     """Permite editar los umbrales R1, R2 y R3 del Motor de Demanda."""
     from configuracion.models import Parametro, GrupoParametro
@@ -95,6 +98,7 @@ def motor_demanda_config(request):
 
 
 @login_required
+@requiere_permiso("Parametrizar el Sistema")
 def proyeccion_demanda_config(request):
     """Permite editar los parámetros de visualización de la tabla Proyección Demanda."""
     from configuracion.models import Parametro, GrupoParametro
@@ -456,6 +460,7 @@ def lista_recetas_productos(request):
 
 # --- UI rápida para editar reglas de ofertas (sin Admin) ---
 @login_required
+@requiere_permiso("Parametrizar el Sistema")
 def editar_reglas_ofertas(request):
     # Permitir a staff o grupo "Comercial"
     es_staff = getattr(request.user, 'is_staff', False)
@@ -590,6 +595,7 @@ def empresa_config(request):
 
 
 @login_required
+@requiere_permiso("Parametrizar el Sistema")
 def ofertas_segmentadas_config(request):
     """Permite editar los parámetros de cada tier de Ofertas Segmentadas (PI-1)."""
     from configuracion.models import Parametro, GrupoParametro
@@ -713,6 +719,7 @@ def ofertas_hub(request):
 
 
 @login_required
+@requiere_permiso("Parametrizar el Sistema")
 def ofertas_general_config(request):
     """Parámetros generales de la generación de ofertas: vigencia y periodicidad."""
     from configuracion.models import Parametro, GrupoParametro
@@ -770,6 +777,7 @@ def ofertas_general_config(request):
 
 
 @login_required
+@requiere_permiso("Parametrizar el Sistema")
 def automatizacion_compras_config(request):
     """Parametros de Automatizacion de Compras con criterios ponderados."""
     from configuracion.models import Parametro, GrupoParametro

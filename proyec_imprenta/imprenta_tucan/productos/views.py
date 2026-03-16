@@ -1,3 +1,5 @@
+from permisos.decorators import requiere_permiso
+from django.contrib.auth.decorators import login_required
 # productos/views.py
 from django.http import JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
@@ -20,6 +22,8 @@ from configuracion.permissions import require_perm
 
 # Listar productos
 @require_perm('Productos', 'Listar', redirect_to='lista_productos')
+@login_required
+@requiere_permiso("Productos")
 def lista_productos(request):
     """Listado de productos con búsqueda, orden y paginación (alineado con otros módulos)."""
     query = request.GET.get('q', '') or request.GET.get('criterio', '')
@@ -68,6 +72,8 @@ def lista_productos(request):
 
 
 @require_perm('Productos', 'Crear', redirect_to='lista_productos')
+@login_required
+@requiere_permiso("Productos", "Crear")
 def crear_producto(request):
     if request.method == 'POST':
         form = ProductoForm(request.POST)
@@ -83,6 +89,8 @@ def crear_producto(request):
 
 
 @require_perm('Productos', 'Editar', redirect_to='lista_productos')
+@login_required
+@requiere_permiso("Productos")
 def editar_producto(request, idProducto):
     producto = get_object_or_404(Producto, idProducto=idProducto)
     if request.method == 'POST':
@@ -99,6 +107,8 @@ def editar_producto(request, idProducto):
 
 
 @require_perm('Productos', 'Eliminar', redirect_to='lista_productos')
+@login_required
+@requiere_permiso("Productos")
 def eliminar_producto(request, idProducto):
     producto = get_object_or_404(Producto, idProducto=idProducto)
     if request.method == 'POST':
@@ -115,12 +125,16 @@ def eliminar_producto(request, idProducto):
 
 
 @require_perm('Productos', 'Ver', redirect_to='lista_productos')
+@login_required
+@requiere_permiso("Productos")
 def detalle_producto(request, idProducto):
     producto = get_object_or_404(Producto, idProducto=idProducto)
     return render(request, 'productos/detalle_producto.html', {'producto': producto})
 
 
 @require_perm('Productos', 'Activar', redirect_to='lista_productos')
+@login_required
+@requiere_permiso("Productos")
 def activar_producto(request, idProducto):
     """Activar/Desactivar producto (toggle de estado lógico)."""
     producto = get_object_or_404(Producto, idProducto=idProducto)
@@ -139,12 +153,16 @@ def activar_producto(request, idProducto):
 
 # Categorías
 @xframe_options_sameorigin
+@login_required
+@requiere_permiso("Productos")
 def lista_categorias(request):
     categorias = CategoriaProducto.objects.all().order_by('nombreCategoria')
     return render(request, 'productos/categorias_lista.html', {'categorias': categorias})
 
 
 @xframe_options_sameorigin
+@login_required
+@requiere_permiso("Productos")
 def crear_categoria(request):
     if request.method == 'POST':
         form = CategoriaProductoForm(request.POST)
@@ -161,6 +179,8 @@ def crear_categoria(request):
 
 
 @xframe_options_sameorigin
+@login_required
+@requiere_permiso("Productos")
 def editar_categoria(request, pk):
     categoria = get_object_or_404(CategoriaProducto, pk=pk)
     if request.method == 'POST':
@@ -178,6 +198,8 @@ def editar_categoria(request, pk):
 
 
 @xframe_options_sameorigin
+@login_required
+@requiere_permiso("Productos")
 def eliminar_categoria(request, pk):
     categoria = get_object_or_404(CategoriaProducto, pk=pk)
     if request.method == 'POST':
@@ -197,12 +219,16 @@ def eliminar_categoria(request, pk):
 
 
 @xframe_options_sameorigin
+@login_required
+@requiere_permiso("Productos")
 def lista_tipos(request):
     tipos = TipoProducto.objects.all().order_by('nombreTipoProducto')
     return render(request, 'productos/tipos_lista.html', {'tipos': tipos})
 
 
 @xframe_options_sameorigin
+@login_required
+@requiere_permiso("Productos")
 def crear_tipo(request):
     if request.method == 'POST':
         form = TipoProductoForm(request.POST)
@@ -219,6 +245,8 @@ def crear_tipo(request):
 
 
 @xframe_options_sameorigin
+@login_required
+@requiere_permiso("Productos")
 def editar_tipo(request, pk):
     tipo = get_object_or_404(TipoProducto, pk=pk)
     if request.method == 'POST':
@@ -236,6 +264,8 @@ def editar_tipo(request, pk):
 
 
 @xframe_options_sameorigin
+@login_required
+@requiere_permiso("Productos")
 def eliminar_tipo(request, pk):
     tipo = get_object_or_404(TipoProducto, pk=pk)
     if request.method == 'POST':
@@ -255,12 +285,16 @@ def eliminar_tipo(request, pk):
 
 
 @xframe_options_sameorigin
+@login_required
+@requiere_permiso("Productos")
 def lista_unidades(request):
     unidades = UnidadMedida.objects.all().order_by('nombreUnidad')
     return render(request, 'productos/unidades_lista.html', {'unidades': unidades})
 
 
 @xframe_options_sameorigin
+@login_required
+@requiere_permiso("Productos")
 def crear_unidad(request):
     if request.method == 'POST':
         form = UnidadMedidaForm(request.POST)
@@ -277,6 +311,8 @@ def crear_unidad(request):
 
 
 @xframe_options_sameorigin
+@login_required
+@requiere_permiso("Productos")
 def editar_unidad(request, pk):
     unidad = get_object_or_404(UnidadMedida, pk=pk)
     if request.method == 'POST':
@@ -294,6 +330,8 @@ def editar_unidad(request, pk):
 
 
 @xframe_options_sameorigin
+@login_required
+@requiere_permiso("Productos")
 def eliminar_unidad(request, pk):
     unidad = get_object_or_404(UnidadMedida, pk=pk)
     if request.method == 'POST':
@@ -310,6 +348,8 @@ def eliminar_unidad(request, pk):
     })
 
 
+@login_required
+@requiere_permiso("Productos")
 def calcular_consumo(request, producto_id: int, cantidad: int):
     """Devuelve el consumo de insumos para un producto y cantidad usando la receta.
     Respuesta JSON: { success, producto: str, cantidad: int, consumo: [{codigo, nombre, requerido, stock, faltan}] }
@@ -349,6 +389,8 @@ def calcular_consumo(request, producto_id: int, cantidad: int):
         return JsonResponse({'success': False, 'error': str(e)}, status=400)
 
 
+@login_required
+@requiere_permiso("Productos")
 def receta_insumos(request, producto_id: int):
     """Devuelve la lista de insumos definidos en la Receta de Producto activa (si existe)."""
     try:
@@ -384,6 +426,8 @@ def receta_insumos(request, producto_id: int):
 # =============================
 
 @require_perm('Productos', 'Ver', redirect_to='lista_productos')
+@login_required
+@requiere_permiso("Productos")
 def gestionar_receta(request, idProducto):
     """Vista principal para gestionar la receta de un producto (lista de insumos requeridos)."""
     producto = get_object_or_404(Producto, idProducto=idProducto)
@@ -397,6 +441,8 @@ def gestionar_receta(request, idProducto):
 
 
 @require_perm('Productos', 'Editar', redirect_to='lista_productos')
+@login_required
+@requiere_permiso("Productos")
 def agregar_insumo_receta(request, idProducto):
     """Agregar un insumo a la receta del producto."""
     producto = get_object_or_404(Producto, idProducto=idProducto)
@@ -421,6 +467,8 @@ def agregar_insumo_receta(request, idProducto):
 
 
 @require_perm('Productos', 'Editar', redirect_to='lista_productos')
+@login_required
+@requiere_permiso("Productos")
 def editar_insumo_receta(request, pk):
     """Editar la cantidad de un insumo en la receta."""
     producto_insumo = get_object_or_404(ProductoInsumo, pk=pk)
@@ -447,6 +495,8 @@ def editar_insumo_receta(request, pk):
 
 
 @require_perm('Productos', 'Eliminar', redirect_to='lista_productos')
+@login_required
+@requiere_permiso("Productos")
 def eliminar_insumo_receta(request, pk):
     """Eliminar un insumo de la receta del producto."""
     producto_insumo = get_object_or_404(ProductoInsumo, pk=pk)
@@ -466,6 +516,8 @@ def eliminar_insumo_receta(request, pk):
 
 
 @require_perm('Productos', 'Editar', redirect_to='lista_productos')
+@login_required
+@requiere_permiso("Productos")
 def revisar_recetas_indirectos(request, idProducto):
     """Muestra todos los insumos indirectos en la receta de un producto y permite eliminarlos."""
     producto = get_object_or_404(Producto, idProducto=idProducto)

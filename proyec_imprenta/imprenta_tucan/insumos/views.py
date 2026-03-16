@@ -1,4 +1,6 @@
 from django.contrib import messages
+from permisos.decorators import requiere_permiso
+
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.core.paginator import Paginator
 from django.shortcuts import get_object_or_404, redirect, render
@@ -15,6 +17,7 @@ from pedidos.models import OrdenCompra
 
 # --- FUNCION PARA ENVIAR REPORTE DE PROYECCIONES ---
 @login_required
+@requiere_permiso("Insumos", "Crear")
 def registrar_consumo_real(request):
     """Registrar consumo real de insumo."""
     if request.method == 'POST':
@@ -337,6 +340,7 @@ def eliminar_insumo(request, idInsumo: int):
 
 
 @login_required
+@requiere_permiso("Insumos")
 def lista_proyecciones(request):
     # T-06: la generacion de proyecciones fue movida a insumos.tasks.generar_proyecciones_insumos
     # que Celery ejecuta diariamente. Esta vista es solo lectura.
@@ -363,6 +367,7 @@ def lista_proyecciones(request):
 
 
 @login_required
+@requiere_permiso("Insumos")
 def validar_proyeccion(request, pk):
     proyeccion = get_object_or_404(ProyeccionInsumo, pk=pk)
     if request.method == 'POST':
@@ -397,6 +402,7 @@ def validar_proyeccion(request, pk):
 
 
 @login_required
+@requiere_permiso("Insumos")
 def rechazar_proyeccion(request, pk):
     proyeccion = get_object_or_404(ProyeccionInsumo, pk=pk)
     proyeccion.estado = 'rechazada'
@@ -406,6 +412,7 @@ def rechazar_proyeccion(request, pk):
 
 
 @login_required
+@requiere_permiso("Insumos")
 def eliminar_proyeccion(request, pk):
     proyeccion = get_object_or_404(ProyeccionInsumo, pk=pk)
     proyeccion.delete()

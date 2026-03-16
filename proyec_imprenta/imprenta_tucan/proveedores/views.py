@@ -1,4 +1,6 @@
 from django.http import HttpResponse, JsonResponse
+from permisos.decorators import requiere_permiso
+
 from django.shortcuts import render, redirect, get_object_or_404
 from django.db.models import Q
 from django.core.paginator import Paginator
@@ -16,6 +18,7 @@ def index(request):
 
 
 @login_required
+@requiere_permiso("Proveedores")
 def lista_proveedores(request):
     """Lista de proveedores unificada con búsqueda y ordenamiento (reemplaza "buscar")."""
     # Parámetros unificados: usar 'q' y aceptar 'criterio' como alias de compatibilidad
@@ -81,6 +84,7 @@ def lista_proveedores(request):
 
 
 @login_required
+@requiere_permiso("Proveedores", "Crear")
 def crear_proveedor(request):
     """Crear nuevo proveedor"""
     if request.method == 'POST':
@@ -129,6 +133,7 @@ def crear_proveedor(request):
 
 
 @login_required
+@requiere_permiso("Proveedores", "Editar")
 def editar_proveedor(request, id):
     """Editar proveedor existente"""
     proveedor = get_object_or_404(Proveedor, id=id)
@@ -164,6 +169,7 @@ def editar_proveedor(request, id):
 
 
 @login_required
+@requiere_permiso("Proveedores", "Eliminar")
 def eliminar_proveedor(request, id):
     """Eliminar proveedor con confirmación"""
     proveedor = get_object_or_404(Proveedor, id=id)
@@ -180,6 +186,7 @@ def eliminar_proveedor(request, id):
 
 
 @login_required
+@requiere_permiso("Proveedores")
 def detalle_proveedor(request, id):
     """Ver detalles completos del proveedor"""
     proveedor = get_object_or_404(Proveedor, id=id)
@@ -187,6 +194,7 @@ def detalle_proveedor(request, id):
 
 
 @login_required
+@requiere_permiso("Proveedores", "Activar")
 def activar_proveedor(request, id):
     """Activar/desactivar proveedor"""
     proveedor = get_object_or_404(Proveedor, id=id)
@@ -219,6 +227,7 @@ def seed_proveedores_ui(request):
 
 
 @login_required
+@requiere_permiso("Proveedores")
 def alta_proveedor(request):
     if request.method == 'POST':
         form = ProveedorForm(request.POST)
@@ -235,6 +244,7 @@ def alta_proveedor(request):
 
 
 @login_required
+@requiere_permiso("Proveedores")
 def lista_rubros(request):
     # Si la petición es AJAX, devolver solo la tabla paginada
     query = request.GET.get('q', '').strip()
@@ -271,6 +281,7 @@ def lista_rubros(request):
 
 
 @login_required
+@requiere_permiso("Proveedores")
 def crear_rubro(request):
     if request.method == 'POST':
         form = RubroForm(request.POST)
@@ -285,6 +296,7 @@ def crear_rubro(request):
 
 
 @login_required
+@requiere_permiso("Proveedores")
 def editar_rubro(request, pk):
     rubro = get_object_or_404(Rubro, pk=pk)
     if request.method == 'POST':
@@ -299,6 +311,7 @@ def editar_rubro(request, pk):
 
 
 @login_required
+@requiere_permiso("Proveedores")
 def eliminar_rubro(request, pk):
     rubro = get_object_or_404(Rubro, pk=pk)
     if request.method == 'POST':
