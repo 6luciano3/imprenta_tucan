@@ -24,6 +24,9 @@ def validar_telefono_e164(valor):
         )
 
 
+
+
+ESTADOS_BLOQUEANTES = {"Pendiente", "En Proceso", "Completado"}
 class Cliente(models.Model):
     TIPO_CLIENTE_CHOICES = [
         ("premium", "Premium"),
@@ -79,3 +82,10 @@ class Cliente(models.Model):
     def numero_whatsapp(self) -> str | None:
         """Retorna el número de WhatsApp a usar: `whatsapp` si está definido, si no `telefono_e164`."""
         return self.whatsapp or self.telefono_e164
+
+    def puede_eliminarse(self):
+        return not self.pedido_set.filter(estado__nombre__in=ESTADOS_BLOQUEANTES).exists()
+
+    def pedidos_bloqueantes(self):
+        return self.pedido_set.filter(estado__nombre__in=ESTADOS_BLOQUEANTES)
+

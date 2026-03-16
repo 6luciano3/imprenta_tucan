@@ -8,46 +8,43 @@ from .models import Cliente
 from .forms import ClienteForm
 from configuracion.permissions import require_perm
 
+ESTADOS_BLOQUEANTES = ["Pendiente", "En Proceso", "Completado"]
+
+
 # Alta de cliente
-
-
-@require_perm('Clientes', 'Crear')
+@require_perm("Clientes", "Crear")
 @login_required
 @requiere_permiso("Clientes", "Crear")
 def alta_cliente(request):
-    if request.method == 'POST':
+    if request.method == "POST":
         form = ClienteForm(request.POST)
         if form.is_valid():
             cliente = form.save()
-            messages.success(request, f'El cliente {cliente.nombre} {cliente.apellido} ha sido creado exitosamente.')
-            return redirect('lista_clientes')
+            messages.success(request, f"El cliente {cliente.nombre} {cliente.apellido} ha sido creado exitosamente.")
+            return redirect("lista_clientes")
         else:
-            # Los errores del formulario se mostrarán automáticamente en el template
-            messages.error(request, 'Por favor corrija los errores en el formulario.')
+            messages.error(request, "Por favor corrija los errores en el formulario.")
     else:
         form = ClienteForm()
-    return render(request, 'clientes/alta.html', {'form': form})
-
-# Lista de clientes unificada con búsqueda y ordenamiento (reemplaza "buscar")
+    return render(request, "clientes/alta.html", {"form": form})
 
 
-@require_perm('Clientes', 'Listar')
+# Lista de clientes unificada con busqueda y ordenamiento
+@require_perm("Clientes", "Listar")
 @login_required
 @requiere_permiso("Clientes")
 def lista_clientes(request):
-    # Parámetros unificados: usamos 'q' para búsqueda; mantenemos 'criterio' como alias por compatibilidad
-    query = request.GET.get('q', '') or request.GET.get('criterio', '')
-    order_by = request.GET.get('order_by', 'apellido')
-    direction = request.GET.get('direction', 'asc')
+    query = request.GET.get("q", "") or request.GET.get("criterio", "")
+    order_by = request.GET.get("order_by", "apellido")
+    direction = request.GET.get("direction", "asc")
 
-    # Campos de orden válidos
-    valid_order_fields = ['id', 'nombre', 'apellido', 'email', 'telefono', 'direccion']
+    valid_order_fields = ["id", "nombre", "apellido", "email", "telefono", "direccion"]
     if order_by not in valid_order_fields:
-        order_by = 'apellido'
+        order_by = "apellido"
 
     clientes_qs = Cliente.objects.all()
     if query:
-        if order_by == 'id' and query.isdigit():
+        if order_by == "id" and query.isdigit():
             clientes_qs = clientes_qs.filter(id=int(query))
         else:
             clientes_qs = clientes_qs.filter(
@@ -59,111 +56,115 @@ def lista_clientes(request):
                 Q(direccion__icontains=query)
             )
 
-    # Orden
-    order_field = f'-{order_by}' if direction == 'desc' else order_by
+    order_field = f"-{order_by}" if direction == "desc" else order_by
     clientes_qs = clientes_qs.order_by(order_field)
 
-    # Paginación
     from configuracion.services import get_page_size
     paginator = Paginator(clientes_qs, get_page_size())
-    page = request.GET.get('page')
+    page = request.GET.get("page")
     clientes = paginator.get_page(page)
 
-    return render(request, 'clientes/lista_clientes.html', {
-        'clientes': clientes,
-        'query': query,
-        'order_by': order_by,
-        'direction': direction,
+    return render(request, "clientes/lista_clientes.html", {
+        "clientes": clientes,
+        "query": query,
+        "order_by": order_by,
+        "direction": direction,
     })
 
+
 # Detalle de cliente
-
-
-@require_perm('Clientes', 'Ver')
+@require_perm("Clientes", "Ver")
 @login_required
 @requiere_permiso("Clientes")
 def detalle_cliente(request, id):
     cliente = get_object_or_404(Cliente, id=id)
-    return render(request, 'clientes/detalle_cliente.html', {'cliente': cliente})
+    return render(request, "clientes/detalle_cliente.html", {"cliente": cliente})
+
 
 # Editar cliente
-
-
-@require_perm('Clientes', 'Editar')
+@require_perm("Clientes", "Editar")
 @login_required
 @requiere_permiso("Clientes", "Editar")
 def editar_cliente(request, id):
     cliente = get_object_or_404(Cliente, id=id)
-    if request.method == 'POST':
+    if request.method == "POST":
         form = ClienteForm(request.POST, instance=cliente)
         if form.is_valid():
             cliente_actualizado = form.save()
             messages.success(
-                request, f'El cliente {cliente_actualizado.nombre} {cliente_actualizado.apellido} ha sido actualizado exitosamente.')
-            return redirect('lista_clientes')
+                request, f"El cliente {cliente_actualizado.nombre} {cliente_actualizado.apellido} ha sido actualizado exitosamente.")
+            return redirect("lista_clientes")
         else:
-            messages.error(request, 'Por favor corrija los errores en el formulario.')
+            messages.error(request, "Por favor corrija los errores en el formulario.")
     else:
         form = ClienteForm(instance=cliente)
-    return render(request, 'clientes/editar_cliente.html', {'form': form, 'cliente': cliente})
+    return render(request, "clientes/editar_cliente.html", {"form": form, "cliente": cliente})
+
 
 # Eliminar cliente
-
-
-@require_perm('Clientes', 'Eliminar')
+@require_perm("Clientes", "Eliminar")
 @login_required
 @requiere_permiso("Clientes", "Eliminar")
 def eliminar_cliente(request, id):
     cliente = get_object_or_404(Cliente, id=id)
-    if request.method == 'POST':
+    if not cliente.puede_eliminarse():
+        messages.error(
+            request,
+            f"No se puede eliminar a {cliente.nombre} {cliente.apellido} porque tiene pedidos en estado Pendiente, En Proceso o Completado."
+        )
+        return redirect("lista_clientes")
+    if request.method == "POST":
         nombre_cliente = f"{cliente.nombre} {cliente.apellido}"
         cliente.delete()
-        messages.success(request, f'El cliente {nombre_cliente} ha sido eliminado exitosamente.')
-        return redirect('lista_clientes')
-    return redirect('lista_clientes')
+        messages.success(request, f"El cliente {nombre_cliente} ha sido eliminado exitosamente.")
+        return redirect("lista_clientes")
+    return redirect("lista_clientes")
 
 
 # Activar/desactivar cliente (toggle)
-@require_perm('Clientes', 'Activar')
+@require_perm("Clientes", "Activar")
 @login_required
 @requiere_permiso("Clientes")
 def activar_cliente(request, id):
     cliente = get_object_or_404(Cliente, id=id)
-    if request.method == 'POST':
-        cliente.estado = 'Inactivo' if cliente.estado == 'Activo' else 'Activo'
+    if request.method == "POST":
+        cliente.estado = "Inactivo" if cliente.estado == "Activo" else "Activo"
         cliente.save()
-        estado_txt = 'activado' if cliente.estado == 'Activo' else 'desactivado'
-        messages.success(request, f'El cliente {cliente.nombre} {cliente.apellido} ha sido {estado_txt}.')
-    return redirect('lista_clientes')
+        estado_txt = "activado" if cliente.estado == "Activo" else "desactivado"
+        messages.success(request, f"El cliente {cliente.nombre} {cliente.apellido} ha sido {estado_txt}.")
+    return redirect("lista_clientes")
 
 
 # Buscar cliente
-@require_perm('Clientes', 'Listar')
+@require_perm("Clientes", "Listar")
 @login_required
 @requiere_permiso("Clientes")
 def buscar_cliente(request):
-    """Vista legacy: redirige a la lista unificada preservando querystring."""
     params = request.GET.urlencode()
-    url = f"/clientes/lista/"
+    url = "/clientes/lista/"
     if params:
         url = f"{url}?{params}"
     return redirect(url)
 
-# Confirmar eliminación de cliente
 
-
-@require_perm('Clientes', 'Eliminar')
+# Confirmar eliminacion de cliente
+@require_perm("Clientes", "Eliminar")
 @login_required
 @requiere_permiso("Clientes")
 def confirmar_eliminacion_cliente(request, id):
     cliente = get_object_or_404(Cliente, id=id)
-
-    if request.method == 'POST':
+    if not cliente.puede_eliminarse():
+        pedidos = cliente.pedidos_bloqueantes()
+        messages.error(
+            request,
+            f"No se puede eliminar a {cliente.nombre} {cliente.apellido} porque tiene {pedidos.count()} pedido(s) activo(s)."
+        )
+        return redirect("lista_clientes")
+    if request.method == "POST":
+        if not cliente.puede_eliminarse():
+            messages.error(request, "El cliente tiene pedidos activos y no puede eliminarse.")
+            return redirect("lista_clientes")
         cliente.delete()
-        messages.success(request, 'El cliente ha sido eliminado exitosamente.')
-        return redirect('lista_clientes')
-
-    return render(request, 'clientes/confirmar_eliminacion.html', {'cliente': cliente})
-
-
-
+        messages.success(request, "El cliente ha sido eliminado exitosamente.")
+        return redirect("lista_clientes")
+    return render(request, "clientes/confirmar_eliminacion.html", {"cliente": cliente})

@@ -139,11 +139,6 @@
                     <td class="py-3 px-5">
                         <div class="flex justify-center gap-3">
 
-                            <a href="{% url 'rechazar_oferta' o.id %}"
-                               class="text-red-600 hover:text-red-800 flex items-center gap-1"
-                               title="Rechazar">
-                                <span class="material-symbols-outlined text-sm">cancel</span>
-                            </a>
                             <button type="button"
                                 class="text-gray-600 hover:text-gray-800 flex items-center gap-1 delete-offer-btn"
                                 data-oferta-id="{{ o.id }}" data-oferta-title="{{ o.titulo }}" data-oferta-cliente="{{ o.cliente.nombre }} {{ o.cliente.apellido }}" title="Eliminar">
