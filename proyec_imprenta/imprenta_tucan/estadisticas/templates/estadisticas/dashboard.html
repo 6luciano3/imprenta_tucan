@@ -1,407 +1,319 @@
 {% extends 'base.html' %}
-{% block title %}Estadísticas{% endblock %}
-
+{% block title %}Estadistica{% endblock %}
 {% block content %}
-<h1 class="text-3xl font-black mb-6 flex items-center gap-2">
-  <span class="material-symbols-outlined text-3xl">monitoring</span>
-  Estadísticas
-</h1>
+<div class="mb-6 flex items-center justify-between">
+  <div>
+    <h1 class="text-2xl font-bold text-gray-800 flex items-center gap-2">
+      <span class="material-symbols-outlined text-blue-600">analytics</span>
+      Estadistica
+    </h1>
+    
+  </div>
+</div>
 
-<!-- Filtros por fecha -->
-<div class="bg-white p-4 rounded-xl shadow mb-6 flex flex-col md:flex-row gap-3 md:items-end">
-  <div class="flex gap-2 items-end">
+<div class="flex flex-wrap gap-2 mb-6">
+  {% for mod in modulos %}
+  <button onclick="cargarModulo('{{ mod.key }}')" id="tab-{{ mod.key }}"
+    class="tab-modulo px-4 py-2 rounded-lg text-sm font-medium border transition-colors bg-white text-gray-600 border-gray-300 hover:bg-gray-50">
+    {{ mod.label }}
+  </button>
+  {% endfor %}
+</div>
+
+<div id="filtro-fechas" class="hidden bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-6 flex gap-4 items-end flex-wrap">
+  <div>
+    <label class="block text-xs font-medium text-gray-500 mb-1">Desde</label>
+    <input type="date" id="filtroDesde" class="border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm">
+  </div>
+  <div>
+    <label class="block text-xs font-medium text-gray-500 mb-1">Hasta</label>
+    <input type="date" id="filtroHasta" class="border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm">
+  </div>
+  <button onclick="recargarActual()" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">Aplicar</button>
+  <button onclick="limpiarFechas()" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200">Limpiar</button>
+</div>
+
+<div id="contenedor-stats">
+  <div class="flex items-center justify-center py-20 text-gray-400">
+    <div class="text-center">
+      <span class="material-symbols-outlined text-5xl block mb-2">bar_chart</span>
+      <p>Selecciona un modulo para ver su estadistica descriptiva.</p>
+    </div>
+  </div>
+</div>
+
+<template id="tpl-stats-card">
+  <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5 mb-6">
+    <h3 class="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
+      <span class="material-symbols-outlined text-blue-500 text-base">functions</span>
+      <span class="card-titulo"></span>
+      <span class="card-n ml-auto text-xs text-gray-400 font-normal"></span>
+    </h3>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+      <div class="bg-blue-50 rounded-lg p-3">
+        <div class="text-xs font-semibold text-blue-600 uppercase tracking-wide mb-2">Rendimiento Tipico</div>
+        <div class="space-y-1 text-sm">
+          <div class="flex justify-between"><span class="text-gray-500">Media</span><span class="font-mono font-bold val-media"></span></div>
+          <div class="flex justify-between"><span class="text-gray-500">Mediana</span><span class="font-mono font-bold val-mediana"></span></div>
+          <div class="flex justify-between"><span class="text-gray-500">Moda</span><span class="font-mono font-bold val-moda"></span></div>
+        </div>
+      </div>
+      <div class="bg-yellow-50 rounded-lg p-3">
+        <div class="text-xs font-semibold text-yellow-600 uppercase tracking-wide mb-2">Rango de Operacion</div>
+        <div class="space-y-1 text-sm">
+          <div class="flex justify-between"><span class="text-gray-500">Rango</span><span class="font-mono font-bold val-rango"></span></div>
+          <div class="flex justify-between"><span class="text-gray-500">Desv. Std</span><span class="font-mono font-bold val-desv"></span></div>
+          <div class="flex justify-between"><span class="text-gray-500">Varianza</span><span class="font-mono font-bold val-varianza"></span></div>
+        </div>
+      </div>
+      <div class="bg-purple-50 rounded-lg p-3">
+        <div class="text-xs font-semibold text-purple-600 uppercase tracking-wide mb-2">Rangos de Desempeno</div>
+        <div class="space-y-1 text-sm">
+          <div class="flex justify-between"><span class="text-gray-500">Q1 (25%)</span><span class="font-mono font-bold val-q1"></span></div>
+          <div class="flex justify-between"><span class="text-gray-500">Q2 (50%)</span><span class="font-mono font-bold val-q2"></span></div>
+          <div class="flex justify-between"><span class="text-gray-500">Q3 (75%)</span><span class="font-mono font-bold val-q3"></span></div>
+        </div>
+      </div>
+      <div class="bg-green-50 rounded-lg p-3">
+        <div class="text-xs font-semibold text-green-600 uppercase tracking-wide mb-2">Picos y Pisos</div>
+        <div class="space-y-1 text-sm">
+          <div class="flex justify-between"><span class="text-gray-500">Min</span><span class="font-mono font-bold val-min"></span></div>
+          <div class="flex justify-between"><span class="text-gray-500">Max</span><span class="font-mono font-bold val-max"></span></div>
+          <div class="flex justify-between"><span class="text-gray-500">P10</span><span class="font-mono font-bold val-p10"></span></div>
+          <div class="flex justify-between"><span class="text-gray-500">P90</span><span class="font-mono font-bold val-p90"></span></div>
+          <div class="flex justify-between"><span class="text-gray-500">IQR</span><span class="font-mono font-bold val-iqr"></span></div>
+        </div>
+      </div>
+    </div>
     <div>
-      <label for="filtroDesde" class="block text-sm font-medium">Desde</label>
-      <input type="date" id="filtroDesde" class="border rounded px-2 py-1" />
-    </div>
-    <div>
-      <label for="filtroHasta" class="block text-sm font-medium">Hasta</label>
-      <input type="date" id="filtroHasta" class="border rounded px-2 py-1" />
-    </div>
-    <button id="btnAplicar" class="bg-blue-600 text-white px-4 py-2 rounded">Aplicar</button>
-    <button id="btnLimpiar" class="bg-gray-300 px-4 py-2 rounded">Limpiar</button>
-  </div>
-</div>
-
-<!-- KPIs -->
-<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-  <div class="bg-white p-4 rounded-xl shadow flex flex-col items-center">
-    <div class="text-lg font-bold" id="kpiClientes">0</div>
-    <div class="text-xs text-gray-500">Clientes</div>
-  </div>
-  <div class="bg-white p-4 rounded-xl shadow flex flex-col items-center">
-    <div class="text-lg font-bold" id="kpiProductos">0</div>
-    <div class="text-xs text-gray-500">Productos</div>
-  </div>
-  <div class="bg-white p-4 rounded-xl shadow flex flex-col items-center">
-    <div class="text-lg font-bold" id="kpiPedidos">0</div>
-    <div class="text-xs text-gray-500">Pedidos</div>
-  </div>
-  <div class="bg-white p-4 rounded-xl shadow flex flex-col items-center">
-    <div class="text-lg font-bold" id="kpiIngresos">$0.00</div>
-    <div class="text-xs text-gray-500">Ingresos totales</div>
-  </div>
-</div>
-
-<!-- KPIs adicionales -->
-<div class="grid grid-cols-3 gap-4 mb-6">
-  <div class="bg-white p-4 rounded-xl shadow flex flex-col items-center">
-    <div class="text-lg font-bold" id="kpiHoy">0</div>
-    <div class="text-xs text-gray-500">Pedidos hoy</div>
-  </div>
-  <div class="bg-white p-4 rounded-xl shadow flex flex-col items-center">
-    <div class="text-lg font-bold" id="kpiSemana">0</div>
-    <div class="text-xs text-gray-500">Pedidos semana</div>
-  </div>
-  <div class="bg-white p-4 rounded-xl shadow flex flex-col items-center">
-    <div class="text-lg font-bold" id="kpiMes">0</div>
-    <div class="text-xs text-gray-500">Pedidos mes</div>
-  </div>
-</div>
-
-<!-- Gráficos -->
-<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-  <div class="bg-white p-4 rounded-xl shadow flex flex-col items-center">
-    <h2 class="font-bold mb-2">Pedidos por estado</h2>
-    <canvas id="chartEstados" width="300" height="300"></canvas>
-  </div>
-  <div class="bg-white p-4 rounded-xl shadow flex flex-col items-center">
-    <h2 class="font-bold mb-2">Ingresos por mes</h2>
-    <canvas id="chartIngresos" width="300" height="300"></canvas>
-  </div>
-  <div class="bg-white p-4 rounded-xl shadow flex flex-col items-center">
-    <h2 class="font-bold mb-2">Top 5 productos por ingresos</h2>
-    <canvas id="chartTopProductos" width="300" height="300"></canvas>
-  </div>
-</div>
-
-<!-- ── Panel de Inteligencia ─────────────────────────────────────────────── -->
-<h2 class="text-xl font-bold mb-3 flex items-center gap-2 mt-2">
-  <span class="material-symbols-outlined">psychology</span>
-  Panel de Inteligencia
-</h2>
-
-<!-- Resumen de motores -->
-<div id="resumenInteligencia" class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-  <!-- Motor 1: Clientes -->
-  <div class="bg-white p-4 rounded-xl shadow border-l-4 border-blue-500">
-    <div class="font-bold text-blue-700 mb-2">Motor Clientes</div>
-    <div class="text-sm text-gray-600 space-y-1" id="resumenClientes">
-      <div class="animate-pulse">Cargando...</div>
+      <div class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Histograma de distribucion</div>
+      <canvas class="canvas-histograma" height="80"></canvas>
     </div>
   </div>
-  <!-- Motor 2: Proveedores -->
-  <div class="bg-white p-4 rounded-xl shadow border-l-4 border-green-500">
-    <div class="font-bold text-green-700 mb-2">Motor Proveedores</div>
-    <div class="text-sm text-gray-600 space-y-1" id="resumenProveedores">
-      <div class="animate-pulse">Cargando...</div>
-    </div>
-  </div>
-  <!-- Motor 3: Insumos -->
-  <div class="bg-white p-4 rounded-xl shadow border-l-4 border-orange-500">
-    <div class="font-bold text-orange-700 mb-2">Motor Insumos / Demanda</div>
-    <div class="text-sm text-gray-600 space-y-1" id="resumenInsumos">
-      <div class="animate-pulse">Cargando...</div>
-    </div>
-  </div>
-</div>
+</template>
 
-<!-- Top clientes + Proyección demanda + Insumos urgentes -->
-<div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-
-  <!-- Top clientes por score -->
-  <div class="bg-white p-4 rounded-xl shadow">
-    <h3 class="font-bold mb-3 flex items-center gap-1">
-      <span class="material-symbols-outlined text-base">leaderboard</span>
-      Top Clientes por Score
-    </h3>
-    <table class="w-full text-sm" id="tablaTopClientes">
-      <thead>
-        <tr class="text-left text-gray-500 border-b">
-          <th class="pb-1">Cliente</th>
-          <th class="pb-1 text-center">Score</th>
-          <th class="pb-1 text-center">Tier</th>
-        </tr>
-      </thead>
-      <tbody id="bodyTopClientes">
-        <tr><td colspan="3" class="text-gray-400 py-2">Cargando...</td></tr>
-      </tbody>
-    </table>
-  </div>
-
-  <!-- Proyección de demanda de insumos -->
-  <div class="bg-white p-4 rounded-xl shadow">
-    <h3 class="font-bold mb-3 flex items-center gap-1">
-      <span class="material-symbols-outlined text-base">trending_up</span>
-      Proyección Demanda Insumos
-      <span class="text-xs text-gray-400 font-normal ml-1">(próximos 3 meses)</span>
-    </h3>
-    <table class="w-full text-sm" id="tablaProyeccion">
-      <thead>
-        <tr class="text-left text-gray-500 border-b">
-          <th class="pb-1">Insumo</th>
-          <th class="pb-1 text-center">Stock</th>
-          <th class="pb-1 text-center">Proyectado</th>
-          <th class="pb-1 text-center">Diferencia</th>
-          <th class="pb-1 text-center">Fuente</th>
-        </tr>
-      </thead>
-      <tbody id="bodyProyeccion">
-        <tr><td colspan="5" class="text-gray-400 py-2">Cargando...</td></tr>
-      </tbody>
-    </table>
-  </div>
-
-  <!-- Insumos urgentes -->
-  <div class="bg-white p-4 rounded-xl shadow">
-    <h3 class="font-bold mb-3 flex items-center gap-1">
-      <span class="material-symbols-outlined text-base text-red-500">warning</span>
-      Insumos con Acción Urgente
-    </h3>
-    <div id="listaUrgentes" class="text-sm text-gray-400">Cargando...</div>
-  </div>
-
-</div>
-<!-- script block eliminado -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-let chartEstados, chartIngresos, chartTopProductos;
-
-function buildParams(){
-  const d = document.getElementById('filtroDesde').value;
-  const h = document.getElementById('filtroHasta').value;
-  const p = new URLSearchParams();
-  if (d) p.set('desde', d);
-  if (h) p.set('hasta', h);
-  const s = p.toString();
-  return s ? `?${s}` : '';
-}
-
-async function drawPie(id, url){
-  const r = await fetch(url + buildParams());
-  const {labels, values} = await r.json();
-  const ctx = document.getElementById(id);
-  if (chartEstados) chartEstados.destroy();
-  chartEstados = new Chart(ctx, {
-    type: 'pie',
-    data: { labels, datasets: [{ data: values, backgroundColor: ['#3498db','#2ecc71','#e74c3c','#9b59b6','#f1c40f','#1abc9c'] }] },
-  });
-}
-async function drawLine(id, url, label){
-  const r = await fetch(url + buildParams());
-  const {labels, values} = await r.json();
-  const ctx = document.getElementById(id);
-  if (chartIngresos) chartIngresos.destroy();
-  chartIngresos = new Chart(ctx, {
-    type: 'line',
-    data: { labels, datasets: [{ label, data: values, borderColor: '#3498db', fill: false }] },
-    options: { scales: { y: { beginAtZero: true } } }
-  });
-}
-async function drawBar(id, url, label){
-  const r = await fetch(url + buildParams());
-  const {labels, values} = await r.json();
-  const ctx = document.getElementById(id);
-  if (chartTopProductos) chartTopProductos.destroy();
-  chartTopProductos = new Chart(ctx, {
-    type: 'bar',
-    data: { labels, datasets: [{ label, data: values, backgroundColor: '#2ecc71' }] },
-    options: { scales: { y: { beginAtZero: true } } }
-  });
-}
-
-async function refreshKPIs(){
-  const r = await fetch('{% url 'estadisticas:api_kpis' %}' + buildParams());
-  const k = await r.json();
-  document.getElementById('kpiClientes').textContent = k.clientes;
-  document.getElementById('kpiProductos').textContent = k.productos;
-  document.getElementById('kpiPedidos').textContent = k.pedidos;
-  document.getElementById('kpiIngresos').textContent = `$${parseFloat(k.ingresos_totales).toFixed(2)}`;
-  document.getElementById('kpiHoy').textContent = k.pedidos_hoy;
-  document.getElementById('kpiSemana').textContent = k.pedidos_semana;
-  document.getElementById('kpiMes').textContent = k.pedidos_mes;
-}
-
-function refreshAll(){
-  drawPie('chartEstados', '/estadisticas/api/pedidos-por-estado/' + buildParams());
-  drawLine('chartIngresos', '/estadisticas/api/ingresos-por-mes/' + buildParams(), 'Ingresos');
-  drawBar('chartTopProductos', '/estadisticas/api/top-productos/' + buildParams(), 'Ingresos');
-  refreshKPIs();
-  refreshInteligencia();
-}
-
-// ── Panel de Inteligencia ─────────────────────────────────────────────────────
-
-const TIER_COLORS = {
-  'Premium':     'bg-purple-100 text-purple-800',
-  'Estratégico': 'bg-blue-100 text-blue-800',
-  'Estándar':    'bg-green-100 text-green-800',
-  'Nuevo':       'bg-gray-100 text-gray-700',
+const MODULOS = {
+  clientes:     { url: "/estadisticas/api/descriptiva/clientes/",     filtroFecha: true },
+  pedidos:      { url: "/estadisticas/api/descriptiva/pedidos/",      filtroFecha: true },
+  productos:    { url: "/estadisticas/api/descriptiva/productos/",    filtroFecha: true },
+  insumos:      { url: "/estadisticas/api/descriptiva/insumos/",      filtroFecha: true },
+  presupuestos: { url: "/estadisticas/api/descriptiva/presupuestos/", filtroFecha: true },
+  proveedores:  { url: "/estadisticas/api/descriptiva/proveedores/",  filtroFecha: true },
+  compras:      { url: "/estadisticas/api/descriptiva/compras/",      filtroFecha: true },
 };
+let moduloActivo = null;
+const chartRefs = {};
 
-async function refreshInteligencia() {
-  await Promise.all([
-    cargarResumenMotores(),
-    cargarTopClientes(),
-    cargarProyeccionDemanda(),
-    cargarInsumosUrgentes(),
-  ]);
+function cargarModulo(key) {
+  moduloActivo = key;
+  document.querySelectorAll(".tab-modulo").forEach(b => {
+    b.classList.remove("bg-blue-600","text-white","border-blue-600");
+    b.classList.add("bg-white","text-gray-600","border-gray-300");
+  });
+  const tab = document.getElementById("tab-" + key);
+  if (tab) { tab.classList.add("bg-blue-600","text-white","border-blue-600"); tab.classList.remove("bg-white","text-gray-600","border-gray-300"); }
+  const ff = document.getElementById("filtro-fechas");
+  MODULOS[key].filtroFecha ? ff.classList.remove("hidden") : ff.classList.add("hidden");
+  fetchYRenderizar(key);
 }
 
-async function cargarResumenMotores() {
+function recargarActual() { if (moduloActivo) fetchYRenderizar(moduloActivo); }
+
+function limpiarFechas() {
+  document.getElementById("filtroDesde").value = "";
+  document.getElementById("filtroHasta").value = "";
+  recargarActual();
+}
+
+async function fetchYRenderizar(key) {
+  const c = document.getElementById("contenedor-stats");
+  c.innerHTML = `<div class="flex items-center justify-center py-20 text-gray-400"><div class="text-center"><span class="material-symbols-outlined text-5xl block mb-2">hourglass_empty</span><p>Calculando estadisticas...</p></div></div>`;
+  Object.values(chartRefs).forEach(ch => { try { ch.destroy(); } catch(e){} });
+  for (const k in chartRefs) delete chartRefs[k];
+  let url = MODULOS[key].url;
+  if (MODULOS[key].filtroFecha) {
+    const d = document.getElementById("filtroDesde").value;
+    const h = document.getElementById("filtroHasta").value;
+    const p = new URLSearchParams();
+    if (d) p.set("desde", d);
+    if (h) p.set("hasta", h);
+    if (p.toString()) url += "?" + p.toString();
+  }
   try {
-    const r = await fetch('/estadisticas/api/resumen-inteligencia/');
-    const d = await r.json();
-    if (d.error) throw new Error(d.error);
-
-    const c = d.motor_clientes;
-    document.getElementById('resumenClientes').innerHTML = `
-      <div>Clientes rankeados: <strong>${c.clientes_rankeados}</strong></div>
-      <div>Score promedio: <strong>${c.score_promedio}</strong></div>
-      <div>Ofertas pendientes: <strong>${c.ofertas_pendientes}</strong></div>
-      <div>Ofertas enviadas: <strong>${c.ofertas_enviadas}</strong></div>
-      <div class="mt-1">Modelo ML: <span class="${c.ml_activo ? 'text-green-600 font-bold' : 'text-orange-500'}">${c.ml_activo ? '✓ Activo' : '⚠ Sin entrenar'}</span></div>
-    `;
-
-    const p = d.motor_proveedores;
-    document.getElementById('resumenProveedores').innerHTML = `
-      <div>Proveedores rankeados: <strong>${p.proveedores_rankeados}</strong></div>
-      <div>Mejor proveedor: <strong>${p.mejor_proveedor || '—'}</strong></div>
-      <div>Score líder: <strong>${p.mejor_score ?? '—'}</strong></div>
-      <div class="mt-1">Modelo ML: <span class="${p.ml_activo ? 'text-green-600 font-bold' : 'text-orange-500'}">${p.ml_activo ? '✓ Activo' : '⚠ Sin entrenar'}</span></div>
-    `;
-
-    const i = d.motor_insumos;
-    document.getElementById('resumenInsumos').innerHTML = `
-      <div>Sin stock: <strong class="${i.sin_stock > 0 ? 'text-red-600' : ''}">${i.sin_stock}</strong></div>
-      <div>Bajo mínimo: <strong class="${i.bajo_minimo > 0 ? 'text-orange-500' : ''}">${i.bajo_minimo}</strong></div>
-      <div>Propuestas compra pendientes: <strong>${i.propuestas_compra_pendientes}</strong></div>
-      <div class="mt-1">Modelo ML: <span class="${i.ml_activo ? 'text-green-600 font-bold' : 'text-orange-500'}">${i.ml_activo ? '✓ Activo' : '⚠ Sin entrenar'}</span></div>
-    `;
-  } catch (e) {
-    document.getElementById('resumenClientes').textContent = 'Error al cargar';
-    document.getElementById('resumenProveedores').textContent = 'Error al cargar';
-    document.getElementById('resumenInsumos').textContent = 'Error al cargar';
+    const res = await fetch(url);
+    const data = await res.json();
+    renderizarModulo(key, data, c);
+  } catch(e) {
+    c.innerHTML = `<div class="bg-red-50 border border-red-200 rounded-xl p-6 text-red-600">Error: ${e.message}</div>`;
   }
 }
 
-async function cargarTopClientes() {
-  try {
-    const r = await fetch('/estadisticas/api/top-clientes-score/?n=8');
-    const d = await r.json();
-    if (d.error) throw new Error(d.error);
+function renderizarModulo(key, data, c) {
+  c.innerHTML = "";
+  const variables = data.variables || {};
+  Object.entries(variables).forEach(([vk, vd]) => {
+    if (vd && vd.stats) c.appendChild(renderStatsCard(vd.label, vd.stats, vk + Date.now()));
+  });
+  const cats = data.categoricas || {};
+  if (Object.keys(cats).length > 0) {
+    const sec = document.createElement("div");
+    sec.className = "bg-white rounded-xl shadow-sm border border-gray-200 p-5 mb-6";
+    sec.innerHTML = `<h3 class="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
+      <span class="material-symbols-outlined text-purple-500 text-base">pie_chart</span>Analisis Categorico
+    </h3><div class="grid grid-cols-1 md:grid-cols-2 gap-6" id="grid-cats"></div>`;
+    c.appendChild(sec);
+    const grid = sec.querySelector("#grid-cats");
+    const COLORS = ["#3b82f6","#10b981","#f59e0b","#ef4444","#8b5cf6","#06b6d4","#f97316","#84cc16","#ec4899","#6366f1"];
+    const TIPOS_CAT = [
+      { key: "bar",           label: "Barras" },
+      { key: "horizontalBar", label: "Barras H." },
+      { key: "line",          label: "Lineas" },
+      { key: "pie",           label: "Torta" },
+      { key: "doughnut",      label: "Dona" },
+      { key: "scatter",       label: "Dispersion" },
+    ];
+    Object.entries(cats).forEach(([ck, cd], idx) => {
+      const w = document.createElement("div");
+      const cid = "chart-cat-" + key + "-" + idx;
+      const btnId = "btns-" + cid;
+      w.innerHTML = `
+        <div class="flex flex-wrap items-center gap-1 mb-2">
+          <span class="text-xs font-semibold text-gray-600 capitalize mr-1">${ck.replace(/_/g," ")}</span>
+          <div id="${btnId}" class="flex flex-wrap gap-0.5"></div>
+        </div>
+        <canvas id="${cid}" height="200"></canvas>`;
+      grid.appendChild(w);
 
-    const tbody = document.getElementById('bodyTopClientes');
-    if (!d.clientes.length) {
-      tbody.innerHTML = '<tr><td colspan="3" class="text-gray-400 py-2">Sin datos</td></tr>';
-      return;
-    }
-    tbody.innerHTML = d.clientes.map(c => {
-      const badge = TIER_COLORS[c.tier] || 'bg-gray-100 text-gray-700';
-      return `<tr class="border-b last:border-0">
-        <td class="py-1 pr-2">${c.nombre}</td>
-        <td class="py-1 text-center font-mono">${c.score}</td>
-        <td class="py-1 text-center"><span class="px-2 py-0.5 rounded text-xs font-medium ${badge}">${c.tier}</span></td>
-      </tr>`;
-    }).join('');
-  } catch (e) {
-    document.getElementById('bodyTopClientes').innerHTML =
-      `<tr><td colspan="3" class="text-red-400 py-2">Error: ${e.message}</td></tr>`;
+      const tipoInicial = cd.labels.length <= 5 ? "pie" : "bar";
+      const btnContainer = w.querySelector("#" + btnId);
+      TIPOS_CAT.forEach(t => {
+        const btn = document.createElement("button");
+        btn.title = t.title;
+        btn.dataset.tipo = t.key;
+        btn.className = "px-1.5 py-0.5 rounded text-xs " + (t.key === tipoInicial ? "bg-blue-100 text-blue-700" : "text-gray-400 hover:text-gray-600 hover:bg-gray-100");
+        btn.textContent = t.label;
+        btn.onclick = () => {
+          btnContainer.querySelectorAll("button").forEach(b => { b.className = "px-1.5 py-0.5 rounded text-xs text-gray-400 hover:text-gray-600 hover:bg-gray-100"; });
+          btn.className = "px-1.5 py-0.5 rounded text-xs bg-blue-100 text-blue-700";
+          cambiarTipoChart(cid, t.key, cd, COLORS);
+        };
+        btnContainer.appendChild(btn);
+      });
+
+      buildCatChart(cid, tipoInicial, cd, COLORS);
+    });
   }
 }
 
-async function cargarProyeccionDemanda() {
-  try {
-    const r = await fetch('/estadisticas/api/proyeccion-demanda/');
-    const d = await r.json();
-    if (d.error) throw new Error(d.error);
+function renderStatsCard(titulo, stats, uid) {
+  const tpl = document.getElementById("tpl-stats-card");
+  const card = tpl.content.cloneNode(true).querySelector("div");
+  card.querySelector(".card-titulo").textContent = titulo;
+  card.querySelector(".card-n").textContent = "n = " + stats.n;
+  card.querySelector(".val-media").textContent = fmt(stats.media);
+  card.querySelector(".val-mediana").textContent = fmt(stats.mediana);
+  card.querySelector(".val-moda").textContent = stats.moda !== null ? fmt(stats.moda) : "--";
+  card.querySelector(".val-rango").textContent = fmt(stats.rango);
+  card.querySelector(".val-desv").textContent = fmt(stats.desv_std);
+  card.querySelector(".val-varianza").textContent = fmt(stats.varianza);
+  card.querySelector(".val-q1").textContent = fmt(stats.q1);
+  card.querySelector(".val-q2").textContent = fmt(stats.q2);
+  card.querySelector(".val-q3").textContent = fmt(stats.q3);
+  card.querySelector(".val-min").textContent = fmt(stats.minimo);
+  card.querySelector(".val-max").textContent = fmt(stats.maximo);
+  card.querySelector(".val-p10").textContent = fmt(stats.p10);
+  card.querySelector(".val-p90").textContent = fmt(stats.p90);
+  card.querySelector(".val-iqr").textContent = fmt(stats.iqr);
+  const histWrapper = card.querySelector(".canvas-histograma").parentElement;
+  const canvas = card.querySelector(".canvas-histograma");
+  const cid = "hist-" + uid;
+  canvas.id = cid;
 
-    const tbody = document.getElementById('bodyProyeccion');
-    if (!d.proyecciones.length) {
-      tbody.innerHTML = '<tr><td colspan="5" class="text-gray-400 py-2">Sin datos</td></tr>';
-      return;
-    }
-    const FUENTE_LABEL = {
-      'proyeccion':  '<span class="px-1.5 py-0.5 rounded text-xs bg-blue-100 text-blue-700" title="Dato oficial del motor de demanda">oficial</span>',
-      'media_movil': '<span class="px-1.5 py-0.5 rounded text-xs bg-green-100 text-green-700" title="Media móvil de consumos reales">historial</span>',
-      'ordenes':     '<span class="px-1.5 py-0.5 rounded text-xs bg-yellow-100 text-yellow-700" title="Promedio de órdenes de compra. Verificar si son datos de prueba.">ordenes</span>',
-      'catalogo':    '<span class="px-1.5 py-0.5 rounded text-xs bg-gray-100 text-gray-500" title="Cantidad típica del catálogo">catálogo</span>',
-      'stock_minimo':'<span class="px-1.5 py-0.5 rounded text-xs bg-orange-100 text-orange-600" title="Stock mínimo manual usado como estimación">estimado</span>',
+  const TIPOS_HIST = [
+    { key: "bar",           label: "Barras" },
+    { key: "line",          label: "Lineas" },
+    { key: "horizontalBar", label: "Barras H." },
+    { key: "pie",           label: "Torta" },
+    { key: "doughnut",      label: "Dona" },
+    { key: "scatter",       label: "Dispersion" },
+  ];
+  const histBtnBar = document.createElement("div");
+  histBtnBar.className = "flex gap-0.5 mb-1 justify-end";
+  TIPOS_HIST.forEach(t => {
+    const btn = document.createElement("button");
+    btn.title = t.title;
+    btn.dataset.tipo = t.key;
+    btn.className = "px-1.5 py-0.5 rounded text-xs " + (t.key === "bar" ? "bg-blue-100 text-blue-700" : "text-gray-400 hover:text-gray-600 hover:bg-gray-100");
+    btn.textContent = t.label;
+    btn.onclick = () => {
+      histBtnBar.querySelectorAll("button").forEach(b => { b.className = "px-1.5 py-0.5 rounded text-xs text-gray-400 hover:text-gray-600 hover:bg-gray-100"; });
+      btn.className = "px-1.5 py-0.5 rounded text-xs bg-blue-100 text-blue-700";
+      const histData = { labels: stats.histograma.map(b => b.label), values: stats.histograma.map(b => b.count) };
+      cambiarTipoChart(cid, t.key, histData, ["rgba(59,130,246,0.7)"]);
     };
-    tbody.innerHTML = d.proyecciones.map(p => {
-      const difClass = p.diferencia < 0 ? 'text-red-600 font-bold' : 'text-green-600';
-      const difText  = p.diferencia < 0 ? `▼ ${Math.abs(p.diferencia)}` : `▲ ${p.diferencia}`;
-      const fuenteHtml = FUENTE_LABEL[p.fuente] || p.fuente;
-      return `<tr class="border-b last:border-0">
-        <td class="py-1 pr-2 truncate max-w-32" title="${p.nombre}">${p.nombre}</td>
-        <td class="py-1 text-center font-mono">${p.stock_actual}</td>
-        <td class="py-1 text-center font-mono">${p.demanda_proyectada}</td>
-        <td class="py-1 text-center font-mono ${difClass}">${difText}</td>
-        <td class="py-1 text-center">${fuenteHtml}</td>
-      </tr>`;
-    }).join('');
-  } catch (e) {
-    document.getElementById('bodyProyeccion').innerHTML =
-      `<tr><td colspan="5" class="text-red-400 py-2">Error: ${e.message}</td></tr>`;
-  }
+    histBtnBar.appendChild(btn);
+  });
+  histWrapper.insertBefore(histBtnBar, canvas);
+
+  setTimeout(() => {
+    const el = document.getElementById(cid);
+    if (!el) return;
+    chartRefs[cid] = new Chart(el.getContext("2d"), {
+      type: "bar",
+      data: { labels: stats.histograma.map(b => b.label), datasets: [{ label: "Frecuencia", data: stats.histograma.map(b => b.count), backgroundColor: "rgba(59,130,246,0.7)", borderColor: "rgba(59,130,246,1)", borderWidth: 1 }] },
+      options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { stepSize: 1, font: { size: 10 } }, title: { display: true, text: "Frecuencia", font: { size: 10 } } }, x: { ticks: { font: { size: 9 }, maxRotation: 45 } } } }
+    });
+  }, 50);
+  return card;
 }
 
-async function cargarInsumosUrgentes() {
-  const el = document.getElementById('listaUrgentes');
-  try {
-    // ?refresh=1 invalida la caché del servidor y recalcula cón el código actual
-    const r = await fetch('/estadisticas/api/insumos-urgentes/?refresh=1');
-    const d = await r.json();
-    if (d.error) throw new Error(d.error);
-
-    if (!d.urgentes.length) {
-      el.innerHTML = '<span class="text-green-600">✓ Sin insumos urgentes en este momento.</span>';
-      return;
+function buildCatChart(cid, tipo, cd, COLORS) {
+  const el = document.getElementById(cid);
+  if (!el) return;
+  const isCircular = tipo === "pie" || tipo === "doughnut";
+  const isHBar = tipo === "horizontalBar";
+  const isScatter = tipo === "scatter";
+  const chartType = isHBar ? "bar" : (isScatter ? "scatter" : tipo);
+  const scatterData = cd.labels.map((l, i) => ({ x: i, y: cd.values[i] }));
+  chartRefs[cid] = new Chart(el.getContext("2d"), {
+    type: chartType,
+    data: {
+      labels: cd.labels,
+      datasets: [{
+        label: "Valor",
+        data: isScatter ? scatterData : cd.values,
+        backgroundColor: isCircular ? COLORS.slice(0, cd.labels.length) : (tipo === "line" || tipo === "area" ? "rgba(59,130,246,0.2)" : "#3b82f6"),
+        borderColor: isCircular ? "#fff" : "#3b82f6",
+        borderWidth: isCircular ? 2 : 1,
+        fill: tipo === "area",
+        tension: 0.3,
+        pointRadius: isScatter ? 5 : 3,
+      }]
+    },
+    options: {
+      indexAxis: isHBar ? "y" : "x",
+      responsive: true,
+      plugins: { legend: { display: isCircular, position: "bottom", labels: { font: { size: 11 } } } },
+      scales: isCircular || isScatter ? {} : {
+        y: { beginAtZero: true, ticks: { font: { size: 10 } } },
+        x: { ticks: { font: { size: 10 }, maxRotation: isHBar ? 0 : 45 } }
+      }
     }
-    const items = d.urgentes.map(u => {
-      const tipo_label = {
-        'sin_stock_critico': '🔴 Sin stock crítico',
-        'compra_urgente':    '🟠 Compra urgente',
-        'compra_preventiva': '🟡 Compra preventiva',
-      }[u.tipo] || u.tipo;
-      return `<div class="flex items-center justify-between py-1 border-b last:border-0">
-        <span>${tipo_label}: <strong>${u.insumo_nombre}</strong></span>
-        <span class="text-gray-500 text-xs">Stock: ${u.stock_actual} | Sugerido: ${u.cantidad_sugerida}</span>
-      </div>`;
-    }).join('');
-    el.innerHTML = items;
-  } catch (e) {
-    el.innerHTML = `<span class="text-red-400">Error: ${e.message}</span>`;
-  }
+  });
 }
 
-document.addEventListener('DOMContentLoaded', function() {
-  const desdeInput = document.getElementById('filtroDesde');
-  const hastaInput = document.getElementById('filtroHasta');
-  if (!desdeInput.value || !hastaInput.value){
-    const hoy = new Date();
-    const hasta = hoy.toISOString().slice(0,10);
-    const hace6 = new Date(hoy);
-    hace6.setMonth(hace6.getMonth() - 6);
-    const desde = hace6.toISOString().slice(0,10);
-    if (!desdeInput.value) desdeInput.value = desde;
-    if (!hastaInput.value) hastaInput.value = hasta;
-  }
+function cambiarTipoChart(cid, tipo, cd, COLORS) {
+  if (chartRefs[cid]) { try { chartRefs[cid].destroy(); } catch(e){} delete chartRefs[cid]; }
+  buildCatChart(cid, tipo, cd, COLORS);
+}
 
-  document.getElementById('btnAplicar').addEventListener('click', function(e) {
-    e.preventDefault();
-    console.log('Botón Aplicar presionado');
-    refreshAll();
-  });
-  document.getElementById('btnLimpiar').addEventListener('click', function(e) {
-    e.preventDefault();
-    document.getElementById('filtroDesde').value = '';
-    document.getElementById('filtroHasta').value = '';
-    refreshAll();
-  });
+function fmt(val) {
+  if (val === null || val === undefined) return "--";
+  return Number(val).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
 
-  refreshAll();
-});
+document.addEventListener("DOMContentLoaded", () => cargarModulo("clientes"));
 </script>
-    <!-- ...existing code... -->
 {% endblock %}
