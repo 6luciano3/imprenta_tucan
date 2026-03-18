@@ -102,7 +102,10 @@
           <span class="material-symbols-outlined">dashboard</span> Dashboard
         </a>
         {% if show_insumos %}
-        <a href="{% url 'lista_insumos' %}" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-light {% if request.resolver_match.url_name == 'lista_insumos' %}bg-primary text-white{% endif %}">
+                <a href="{% url 'compras:lista_ordenes_compra' %}" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-light">
+          <span class="material-symbols-outlined">package_2</span> Compras
+        </a>
+<a href="{% url 'lista_insumos' %}" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-light {% if request.resolver_match.url_name == 'lista_insumos' %}bg-primary text-white{% endif %}">
           <span class="material-symbols-outlined">construction</span> Insumos
         </a>
         {% endif %}

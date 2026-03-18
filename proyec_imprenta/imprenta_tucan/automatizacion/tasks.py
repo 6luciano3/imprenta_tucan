@@ -657,8 +657,24 @@ def tarea_automatizacion_presupuestos_ponderada():
                         insumo = p.insumo
                         if proveedor:
                             insumo.proveedor = proveedor
-                        insumo.stock = (insumo.stock or 0) + int(p.cantidad_requerida or 0)
-                        insumo.save(update_fields=['proveedor', 'stock'])
+                        # Remito automatico generado por App Compras
+                        try:
+                            from compras.models import Remito, DetalleRemito, EstadoCompra, OrdenCompra
+                            from django.utils import timezone
+                            estado_recibida, _ = EstadoCompra.objects.get_or_create(nombre='Recibida')
+                            remito = Remito.objects.create(
+                                proveedor=insumo.proveedor,
+                                numero=f'AUTO-{p.pk:06d}',
+                                fecha=timezone.now().date(),
+                                observaciones=f'Automatico CompraPropuesta #{p.pk}',
+                            )
+                            cantidad = int(p.cantidad_requerida or 0)
+                            DetalleRemito.objects.create(remito=remito, insumo=insumo, cantidad=cantidad)
+                            insumo.stock = (insumo.stock or 0) + cantidad
+                            insumo.save(update_fields=['stock', 'updated_at'])
+                        except Exception as e_r:
+                            insumo.stock = (insumo.stock or 0) + int(p.cantidad_requerida or 0)
+                            insumo.save(update_fields=['stock'])
                         p.estado = 'aceptada'
                         p.decision = 'aceptar'
                         p.comentario_admin = 'Aceptada automáticamente por umbrales'

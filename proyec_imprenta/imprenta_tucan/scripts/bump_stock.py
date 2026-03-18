@@ -1,3 +1,6 @@
+# ADVERTENCIA: SOLO PARA DESARROLLO - No usar en produccion
+# Para incrementar stock en produccion usar App Compras > Remitos
+
 import os
 import sys
 

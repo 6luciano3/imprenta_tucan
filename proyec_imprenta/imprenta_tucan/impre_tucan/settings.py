@@ -68,6 +68,7 @@ INSTALLED_APPS = [
     'permisos',
     'widget_tweaks',
     'estadisticas',
+    'compras',
     'auditoria',
     'configuracion',
     'geo',

@@ -21,7 +21,7 @@ class InsumoForm(forms.ModelForm):
             'nombre': forms.TextInput(attrs={'class': 'form-control'}),
             'categoria': forms.TextInput(attrs={'class': 'form-control'}),
             'tipo': forms.Select(attrs={'class': 'form-select'}),
-            'stock': forms.NumberInput(attrs={'class': 'form-control', 'min': '0'}),
+            # stock widget eliminado - campo excluido del formulario
             'precio': forms.NumberInput(attrs={'class': 'form-control', 'min': '0', 'step': '0.01'}),
         }
 
@@ -35,7 +35,7 @@ class AltaInsumoForm(forms.ModelForm):
             "codigo": forms.TextInput(attrs={"class": "form-control", "required": True, "maxlength": 20}),
             "tipo": forms.Select(attrs={"class": "form-select", "required": True}),
             "proveedor": forms.Select(attrs={"class": "form-select", "required": True}),
-            "cantidad": forms.NumberInput(attrs={"class": "form-control", "required": True, "min": 1, "step": 1}),
+            # cantidad excluida del form - solo desde App Compras
             "precio_unitario": forms.NumberInput(attrs={"class": "form-control", "required": True, "min": 0.01, "step": "0.01"}),
         }
 
@@ -119,7 +119,8 @@ class ModificarInsumoForm(forms.ModelForm):
 
     class Meta:
         model = Insumo
-        fields = ["nombre", "codigo", "descripcion", "categoria", "tipo", "proveedor", "cantidad", "precio_unitario", "stock_minimo_manual", "cantidad_compra_sugerida", "unidad_medida"]
+        fields = ["nombre", "codigo", "descripcion", "categoria", "tipo", "proveedor", "precio_unitario", "stock_minimo_manual", "cantidad_compra_sugerida", "unidad_medida"]
+        # stock y cantidad excluidos: solo se modifican desde App Compras via Remito
         widgets = {
             "nombre": forms.TextInput(attrs={"class": "form-control", "required": True, "maxlength": 100}),
             "codigo": forms.TextInput(attrs={"class": "form-control", "required": True, "maxlength": 20}),
@@ -127,7 +128,7 @@ class ModificarInsumoForm(forms.ModelForm):
             "categoria": forms.TextInput(attrs={"class": "form-control", "maxlength": 100}),
             "tipo": forms.Select(attrs={"class": "form-select"}),
             "proveedor": forms.Select(attrs={"class": "form-select", "required": True}),
-            "cantidad": forms.NumberInput(attrs={"class": "form-control", "required": True, "min": 1, "step": 1}),
+            # cantidad excluida del form - solo desde App Compras
             "precio_unitario": forms.NumberInput(attrs={"class": "form-control", "required": True, "min": 0.01, "step": "0.01"}),
             "stock_minimo_manual": forms.NumberInput(attrs={"class": "form-control", "min": 0, "step": 1, "placeholder": "Opcional"}),
             "cantidad_compra_sugerida": forms.NumberInput(attrs={"class": "form-control", "min": 0, "step": 1, "placeholder": "Opcional"}),
