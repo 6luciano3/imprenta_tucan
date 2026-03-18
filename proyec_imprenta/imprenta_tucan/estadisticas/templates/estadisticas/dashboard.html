@@ -7,8 +7,10 @@
       <span class="material-symbols-outlined text-blue-600">analytics</span>
       Estadistica
     </h1>
-    
   </div>
+  <button onclick="imprimirPDF()" class="no-print inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-semibold">
+    <span class="material-symbols-outlined text-base">picture_as_pdf</span> Imprimir PDF
+  </button>
 </div>
 
 <div class="flex flex-wrap gap-2 mb-6">
@@ -315,5 +317,36 @@ function fmt(val) {
 }
 
 document.addEventListener("DOMContentLoaded", () => cargarModulo("clientes"));
+
+function imprimirPDF() {
+  const titulo = moduloActivo ? moduloActivo.charAt(0).toUpperCase() + moduloActivo.slice(1) : "Estadistica";
+  const original = document.title;
+  document.title = "Estadistica_" + titulo + "_" + new Date().toISOString().slice(0,10);
+  window.print();
+  document.title = original;
+}
+
+function exportarPDF() {
+  const titulo = moduloActivo ? moduloActivo.charAt(0).toUpperCase() + moduloActivo.slice(1) : "Estadistica";
+  const original = document.title;
+  document.title = "Estadistica_" + titulo + "_" + new Date().toISOString().slice(0,10);
+  window.print();
+  document.title = original;
+}
 </script>
+
+<style>
+@media print {
+  .no-print { display: none !important; }
+  nav, aside, footer, #filtro-fechas { display: none !important; }
+  body { background: white !important; }
+  #contenedor-stats { width: 100% !important; }
+  .bg-white { box-shadow: none !important; }
+  canvas { max-width: 100% !important; page-break-inside: avoid; }
+  .grid { display: block !important; }
+  .grid > div { margin-bottom: 1rem; page-break-inside: avoid; }
+  h1, h2, h3 { page-break-after: avoid; }
+  .rounded-xl { border-radius: 0 !important; }
+}
+</style>
 {% endblock %}
