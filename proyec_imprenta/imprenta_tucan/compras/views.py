@@ -94,6 +94,23 @@ def lista_remitos(request):
     return render(request, "compras/lista_remitos.html", {"remitos": remitos})
 
 
+
+
+def _generar_numero_remito():
+    from django.utils import timezone
+    from .models import Remito
+    anio = timezone.now().year
+    prefijo = f"R-{anio}-"
+    ultimo = Remito.objects.filter(numero__startswith=prefijo).order_by("-numero").first()
+    if ultimo:
+        try:
+            seq = int(ultimo.numero.split("-")[-1]) + 1
+        except (ValueError, IndexError):
+            seq = 1
+    else:
+        seq = 1
+    return f"{prefijo}{seq:04d}"
+
 @login_required
 def nuevo_remito(request):
     if request.method == "POST":
@@ -109,8 +126,23 @@ def nuevo_remito(request):
                     insumo = df.cleaned_data["insumo"]
                     cantidad = df.cleaned_data["cantidad"]
                     DetalleRemito.objects.create(remito=remito, insumo=insumo, cantidad=cantidad)
-                    insumo.stock = (insumo.stock or 0) + cantidad
+                    stock_anterior = insumo.stock or 0
+                    insumo.stock = stock_anterior + cantidad
                     insumo.save(update_fields=["stock", "updated_at"])
+                    # Registrar MovimientoStock
+                    from .models import MovimientoStock
+                    MovimientoStock.objects.create(
+                        insumo=insumo,
+                        tipo="entrada",
+                        origen="remito",
+                        cantidad=cantidad,
+                        stock_anterior=stock_anterior,
+                        stock_posterior=insumo.stock,
+                        referencia=f"Remito {remito.numero}",
+                        remito=remito,
+                        fecha=remito.fecha,
+                        usuario=request.user if request.user.is_authenticated else None,
+                    )
                     actualizados.append(f"{insumo.nombre} (+{cantidad})")
             # Si hay orden de compra vinculada, marcarla como Recibida
             if remito.orden_compra:
@@ -130,9 +162,16 @@ def nuevo_remito(request):
         else:
             messages.error(request, "Por favor corrija los errores en el formulario.")
     else:
-        form = RemitoForm(initial={"fecha": timezone.now().date()})
+        from datetime import date
+        hoy = date.today().strftime("%Y-%m-%d")
+        form = RemitoForm(initial={"fecha": hoy, "numero": _generar_numero_remito()})
         formset = DetalleRemitoFormSet(prefix="detalles")
-    return render(request, "compras/nuevo_remito.html", {"form": form, "formset": formset})
+    from insumos.models import Insumo
+    return render(request, "compras/nuevo_remito.html", {
+        "form": form,
+        "formset": formset,
+        "insumos": Insumo.objects.filter(activo=True).select_related().order_by("nombre"),
+    })
 
 
 # ── API: items de solicitud de cotizacion confirmada ─────────────────────────
@@ -273,3 +312,96 @@ def comparacion_precios(request):
         "sin_precio": sin_precio,
         "total": qs.count(),
     })
+
+
+@login_required
+def kardex_insumo(request, insumo_pk):
+    from insumos.models import Insumo
+    from .models import MovimientoStock
+    insumo = get_object_or_404(Insumo, pk=insumo_pk)
+    movimientos = MovimientoStock.objects.filter(insumo=insumo).select_related("usuario", "remito").order_by("-fecha", "-creado_en")
+    return render(request, "compras/kardex.html", {
+        "insumo": insumo,
+        "movimientos": movimientos,
+    })
+
+
+@login_required
+def ajuste_stock(request, insumo_pk):
+    from insumos.models import Insumo
+    from .models import MovimientoStock
+    from django import forms as dj_forms
+
+    insumo = get_object_or_404(Insumo, pk=insumo_pk)
+
+    class AjusteForm(dj_forms.Form):
+        tipo = dj_forms.ChoiceField(
+            choices=[("ajuste_positivo", "Ajuste positivo (sumar)"), ("ajuste_negativo", "Ajuste negativo (restar)")],
+            widget=dj_forms.Select(attrs={"class": "form-select border border-gray-300 rounded-lg px-3 py-2 text-sm w-full"})
+        )
+        cantidad = dj_forms.IntegerField(
+            min_value=1,
+            widget=dj_forms.NumberInput(attrs={"class": "form-control border border-gray-300 rounded-lg px-3 py-2 text-sm w-full", "min": "1"})
+        )
+        motivo = dj_forms.ChoiceField(
+            choices=[("rotura", "Rotura"), ("perdida", "Perdida"), ("error_carga", "Error de carga"), ("otro", "Otro")],
+            widget=dj_forms.Select(attrs={"class": "form-select border border-gray-300 rounded-lg px-3 py-2 text-sm w-full"})
+        )
+        observaciones = dj_forms.CharField(
+            required=False,
+            widget=dj_forms.Textarea(attrs={"class": "form-control border border-gray-300 rounded-lg px-3 py-2 text-sm w-full", "rows": "2"})
+        )
+
+    if request.method == "POST":
+        form = AjusteForm(request.POST)
+        if form.is_valid():
+            tipo = form.cleaned_data["tipo"]
+            cantidad = form.cleaned_data["cantidad"]
+            motivo = form.cleaned_data["motivo"]
+            obs = form.cleaned_data["observaciones"]
+            stock_anterior = insumo.stock or 0
+            if tipo == "ajuste_positivo":
+                insumo.stock = stock_anterior + cantidad
+            else:
+                insumo.stock = max(0, stock_anterior - cantidad)
+            insumo.save(update_fields=["stock", "updated_at"])
+            MovimientoStock.objects.create(
+                insumo=insumo,
+                tipo=tipo,
+                origen="ajuste",
+                cantidad=cantidad,
+                stock_anterior=stock_anterior,
+                stock_posterior=insumo.stock,
+                referencia=f"Ajuste: {motivo}",
+                observaciones=obs,
+                fecha=__import__("django.utils.timezone", fromlist=["timezone"]).timezone.now().date(),
+                usuario=request.user if request.user.is_authenticated else None,
+            )
+            _registrar_auditoria(request, insumo, "update")
+            messages.success(request, f"Ajuste aplicado: {insumo.nombre} stock {stock_anterior} → {insumo.stock}.")
+            return redirect("compras:kardex_insumo", insumo_pk=insumo.pk)
+    else:
+        form = AjusteForm()
+
+    return render(request, "compras/ajuste_stock.html", {"form": form, "insumo": insumo})
+
+
+@login_required
+def api_items_orden(request, pk):
+    from .models import OrdenCompra
+    try:
+        oc = OrdenCompra.objects.prefetch_related("detalles__insumo").get(pk=pk)
+        items = []
+        for d in oc.detalles.all():
+            items.append({
+                "insumo_id": d.insumo.idInsumo,
+                "insumo_nombre": d.insumo.nombre,
+                "insumo_codigo": d.insumo.codigo,
+                "cantidad": d.cantidad,
+                "unidad": d.insumo.unidad_medida or "-",
+            })
+        from django.http import JsonResponse
+        return JsonResponse({"ok": True, "proveedor_id": oc.proveedor_id, "items": items})
+    except Exception as e:
+        from django.http import JsonResponse
+        return JsonResponse({"ok": False, "error": str(e)}, status=404)

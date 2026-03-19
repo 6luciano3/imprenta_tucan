@@ -98,3 +98,44 @@ class DetalleRemito(models.Model):
 
     def __str__(self):
         return f"{self.insumo.nombre} x {self.cantidad}"
+
+
+class MovimientoStock(models.Model):
+    TIPOS = [
+        ("entrada", "Entrada"),
+        ("salida", "Salida"),
+        ("ajuste_positivo", "Ajuste positivo"),
+        ("ajuste_negativo", "Ajuste negativo"),
+    ]
+    ORIGENES = [
+        ("remito", "Remito de compra"),
+        ("produccion", "Orden de produccion"),
+        ("ajuste", "Ajuste manual"),
+        ("automatico", "Sistema automatico"),
+    ]
+    insumo = models.ForeignKey(
+        "insumos.Insumo", on_delete=models.CASCADE, related_name="movimientos_stock"
+    )
+    tipo = models.CharField(max_length=20, choices=TIPOS)
+    origen = models.CharField(max_length=20, choices=ORIGENES)
+    cantidad = models.PositiveIntegerField()
+    stock_anterior = models.IntegerField(default=0)
+    stock_posterior = models.IntegerField(default=0)
+    referencia = models.CharField(max_length=100, blank=True, help_text="Ej: Remito R-0001, OC-0002")
+    observaciones = models.TextField(blank=True)
+    usuario = models.ForeignKey(
+        "usuarios.Usuario", on_delete=models.SET_NULL, null=True, blank=True, related_name="movimientos_stock"
+    )
+    remito = models.ForeignKey(
+        Remito, on_delete=models.SET_NULL, null=True, blank=True, related_name="movimientos"
+    )
+    fecha = models.DateField()
+    creado_en = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-creado_en"]
+        verbose_name = "Movimiento de Stock"
+        verbose_name_plural = "Movimientos de Stock"
+
+    def __str__(self):
+        return f"{self.get_tipo_display()} | {self.insumo.nombre} | {self.cantidad} | {self.fecha}"

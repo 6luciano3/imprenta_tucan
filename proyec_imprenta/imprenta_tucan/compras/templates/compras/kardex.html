@@ -1,0 +1,90 @@
+{% extends 'base.html' %}
+{% block title %}Kardex - {{ insumo.nombre }}{% endblock %}
+{% block content %}
+<div class="mb-6 flex items-center justify-between">
+  <h1 class="text-2xl font-bold text-gray-800 flex items-center gap-2">
+    <span class="material-symbols-outlined text-blue-600">history</span>
+    Kardex: {{ insumo.codigo }} - {{ insumo.nombre }}
+  </h1>
+  <div class="flex gap-2">
+    <a href="{% url 'compras:ajuste_stock' insumo.idInsumo %}" class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-yellow-500 hover:bg-yellow-600 text-white text-sm font-semibold">
+      <span class="material-symbols-outlined text-base">tune</span> Ajuste de Stock
+    </a>
+    <a href="{% url 'compras:actualizar_precio_insumo' insumo.idInsumo %}" class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold">
+      <span class="material-symbols-outlined text-base">price_change</span> Actualizar Precio
+    </a>
+    <a href="{% url 'compras:insumos_compras' %}" class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 text-sm text-gray-600">
+      <span class="material-symbols-outlined text-base">arrow_back</span> Volver
+    </a>
+  </div>
+</div>
+
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+  <div class="bg-white rounded-xl border border-gray-200 p-4">
+    <p class="text-xs text-gray-500 uppercase font-semibold mb-1">Stock Actual</p>
+    <p class="text-2xl font-bold {% if insumo.stock <= 0 %}text-red-700{% elif insumo.stock < 10 %}text-yellow-700{% else %}text-green-700{% endif %}">{{ insumo.stock }}</p>
+  </div>
+  <div class="bg-white rounded-xl border border-gray-200 p-4">
+    <p class="text-xs text-gray-500 uppercase font-semibold mb-1">Precio Unitario</p>
+    <p class="text-2xl font-bold text-gray-800 font-mono">${{ insumo.precio_unitario|floatformat:2 }}</p>
+  </div>
+  <div class="bg-white rounded-xl border border-gray-200 p-4">
+    <p class="text-xs text-gray-500 uppercase font-semibold mb-1">Proveedor</p>
+    <p class="text-sm font-semibold text-gray-700">{{ insumo.proveedor }}</p>
+  </div>
+  <div class="bg-white rounded-xl border border-gray-200 p-4">
+    <p class="text-xs text-gray-500 uppercase font-semibold mb-1">Movimientos</p>
+    <p class="text-2xl font-bold text-blue-700">{{ movimientos|length }}</p>
+  </div>
+</div>
+
+<div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+  <div class="bg-gray-50 border-b border-gray-200 px-4 py-3">
+    <h2 class="text-xs font-bold text-gray-600 uppercase tracking-wide">Historial de Movimientos</h2>
+  </div>
+  <table class="w-full text-sm text-left">
+    <thead class="border-b border-gray-100">
+      <tr>
+        <th class="px-4 py-2 text-xs font-semibold text-gray-500">Fecha</th>
+        <th class="px-4 py-2 text-xs font-semibold text-gray-500">Tipo</th>
+        <th class="px-4 py-2 text-xs font-semibold text-gray-500">Origen</th>
+        <th class="px-4 py-2 text-xs font-semibold text-gray-500">Referencia</th>
+        <th class="px-4 py-2 text-xs font-semibold text-gray-500 text-right">Cantidad</th>
+        <th class="px-4 py-2 text-xs font-semibold text-gray-500 text-center">Stock Ant.</th>
+        <th class="px-4 py-2 text-xs font-semibold text-gray-500 text-center">Stock Post.</th>
+        <th class="px-4 py-2 text-xs font-semibold text-gray-500">Usuario</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-50">
+      {% for mov in movimientos %}
+      <tr class="hover:bg-gray-50">
+        <td class="px-4 py-2 text-xs text-gray-500">{{ mov.fecha|date:"d/m/Y" }}</td>
+        <td class="px-4 py-2">
+          <span class="px-2 py-0.5 rounded-full text-xs font-semibold
+            {% if mov.tipo == 'entrada' %}bg-green-100 text-green-700
+            {% elif mov.tipo == 'salida' %}bg-red-100 text-red-700
+            {% elif mov.tipo == 'ajuste_positivo' %}bg-blue-100 text-blue-700
+            {% else %}bg-yellow-100 text-yellow-700{% endif %}">
+            {{ mov.get_tipo_display }}
+          </span>
+        </td>
+        <td class="px-4 py-2 text-xs text-gray-600">{{ mov.get_origen_display }}</td>
+        <td class="px-4 py-2 text-xs text-gray-600">{{ mov.referencia }}</td>
+        <td class="px-4 py-2 text-right font-mono font-bold
+          {% if mov.tipo == 'entrada' or mov.tipo == 'ajuste_positivo' %}text-green-700{% else %}text-red-700{% endif %}">
+          {% if mov.tipo == 'entrada' or mov.tipo == 'ajuste_positivo' %}+{% else %}-{% endif %}{{ mov.cantidad }}
+        </td>
+        <td class="px-4 py-2 text-center font-mono text-gray-500">{{ mov.stock_anterior }}</td>
+        <td class="px-4 py-2 text-center font-mono font-bold text-gray-800">{{ mov.stock_posterior }}</td>
+        <td class="px-4 py-2 text-xs text-gray-500">{{ mov.usuario|default:"Sistema" }}</td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="8" class="px-4 py-12 text-center text-gray-400">
+        <span class="material-symbols-outlined text-4xl block mb-2">history</span>
+        Sin movimientos registrados aun.
+      </td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

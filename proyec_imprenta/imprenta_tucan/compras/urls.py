@@ -16,4 +16,7 @@ urlpatterns = [
     path("precios/", views.lista_precios_insumos, name="lista_precios_insumos"),
     path("", views.home_compras, name="home_compras"),
     path("comparacion/", views.comparacion_precios, name="comparacion_precios"),
+    path("insumos/<int:insumo_pk>/kardex/", views.kardex_insumo, name="kardex_insumo"),
+    path("insumos/<int:insumo_pk>/ajuste/", views.ajuste_stock, name="ajuste_stock"),
+    path("api/orden/<int:pk>/items/", views.api_items_orden, name="api_items_orden"),
 ]

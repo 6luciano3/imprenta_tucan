@@ -1,81 +1,253 @@
 {% extends 'base.html' %}
-{% block title %}Nuevo Remito{% endblock %}
+{% block title %}Ingreso de Remito{% endblock %}
 {% block content %}
 <div class="mb-6 flex items-center justify-between">
   <h1 class="text-2xl font-bold text-gray-800 flex items-center gap-2">
     <span class="material-symbols-outlined text-blue-600">receipt_long</span>
-    Registrar Remito
+    Ingreso de Remito
   </h1>
   <a href="{% url 'compras:lista_remitos_compra' %}" class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 text-sm text-gray-600">
     <span class="material-symbols-outlined text-base">arrow_back</span> Volver
   </a>
 </div>
+
 {% if messages %}{% for msg in messages %}
 <div class="mb-4 px-4 py-3 rounded-lg {% if msg.tags == 'error' %}bg-red-50 text-red-700 border border-red-200{% else %}bg-green-50 text-green-700 border border-green-200{% endif %}">{{ msg }}</div>
 {% endfor %}{% endif %}
-<form method="post">
+
+<form method="post" id="remito-form">
   {% csrf_token %}
-  <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5 mb-6">
-    <h2 class="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-4">Datos del Remito</h2>
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-      <div><label class="block text-xs font-medium text-gray-500 mb-1">Numero</label>{{ form.numero }}{% if form.numero.errors %}<p class="text-red-500 text-xs mt-1">{{ form.numero.errors.0 }}</p>{% endif %}</div>
-      <div><label class="block text-xs font-medium text-gray-500 mb-1">Proveedor</label>{{ form.proveedor }}{% if form.proveedor.errors %}<p class="text-red-500 text-xs mt-1">{{ form.proveedor.errors.0 }}</p>{% endif %}</div>
-      <div><label class="block text-xs font-medium text-gray-500 mb-1">Fecha</label>{{ form.fecha }}{% if form.fecha.errors %}<p class="text-red-500 text-xs mt-1">{{ form.fecha.errors.0 }}</p>{% endif %}</div>
-      <div><label class="block text-xs font-medium text-gray-500 mb-1">Orden de Compra Vinculada (opcional)</label>{{ form.orden_compra }}</div>
-      <div class="md:col-span-2"><label class="block text-xs font-medium text-gray-500 mb-1">Observaciones</label>{{ form.observaciones }}</div>
+  <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5 mb-4">
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div>
+        <label class="block text-xs font-medium text-gray-500 mb-1">Proveedor</label>
+        {{ form.proveedor }}{% if form.proveedor.errors %}<p class="text-red-500 text-xs mt-1">{{ form.proveedor.errors.0 }}</p>{% endif %}
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-500 mb-1">N° de Remito</label>
+        {{ form.numero }}{% if form.numero.errors %}<p class="text-red-500 text-xs mt-1">{{ form.numero.errors.0 }}</p>{% endif %}
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-500 mb-1">Fecha</label>
+        {{ form.fecha }}{% if form.fecha.errors %}<p class="text-red-500 text-xs mt-1">{{ form.fecha.errors.0 }}</p>{% endif %}
+      </div>
+      <div class="md:col-span-3">
+        <label class="block text-xs font-medium text-gray-500 mb-1">Orden de Compra Vinculada (opcional)</label>
+        {{ form.orden_compra }}
+      </div>
     </div>
   </div>
-  <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5 mb-6">
-    <div class="flex items-center justify-between mb-4">
-      <h2 class="text-sm font-semibold text-gray-600 uppercase tracking-wide">Insumos Recibidos</h2>
+
+  <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-4">
+    <div class="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-gray-50">
+      <h2 class="text-sm font-semibold text-gray-700">Detalle de Insumos Recibidos</h2>
       <button type="button" onclick="agregarLinea()" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium">
-        <span class="material-symbols-outlined text-sm">add</span> Agregar insumo
+        <span class="material-symbols-outlined text-sm">add</span> Agregar Insumo
       </button>
     </div>
+
     {{ formset.management_form }}
-    <div class="grid grid-cols-3 gap-2 mb-2 text-xs font-medium text-gray-500 uppercase">
-      <div class="col-span-2">Insumo</div><div>Cantidad</div>
-    </div>
-    <div id="detalles-container">
-      {% for df in formset %}
-      <div class="detalle-row grid grid-cols-3 gap-2 mb-2 items-end">
-        <div class="col-span-2">{{ df.insumo }}</div>
-        <div class="flex gap-1">{{ df.cantidad }}
-          <button type="button" onclick="eliminarLinea(this)" class="px-2 py-2 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 border border-red-200">
-            <span class="material-symbols-outlined text-sm">delete</span>
-          </button>
-        </div>
-      </div>
-      {% endfor %}
-    </div>
+
+    <table class="w-full text-sm" id="tabla-detalles">
+      <thead class="bg-gray-50 border-b border-gray-200">
+        <tr>
+          <th class="px-4 py-2 text-xs font-semibold text-gray-600 uppercase w-32">Código</th>
+          <th class="px-4 py-2 text-xs font-semibold text-gray-600 uppercase">Descripción</th>
+          <th class="px-4 py-2 text-xs font-semibold text-gray-600 uppercase w-28">Cantidad</th>
+          <th class="px-4 py-2 text-xs font-semibold text-gray-600 uppercase w-28">Unidad</th>
+          <th class="px-4 py-2 w-10"></th>
+        </tr>
+      </thead>
+      <tbody id="detalles-container">
+        {% for df in formset %}
+        <tr class="detalle-row border-b border-gray-100 hover:bg-gray-50">
+          <td class="px-3 py-2">
+            <input type="text" id="codigo-{{ forloop.counter0 }}" class="w-full border border-gray-300 rounded px-2 py-1.5 text-xs font-mono bg-gray-50" placeholder="IN-001" readonly>
+          </td>
+          <td class="px-3 py-2">
+            <div>{{ df.insumo }}</div>
+          </td>
+          <td class="px-3 py-2">{{ df.cantidad }}</td>
+          <td class="px-3 py-2">
+            <span id="unidad-{{ forloop.counter0 }}" class="text-xs text-gray-500">-</span>
+          </td>
+          <td class="px-3 py-2 text-center">
+            <button type="button" onclick="eliminarLinea(this)" class="text-red-500 hover:text-red-700">
+              <span class="material-symbols-outlined text-base">delete</span>
+            </button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot>
+        <tr class="bg-gray-50 border-t border-gray-200">
+          <td colspan="5" class="px-4 py-2 text-xs text-gray-500">
+            Total de items: <span id="total-items" class="font-bold text-gray-800">{{ formset|length }}</span>
+          </td>
+        </tr>
+      </tfoot>
+    </table>
   </div>
-  <div class="flex gap-3">
-    <button type="submit" class="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm">
-      <span class="material-symbols-outlined text-base">save</span> Guardar Remito
-    </button>
+
+  <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-6">
+    <label class="block text-xs font-medium text-gray-500 mb-1">Observaciones</label>
+    {{ form.observaciones }}
+  </div>
+
+  <div class="flex justify-between items-center">
     <a href="{% url 'compras:lista_remitos_compra' %}" class="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-lg border border-gray-300 hover:bg-gray-50 text-gray-700 font-semibold text-sm">Cancelar</a>
+    <button type="submit" class="inline-flex items-center gap-1.5 px-6 py-2.5 rounded-lg bg-green-600 hover:bg-green-700 text-white font-semibold text-sm">
+      <span class="material-symbols-outlined text-base">check_circle</span> Registrar Ingreso
+    </button>
   </div>
 </form>
+
+<!-- Datos de insumos para JS -->
 <script>
+const INSUMOS_DATA = {
+  {% for insumo in insumos %}
+  "{{ insumo.idInsumo }}": {"codigo": "{{ insumo.codigo }}", "nombre": "{{ insumo.nombre }}", "unidad": "{{ insumo.unidad_medida|default:'-' }}"},
+  {% endfor %}
+};
+
+function actualizarFila(idx) {
+  const selInsumo = document.querySelector(`[name="detalles-${idx}-insumo"]`);
+  if (!selInsumo) return;
+  const val = selInsumo.value;
+  const d = INSUMOS_DATA[val];
+  const codigoEl = document.getElementById(`codigo-${idx}`);
+  const descEl = document.getElementById(`desc-${idx}`);
+  const unidadEl = document.getElementById(`unidad-${idx}`);
+  if (d) {
+    if (codigoEl) codigoEl.value = d.codigo;
+    if (descEl) descEl.innerHTML = `<span class="font-medium text-gray-800">${d.nombre}</span>`;
+    if (unidadEl) unidadEl.textContent = d.unidad;
+  } else {
+    if (codigoEl) codigoEl.value = "";
+    if (descEl) descEl.innerHTML = `<span class="text-gray-400 italic">Seleccioná un insumo →</span>`;
+    if (unidadEl) unidadEl.textContent = "-";
+  }
+}
+
+// Escuchar cambios en selects existentes
+document.addEventListener("DOMContentLoaded", function() {
+  document.querySelectorAll("[name$='-insumo']").forEach((sel, idx) => {
+    sel.addEventListener("change", () => actualizarFila(idx));
+  });
+  actualizarContador();
+
+  // Autocompletar desde Orden de Compra vinculada
+  const ocSelect = document.getElementById("id_orden_compra");
+  if (ocSelect) {
+    ocSelect.addEventListener("change", function() {
+      const ocId = this.value;
+      if (!ocId) return;
+      fetch(`/compras/api/orden/${ocId}/items/`)
+        .then(r => r.json())
+        .then(data => {
+          if (!data.ok || !data.items.length) {
+            alert("La orden no tiene insumos cargados.");
+            return;
+          }
+          // Setear proveedor
+          const provSelect = document.getElementById("id_proveedor");
+          if (provSelect) {
+            for (let opt of provSelect.options) {
+              if (opt.value == data.proveedor_id) { opt.selected = true; break; }
+            }
+          }
+          // Limpiar y rellenar detalles
+          const container = document.getElementById("detalles-container");
+          const total = document.getElementById("id_detalles-TOTAL_FORMS");
+          const plantilla = container.querySelector(".detalle-row");
+          if (!plantilla) return;
+          const plantillaClone = plantilla.cloneNode(true);
+          container.innerHTML = "";
+          total.value = 0;
+          data.items.forEach((item, idx) => {
+            const row = plantillaClone.cloneNode(true);
+            row.querySelectorAll("input,select").forEach(el => {
+              el.name = el.name.replace(/-\d+-/, `-${idx}-`);
+              el.id = el.id ? el.id.replace(/-\d+-/, `-${idx}-`) : "";
+              if (el.tagName === "INPUT" && !el.readOnly) el.value = "";
+              if (el.tagName === "SELECT") el.selectedIndex = 0;
+            });
+            row.querySelectorAll("[id^='codigo-'],[id^='desc-'],[id^='unidad-']").forEach(el => {
+              el.id = el.id.replace(/-\d+$/, `-${idx}`);
+            });
+            // Setear insumo
+            const insumoSel = row.querySelector("select[name$='-insumo']");
+            if (insumoSel) {
+              for (let opt of insumoSel.options) {
+                if (opt.value == item.insumo_id) { opt.selected = true; break; }
+              }
+              insumoSel.addEventListener("change", () => actualizarFila(idx));
+            }
+            // Setear cantidad
+            const cantInput = row.querySelector("input[name$='-cantidad']");
+            if (cantInput) cantInput.value = item.cantidad;
+            // Setear codigo y unidad visualmente
+            const codigoEl = row.querySelector("[id^='codigo-']");
+            const unidadEl = row.querySelector("[id^='unidad-']");
+            if (codigoEl) codigoEl.value = item.insumo_codigo;
+            if (unidadEl) unidadEl.textContent = item.unidad;
+            container.appendChild(row);
+          });
+          total.value = data.items.length;
+          actualizarContador();
+        })
+        .catch(e => {
+          console.error("Error:", e);
+          alert("Error al cargar los items de la orden.");
+        });
+    });
+  }
+});
+
 function agregarLinea() {
-  const container = document.getElementById('detalles-container');
-  const total = document.getElementById('id_detalles-TOTAL_FORMS');
+  const container = document.getElementById("detalles-container");
+  const total = document.getElementById("id_detalles-TOTAL_FORMS");
   const n = parseInt(total.value);
-  const first = container.querySelector('.detalle-row');
+  const first = container.querySelector(".detalle-row");
   if (!first) return;
   const row = first.cloneNode(true);
-  row.querySelectorAll('input,select').forEach(el => {
+  row.querySelectorAll("input,select").forEach(el => {
     el.name = el.name.replace(/-\d+-/, `-${n}-`);
-    el.id = el.id ? el.id.replace(/-\d+-/, `-${n}-`) : '';
-    if (el.tagName === 'INPUT') el.value = '';
-    if (el.tagName === 'SELECT') el.selectedIndex = 0;
+    el.id = el.id ? el.id.replace(/-\d+-/, `-${n}-`) : "";
+    if (el.tagName === "INPUT" && !el.readOnly) el.value = "";
+    if (el.tagName === "SELECT") el.selectedIndex = 0;
   });
+  // Actualizar IDs de codigo/desc/unidad
+  row.querySelectorAll("[id^='codigo-'],[id^='desc-'],[id^='unidad-']").forEach(el => {
+    el.id = el.id.replace(/-\d+$/, `-${n}`);
+  });
+  // Reset visual
+  const codigoEl = row.querySelector(`[id^='codigo-']`);
+  const descEl = row.querySelector(`[id^='desc-']`);
+  const unidadEl = row.querySelector(`[id^='unidad-']`);
+  if (codigoEl) codigoEl.value = "";
+  if (descEl) descEl.innerHTML = `<span class="text-gray-400 italic">Seleccioná un insumo →</span>`;
+  if (unidadEl) unidadEl.textContent = "-";
+  // Agregar listener al nuevo select
+  const newSel = row.querySelector(`[name="detalles-${n}-insumo"]`);
+  if (newSel) newSel.addEventListener("change", () => actualizarFila(n));
   container.appendChild(row);
   total.value = n + 1;
+  actualizarContador();
 }
+
 function eliminarLinea(btn) {
-  const rows = document.querySelectorAll('.detalle-row');
-  if (rows.length > 1) btn.closest('.detalle-row').remove();
+  const rows = document.querySelectorAll(".detalle-row");
+  if (rows.length > 1) {
+    btn.closest(".detalle-row").remove();
+    actualizarContador();
+  }
+}
+
+function actualizarContador() {
+  const c = document.querySelectorAll(".detalle-row").length;
+  const el = document.getElementById("total-items");
+  if (el) el.textContent = c;
 }
 </script>
 {% endblock %}

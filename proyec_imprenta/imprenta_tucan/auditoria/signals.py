@@ -117,7 +117,17 @@ def audit_post_save(sender, instance, created, **kwargs):
             after[f.name] = get_field_value(instance, f)
 
     if created:
-        changes = {k: {'before': None, 'after': v} for k, v in after.items() if v is not None}
+        # Para MovimientoStock, usar stock_anterior/stock_posterior como before/after
+        if model_name == 'MovimientoStock':
+            changes = {k: {'before': None, 'after': v} for k, v in after.items() if v is not None}
+            # Sobrescribir stock_anterior para que aparezca en columna "Antes"
+            if 'stock_anterior' in after and after['stock_anterior'] is not None:
+                changes['stock_anterior'] = {'before': after['stock_anterior'], 'after': after.get('stock_posterior')}
+                # Quitar stock_posterior como campo separado
+                if 'stock_posterior' in changes:
+                    del changes['stock_posterior']
+        else:
+            changes = {k: {'before': None, 'after': v} for k, v in after.items() if v is not None}
         action = AuditEntry.ACTION_CREATE
         before = {}
     else:

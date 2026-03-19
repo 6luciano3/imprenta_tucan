@@ -1,0 +1,52 @@
+{% extends 'base.html' %}
+{% block title %}Ajuste de Stock - {{ insumo.nombre }}{% endblock %}
+{% block content %}
+<div class="mb-6 flex items-center justify-between">
+  <h1 class="text-2xl font-bold text-gray-800 flex items-center gap-2">
+    <span class="material-symbols-outlined text-yellow-600">tune</span>
+    Ajuste de Stock: {{ insumo.nombre }}
+  </h1>
+  <a href="{% url 'compras:kardex_insumo' insumo.idInsumo %}" class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 text-sm text-gray-600">
+    <span class="material-symbols-outlined text-base">arrow_back</span> Volver
+  </a>
+</div>
+
+<div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 max-w-lg">
+  <div class="mb-5 p-4 bg-gray-50 rounded-lg border border-gray-200">
+    <p class="text-xs text-gray-500 uppercase font-semibold mb-1">Insumo</p>
+    <p class="font-bold text-gray-800">{{ insumo.codigo }} - {{ insumo.nombre }}</p>
+    <p class="text-sm text-gray-500 mt-1">Stock actual: <span class="font-mono font-bold text-gray-800">{{ insumo.stock }}</span></p>
+  </div>
+
+  <div class="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-xs text-yellow-800">
+    <span class="material-symbols-outlined text-sm align-middle">warning</span>
+    Los ajustes quedan registrados en el Kardex con motivo y usuario.
+  </div>
+
+  <form method="post">
+    {% csrf_token %}
+    <div class="mb-4">
+      <label class="block text-xs font-medium text-gray-500 mb-1">Tipo de Ajuste</label>
+      {{ form.tipo }}
+    </div>
+    <div class="mb-4">
+      <label class="block text-xs font-medium text-gray-500 mb-1">Cantidad</label>
+      {{ form.cantidad }}
+    </div>
+    <div class="mb-4">
+      <label class="block text-xs font-medium text-gray-500 mb-1">Motivo</label>
+      {{ form.motivo }}
+    </div>
+    <div class="mb-6">
+      <label class="block text-xs font-medium text-gray-500 mb-1">Observaciones</label>
+      {{ form.observaciones }}
+    </div>
+    <div class="flex gap-3">
+      <button type="submit" class="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-lg bg-yellow-500 hover:bg-yellow-600 text-white font-semibold text-sm">
+        <span class="material-symbols-outlined text-base">save</span> Aplicar Ajuste
+      </button>
+      <a href="{% url 'compras:kardex_insumo' insumo.idInsumo %}" class="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-lg border border-gray-300 hover:bg-gray-50 text-gray-700 font-semibold text-sm">Cancelar</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

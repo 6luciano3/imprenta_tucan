@@ -84,8 +84,8 @@ class RemitoForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.fields["proveedor"].queryset = Proveedor.objects.filter(activo=True).order_by("nombre")
         self.fields["proveedor"].label_from_instance = lambda obj: obj.nombre
-        self.fields["orden_compra"].queryset = OrdenCompra.objects.filter(
-            estado__nombre__in=["Aprobada", "Pendiente"]
+        self.fields["orden_compra"].queryset = OrdenCompra.objects.exclude(
+            estado__nombre="Cancelada"
         ).order_by("-creado_en")
         self.fields["orden_compra"].required = False
         self.fields["orden_compra"].label_from_instance = lambda obj: str(obj)
