@@ -73,6 +73,9 @@
 															<span class="material-symbols-outlined text-sm">edit</span>
 														</a>
 														{% endif %}
+                                                        <a href="{% url 'compras:actualizar_precio_insumo' insumo.idInsumo %}" class="text-orange-600 hover:text-orange-800 flex items-center gap-1" title="Actualizar precio">
+                                                            <span class="material-symbols-outlined text-sm">price_change</span>
+                                                        </a>
 														{% if can_insumos_activar %}
 														  {% if insumo.activo %}
 														  <form method="POST" action="{% url 'activar_insumo' insumo.idInsumo %}" class="inline">

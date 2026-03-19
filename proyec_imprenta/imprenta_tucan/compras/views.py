@@ -158,3 +158,118 @@ def api_items_solicitud(request, pk):
         return JsonResponse({"ok": True, "proveedor_id": sc.proveedor_id, "items": items})
     except Exception as e:
         return JsonResponse({"ok": False, "error": str(e)}, status=404)
+
+
+# ── Actualizar precio de insumo ───────────────────────────────────────────────
+@login_required
+def actualizar_precio_insumo(request, insumo_pk):
+    from insumos.models import Insumo
+    from django import forms as dj_forms
+
+    insumo = get_object_or_404(Insumo, pk=insumo_pk)
+
+    class PrecioForm(dj_forms.Form):
+        precio_unitario = dj_forms.DecimalField(
+            min_value=0.01, decimal_places=2,
+            widget=dj_forms.NumberInput(attrs={"class": "form-control", "min": "0.01", "step": "0.01"}),
+            label="Nuevo Precio Unitario"
+        )
+        motivo = dj_forms.CharField(
+            max_length=200, required=False,
+            widget=dj_forms.TextInput(attrs={"class": "form-control", "placeholder": "Ej: Actualizacion por remito R-0023"}),
+            label="Motivo (opcional)"
+        )
+
+    if request.method == "POST":
+        form = PrecioForm(request.POST)
+        if form.is_valid():
+            precio_anterior = insumo.precio_unitario
+            insumo.precio_unitario = form.cleaned_data["precio_unitario"]
+            insumo.save(update_fields=["precio_unitario", "updated_at"])
+            _registrar_auditoria(request, insumo, "update")
+            messages.success(
+                request,
+                f"Precio de {insumo.nombre} actualizado: ${precio_anterior} → ${insumo.precio_unitario}."
+            )
+            return redirect("compras:lista_ordenes_compra")
+    else:
+        form = PrecioForm(initial={"precio_unitario": insumo.precio_unitario})
+
+    return render(request, "compras/actualizar_precio.html", {
+        "form": form,
+        "insumo": insumo,
+    })
+
+
+# ── Lista de precios de insumos ───────────────────────────────────────────────
+@login_required
+def lista_precios_insumos(request):
+    from insumos.models import Insumo
+    insumos = Insumo.objects.filter(activo=True).select_related("proveedor").order_by("nombre")
+    return render(request, "compras/lista_precios.html", {"insumos": insumos})
+
+
+# ── Home de Compras ───────────────────────────────────────────────────────────
+def home_compras(request):
+    from .models import OrdenCompra, Remito
+    from insumos.models import Insumo
+    ordenes_count = OrdenCompra.objects.count()
+    remitos_count = Remito.objects.count()
+    insumos_count = Insumo.objects.filter(activo=True).count()
+    return render(request, "compras/home.html", {
+        "ordenes_count": ordenes_count,
+        "remitos_count": remitos_count,
+        "insumos_count": insumos_count,
+    })
+
+
+# ── Comparacion de precios por proveedor ──────────────────────────────────────
+@login_required
+def comparacion_precios(request):
+    from insumos.models import Insumo
+    from proveedores.models import Proveedor
+    from django.db.models import Avg, Min, Max, Count
+
+    proveedor_id = request.GET.get("proveedor")
+    categoria = request.GET.get("categoria")
+
+    proveedores = Proveedor.objects.filter(activo=True).annotate(
+        n_insumos=Count("insumos")
+    ).filter(n_insumos__gt=0).order_by("nombre")
+
+    categorias = Insumo.objects.filter(activo=True).values_list(
+        "categoria", flat=True
+    ).distinct().order_by("categoria")
+
+    qs = Insumo.objects.filter(activo=True).select_related("proveedor").order_by("categoria", "nombre")
+
+    if proveedor_id:
+        qs = qs.filter(proveedor_id=proveedor_id)
+    if categoria:
+        qs = qs.filter(categoria=categoria)
+
+    # Agrupar por categoria
+    from collections import defaultdict
+    por_categoria = defaultdict(list)
+    for insumo in qs:
+        por_categoria[insumo.categoria or "Sin categoría"].append(insumo)
+
+    # Estadisticas globales
+    stats = Insumo.objects.filter(activo=True).aggregate(
+        precio_promedio=Avg("precio_unitario"),
+        precio_min=Min("precio_unitario"),
+        precio_max=Max("precio_unitario"),
+    )
+
+    sin_precio = Insumo.objects.filter(activo=True, precio_unitario=0).count()
+
+    return render(request, "compras/comparacion_precios.html", {
+        "por_categoria": dict(por_categoria),
+        "proveedores": proveedores,
+        "categorias": categorias,
+        "proveedor_sel": proveedor_id,
+        "categoria_sel": categoria,
+        "stats": stats,
+        "sin_precio": sin_precio,
+        "total": qs.count(),
+    })

@@ -29,7 +29,8 @@ class InsumoForm(forms.ModelForm):
 class AltaInsumoForm(forms.ModelForm):
     class Meta:
         model = Insumo
-        fields = ["nombre", "codigo", "tipo", "proveedor", "cantidad", "precio_unitario"]
+        fields = ["nombre", "codigo", "tipo", "proveedor", "cantidad"]
+        # precio_unitario excluido: solo se modifica desde App Compras
         widgets = {
             "nombre": forms.TextInput(attrs={"class": "form-control", "required": True, "maxlength": 100}),
             "codigo": forms.TextInput(attrs={"class": "form-control", "required": True, "maxlength": 20}),
@@ -119,7 +120,8 @@ class ModificarInsumoForm(forms.ModelForm):
 
     class Meta:
         model = Insumo
-        fields = ["nombre", "codigo", "descripcion", "categoria", "tipo", "proveedor", "precio_unitario", "stock_minimo_manual", "cantidad_compra_sugerida", "unidad_medida"]
+        fields = ["nombre", "codigo", "descripcion", "categoria", "tipo", "proveedor", "stock_minimo_manual", "cantidad_compra_sugerida", "unidad_medida"]
+        # precio_unitario excluido: solo se modifica desde App Compras
         # stock y cantidad excluidos: solo se modifican desde App Compras via Remito
         widgets = {
             "nombre": forms.TextInput(attrs={"class": "form-control", "required": True, "maxlength": 100}),
@@ -129,7 +131,6 @@ class ModificarInsumoForm(forms.ModelForm):
             "tipo": forms.Select(attrs={"class": "form-select"}),
             "proveedor": forms.Select(attrs={"class": "form-select", "required": True}),
             # cantidad excluida del form - solo desde App Compras
-            "precio_unitario": forms.NumberInput(attrs={"class": "form-control", "required": True, "min": 0.01, "step": "0.01"}),
             "stock_minimo_manual": forms.NumberInput(attrs={"class": "form-control", "min": 0, "step": 1, "placeholder": "Opcional"}),
             "cantidad_compra_sugerida": forms.NumberInput(attrs={"class": "form-control", "min": 0, "step": 1, "placeholder": "Opcional"}),
             "unidad_medida": forms.TextInput(attrs={"class": "form-control", "maxlength": 20}),

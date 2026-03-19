@@ -1,0 +1,94 @@
+{% extends 'base.html' %}
+{% block title %}Compras{% endblock %}
+{% block content %}
+<div class="mb-8">
+  <h1 class="text-2xl font-bold text-gray-800 flex items-center gap-2">
+    <span class="material-symbols-outlined text-blue-600">package_2</span>
+    Gestión de Compras
+  </h1>
+  <p class="text-gray-500 text-sm mt-1">Administrá órdenes, remitos y precios de insumos desde un solo lugar.</p>
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+
+  <!-- Ordenes -->
+  <a href="{% url 'compras:lista_ordenes_compra' %}" class="group bg-white border border-gray-200 rounded-xl p-6 shadow-sm hover:shadow-md transition">
+    <div class="flex items-center gap-4 mb-4">
+      <div class="h-12 w-12 rounded-full bg-blue-50 text-blue-600 grid place-items-center">
+        <span class="material-symbols-outlined text-2xl">shopping_cart</span>
+      </div>
+      <div>
+        <p class="text-xs text-gray-500 uppercase font-semibold">Órdenes de Compra</p>
+        <p class="text-2xl font-bold text-gray-800 group-hover:text-blue-700">{{ ordenes_count }}</p>
+      </div>
+    </div>
+    <p class="text-sm text-gray-500">Crear y gestionar órdenes de compra a proveedores, vinculadas a solicitudes de cotización.</p>
+    <div class="mt-4 flex gap-2">
+      <span class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-semibold group-hover:bg-blue-700">
+        <span class="material-symbols-outlined text-sm">open_in_new</span> Ver órdenes
+      </span>
+    </div>
+  </a>
+
+  <!-- Remitos -->
+  <a href="{% url 'compras:lista_remitos_compra' %}" class="group bg-white border border-gray-200 rounded-xl p-6 shadow-sm hover:shadow-md transition">
+    <div class="flex items-center gap-4 mb-4">
+      <div class="h-12 w-12 rounded-full bg-green-50 text-green-600 grid place-items-center">
+        <span class="material-symbols-outlined text-2xl">receipt_long</span>
+      </div>
+      <div>
+        <p class="text-xs text-gray-500 uppercase font-semibold">Remitos</p>
+        <p class="text-2xl font-bold text-gray-800 group-hover:text-green-700">{{ remitos_count }}</p>
+      </div>
+    </div>
+    <p class="text-sm text-gray-500">Registrar remitos de insumos recibidos. Al guardar, el stock se actualiza automáticamente.</p>
+    <div class="mt-4 flex gap-2">
+      <span class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-green-600 text-white text-xs font-semibold group-hover:bg-green-700">
+        <span class="material-symbols-outlined text-sm">open_in_new</span> Ver remitos
+      </span>
+    </div>
+  </a>
+
+  <!-- Precios -->
+  <a href="{% url 'compras:lista_precios_insumos' %}" class="group bg-white border border-gray-200 rounded-xl p-6 shadow-sm hover:shadow-md transition">
+    <div class="flex items-center gap-4 mb-4">
+      <div class="h-12 w-12 rounded-full bg-orange-50 text-orange-600 grid place-items-center">
+        <span class="material-symbols-outlined text-2xl">price_change</span>
+      </div>
+      <div>
+        <p class="text-xs text-gray-500 uppercase font-semibold">Precios de Insumos</p>
+        <p class="text-2xl font-bold text-gray-800 group-hover:text-orange-700">{{ insumos_count }}</p>
+      </div>
+    </div>
+    <p class="text-sm text-gray-500">Actualizar el precio unitario de cada insumo. Es el único punto autorizado para modificar precios.</p>
+    <div class="mt-4 flex gap-2">
+      <span class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-orange-500 text-white text-xs font-semibold group-hover:bg-orange-600">
+        <span class="material-symbols-outlined text-sm">open_in_new</span> Ver precios
+      </span>
+    </div>
+  </a>
+
+</div>
+
+<div class="mb-6">
+  <a href="{% url 'compras:comparacion_precios' %}" class="group bg-white border border-gray-200 rounded-xl p-6 shadow-sm hover:shadow-md transition flex items-center gap-4">
+    <div class="h-12 w-12 rounded-full bg-blue-50 text-blue-600 grid place-items-center flex-shrink-0">
+      <span class="material-symbols-outlined text-2xl">compare_arrows</span>
+    </div>
+    <div>
+      <p class="font-bold text-gray-800 group-hover:text-blue-700">Comparacion de Precios</p>
+      <p class="text-sm text-gray-500">Ver precios de insumos por proveedor, detectar insumos sin precio e identificar oportunidades de ahorro.</p>
+    </div>
+    <span class="ml-auto material-symbols-outlined text-gray-400 group-hover:text-blue-600">chevron_right</span>
+  </a>
+</div>
+
+<div class="flex gap-3">
+  <a href="{% url 'compras:nueva_orden_compra' %}" class="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm">
+    <span class="material-symbols-outlined text-base">add</span> Nueva Orden
+  </a>
+  <a href="{% url 'compras:nuevo_remito_compra' %}" class="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-lg bg-green-600 hover:bg-green-700 text-white font-semibold text-sm">
+    <span class="material-symbols-outlined text-base">add</span> Nuevo Remito
+  </a>
+</div>
+{% endblock %}
