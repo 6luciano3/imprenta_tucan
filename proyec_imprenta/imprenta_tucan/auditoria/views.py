@@ -40,6 +40,14 @@ def _filtrar_auditorias(request):
         qs = qs.filter(app_label__icontains=app)
     if modelo:
         qs = qs.filter(model__icontains=modelo)
+    # Filtro adicional por evento desde GET directo
+    accion_directa = request.GET.get('action', '').strip()
+    if accion_directa:
+        qs = qs.filter(action=accion_directa)
+    # Filtro adicional por evento desde GET directo
+    accion_directa = request.GET.get('action', '').strip()
+    if accion_directa:
+        qs = qs.filter(action=accion_directa)
     if evento:
         qs = qs.filter(action=evento)
     if usuario:

@@ -84,6 +84,7 @@
             <option value="presupuestos" {% if request.GET.app == "presupuestos" %}selected{% endif %}>Presupuestos</option>
             <option value="productos" {% if request.GET.app == "productos" %}selected{% endif %}>Productos</option>
             <option value="proveedores" {% if request.GET.app == "proveedores" %}selected{% endif %}>Proveedores</option>
+            <option value="compras" {% if request.GET.app == "compras" %}selected{% endif %}>Compras</option>
             <option value="roles" {% if request.GET.app == "roles" %}selected{% endif %}>Roles</option>
             <option value="usuarios" {% if request.GET.app == "usuarios" %}selected{% endif %}>Usuarios</option>
           </select>
@@ -340,7 +341,7 @@
 {% endif %}
 
 <div class="mt-4">
-  {% include 'layouts/pagination.html' with page_obj=auditorias %}
+  {% include 'layouts/pagination.html' with page_obj=auditorias extra_params=export_params %}
 </div>
 
 <script>
