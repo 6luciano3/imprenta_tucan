@@ -574,13 +574,14 @@ def _tbl_style(st, header_cols=None):
     from reportlab.platypus import TableStyle
     from reportlab.lib import colors
     base = [
-        ("BACKGROUND", (0,0), (-1,0), colors.HexColor("#2C3E50")),
-        ("TEXTCOLOR",  (0,0), (-1,0), colors.white),
+        ("BACKGROUND", (0,0), (-1,0), colors.white),
+        ("TEXTCOLOR",  (0,0), (-1,0), colors.HexColor("#1E3A5F")),
         ("FONTNAME",   (0,0), (-1,0), "Helvetica-Bold"),
         ("FONTSIZE",   (0,0), (-1,0), 9),
         ("ROWBACKGROUNDS", (0,1), (-1,-1), [colors.HexColor("#F8F9FA"), colors.white]),
         ("GRID",   (0,0), (-1,-1), 0.5, colors.HexColor("#DEE2E6")),
-        ("LINEBELOW", (0,0), (-1,0), 2, colors.HexColor("#2C3E50")),
+        ("LINEBELOW", (0,0), (-1,0), 1.5, colors.HexColor("#1E3A5F")),
+        ("LINEABOVE", (0,0), (-1,0), 1.5, colors.HexColor("#1E3A5F")),
         ("PADDING", (0,0), (-1,-1), 7),
         ("TOPPADDING", (0,0), (-1,0), 8),
         ("BOTTOMPADDING", (0,0), (-1,0), 8),
@@ -689,7 +690,58 @@ def informe_pdf_pedidos(request):
         img2 = _grafico_linea(mes_labels, mes_vals, "Ingresos por Mes ($)", "#2980B9")
         story.append(_img_flowable(img2, 15, 5))
     hr2, firma = _pdf_firma(st, usuario); story += [hr2, firma]
-    doc.build(story)
+    # Dos pasadas para obtener total de paginas
+    def _contar_paginas(story_items, doc_obj):
+        from io import BytesIO as _BytesIO
+        from reportlab.platypus import BaseDocTemplate, PageTemplate, Frame
+        from reportlab.lib.pagesizes import A4 as _A4
+        from reportlab.lib.units import cm as _cm
+        _W, _H = _A4
+        _buf = _BytesIO()
+        _frame = Frame(2*_cm, 1.5*_cm, _W-4*_cm, _H-3*_cm,
+            leftPadding=0, rightPadding=0, topPadding=0, bottomPadding=0)
+        _tpl = PageTemplate(id="cnt", frames=[_frame], onPage=lambda c,d: None)
+        _doc2 = BaseDocTemplate(_buf, pagesize=_A4, pageTemplates=[_tpl])
+        _doc2.build(story_items)
+        _buf.seek(0)
+        from pypdf import PdfReader as _PR
+        return len(_PR(_buf).pages)
+
+    import copy
+    _total = _contar_paginas(copy.copy(story), doc)
+
+    def _draw_page_nm(canvas_obj, doc_obj):
+        from reportlab.lib.pagesizes import A4 as _A4
+        from reportlab.lib import colors as _c
+        _W, _H = _A4
+        canvas_obj.saveState()
+        canvas_obj.setFillColor(_c.HexColor("#F4F6F8"))
+        canvas_obj.rect(0, 0, _W, 1.2*st["cm"], fill=1, stroke=0)
+        canvas_obj.setStrokeColor(_c.HexColor("#BDC3C7"))
+        canvas_obj.line(0, 1.2*st["cm"], _W, 1.2*st["cm"])
+        canvas_obj.setFont("Helvetica", 7)
+        canvas_obj.setFillColor(_c.HexColor("#7F8C8D"))
+        canvas_obj.drawString(2*st["cm"], 0.42*st["cm"],
+            "Sistema de Gestion - Imprenta Tucan  |  " + st["hoy"].strftime("%d/%m/%Y"))
+        canvas_obj.setFont("Helvetica-Bold", 8)
+        canvas_obj.setFillColor(_c.HexColor("#1E3A5F"))
+        canvas_obj.drawRightString(_W - 2*st["cm"], 0.42*st["cm"],
+            "Pagina " + str(doc_obj.page) + " de " + str(_total))
+        canvas_obj.restoreState()
+
+    from reportlab.platypus import BaseDocTemplate, PageTemplate, Frame
+    from reportlab.lib.pagesizes import A4 as _A42
+    from reportlab.lib.units import cm as _cm2
+    _W2, _H2 = _A42
+    _frame2 = Frame(2*_cm2, 1.5*_cm2, _W2-4*_cm2, _H2-3*_cm2,
+        leftPadding=0, rightPadding=0, topPadding=0, bottomPadding=0, id="main")
+    _tpl2 = PageTemplate(id="main", frames=[_frame2], onPage=_draw_page_nm)
+    from io import BytesIO as _BytesIO2
+    buffer = _BytesIO2()
+    _doc_final = BaseDocTemplate(buffer, pagesize=_A42,
+        pageTemplates=[_tpl2],
+        title=st["titulo_inf"] + " - Imprenta Tucan")
+    _doc_final.build(story)
     return _pdf_response(buffer, "informe_pedidos", request)
 
 
@@ -749,7 +801,58 @@ def informe_pdf_clientes(request):
         img2 = _grafico_torta(tipo_labels, tipo_vals, "Clientes por Tipo")
         story.append(_img_flowable(img2, 9, 6))
     hr2, firma = _pdf_firma(st, usuario); story += [hr2, firma]
-    doc.build(story)
+    # Dos pasadas para obtener total de paginas
+    def _contar_paginas(story_items, doc_obj):
+        from io import BytesIO as _BytesIO
+        from reportlab.platypus import BaseDocTemplate, PageTemplate, Frame
+        from reportlab.lib.pagesizes import A4 as _A4
+        from reportlab.lib.units import cm as _cm
+        _W, _H = _A4
+        _buf = _BytesIO()
+        _frame = Frame(2*_cm, 1.5*_cm, _W-4*_cm, _H-3*_cm,
+            leftPadding=0, rightPadding=0, topPadding=0, bottomPadding=0)
+        _tpl = PageTemplate(id="cnt", frames=[_frame], onPage=lambda c,d: None)
+        _doc2 = BaseDocTemplate(_buf, pagesize=_A4, pageTemplates=[_tpl])
+        _doc2.build(story_items)
+        _buf.seek(0)
+        from pypdf import PdfReader as _PR
+        return len(_PR(_buf).pages)
+
+    import copy
+    _total = _contar_paginas(copy.copy(story), doc)
+
+    def _draw_page_nm(canvas_obj, doc_obj):
+        from reportlab.lib.pagesizes import A4 as _A4
+        from reportlab.lib import colors as _c
+        _W, _H = _A4
+        canvas_obj.saveState()
+        canvas_obj.setFillColor(_c.HexColor("#F4F6F8"))
+        canvas_obj.rect(0, 0, _W, 1.2*st["cm"], fill=1, stroke=0)
+        canvas_obj.setStrokeColor(_c.HexColor("#BDC3C7"))
+        canvas_obj.line(0, 1.2*st["cm"], _W, 1.2*st["cm"])
+        canvas_obj.setFont("Helvetica", 7)
+        canvas_obj.setFillColor(_c.HexColor("#7F8C8D"))
+        canvas_obj.drawString(2*st["cm"], 0.42*st["cm"],
+            "Sistema de Gestion - Imprenta Tucan  |  " + st["hoy"].strftime("%d/%m/%Y"))
+        canvas_obj.setFont("Helvetica-Bold", 8)
+        canvas_obj.setFillColor(_c.HexColor("#1E3A5F"))
+        canvas_obj.drawRightString(_W - 2*st["cm"], 0.42*st["cm"],
+            "Pagina " + str(doc_obj.page) + " de " + str(_total))
+        canvas_obj.restoreState()
+
+    from reportlab.platypus import BaseDocTemplate, PageTemplate, Frame
+    from reportlab.lib.pagesizes import A4 as _A42
+    from reportlab.lib.units import cm as _cm2
+    _W2, _H2 = _A42
+    _frame2 = Frame(2*_cm2, 1.5*_cm2, _W2-4*_cm2, _H2-3*_cm2,
+        leftPadding=0, rightPadding=0, topPadding=0, bottomPadding=0, id="main")
+    _tpl2 = PageTemplate(id="main", frames=[_frame2], onPage=_draw_page_nm)
+    from io import BytesIO as _BytesIO2
+    buffer = _BytesIO2()
+    _doc_final = BaseDocTemplate(buffer, pagesize=_A42,
+        pageTemplates=[_tpl2],
+        title=st["titulo_inf"] + " - Imprenta Tucan")
+    _doc_final.build(story)
     return _pdf_response(buffer, "informe_clientes", request)
 
 
@@ -790,7 +893,58 @@ def informe_pdf_productos(request):
         img = _grafico_barras(prod_nombres, prod_vals, "Top Productos por Ingresos ($)", "#8E44AD")
         story.append(_img_flowable(img, 15, 5))
     hr2, firma = _pdf_firma(st, usuario); story += [hr2, firma]
-    doc.build(story)
+    # Dos pasadas para obtener total de paginas
+    def _contar_paginas(story_items, doc_obj):
+        from io import BytesIO as _BytesIO
+        from reportlab.platypus import BaseDocTemplate, PageTemplate, Frame
+        from reportlab.lib.pagesizes import A4 as _A4
+        from reportlab.lib.units import cm as _cm
+        _W, _H = _A4
+        _buf = _BytesIO()
+        _frame = Frame(2*_cm, 1.5*_cm, _W-4*_cm, _H-3*_cm,
+            leftPadding=0, rightPadding=0, topPadding=0, bottomPadding=0)
+        _tpl = PageTemplate(id="cnt", frames=[_frame], onPage=lambda c,d: None)
+        _doc2 = BaseDocTemplate(_buf, pagesize=_A4, pageTemplates=[_tpl])
+        _doc2.build(story_items)
+        _buf.seek(0)
+        from pypdf import PdfReader as _PR
+        return len(_PR(_buf).pages)
+
+    import copy
+    _total = _contar_paginas(copy.copy(story), doc)
+
+    def _draw_page_nm(canvas_obj, doc_obj):
+        from reportlab.lib.pagesizes import A4 as _A4
+        from reportlab.lib import colors as _c
+        _W, _H = _A4
+        canvas_obj.saveState()
+        canvas_obj.setFillColor(_c.HexColor("#F4F6F8"))
+        canvas_obj.rect(0, 0, _W, 1.2*st["cm"], fill=1, stroke=0)
+        canvas_obj.setStrokeColor(_c.HexColor("#BDC3C7"))
+        canvas_obj.line(0, 1.2*st["cm"], _W, 1.2*st["cm"])
+        canvas_obj.setFont("Helvetica", 7)
+        canvas_obj.setFillColor(_c.HexColor("#7F8C8D"))
+        canvas_obj.drawString(2*st["cm"], 0.42*st["cm"],
+            "Sistema de Gestion - Imprenta Tucan  |  " + st["hoy"].strftime("%d/%m/%Y"))
+        canvas_obj.setFont("Helvetica-Bold", 8)
+        canvas_obj.setFillColor(_c.HexColor("#1E3A5F"))
+        canvas_obj.drawRightString(_W - 2*st["cm"], 0.42*st["cm"],
+            "Pagina " + str(doc_obj.page) + " de " + str(_total))
+        canvas_obj.restoreState()
+
+    from reportlab.platypus import BaseDocTemplate, PageTemplate, Frame
+    from reportlab.lib.pagesizes import A4 as _A42
+    from reportlab.lib.units import cm as _cm2
+    _W2, _H2 = _A42
+    _frame2 = Frame(2*_cm2, 1.5*_cm2, _W2-4*_cm2, _H2-3*_cm2,
+        leftPadding=0, rightPadding=0, topPadding=0, bottomPadding=0, id="main")
+    _tpl2 = PageTemplate(id="main", frames=[_frame2], onPage=_draw_page_nm)
+    from io import BytesIO as _BytesIO2
+    buffer = _BytesIO2()
+    _doc_final = BaseDocTemplate(buffer, pagesize=_A42,
+        pageTemplates=[_tpl2],
+        title=st["titulo_inf"] + " - Imprenta Tucan")
+    _doc_final.build(story)
     return _pdf_response(buffer, "informe_productos", request)
 
 
@@ -831,7 +985,58 @@ def informe_pdf_proveedores(request):
         img = _grafico_barras(prov_nombres, prov_vals, "Top 10 Proveedores por Cantidad de Insumos", "#E67E22")
         story.append(_img_flowable(img, 15, 5))
     hr2, firma = _pdf_firma(st, usuario); story += [hr2, firma]
-    doc.build(story)
+    # Dos pasadas para obtener total de paginas
+    def _contar_paginas(story_items, doc_obj):
+        from io import BytesIO as _BytesIO
+        from reportlab.platypus import BaseDocTemplate, PageTemplate, Frame
+        from reportlab.lib.pagesizes import A4 as _A4
+        from reportlab.lib.units import cm as _cm
+        _W, _H = _A4
+        _buf = _BytesIO()
+        _frame = Frame(2*_cm, 1.5*_cm, _W-4*_cm, _H-3*_cm,
+            leftPadding=0, rightPadding=0, topPadding=0, bottomPadding=0)
+        _tpl = PageTemplate(id="cnt", frames=[_frame], onPage=lambda c,d: None)
+        _doc2 = BaseDocTemplate(_buf, pagesize=_A4, pageTemplates=[_tpl])
+        _doc2.build(story_items)
+        _buf.seek(0)
+        from pypdf import PdfReader as _PR
+        return len(_PR(_buf).pages)
+
+    import copy
+    _total = _contar_paginas(copy.copy(story), doc)
+
+    def _draw_page_nm(canvas_obj, doc_obj):
+        from reportlab.lib.pagesizes import A4 as _A4
+        from reportlab.lib import colors as _c
+        _W, _H = _A4
+        canvas_obj.saveState()
+        canvas_obj.setFillColor(_c.HexColor("#F4F6F8"))
+        canvas_obj.rect(0, 0, _W, 1.2*st["cm"], fill=1, stroke=0)
+        canvas_obj.setStrokeColor(_c.HexColor("#BDC3C7"))
+        canvas_obj.line(0, 1.2*st["cm"], _W, 1.2*st["cm"])
+        canvas_obj.setFont("Helvetica", 7)
+        canvas_obj.setFillColor(_c.HexColor("#7F8C8D"))
+        canvas_obj.drawString(2*st["cm"], 0.42*st["cm"],
+            "Sistema de Gestion - Imprenta Tucan  |  " + st["hoy"].strftime("%d/%m/%Y"))
+        canvas_obj.setFont("Helvetica-Bold", 8)
+        canvas_obj.setFillColor(_c.HexColor("#1E3A5F"))
+        canvas_obj.drawRightString(_W - 2*st["cm"], 0.42*st["cm"],
+            "Pagina " + str(doc_obj.page) + " de " + str(_total))
+        canvas_obj.restoreState()
+
+    from reportlab.platypus import BaseDocTemplate, PageTemplate, Frame
+    from reportlab.lib.pagesizes import A4 as _A42
+    from reportlab.lib.units import cm as _cm2
+    _W2, _H2 = _A42
+    _frame2 = Frame(2*_cm2, 1.5*_cm2, _W2-4*_cm2, _H2-3*_cm2,
+        leftPadding=0, rightPadding=0, topPadding=0, bottomPadding=0, id="main")
+    _tpl2 = PageTemplate(id="main", frames=[_frame2], onPage=_draw_page_nm)
+    from io import BytesIO as _BytesIO2
+    buffer = _BytesIO2()
+    _doc_final = BaseDocTemplate(buffer, pagesize=_A42,
+        pageTemplates=[_tpl2],
+        title=st["titulo_inf"] + " - Imprenta Tucan")
+    _doc_final.build(story)
     return _pdf_response(buffer, "informe_proveedores", request)
 
 
@@ -883,7 +1088,58 @@ def informe_pdf_insumos(request):
         img2 = _grafico_barras(ins_nombres, ins_vals, "Insumos con Menos Stock", "#E74C3C")
         story.append(_img_flowable(img2, 15, 5))
     hr2, firma = _pdf_firma(st, usuario); story += [hr2, firma]
-    doc.build(story)
+    # Dos pasadas para obtener total de paginas
+    def _contar_paginas(story_items, doc_obj):
+        from io import BytesIO as _BytesIO
+        from reportlab.platypus import BaseDocTemplate, PageTemplate, Frame
+        from reportlab.lib.pagesizes import A4 as _A4
+        from reportlab.lib.units import cm as _cm
+        _W, _H = _A4
+        _buf = _BytesIO()
+        _frame = Frame(2*_cm, 1.5*_cm, _W-4*_cm, _H-3*_cm,
+            leftPadding=0, rightPadding=0, topPadding=0, bottomPadding=0)
+        _tpl = PageTemplate(id="cnt", frames=[_frame], onPage=lambda c,d: None)
+        _doc2 = BaseDocTemplate(_buf, pagesize=_A4, pageTemplates=[_tpl])
+        _doc2.build(story_items)
+        _buf.seek(0)
+        from pypdf import PdfReader as _PR
+        return len(_PR(_buf).pages)
+
+    import copy
+    _total = _contar_paginas(copy.copy(story), doc)
+
+    def _draw_page_nm(canvas_obj, doc_obj):
+        from reportlab.lib.pagesizes import A4 as _A4
+        from reportlab.lib import colors as _c
+        _W, _H = _A4
+        canvas_obj.saveState()
+        canvas_obj.setFillColor(_c.HexColor("#F4F6F8"))
+        canvas_obj.rect(0, 0, _W, 1.2*st["cm"], fill=1, stroke=0)
+        canvas_obj.setStrokeColor(_c.HexColor("#BDC3C7"))
+        canvas_obj.line(0, 1.2*st["cm"], _W, 1.2*st["cm"])
+        canvas_obj.setFont("Helvetica", 7)
+        canvas_obj.setFillColor(_c.HexColor("#7F8C8D"))
+        canvas_obj.drawString(2*st["cm"], 0.42*st["cm"],
+            "Sistema de Gestion - Imprenta Tucan  |  " + st["hoy"].strftime("%d/%m/%Y"))
+        canvas_obj.setFont("Helvetica-Bold", 8)
+        canvas_obj.setFillColor(_c.HexColor("#1E3A5F"))
+        canvas_obj.drawRightString(_W - 2*st["cm"], 0.42*st["cm"],
+            "Pagina " + str(doc_obj.page) + " de " + str(_total))
+        canvas_obj.restoreState()
+
+    from reportlab.platypus import BaseDocTemplate, PageTemplate, Frame
+    from reportlab.lib.pagesizes import A4 as _A42
+    from reportlab.lib.units import cm as _cm2
+    _W2, _H2 = _A42
+    _frame2 = Frame(2*_cm2, 1.5*_cm2, _W2-4*_cm2, _H2-3*_cm2,
+        leftPadding=0, rightPadding=0, topPadding=0, bottomPadding=0, id="main")
+    _tpl2 = PageTemplate(id="main", frames=[_frame2], onPage=_draw_page_nm)
+    from io import BytesIO as _BytesIO2
+    buffer = _BytesIO2()
+    _doc_final = BaseDocTemplate(buffer, pagesize=_A42,
+        pageTemplates=[_tpl2],
+        title=st["titulo_inf"] + " - Imprenta Tucan")
+    _doc_final.build(story)
     return _pdf_response(buffer, "informe_insumos", request)
 
 
@@ -947,5 +1203,56 @@ def informe_pdf_compras(request):
         img2 = _grafico_barras(mov_labels, mov_vals, "Movimientos de Stock por Tipo", "#1E3A5F")
         story.append(_img_flowable(img2, 12, 4))
     hr2, firma = _pdf_firma(st, usuario); story += [hr2, firma]
-    doc.build(story)
+    # Dos pasadas para obtener total de paginas
+    def _contar_paginas(story_items, doc_obj):
+        from io import BytesIO as _BytesIO
+        from reportlab.platypus import BaseDocTemplate, PageTemplate, Frame
+        from reportlab.lib.pagesizes import A4 as _A4
+        from reportlab.lib.units import cm as _cm
+        _W, _H = _A4
+        _buf = _BytesIO()
+        _frame = Frame(2*_cm, 1.5*_cm, _W-4*_cm, _H-3*_cm,
+            leftPadding=0, rightPadding=0, topPadding=0, bottomPadding=0)
+        _tpl = PageTemplate(id="cnt", frames=[_frame], onPage=lambda c,d: None)
+        _doc2 = BaseDocTemplate(_buf, pagesize=_A4, pageTemplates=[_tpl])
+        _doc2.build(story_items)
+        _buf.seek(0)
+        from pypdf import PdfReader as _PR
+        return len(_PR(_buf).pages)
+
+    import copy
+    _total = _contar_paginas(copy.copy(story), doc)
+
+    def _draw_page_nm(canvas_obj, doc_obj):
+        from reportlab.lib.pagesizes import A4 as _A4
+        from reportlab.lib import colors as _c
+        _W, _H = _A4
+        canvas_obj.saveState()
+        canvas_obj.setFillColor(_c.HexColor("#F4F6F8"))
+        canvas_obj.rect(0, 0, _W, 1.2*st["cm"], fill=1, stroke=0)
+        canvas_obj.setStrokeColor(_c.HexColor("#BDC3C7"))
+        canvas_obj.line(0, 1.2*st["cm"], _W, 1.2*st["cm"])
+        canvas_obj.setFont("Helvetica", 7)
+        canvas_obj.setFillColor(_c.HexColor("#7F8C8D"))
+        canvas_obj.drawString(2*st["cm"], 0.42*st["cm"],
+            "Sistema de Gestion - Imprenta Tucan  |  " + st["hoy"].strftime("%d/%m/%Y"))
+        canvas_obj.setFont("Helvetica-Bold", 8)
+        canvas_obj.setFillColor(_c.HexColor("#1E3A5F"))
+        canvas_obj.drawRightString(_W - 2*st["cm"], 0.42*st["cm"],
+            "Pagina " + str(doc_obj.page) + " de " + str(_total))
+        canvas_obj.restoreState()
+
+    from reportlab.platypus import BaseDocTemplate, PageTemplate, Frame
+    from reportlab.lib.pagesizes import A4 as _A42
+    from reportlab.lib.units import cm as _cm2
+    _W2, _H2 = _A42
+    _frame2 = Frame(2*_cm2, 1.5*_cm2, _W2-4*_cm2, _H2-3*_cm2,
+        leftPadding=0, rightPadding=0, topPadding=0, bottomPadding=0, id="main")
+    _tpl2 = PageTemplate(id="main", frames=[_frame2], onPage=_draw_page_nm)
+    from io import BytesIO as _BytesIO2
+    buffer = _BytesIO2()
+    _doc_final = BaseDocTemplate(buffer, pagesize=_A42,
+        pageTemplates=[_tpl2],
+        title=st["titulo_inf"] + " - Imprenta Tucan")
+    _doc_final.build(story)
     return _pdf_response(buffer, "informe_compras", request)
