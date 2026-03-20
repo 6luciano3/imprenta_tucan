@@ -2,12 +2,16 @@
 {% block title %}Lista de Clientes{% endblock %}
 
 {% block list_actions_right %}
-  <a href="{% url 'reporte_clientes_frecuentes' %}"
-     class="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg shadow hover:bg-blue-700"
-     title="Ver reporte de clientes frecuentes">
-    <span class="material-symbols-outlined">description</span>
-    Reporte
-  </a>
+  <div class="flex gap-2">
+    <a href="{% url 'estadisticas:informe_pdf_clientes' %}" target="_blank"
+       class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-semibold shadow-sm">
+      <span class="material-symbols-outlined text-base">picture_as_pdf</span> PDF
+    </a>
+    <a href="{% url 'estadisticas:informe_pdf_clientes' %}"
+       class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gray-700 hover:bg-gray-800 text-white text-sm font-semibold shadow-sm">
+      <span class="material-symbols-outlined text-base">download</span> Descargar
+    </a>
+  </div>
 {% endblock %}
 
 {% block extra_head %}

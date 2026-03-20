@@ -8,9 +8,110 @@
       Estadistica
     </h1>
   </div>
-  <button onclick="imprimirPDF()" class="no-print inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-semibold">
-    <span class="material-symbols-outlined text-base">picture_as_pdf</span> Imprimir PDF
-  </button>
+  <div class="no-print flex gap-2 items-center">
+    <button onclick="imprimirPDF()" class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gray-600 hover:bg-gray-700 text-white text-sm font-semibold">
+      <span class="material-symbols-outlined text-base">print</span> Imprimir
+    </button>
+    <div class="relative" id="pdf-dropdown-wrapper">
+      <button onclick="toggleDropdown()" class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-semibold">
+        <span class="material-symbols-outlined text-base">picture_as_pdf</span> Informes PDF
+        <span class="material-symbols-outlined text-sm">expand_more</span>
+      </button>
+      <div id="pdf-dropdown" class="hidden absolute right-0 mt-1 w-64 bg-white rounded-xl shadow-lg border border-gray-200 z-50 overflow-hidden">
+        <div class="px-3 py-2 bg-gray-50 border-b border-gray-100">
+          <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Informes PDF</p>
+        </div>
+        <div class="px-3 py-1.5 bg-gray-50 border-b border-gray-100 grid grid-cols-2 gap-1">
+          <span class="text-xs text-gray-400 text-center">Ver</span>
+          <span class="text-xs text-gray-400 text-center">Descargar</span>
+        </div>
+        <div class="grid grid-cols-2 border-b border-gray-100">
+          <a href="{% url 'estadisticas:informe_pdf_pedidos' %}" target="_blank"
+             class="flex items-center justify-center gap-1 px-2 py-2.5 hover:bg-blue-50 text-sm text-gray-700 border-r border-gray-100"
+             title="Ver Pedidos">
+            <span class="material-symbols-outlined text-base text-blue-600">visibility</span>
+            <span class="text-xs">Pedidos</span>
+          </a>
+          <a href="{% url 'estadisticas:informe_pdf_pedidos' %}?download=1"
+             class="flex items-center justify-center gap-1 px-2 py-2.5 hover:bg-green-50 text-sm text-gray-700"
+             title="Descargar Pedidos">
+            <span class="material-symbols-outlined text-base text-gray-500">download</span>
+            <span class="text-xs">Bajar</span>
+          </a>
+        </div>
+        <div class="grid grid-cols-2 border-b border-gray-100">
+          <a href="{% url 'estadisticas:informe_pdf_clientes' %}" target="_blank"
+             class="flex items-center justify-center gap-1 px-2 py-2.5 hover:bg-blue-50 text-sm text-gray-700 border-r border-gray-100"
+             title="Ver Clientes">
+            <span class="material-symbols-outlined text-base text-green-600">visibility</span>
+            <span class="text-xs">Clientes</span>
+          </a>
+          <a href="{% url 'estadisticas:informe_pdf_clientes' %}?download=1"
+             class="flex items-center justify-center gap-1 px-2 py-2.5 hover:bg-green-50 text-sm text-gray-700"
+             title="Descargar Clientes">
+            <span class="material-symbols-outlined text-base text-gray-500">download</span>
+            <span class="text-xs">Bajar</span>
+          </a>
+        </div>
+        <div class="grid grid-cols-2 border-b border-gray-100">
+          <a href="{% url 'estadisticas:informe_pdf_productos' %}" target="_blank"
+             class="flex items-center justify-center gap-1 px-2 py-2.5 hover:bg-blue-50 text-sm text-gray-700 border-r border-gray-100"
+             title="Ver Productos">
+            <span class="material-symbols-outlined text-base text-purple-600">visibility</span>
+            <span class="text-xs">Productos</span>
+          </a>
+          <a href="{% url 'estadisticas:informe_pdf_productos' %}?download=1"
+             class="flex items-center justify-center gap-1 px-2 py-2.5 hover:bg-green-50 text-sm text-gray-700"
+             title="Descargar Productos">
+            <span class="material-symbols-outlined text-base text-gray-500">download</span>
+            <span class="text-xs">Bajar</span>
+          </a>
+        </div>
+        <div class="grid grid-cols-2 border-b border-gray-100">
+          <a href="{% url 'estadisticas:informe_pdf_proveedores' %}" target="_blank"
+             class="flex items-center justify-center gap-1 px-2 py-2.5 hover:bg-blue-50 text-sm text-gray-700 border-r border-gray-100"
+             title="Ver Proveedores">
+            <span class="material-symbols-outlined text-base text-orange-600">visibility</span>
+            <span class="text-xs">Proveedores</span>
+          </a>
+          <a href="{% url 'estadisticas:informe_pdf_proveedores' %}?download=1"
+             class="flex items-center justify-center gap-1 px-2 py-2.5 hover:bg-green-50 text-sm text-gray-700"
+             title="Descargar Proveedores">
+            <span class="material-symbols-outlined text-base text-gray-500">download</span>
+            <span class="text-xs">Bajar</span>
+          </a>
+        </div>
+        <div class="grid grid-cols-2 border-b border-gray-100">
+          <a href="{% url 'estadisticas:informe_pdf_insumos' %}" target="_blank"
+             class="flex items-center justify-center gap-1 px-2 py-2.5 hover:bg-blue-50 text-sm text-gray-700 border-r border-gray-100"
+             title="Ver Insumos">
+            <span class="material-symbols-outlined text-base text-teal-600">visibility</span>
+            <span class="text-xs">Insumos</span>
+          </a>
+          <a href="{% url 'estadisticas:informe_pdf_insumos' %}?download=1"
+             class="flex items-center justify-center gap-1 px-2 py-2.5 hover:bg-green-50 text-sm text-gray-700"
+             title="Descargar Insumos">
+            <span class="material-symbols-outlined text-base text-gray-500">download</span>
+            <span class="text-xs">Bajar</span>
+          </a>
+        </div>
+        <div class="grid grid-cols-2">
+          <a href="{% url 'estadisticas:informe_pdf_compras' %}" target="_blank"
+             class="flex items-center justify-center gap-1 px-2 py-2.5 hover:bg-blue-50 text-sm text-gray-700 border-r border-gray-100"
+             title="Ver Compras">
+            <span class="material-symbols-outlined text-base text-red-600">visibility</span>
+            <span class="text-xs">Compras</span>
+          </a>
+          <a href="{% url 'estadisticas:informe_pdf_compras' %}?download=1"
+             class="flex items-center justify-center gap-1 px-2 py-2.5 hover:bg-green-50 text-sm text-gray-700"
+             title="Descargar Compras">
+            <span class="material-symbols-outlined text-base text-gray-500">download</span>
+            <span class="text-xs">Bajar</span>
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <div class="flex flex-wrap gap-2 mb-6">
@@ -317,6 +418,18 @@ function fmt(val) {
 }
 
 document.addEventListener("DOMContentLoaded", () => cargarModulo("clientes"));
+
+
+function toggleDropdown() {
+  const dd = document.getElementById("pdf-dropdown");
+  dd.classList.toggle("hidden");
+}
+document.addEventListener("click", function(e) {
+  const wrapper = document.getElementById("pdf-dropdown-wrapper");
+  if (wrapper && !wrapper.contains(e.target)) {
+    document.getElementById("pdf-dropdown").classList.add("hidden");
+  }
+});
 
 function imprimirPDF() {
   const titulo = moduloActivo ? moduloActivo.charAt(0).toUpperCase() + moduloActivo.slice(1) : "Estadistica";

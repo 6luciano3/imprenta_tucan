@@ -6,6 +6,16 @@
     <span class="material-symbols-outlined text-blue-600">package_2</span>
     Gestión de Compras
   </h1>
+  <div class="flex gap-2">
+    <a href="{% url 'estadisticas:informe_pdf_compras' %}" target="_blank"
+       class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-semibold shadow-sm">
+      <span class="material-symbols-outlined text-base">picture_as_pdf</span> PDF
+    </a>
+    <a href="{% url 'estadisticas:informe_pdf_compras' %}" download
+       class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gray-700 hover:bg-gray-800 text-white text-sm font-semibold shadow-sm">
+      <span class="material-symbols-outlined text-base">download</span> Descargar
+    </a>
+  </div>
   <p class="text-gray-500 text-sm mt-1">Administrá órdenes, remitos y precios de insumos desde un solo lugar.</p>
 </div>
 

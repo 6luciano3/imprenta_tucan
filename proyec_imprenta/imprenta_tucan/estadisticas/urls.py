@@ -18,4 +18,10 @@ urlpatterns = [
     path("api/descriptiva/presupuestos/", views.api_estadistica_presupuestos, name="api_desc_presupuestos"),
     path("api/descriptiva/proveedores/", views.api_estadistica_proveedores, name="api_desc_proveedores"),
     path("api/descriptiva/compras/", views.api_estadistica_compras, name="api_desc_compras"),
+    path('informe-pdf/pedidos/', views.informe_pdf_pedidos, name='informe_pdf_pedidos'),
+    path('informe-pdf/clientes/', views.informe_pdf_clientes, name='informe_pdf_clientes'),
+    path('informe-pdf/productos/', views.informe_pdf_productos, name='informe_pdf_productos'),
+    path('informe-pdf/proveedores/', views.informe_pdf_proveedores, name='informe_pdf_proveedores'),
+    path('informe-pdf/insumos/', views.informe_pdf_insumos, name='informe_pdf_insumos'),
+    path('informe-pdf/compras/', views.informe_pdf_compras, name='informe_pdf_compras'),
 ]
