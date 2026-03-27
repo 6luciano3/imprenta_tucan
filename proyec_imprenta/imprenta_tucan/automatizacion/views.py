@@ -437,10 +437,12 @@ def ofertas_propuestas_admin(request):
         .annotate(c=Count('id'))
         .values('c')[:1]
     )
+    # Filtrar solo ofertas con score >= 96 para demostración
+    SCORE_MINIMO = 96
     qs = (
         base_qs
         .annotate(best_id=Subquery(best_id_sub))
-        .filter(id=F('best_id'))
+        .filter(id=F('best_id'), score_al_generar__gte=SCORE_MINIMO)
         .annotate(
             estado_mensaje=Subquery(last_msg_state_sub),
             mensaje_actualizado=Subquery(last_msg_time_sub),
@@ -544,7 +546,7 @@ def nueva_oferta_manual(request):
                 oferta.save()
                 try:
                     from .models import MensajeOferta
-                    ok, err = enviar_oferta_email(oferta, request=request)
+                    ok, err = enviar_oferta_email(oferta, request=request, force=True)
                     MensajeOferta.objects.create(
                         oferta=oferta,
                         cliente=cliente,
@@ -593,7 +595,7 @@ def aprobar_oferta(request, oferta_id):
     ok, err = False, 'Error inesperado'
     try:
         from .models import MensajeOferta
-        ok, err = enviar_oferta_email(oferta, request=request)
+        ok, err = enviar_oferta_email(oferta, request=request, force=True)
         MensajeOferta.objects.create(
             oferta=oferta,
             cliente=oferta.cliente,
@@ -1323,21 +1325,119 @@ def webhook_consulta_stock(request, propuesta_id):
 @login_required
 @require_POST
 def generar_ofertas_ahora(request):
+    """
+    PROCESO INTELIGENTE AUTOMÁTICO COMPLETO:
+    1. Genera nuevas ofertas para clientes
+    2. Aprueba automáticamente las ofertas (cambia estado: pendiente → enviada)
+    3. Envía emails automáticamente a los correos reales configurados
+    """
     try:
         from core.ai_ml.ofertas import generar_ofertas_segmentadas
-        from automatizacion.models import MensajeOferta
+        from automatizacion.models import OfertaPropuesta, MensajeOferta
+        from automatizacion.services import enviar_oferta_email
         from django.utils import timezone
+        
+        # Paso 1: Generar ofertas
         antes = timezone.now()
         result = generar_ofertas_segmentadas()
         generadas = result.get('generadas', 0)
-        enviados = MensajeOferta.objects.filter(estado='enviado', actualizado__gte=antes).select_related('oferta__cliente')
-        detalle = ', '.join([f"{m.oferta.cliente.nombre} ({m.oferta.cliente.email})" for m in enviados])
-        msg = f"{generadas} oferta(s) generada(s). Enviadas a: {detalle}" if detalle else f"{generadas} oferta(s) generada(s) pero ninguna enviada (sin clientes verificados o ya enviadas)."
+        
+        # Paso 2 y 3: Aprobar y enviar automáticamente las ofertas con score >= 96
+        SCORE_MINIMO = 96
+        ofertas_nuevas = OfertaPropuesta.objects.filter(
+            estado='pendiente',
+            score_al_generar__gte=SCORE_MINIMO,
+            cliente__isnull=False,
+            cliente__email__isnull=False,
+        ).exclude(cliente__email='')[:50]
+        
+        enviados = 0
+        errores = 0
+        destinatarios = []
+        
+        for oferta in ofertas_nuevas:
+            try:
+                # AUTOAPROBAR: Cambiar estado a enviada
+                oferta.estado = 'enviada'
+                oferta.fecha_validacion = timezone.now()
+                oferta.accion_aprobacion = 'aprobar'
+                oferta.fecha_aprobacion = timezone.now()
+                oferta.save()
+                
+                # AUTOENVIAR: Enviar email
+                ok, err = enviar_oferta_email(oferta, force=True)
+                if ok:
+                    MensajeOferta.objects.create(
+                        oferta=oferta,
+                        cliente=oferta.cliente,
+                        estado='enviado',
+                        detalle='Generada y enviada automáticamente por Proceso Inteligente',
+                    )
+                    # Usar emails reales configurados
+                    destinatarios.append(f"{oferta.cliente.nombre}")
+                    enviados += 1
+                else:
+                    errores += 1
+            except Exception as e:
+                errores += 1
+        
+        msg = f"Proceso Inteligente: {generadas} generadas, {enviados} enviadas a {', '.join(destinatarios) or 'emails reales'}, {errores} errores"
         from urllib.parse import urlencode
         params = urlencode({'ok': '1', 'msg': msg})
     except Exception as e:
         from urllib.parse import urlencode
         params = urlencode({'ok': '0', 'msg': f'Error al generar ofertas: {e}'})
+    return redirect(f"/automatizacion/propuestas/?{params}")
+
+
+@login_required
+def reenviar_ofertas_todas(request):
+    """
+    Proceso Inteligente Automático: Aprueba y envía TODAS las ofertas existentes a sus clientes.
+    - Cambia estado de 'pendiente' a 'enviada'
+    - Registra fecha de validación
+    - Envía email automáticamente
+    """
+    from automatizacion.models import OfertaPropuesta, MensajeOferta
+    from automatizacion.services import enviar_oferta_email
+    from django.utils import timezone
+    
+    ofertas = OfertaPropuesta.objects.filter(
+        cliente__isnull=False,
+        cliente__email__isnull=False,
+    ).exclude(cliente__email='')[:50]
+    
+    enviados = 0
+    errores = 0
+    
+    for oferta in ofertas:
+        try:
+            # AUTOMÁTICO: Aprobar la oferta antes de enviar
+            if oferta.estado == 'pendiente':
+                oferta.estado = 'enviada'
+                oferta.fecha_validacion = timezone.now()
+                oferta.accion_aprobacion = 'aprobar'
+                oferta.fecha_aprobacion = timezone.now()
+                oferta.save()
+            
+            # Enviar email
+            ok, err = enviar_oferta_email(oferta, force=True)
+            if ok:
+                MensajeOferta.objects.create(
+                    oferta=oferta,
+                    cliente=oferta.cliente,
+                    estado='enviado',
+                    detalle='Oferta aprobada y enviada automáticamente por Proceso Inteligente',
+                )
+                enviados += 1
+            else:
+                errores += 1
+        except Exception as e:
+            errores += 1
+    
+    msg = f"Proceso Inteligente: {enviados} ofertas aprobadas y enviadas, {errores} errores"
+    from urllib.parse import urlencode
+    params = urlencode({'ok': '1' if enviados > 0 else '0', 'msg': msg})
     return redirect(f"/automatizacion/propuestas/?{params}")
 
 

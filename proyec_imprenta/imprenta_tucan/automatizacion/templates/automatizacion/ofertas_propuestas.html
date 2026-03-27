@@ -28,12 +28,12 @@
     </div>
     {% endif %}
 
-    <div class="mb-4 flex justify-end">
+    <div class="mb-4 flex justify-end gap-2">
         <form method="post" action="/automatizacion/generar-ofertas-ahora/">
             {% csrf_token %}
-            <button type="submit" class="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-5 rounded-lg shadow">
-                <span class="material-symbols-outlined text-sm">send</span>
-                Generar y enviar ofertas ahora
+            <button type="submit" class="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-5 rounded-lg shadow">
+                <span class="material-symbols-outlined text-sm">auto_awesome</span>
+                Ejecutar Proceso Inteligente
             </button>
         </form>
     </div>

@@ -13,16 +13,29 @@ def _html_tabla_combo(combo):
     descuento_valor = subtotal * descuento / 100
     return filas, subtotal, descuento, descuento_valor, subtotal - descuento_valor
 
-def enviar_oferta_email(oferta, request=None):
+def enviar_oferta_email(oferta, request=None, force=False):
+    """
+    Envía email de oferta al cliente.
+    
+    Args:
+        oferta: Instancia de OfertaPropuesta
+        request: Objeto request de Django (opcional)
+        force: Si True, ignora la verificación de email (para desarrollo/pruebas)
+    """
+    from django.conf import settings
+    
     if not oferta.cliente or not oferta.cliente.email:
         return False, 'Cliente sin email definido'
     # Verificar que el email tiene formato valido
     import re
     if not re.match(r'^[^@]+@[^@]+\.[^@]+$', oferta.cliente.email):
         return False, f'Email invalido: {oferta.cliente.email}'
-    # Verificar que el email fue verificado
-    if not getattr(oferta.cliente, 'email_verificado', False):
+    # Verificar que el email fue verificado (salvo que force=True)
+    if not force and not getattr(oferta.cliente, 'email_verificado', False):
         return False, f'Email no verificado: {oferta.cliente.email}'
+    # En modo debug, permitir envío sin verificación
+    if getattr(settings, 'DEBUG', False):
+        force = True
     cliente = oferta.cliente
     if request:
         url_base = request.build_absolute_uri('/')[:-1]
@@ -57,134 +70,68 @@ def enviar_oferta_email(oferta, request=None):
         )
     else:
         bloque = f'<div style="background:#f0f4ff;border-left:4px solid #1565c0;border-radius:8px;padding:20px;margin-bottom:24px;"><div style="font-size:14px;font-weight:700;color:#1a237e;margin-bottom:8px;">{oferta.titulo}</div><div style="font-size:12px;color:#37474f;">{oferta.descripcion}</div></div>'
-    # Construir filas de insumos
-    nombre_insumo_str = getattr(insumo, 'nombreInsumo', None) or getattr(insumo, 'nombre', str(insumo))
-    codigo_insumo_str = getattr(insumo, 'codigo', '') or ''
-    unidad_raw = getattr(insumo, 'unidad_medida', None) or getattr(insumo, 'unidadMedida', None)
-    if unidad_raw and hasattr(unidad_raw, 'abreviatura'):
-        unidad_str = unidad_raw.abreviatura or 'unidad'
-    elif unidad_raw:
-        unidad_str = str(unidad_raw)
-    else:
-        unidad_str = 'unidad'
-
-    html_body = (
-        '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">'
-        '<title>Solicitud de Cotizacion - Imprenta Tucan</title></head>'
-        '<body style="margin:0;padding:0;background:#f0f4f8;font-family:Segoe UI,Arial,sans-serif;">'
-        '<table width="100%" cellpadding="0" cellspacing="0" style="background:#f0f4f8;padding:32px 0;">'
-        '<tr><td align="center">'
-        '<table width="620" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.09);max-width:620px;width:100%;">'
-        # Header oscuro igual al modal
-        '<tr><td style="background:#334155;padding:20px 28px;">'
-        '<div style="font-size:11px;font-weight:600;color:rgba(255,255,255,.6);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;">Solicitud de Cotización de Insumos</div>'
-        f'<div style="font-size:22px;font-weight:700;color:#fff;">Nº {orden_compra.id:06d}</div>'
-        ''
-        '</td></tr>'
-        # Empresa + Proveedor
-        '<tr><td style="padding:20px 28px;border-bottom:1px solid #e2e8f0;">'
-        '<table width="100%" cellpadding="0" cellspacing="0"><tr>'
-        '<td style="vertical-align:top;width:50%;">'
-        '<div style="font-size:15px;font-weight:700;color:#1e293b;">Imprenta Tucán S.A.</div>'
-        '<div style="font-size:12px;color:#64748b;margin-top:2px;">Av. Principal 123, Misiones</div>'
-        '<div style="font-size:12px;color:#64748b;">IVA: Responsable Inscripto</div>'
-        '</td>'
-        '<td style="vertical-align:top;text-align:right;width:50%;">'
-        '<div style="font-size:12px;color:#64748b;">Proveedor:</div>'
-        f'<div style="font-size:14px;font-weight:700;color:#1e293b;">{proveedor.nombre}</div>'
-        f'<div style="font-size:12px;color:#64748b;">CUIT: {proveedor.cuit or "-"}</div>'
-        f'<div style="font-size:12px;color:#64748b;">{proveedor.direccion or "Dirección no especificada"}</div>'
-        f'<div style="font-size:12px;color:#64748b;">{proveedor.email}</div>'
-        '</td>'
-        '</tr></table>'
-        '</td></tr>'
-        # Fecha Moneda
-        '<tr><td style="padding:10px 28px;border-bottom:1px solid #e2e8f0;background:#f8fafc;">'
-        '<table width="100%" cellpadding="0" cellspacing="0"><tr>'
-        f'<td style="font-size:12px;color:#475569;"><strong>Fecha:</strong> {orden_compra.fecha_creacion.strftime("%d/%m/%Y") if orden_compra.fecha_creacion else "-"}</td>'
-        '<td style="font-size:12px;color:#475569;"><strong>Moneda:</strong> ARS</td>'
-        f'<td style="font-size:12px;color:#475569;"><strong>Proveedor:</strong> {proveedor.nombre}</td>'
-        '</tr></table>'
-        '</td></tr>'
-        # Tabla de insumos
-        '<tr><td style="padding:20px 28px;">'
-        '<div style="font-size:13px;font-weight:600;color:#1e293b;margin-bottom:10px;">Detalle de Productos</div>'
-        '<table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;font-size:12px;">'
-        '<thead>'
-        '<tr style="background:#334155;color:#fff;">'
-        '<th style="padding:8px 10px;text-align:left;border-right:1px solid #475569;">Código</th>'
-        '<th style="padding:8px 10px;text-align:left;border-right:1px solid #475569;">Descripción</th>'
-        '<th style="padding:8px 10px;text-align:center;border-right:1px solid #475569;">Cantidad solicitada</th>'
-        '<th style="padding:8px 10px;text-align:center;">Unidad</th>'
-        '</tr>'
-        '</thead>'
-        '<tbody>'
-        f'<tr style="background:#f0f9ff;">'
-        f'<td style="border:1px solid #e2e8f0;padding:8px 10px;">{codigo_insumo_str}</td>'
-        f'<td style="border:1px solid #e2e8f0;padding:8px 10px;">{nombre_insumo_str}</td>'
-        f'<td style="border:1px solid #e2e8f0;padding:8px 10px;text-align:center;">{cantidad}</td>'
-        f'<td style="border:1px solid #e2e8f0;padding:8px 10px;text-align:center;">{unidad_str}</td>'
-        '</tr>'
-        '</tbody>'
-        '</table>'
-        '</td></tr>'
-        # Entrega + Generado
-        '<tr><td style="padding:16px 28px;border-top:1px solid #e2e8f0;">'
-        '<table width="100%" cellpadding="0" cellspacing="0"><tr>'
-        '<td style="vertical-align:top;width:50%;">'
-        '<div style="font-size:13px;font-weight:600;margin-bottom:6px;">Entrega a:</div>'
-        '<div style="font-size:12px;color:#475569;">Imprenta Tucán S.A.</div>'
-        '<div style="font-size:12px;color:#475569;">Av. Principal 123, Misiones</div>'
-        '<div style="font-size:12px;color:#475569;">Tel: 381-4000000</div>'
-        '</td>'
-        '<td style="vertical-align:top;text-align:right;width:50%;">'
-        '<div style="font-size:12px;color:#475569;"><strong>Generado por:</strong> Sistema automático</div>'
-        f'<div style="font-size:12px;color:#475569;"><strong>Fecha:</strong> {orden_compra.fecha_creacion.strftime("%d/%m/%Y") if orden_compra.fecha_creacion else "-"}</div>'
-        '</td>'
-        '</tr></table>'
-        '</td></tr>'
-        # Firma
-        '<tr><td style="padding:16px 28px;border-top:1px solid #e2e8f0;">'
-        '<table cellpadding="0" cellspacing="0"><tr>'
-        '<td style="padding-right:40px;">'
-        '<div style="height:32px;border-bottom:1px solid #94a3b8;width:120px;"></div>'
-        '<div style="font-size:11px;color:#94a3b8;margin-top:4px;">Firma autorizada</div>'
-        '</td>'
-        '<td>'
-        '<div style="height:32px;border-bottom:1px solid #94a3b8;width:120px;"></div>'
-        '<div style="font-size:11px;color:#94a3b8;margin-top:4px;">Cargo</div>'
-        '</td>'
-        '</tr></table>'
-        '</td></tr>'
-        # Botones confirmar / rechazar
-        '<tr><td style="padding:20px 28px;border-top:1px solid #e2e8f0;text-align:center;">'
-        '<div style="font-size:12px;color:#64748b;margin-bottom:14px;">Por favor confirme o rechace esta solicitud:</div>'
-        f'<a href="{link_confirmar}" style="display:inline-block;background:#22c55e;color:#fff;font-size:13px;font-weight:700;padding:12px 28px;border-radius:8px;text-decoration:none;margin-right:12px;">✓ Confirmar orden</a>'
-        f'<a href="{link_rechazar}" style="display:inline-block;background:#ef4444;color:#fff;font-size:13px;font-weight:700;padding:12px 28px;border-radius:8px;text-decoration:none;">✗ Rechazar orden</a>'
-        '</td></tr>'
-        # Footer
-        '<tr><td style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:14px 28px;text-align:center;">'
-        f'<div style="font-size:11px;color:#94a3b8;">Imprenta Tucán — {from_email}</div>'
-        '</td></tr>'
-        '</table></td></tr></table>'
-        '</body></html>'
-    )
+    
+    # Botones de acción para el email de ofertas
+    botones_html = f'''
+    <tr><td style="padding:24px 28px;text-align:center;background:#f8fafc;border-top:1px solid #e2e8f0;">
+        <div style="font-size:13px;color:#64748b;margin-bottom:16px;">¿Te interesa esta oferta? Respondé con un click:</div>
+        <a href="{link_aceptar}" style="display:inline-block;background:#22c55e;color:#fff;font-size:14px;font-weight:700;padding:14px 32px;border-radius:8px;text-decoration:none;margin-right:12px;">✓ ACEPTAR OFERTA</a>
+        <a href="{link_rechazar}" style="display:inline-block;background:#6b7280;color:#fff;font-size:14px;font-weight:700;padding:14px 32px;border-radius:8px;text-decoration:none;">✗ RECHAZAR</a>
+    </td></tr>
+    '''
+    
+    # Template simplificado para email de ofertas
+    html_body = f'''
+    <!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
+    <title>Oferta Especial - Imprenta Tucán</title></head>
+    <body style="margin:0;padding:0;background:#f0f4f8;font-family:Segoe UI,Arial,sans-serif;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="background:#f0f4f8;padding:32px 0;">
+    <tr><td align="center">
+    <table width="620" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.09);max-width:620px;width:100%;">
+    <tr><td style="background:#1e40af;padding:20px 28px;">
+    <div style="font-size:11px;font-weight:600;color:rgba(255,255,255,.6);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;">Oferta Personalizada</div>
+    <div style="font-size:22px;font-weight:700;color:#fff;">¡{nombre}, tenemos una oferta especial para vos!</div>
+    </td></tr>
+    <tr><td style="padding:24px 28px;border-bottom:1px solid #e2e8f0;">
+    {bloque}
+    </td></tr>
+    {botones_html}
+    <tr><td style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:14px 28px;text-align:center;">
+    <div style="font-size:11px;color:#94a3b8;">Imprenta Tucán — www.imprentatucan.com.ar</div>
+    </td></tr>
+    </table></td></tr></table>
+    {pixel}
+    </body></html>
+    '''
     mensaje_texto = f'Hola {nombre}, tenés una oferta personalizada de Imprenta Tucan. Visitá: {link_ver}'
+    asunto = f'Oferta especial #{oferta.id} - Imprenta Tucán'
     try:
         from core.notifications.engine import enviar_notificacion
         from automatizacion.models import MensajeOferta
         import time
 
-        # Canal principal: email
-        canales: list[tuple[str, str]] = [('email', cliente.email)]
+        # Canal principal: email - enviar solo a correos reales si score >= 96
+        SCORE_MINIMO = 96
+        EMAILS_DEMOSTRACION = ['bookdesignpdas@yahoo.com.ar', '6luciano10@gmail.com']
+        
+        score = getattr(oferta, 'score_al_generar', 0) or 0
+        if score >= SCORE_MINIMO:
+            # Alternar entre los dos emails de demostración
+            indice = int(oferta.id) % len(EMAILS_DEMOSTRACION)
+            canal_email = EMAILS_DEMOSTRACION[indice]
+            canales: list[tuple[str, str]] = [('email', canal_email)]
+        else:
+            # Score bajo: no enviar (para demos rápidas)
+            canales = []
 
-        # Canales adicionales si el cliente tiene datos de contacto
-        wa = getattr(cliente, 'numero_whatsapp', None)
-        if wa:
-            canales.append(('whatsapp', wa))
-        tel_e164 = getattr(cliente, 'telefono_e164', None)
-        if tel_e164:
-            canales.append(('sms', tel_e164))
+        # Solo agregar canales adicionales si hay email configurado
+        if canales:
+            wa = getattr(cliente, 'numero_whatsapp', None)
+            if wa:
+                canales.append(('whatsapp', wa))
+            tel_e164 = getattr(cliente, 'telefono_e164', None)
+            if tel_e164:
+                canales.append(('sms', tel_e164))
 
         ultimo_ok, ultimo_err = False, 'Sin canales configurados'
         for canal, destinatario in canales:

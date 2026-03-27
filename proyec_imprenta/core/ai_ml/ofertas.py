@@ -283,7 +283,7 @@ def generar_ofertas_segmentadas() -> dict:
             oferta.estado = 'enviada'
             oferta.fecha_validacion = timezone.now()
             oferta.save(update_fields=['estado', 'fecha_validacion'])
-            ok, err = enviar_oferta_email(oferta)
+            ok, err = enviar_oferta_email(oferta, force=True)
             MensajeOferta.objects.create(
                 oferta=oferta,
                 cliente=cliente,

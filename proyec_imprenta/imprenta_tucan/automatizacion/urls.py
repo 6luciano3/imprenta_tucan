@@ -15,6 +15,7 @@ urlpatterns = [
     path('acciones/pixel/', views.pixel_leido, name='pixel_leido'),
     path('propuestas/<int:oferta_id>/aprobar/', views.aprobar_oferta, name='aprobar_oferta'),
     path('generar-ofertas-ahora/', views.generar_ofertas_ahora, name='generar_ofertas_ahora'),
+    path('reenviar-ofertas/', views.reenviar_ofertas_todas, name='reenviar_ofertas'),
     path('propuestas/<int:oferta_id>/rechazar/', views.rechazar_oferta, name='rechazar_oferta'),
     path('propuestas/<int:oferta_id>/eliminar/', views.eliminar_oferta, name='eliminar_oferta'),
 

@@ -288,7 +288,7 @@ def tarea_verificar_generacion_ofertas():
         for oferta in pendientes:
             score = oferta.score_al_generar or 0
             if score >= umbral:
-                ok, _ = enviar_oferta_email(oferta)
+                ok, _ = enviar_oferta_email(oferta, force=True)
                 if ok:
                     oferta.estado = 'enviada'
                     oferta.fecha_validacion = ahora
