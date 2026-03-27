@@ -1,0 +1,155 @@
+{% extends 'base.html' %}
+{% block title %}Ajuste Masivo de Precios{% endblock %}
+
+{% block content %}
+<div class="mb-6 flex items-center justify-between">
+    <div>
+        <h1 class="text-3xl font-black tracking-tight flex items-center gap-2">
+            <span class="material-symbols-outlined text-blue-600">trending_up</span>
+            Ajuste Masivo de Precios
+        </h1>
+        <p class="text-gray-500">Aumentar o disminuir precios de múltiples insumos a la vez</p>
+    </div>
+    <a href="{% url 'compras:home_compras' %}" class="bg-gray-600 hover:bg-gray-700 text-white font-semibold px-4 py-2 rounded flex items-center gap-2">
+        <span class="material-symbols-outlined">arrow_back</span>
+        Volver
+    </a>
+</div>
+
+{% if messages %}
+{% for message in messages %}
+<div class="mb-4 p-4 rounded-lg {% if message.tags == 'success' %}bg-green-100 border border-green-400 text-green-700{% else %}bg-red-100 border border-red-400 text-red-700{% endif %}">
+    {{ message }}
+</div>
+{% endfor %}
+{% endif %}
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <!-- Formulario de Ajuste -->
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
+        <h2 class="text-lg font-semibold mb-4">Configurar Ajuste</h2>
+        
+        <form method="POST" class="space-y-4">
+            {% csrf_token %}
+            
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Porcentaje de ajuste (%)</label>
+                <div class="flex items-center gap-2">
+                    <input type="text" name="porcentaje" placeholder="Ej: 10 o -5" 
+                           class="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                           required>
+                    <span class="text-gray-500 text-sm">%</span>
+                </div>
+                <p class="text-xs text-gray-500 mt-1">Usá positivo (10) para aumentar o negativo (-10) para disminuir</p>
+            </div>
+            
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Filtrar por tipo de insumo</label>
+                <select name="filtro_tipo" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                    <option value="todos">Todos los insumos</option>
+                    <option value="con_precio">Solo insumos con precio</option>
+                </select>
+            </div>
+            
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Filtrar por categoría (opcional)</label>
+                <input type="text" name="categoria" placeholder="Ej: Papel, Tinta, etc." 
+                       class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+            </div>
+            
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Filtrar por proveedor (opcional)</label>
+                <select name="proveedor" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                    <option value="">Todos los proveedores</option>
+                    {% for proveedor in proveedores %}
+                    <option value="{{ proveedor.id }}">{{ proveedor.nombre }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-3 rounded-lg flex items-center justify-center gap-2">
+                <span class="material-symbols-outlined">calculate</span>
+                Aplicar Ajuste
+            </button>
+        </form>
+    </div>
+    
+    <!-- Vista Previa -->
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
+        <h2 class="text-lg font-semibold mb-4">Información</h2>
+        
+        <div class="space-y-4">
+            <div class="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <div class="flex items-start gap-2">
+                    <span class="material-symbols-outlined text-yellow-600">warning</span>
+                    <div>
+                        <p class="font-medium text-yellow-800">Antes de continuar:</p>
+                        <ul class="text-sm text-yellow-700 mt-1 list-disc list-inside">
+                            <li>Hacé un backup de los precios actuales</li>
+                            <li>Verificá que el porcentaje sea correcto</li>
+                            <li>Podés usar valores negativos para disminuciones</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <div class="flex items-start gap-2">
+                    <span class="material-symbols-outlined text-blue-600">info</span>
+                    <div>
+                        <p class="font-medium text-blue-800">Ejemplos:</p>
+                        <ul class="text-sm text-blue-700 mt-1 space-y-1">
+                            <li><code>+10</code> = Aumentar 10%</li>
+                            <li><code>-15</code> = Disminuir 15%</li>
+                            <li><code>+5.5</code> = Aumentar 5.5%</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="text-sm text-gray-600">
+                <p><strong>Total de insumos activos:</strong> {{ insumos_count }}</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Tabla de precios actuales -->
+<div class="mt-6 bg-white border border-gray-200 rounded-xl shadow-sm">
+    <div class="p-4 border-b border-gray-200">
+        <h2 class="text-lg font-semibold">Precios Actuales (vista previa)</h2>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="w-full">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Insumo</th>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Categoría</th>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Precio Actual</th>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Con +10%</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200">
+                {% for insumo in ultimos_insumos %}
+                <tr class="hover:bg-gray-50">
+                    <td class="px-4 py-3 font-medium">{{ insumo.nombre|default:insumo.codigo }}</td>
+                    <td class="px-4 py-3 text-gray-500">{{ insumo.categoria|default:"-" }}</td>
+                    <td class="px-4 py-3">${{ insumo.precio|default:"0"|floatformat:2 }}</td>
+                    <td class="px-4 py-3 text-green-600 font-medium">
+                        {% with precio_actual=insumo.precio|default:"0" %}
+                        ${{ precio_actual|add:precio_actual|floatformat:2 }}
+                        {% endwith %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="4" class="px-4 py-8 text-center text-gray-500">
+                        No hay insumos para mostrar
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

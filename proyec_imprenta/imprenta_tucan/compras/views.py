@@ -262,6 +262,72 @@ def home_compras(request):
     })
 
 
+# ── Ajuste Masivo de Precios de Insumos ──────────────────────────────────────
+@login_required
+def ajuste_masivo_precios(request):
+    from insumos.models import Insumo
+    from django.db.models import Q
+    from django.contrib import messages
+    
+    mensaje_resultado = None
+    insumos_actualizados = 0
+    
+    if request.method == 'POST':
+        porcentaje = request.POST.get('porcentaje', '0').replace(',', '.')
+        try:
+            porcentaje = float(porcentaje)
+        except ValueError:
+            porcentaje = 0
+        
+        filtro_categoria = request.POST.get('categoria', '')
+        filtro_proveedor = request.POST.get('proveedor', '')
+        filtro_tipo = request.POST.get('filtro_tipo', 'todos')
+        
+        # Construir query base
+        queryset = Insumo.objects.filter(activo=True)
+        
+        if filtro_categoria:
+            queryset = queryset.filter(categoria__icontains=filtro_categoria)
+        
+        if filtro_proveedor:
+            queryset = queryset.filter(proveedor_predeterminado_id=filtro_proveedor)
+        
+        if filtro_tipo == 'con_precio':
+            queryset = queryset.filter(precio__isnull=False, precio__gt=0)
+        
+        # Aplicar ajuste
+        from decimal import Decimal
+        factor = Decimal('1') + Decimal(str(porcentaje)) / Decimal('100')
+        
+        insumos_actualizados = queryset.count()
+        
+        for insumo in queryset:
+            if insumo.precio:
+                insumo.precio = (insumo.precio * factor).quantize(Decimal('0.01'))
+                insumo.save(update_fields=['precio'])
+        
+        mensaje_resultado = f"Se actualizaron {insumos_actualizados} insumos con un {'aumento' if porcentaje > 0 else 'descuento'} del {abs(porcentaje)}%"
+        messages.success(request, mensaje_resultado)
+    
+    # Obtener datos para los filtros
+    categorias = Insumo.objects.filter(activo=True).values_list('categoria', flat=True).distinct()
+    from proveedores.models import Proveedor
+    proveedores = Proveedor.objects.filter(activo=True)
+    
+    ultimos_insumos = Insumo.objects.filter(activo=True).exclude(precio=0).exclude(precio__isnull=True).order_by('-idInsumo')[:10]
+    insumos_count = Insumo.objects.filter(activo=True).count()
+    
+    context = {
+        'categorias': categorias,
+        'proveedores': proveedores,
+        'mensaje_resultado': mensaje_resultado,
+        'insumos_actualizados': insumos_actualizados,
+        'ultimos_insumos': ultimos_insumos,
+        'insumos_count': insumos_count,
+    }
+    return render(request, "compras/ajuste_masivo_precios.html", context)
+
+
 # ── Comparacion de precios por proveedor ──────────────────────────────────────
 @login_required
 def comparacion_precios(request):

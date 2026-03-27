@@ -569,10 +569,14 @@ def nueva_oferta_manual(request):
 
 @login_required
 def aprobar_oferta(request, oferta_id):
+    from django.utils import timezone
     oferta = get_object_or_404(OfertaPropuesta, pk=oferta_id)
     oferta.estado = 'enviada'
     oferta.fecha_validacion = timezone.now()
     oferta.administrador = request.user
+    oferta.accion_aprobacion = 'aprobar'
+    oferta.fecha_aprobacion = timezone.now()
+    oferta.observacion_aprobacion = request.POST.get('observacion', '')
     oferta.save()
     # Enviar email al cliente y registrar estado de mensaje
     # Log de aprobacion del admin
@@ -612,10 +616,14 @@ def aprobar_oferta(request, oferta_id):
 
 @login_required
 def rechazar_oferta(request, oferta_id):
+    from django.utils import timezone
     oferta = get_object_or_404(OfertaPropuesta, pk=oferta_id)
     oferta.estado = 'rechazada'
     oferta.fecha_validacion = timezone.now()
     oferta.administrador = request.user
+    oferta.accion_aprobacion = 'rechazar'
+    oferta.fecha_aprobacion = timezone.now()
+    oferta.observacion_aprobacion = request.POST.get('observacion', '')
     oferta.save()
     # Notificar área comercial y registrar log
     try:

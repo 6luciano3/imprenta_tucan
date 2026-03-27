@@ -1,6 +1,7 @@
-from django.urls import path
+from django.urls import path, include
 from django.views.generic import RedirectView
 from . import views
+from insumos import views as insumos_views
 
 app_name = "compras"
 
@@ -19,4 +20,16 @@ urlpatterns = [
     path("insumos/<int:insumo_pk>/kardex/", views.kardex_insumo, name="kardex_insumo"),
     path("insumos/<int:insumo_pk>/ajuste/", views.ajuste_stock, name="ajuste_stock"),
     path("api/orden/<int:pk>/items/", views.api_items_orden, name="api_items_orden"),
+    
+    # CRUD de Insumos integrado en Compras
+    path("insumos/", insumos_views.lista_insumos, name="lista_insumos_desde_compras"),
+    path("insumos/crear/", insumos_views.crear_insumo, name="crear_insumo_desde_compras"),
+    path("insumos/<int:pk>/", insumos_views.detalle_insumo, name="detalle_insumo_desde_compras"),
+    path("insumos/<int:pk>/editar/", insumos_views.editar_insumo, name="editar_insumo_desde_compras"),
+    path("insumos/<int:pk>/eliminar/", insumos_views.eliminar_insumo, name="eliminar_insumo_desde_compras"),
+    path("insumos/<int:pk>/activar/", insumos_views.activar_insumo, name="activar_insumo_desde_compras"),
+    path("insumos/<int:pk>/baja/", insumos_views.baja_insumo, name="baja_insumo_desde_compras"),
+    
+    # Ajuste masivo de precios
+    path("ajuste-masivo/", views.ajuste_masivo_precios, name="ajuste_masivo_precios"),
 ]

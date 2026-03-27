@@ -96,12 +96,23 @@ class OfertaPropuesta(models.Model):
     parametros = models.JSONField(default=dict, blank=True)  # Ej: {"descuento": 10}
     creada = models.DateTimeField(auto_now_add=True)
     actualizada = models.DateTimeField(auto_now=True)
-    administrador = models.ForeignKey(get_user_model(), on_delete=models.SET_NULL, null=True, blank=True)
+    administrador = models.ForeignKey(get_user_model(), on_delete=models.SET_NULL, null=True, blank=True, related_name='ofertas_aprobadas')
     fecha_validacion = models.DateTimeField(null=True, blank=True)
     fecha_expiracion = models.DateTimeField(
         null=True, blank=True,
         help_text='Fecha límite para que el cliente responda. Se asigna automáticamente al crear.'
     )
+    
+    # Auditoría de aprobación/rechazo
+    accion_aprobacion = models.CharField(
+        max_length=20, 
+        choices=[('aprobar', 'Aprobada'), ('rechazar', 'Rechazada'), ('enviar', 'Enviada')],
+        null=True, 
+        blank=True,
+        verbose_name='Acción de validación'
+    )
+    fecha_aprobacion = models.DateTimeField(null=True, blank=True, verbose_name='Fecha de aprobación/rechazo')
+    observacion_aprobacion = models.TextField(blank=True, default='', verbose_name='Observación de validación')
 
     def save(self, *args, **kwargs):
         # Auto-generar token único para links de email

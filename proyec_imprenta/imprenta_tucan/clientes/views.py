@@ -196,17 +196,26 @@ def clientes_inactivos(request):
         fecha_pedido__gt=fecha_limite
     ).values_list('cliente_id', flat=True).distinct()
 
-    clientes_inactivos = Cliente.objects.filter(
+
+    # Paginación igual que en lista_clientes
+    clientes_inactivos_qs = Cliente.objects.filter(
         estado='Activo'
     ).exclude(
         id__in=clientes_con_pedidos_recientes
     ).select_related(None).prefetch_related('pedido_set')
 
-    for cliente in clientes_inactivos:
+    # Anotar días sin pedido
+    for cliente in clientes_inactivos_qs:
         ultimo_pedido = cliente.pedido_set.order_by('-fecha_pedido').first()
         cliente.dias_sin_pedido = 0
         if ultimo_pedido:
             cliente.dias_sin_pedido = (timezone.now().date() - ultimo_pedido.fecha_pedido).days
+
+    # Paginación
+    from configuracion.services import get_page_size
+    paginator = Paginator(list(clientes_inactivos_qs), get_page_size())
+    page = request.GET.get("page")
+    clientes_inactivos = paginator.get_page(page)
 
     mensaje_resultado = None
     if request.method == 'POST' and 'enviar_notificaciones' in request.POST:

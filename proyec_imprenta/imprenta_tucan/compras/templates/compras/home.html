@@ -19,7 +19,45 @@
   <p class="text-gray-500 text-sm mt-1">Administrá órdenes, remitos y precios de insumos desde un solo lugar.</p>
 </div>
 
-<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+<div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+
+  <!-- Insumos CRUD -->
+  <a href="{% url 'compras:lista_insumos_desde_compras' %}" class="group bg-white border border-gray-200 rounded-xl p-6 shadow-sm hover:shadow-md transition">
+    <div class="flex items-center gap-4 mb-4">
+      <div class="h-12 w-12 rounded-full bg-purple-50 text-purple-600 grid place-items-center">
+        <span class="material-symbols-outlined text-2xl">inventory</span>
+      </div>
+      <div>
+        <p class="text-xs text-gray-500 uppercase font-semibold">Insumos</p>
+        <p class="text-2xl font-bold text-gray-800 group-hover:text-purple-700">{{ insumos_count }}</p>
+      </div>
+    </div>
+    <p class="text-sm text-gray-500">CRUD completo: crear, editar, eliminar y gestionar insumos.</p>
+    <div class="mt-4 flex gap-2">
+      <span class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-purple-600 text-white text-xs font-semibold group-hover:bg-purple-700">
+        <span class="material-symbols-outlined text-sm">open_in_new</span> Gestionar
+      </span>
+    </div>
+  </a>
+
+  <!-- Ajuste Masivo de Precios -->
+  <a href="{% url 'compras:ajuste_masivo_precios' %}" class="group bg-white border border-gray-200 rounded-xl p-6 shadow-sm hover:shadow-md transition">
+    <div class="flex items-center gap-4 mb-4">
+      <div class="h-12 w-12 rounded-full bg-indigo-50 text-indigo-600 grid place-items-center">
+        <span class="material-symbols-outlined text-2xl">trending_up</span>
+      </div>
+      <div>
+        <p class="text-xs text-gray-500 uppercase font-semibold">Precios</p>
+        <p class="text-2xl font-bold text-gray-800 group-hover:text-indigo-700">Ajuste</p>
+      </div>
+    </div>
+    <p class="text-sm text-gray-500">Aumentar o disminuir precios de múltiples insumos por porcentaje.</p>
+    <div class="mt-4 flex gap-2">
+      <span class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-xs font-semibold group-hover:bg-indigo-700">
+        <span class="material-symbols-outlined text-sm">open_in_new</span> Ajustar
+      </span>
+    </div>
+  </a>
 
   <!-- Ordenes -->
   <a href="{% url 'compras:lista_ordenes_compra' %}" class="group bg-white border border-gray-200 rounded-xl p-6 shadow-sm hover:shadow-md transition">
