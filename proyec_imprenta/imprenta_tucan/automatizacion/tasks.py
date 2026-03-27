@@ -439,10 +439,15 @@ def _crear_propuesta_compra(insumo, cantidad_req, comentario_oc, motivo_trigger,
 
 
 
-def _enviar_cotizacion_multiples_proveedores(insumo, cantidad_req, comentario, motivo_trigger, criterios_pesos):
+def _enviar_cotizacion_multiples_proveedores(insumo, cantidad_req, comentario, motivo_trigger, criterios_pesos, auto_aprobar=True):
     """
-    Envia solicitud de cotizacion automaticamente a los top N proveedores
+    PROCESO INTELIGENTE: Envía solicitud de cotización automáticamente a los top N proveedores
     con email real (no .local). Crea una OrdenCompra por cada proveedor.
+    
+    Si auto_aprobar=True (por defecto):
+    - Aprueba automáticamente la orden (estado='confirmada')
+    - Envía email automáticamente al proveedor
+    
     Notifica al admin con el resumen de envios.
     """
     from automatizacion.models import CompraPropuesta, ConsultaStockProveedor, ScoreProveedor
@@ -457,18 +462,24 @@ def _enviar_cotizacion_multiples_proveedores(insumo, cantidad_req, comentario, m
     except Exception:
         top_n = 5
 
-    # Top N proveedores activos con email real (excluir .local)
-    scores = (
-        ScoreProveedor.objects
-        .select_related('proveedor')
-        .filter(proveedor__activo=True)
-        .exclude(proveedor__email__isnull=True)
-        .exclude(proveedor__email='')
-        .exclude(proveedor__email__endswith='.local')
-        .order_by('-score')[:top_n]
-    )
-
-    proveedores_seleccionados = [s.proveedor for s in scores]
+    # PROCESO INTELIGENTE: Usar proveedor real para demostración
+    EMAIL_PROVEEDOR_REAL = 'serigrafiaplusrawson@gmail.com'
+    proveedor_real = Proveedor.objects.filter(email=EMAIL_PROVEEDOR_REAL, activo=True).first()
+    if proveedor_real:
+        proveedores_seleccionados = [proveedor_real]
+    else:
+        # Fallback: Top N proveedores activos con email real (excluir .local)
+        scores = (
+            ScoreProveedor.objects
+            .select_related('proveedor')
+            .filter(proveedor__activo=True)
+            .exclude(proveedor__email__isnull=True)
+            .exclude(proveedor__email='')
+            .exclude(proveedor__email__endswith='.local')
+            .order_by('-score')[:top_n]
+        )
+        proveedores_seleccionados = [s.proveedor for s in scores]
+    
     if not proveedores_seleccionados:
         logger.warning('_enviar_cotizacion_multiples_proveedores: sin proveedores con email real')
         return 0
@@ -479,13 +490,16 @@ def _enviar_cotizacion_multiples_proveedores(insumo, cantidad_req, comentario, m
     for proveedor in proveedores_seleccionados:
         try:
             from django.db import transaction
+            from django.utils import timezone
             with transaction.atomic():
+                # PROCESO INTELIGENTE: Aprobar automáticamente si está habilitado
+                estado_inicial = 'confirmada' if auto_aprobar else 'sugerida'
                 oc = OrdenCompra.objects.create(
                     insumo=insumo,
                     cantidad=cantidad_req,
                     proveedor=proveedor,
-                    estado='sugerida',
-                    comentario=comentario,
+                    estado=estado_inicial,
+                    comentario=comentario + (' [AUTO-APROBADO]' if auto_aprobar else ''),
                 )
                 consulta = ConsultaStockProveedor.objects.create(
                     proveedor=proveedor,
@@ -494,13 +508,15 @@ def _enviar_cotizacion_multiples_proveedores(insumo, cantidad_req, comentario, m
                     estado='pendiente',
                     respuesta={},
                 )
+                # PROCESO INTELIGENTE: Cambiar estado según auto_aprobar
+                estado_propuesta = 'aprobada' if auto_aprobar else 'consultado'
                 CompraPropuesta.objects.create(
                     insumo=insumo,
                     cantidad_requerida=cantidad_req,
                     proveedor_recomendado=proveedor,
                     pesos_usados=criterios_pesos,
                     motivo_trigger=motivo_trigger,
-                    estado='consultado',
+                    estado=estado_propuesta,
                     borrador_oc=oc,
                     consulta_stock=consulta,
                 )

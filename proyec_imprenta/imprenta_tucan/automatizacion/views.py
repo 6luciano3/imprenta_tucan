@@ -321,12 +321,48 @@ from .services import enviar_oferta_email
 
 
 def panel(request):
-    ordenes = OrdenSugerida.objects.select_related('pedido', 'insumo').order_by('-generada')[:10]
+    from pedidos.models import OrdenCompra
+    ordenes_sugeridas = OrdenSugerida.objects.select_related('pedido', 'insumo').order_by('-generada')[:10]
     ofertas = OfertaAutomatica.objects.select_related('cliente').order_by('-generada')[:10]
+    # Órdenes de compra reales
+    ordenes_compra = OrdenCompra.objects.select_related('proveedor', 'insumo').order_by('-fecha_creacion')[:10]
     return render(request, 'automatizacion/panel.html', {
-        'ordenes': ordenes,
+        'ordenes': ordenes_sugeridas,
         'ofertas': ofertas,
+        'ordenes_compra': ordenes_compra,
     })
+
+
+@login_required
+def ejecutar_anticipacion_compras(request):
+    """
+    Ejecuta el proceso inteligente de anticipación de compras.
+    Genera órdenes de compra auto-aprobadas y envía emails automáticamente.
+    """
+    from django.http import JsonResponse
+    from django.views.decorators.http import require_POST
+    from .tasks import tarea_anticipacion_compras
+    from django.utils import timezone
+    
+    try:
+        # Ejecutar tarea de anticipación
+        resultado = tarea_anticipacion_compras()
+        
+        # Contar órdenes creadas recientemente
+        from pedidos.models import OrdenCompra
+        hace_1_minuto = timezone.now() - timezone.timedelta(minutes=1)
+        ordenes_nuevas = OrdenCompra.objects.filter(
+            fecha_creacion__gte=hace_1_minuto,
+            comentario__icontains='[AUTO-APROBADO]'
+        ).count()
+        
+        return JsonResponse({
+            'ok': True,
+            'mensaje': resultado,
+            'ordenes_creadas': ordenes_nuevas
+        })
+    except Exception as e:
+        return JsonResponse({'ok': False, 'error': str(e)})
 
 
 def lista_ordenes(request):

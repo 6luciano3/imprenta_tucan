@@ -6,6 +6,60 @@
     Volver al Dashboard
   </a>
   </div>
+
+<!-- Órdenes de Compra - Respuestas de Proveedores -->
+<section class="mt-8 bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+  <div class="flex items-center justify-between mb-3">
+    <div class="flex items-center gap-3">
+      <div class="h-12 w-12 rounded-full bg-purple-50 text-purple-700 grid place-items-center">
+        <span class="material-symbols-outlined">local_shipping</span>
+      </div>
+      <div>
+        <p class="text-sm text-gray-500">Respuestas de Proveedores</p>
+        <p class="text-lg font-bold">Órdenes de Compra</p>
+      </div>
+    </div>
+  </div>
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead class="bg-purple-100">
+        <tr>
+          <th class="py-2 px-3">ID</th>
+          <th class="py-2 px-3">Insumo</th>
+          <th class="py-2 px-3">Proveedor</th>
+          <th class="py-2 px-3">Cantidad</th>
+          <th class="py-2 px-3">Estado</th>
+          <th class="py-2 px-3">Fecha</th>
+          <th class="py-2 px-3">Respuesta</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for oc in ordenes_compra %}
+          <tr class="border-b hover:bg-gray-50">
+            <td class="py-2 px-3">#{{ oc.id }}</td>
+            <td class="py-2 px-3">{{ oc.insumo.nombre|default:oc.insumo_id }}</td>
+            <td class="py-2 px-3">{{ oc.proveedor.nombre|default:oc.proveedor_id }}</td>
+            <td class="py-2 px-3">{{ oc.cantidad }}</td>
+            <td class="py-2 px-3">
+              {% if oc.estado == 'confirmada' %}
+                <span class="px-2 py-1 rounded bg-green-100 text-green-700 text-xs">Confirmada</span>
+              {% elif oc.estado == 'rechazada' %}
+                <span class="px-2 py-1 rounded bg-red-100 text-red-700 text-xs">Rechazada</span>
+              {% else %}
+                <span class="px-2 py-1 rounded bg-yellow-100 text-yellow-700 text-xs">Pendiente</span>
+              {% endif %}
+            </td>
+            <td class="py-2 px-3">{{ oc.fecha_creacion|date:"d/m H:i" }}</td>
+            <td class="py-2 px-3 text-xs">{{ oc.comentario|truncatechars:30 }}</td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="7" class="py-3 px-3 text-center text-gray-500">Sin órdenes de compra</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
 <section class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
   <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
     <div class="flex items-center justify-between mb-3">
@@ -55,6 +109,47 @@
   </div>
 </section>
 
+<!-- Procesos Inteligentes -->
+<section class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
+  <div class="bg-white border border-blue-200 rounded-xl p-4 shadow-sm">
+    <div class="flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="h-10 w-10 rounded-full bg-blue-50 text-blue-700 grid place-items-center">
+          <span class="material-symbols-outlined">shopping_cart</span>
+        </div>
+        <div>
+          <p class="text-sm text-gray-500">Proceso Inteligente</p>
+          <p class="text-base font-semibold">Anticipación de Compras</p>
+        </div>
+      </div>
+      <button id="btnAnticipacionCompras" class="text-xs px-3 py-2 rounded bg-blue-600 text-white hover:bg-blue-700">
+        Ejecutar
+      </button>
+    </div>
+    <p class="text-xs text-gray-500 mt-2">Detecta insumos con stock bajo, crea órdenes auto-aprobadas y envía emails automáticamente.</p>
+  </div>
+  <div class="bg-white border border-green-200 rounded-xl p-4 shadow-sm">
+    <div class="flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="h-10 w-10 rounded-full bg-green-50 text-green-700 grid place-items-center">
+          <span class="material-symbols-outlined">local_offer</span>
+        </div>
+        <div>
+          <p class="text-sm text-gray-500">Proceso Inteligente</p>
+          <p class="text-base font-semibold">Ofertas a Clientes</p>
+        </div>
+      </div>
+      <form method="post" action="{% url 'generar_ofertas_ahora' %}">
+        {% csrf_token %}
+        <button type="submit" class="text-xs px-3 py-2 rounded bg-green-600 text-white hover:bg-green-700">
+          Ejecutar
+        </button>
+      </form>
+    </div>
+    <p class="text-xs text-gray-500 mt-2">Genera ofertas personalizadas, las aprueba y envía emails automáticamente (score >= 96).</p>
+  </div>
+</section>
+
 <!-- Acciones rápidas -->
 <section class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
   <a href="{% url 'ranking_clientes' %}" class="bg-white border border-gray-200 rounded-xl p-4 shadow-sm hover:shadow-md transition block">
@@ -94,28 +189,58 @@
 {% endblock %}
 {% block extra_js %}
 <script>
+function getCookie(name) {
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop().split(';').shift();
+}
+const csrftoken = getCookie('csrftoken');
+
 document.addEventListener('DOMContentLoaded', function(){
-  const btnDemo = document.getElementById('btnDemoAutomatizacion');
-  if (!btnDemo) return;
-  function getCookie(name) {
-    const value = `; ${document.cookie}`;
-    const parts = value.split(`; ${name}=`);
-    if (parts.length === 2) return parts.pop().split(';').shift();
+  // Botón de Anticipación de Compras
+  const btnAnticipacion = document.getElementById('btnAnticipacionCompras');
+  if (btnAnticipacion) {
+    btnAnticipacion.addEventListener('click', function(){
+      if (!confirm('¿Ejecutar Proceso Inteligente de Anticipación de Compras?')) return;
+      btnAnticipacion.disabled = true;
+      btnAnticipacion.textContent = 'Ejecutando...';
+      fetch('{% url "ejecutar_anticipacion_compras" %}', {
+        method: 'POST',
+        headers: { 
+          'X-CSRFToken': csrftoken, 
+          'Content-Type': 'application/json' 
+        },
+        body: JSON.stringify({})
+      })
+      .then(r => r.json())
+      .then(data => {
+        alert(data.mensaje + (data.ordenes_creadas ? '\nOrdenes creadas: ' + data.ordenes_creadas : ''));
+        window.location.reload();
+      })
+      .catch(err => {
+        alert('Error: ' + err);
+        btnAnticipacion.disabled = false;
+        btnAnticipacion.textContent = 'Ejecutar';
+      });
+    });
   }
-  const csrftoken = getCookie('csrftoken');
-  btnDemo.addEventListener('click', function(){
-    fetch('{% url "automatizacion_demo" %}', {
-      method: 'POST',
-      headers: { 'X-CSRFToken': csrftoken, 'Content-Type': 'application/json' },
-      body: JSON.stringify({})
-    })
-    .then(r => r.json())
-    .then(_ => {
-      // recargar la página para ver los nuevos datos
-      window.location.reload();
-    })
-    .catch(_ => alert('Error al generar datos de demo'));
-  });
+  
+  // Botón demo
+  const btnDemo = document.getElementById('btnDemoAutomatizacion');
+  if (btnDemo) {
+    btnDemo.addEventListener('click', function(){
+      fetch('{% url "automatizacion_demo" %}', {
+        method: 'POST',
+        headers: { 'X-CSRFToken': csrftoken, 'Content-Type': 'application/json' },
+        body: JSON.stringify({})
+      })
+      .then(r => r.json())
+      .then(_ => {
+        window.location.reload();
+      })
+      .catch(_ => alert('Error al generar datos de demo'));
+    });
+  }
 });
 </script>
 {% endblock %}

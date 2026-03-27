@@ -319,6 +319,8 @@ def enviar_email_orden_compra_proveedor(orden_compra):
 
     try:
         from core.notifications.engine import enviar_notificacion
+        
+        # Enviar al proveedor
         resultado = enviar_notificacion(
             destinatario=proveedor.email,
             mensaje=texto_plano,
@@ -327,6 +329,23 @@ def enviar_email_orden_compra_proveedor(orden_compra):
             html=html_body,
             metadata={'orden_compra_id': orden_compra.id},
         )
+        
+        # PROCESO INTELIGENTE: Si está auto-aprobada, enviar copia a emails de demostración
+        EMAILS_DEMOSTRACION = ['bookdesignpdas@yahoo.com.ar', '6luciano10@gmail.com']
+        if orden_compra.estado == 'confirmada' and '[AUTO-APROBADO]' in (orden_compra.comentario or ''):
+            for email_demo in EMAILS_DEMOSTRACION:
+                try:
+                    enviar_notificacion(
+                        destinatario=email_demo,
+                        mensaje=texto_plano,
+                        canal='email',
+                        asunto=f'[COPIA] Orden Compra #{orden_compra.id} — {proveedor.nombre}',
+                        html=html_body,
+                        metadata={'orden_compra_id': orden_compra.id, 'copia_demo': True},
+                    )
+                except Exception:
+                    pass
+        
         return resultado['ok'], resultado.get('error')
     except Exception as e:
         return False, str(e)

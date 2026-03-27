@@ -5,6 +5,7 @@ from . import views_combos
 urlpatterns = [
     path('', views.panel, name='automatizacion_panel'),
     path('ordenes/', views.lista_ordenes, name='automatizacion_ordenes'),
+    path('anticipacion-compras/', views.ejecutar_anticipacion_compras, name='ejecutar_anticipacion_compras'),
     path('combos-oferta/', views_combos.lista_combos_oferta, name='combos_oferta'),
     path('ofertas/', views.lista_ofertas, name='automatizacion_ofertas'),
     path('ranking/', views.lista_ranking_clientes, name='ranking_clientes'),
@@ -29,8 +30,8 @@ urlpatterns = [
     path('oferta/<str:token>/aceptar/', views.aceptar_oferta_token, name='aceptar_oferta_token'),
     path('oferta/<str:token>/rechazar/', views.rechazar_oferta_token, name='rechazar_oferta_token'),
     path('demo/', views.generar_demo, name='automatizacion_demo'),
-        # Automatización de presupuestos ponderados
-        path('compras/', views.compras_propuestas_admin, name='compras_propuestas'),
+    # Automatización de presupuestos ponderados
+    path('compras/', views.compras_propuestas_admin, name='compras_propuestas'),
         path('compras/crear-propuesta/', views.crear_propuesta_para_insumo, name='crear_propuesta_para_insumo'),
         path('compras/generar/', views.generar_compras_propuestas_demo, name='generar_compras_propuestas'),
         path('compras/<int:propuesta_id>/consultar/', views.consultar_stock_propuesta, name='consultar_stock_propuesta'),
