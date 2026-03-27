@@ -569,6 +569,7 @@ def tarea_automatizacion_presupuestos_ponderada():
     """
     try:
         from decimal import Decimal
+        from django.utils import timezone
         from pedidos.services import calcular_consumo_pedido, verificar_stock_consumo
         from automatizacion.api.services import ProveedorInteligenteService
         from automatizacion.models import CompraPropuesta
@@ -621,30 +622,66 @@ def tarea_automatizacion_presupuestos_ponderada():
                 cantidad_req = insumo.cantidad_compra_sugerida or max(1, stock_minimo * 2)
                 insumos_libres.append((insumo, cantidad_req))
         if insumos_libres:
-            scores = (
-                ScoreProveedor.objects
-                .select_related('proveedor')
-                .filter(proveedor__activo=True)
-                .exclude(proveedor__email__isnull=True)
-                .exclude(proveedor__email='')
-                .exclude(proveedor__email__endswith='.local')
-                .order_by('-score')[:top_n]
-            )
-            proveedores = [s.proveedor for s in scores]
-            for proveedor in proveedores:
+            # PROCESO INTELIGENTE: Usar proveedor real para demostración
+            EMAIL_PROVEEDOR_REAL = 'serigrafiaplusrawson@gmail.com'
+            proveedor_real = Proveedor.objects.filter(email=EMAIL_PROVEEDOR_REAL, activo=True).first()
+            
+            if proveedor_real:
+                # Usar el proveedor real
                 try:
                     sc, ok, err = enviar_solicitud_cotizacion(
-                        proveedor=proveedor,
+                        proveedor=proveedor_real,
                         insumos_cantidades=insumos_libres,
-                        comentario='Solicitud automatica por stock minimo detectado',
+                        comentario='Solicitud automatica por stock minimo detectado [PROCESO INTELIGENTE]',
                     )
                     if ok:
                         propuestas_creadas += 1
-                        logger.info('SC-%s enviada a %s con %s insumos', sc.id, proveedor.email, len(insumos_libres))
+                        logger.info('SC-%s enviada a proveedor real %s con %s insumos', sc.id, proveedor_real.email, len(insumos_libres))
+                        
+                        # Enviar copia a emails de demostración
+                        EMAILS_DEMOSTRACION = ['bookdesignpdas@yahoo.com.ar', '6luciano10@gmail.com']
+                        from core.notifications.engine import enviar_notificacion
+                        for email_demo in EMAILS_DEMOSTRACION:
+                            try:
+                                enviar_notificacion(
+                                    destinatario=email_demo,
+                                    mensaje=f'COTIZACIÓN ENVIADA: SC-{sc.id} a {proveedor_real.nombre}\nInsumos: {len(insumos_libres)}',
+                                    canal='email',
+                                    asunto=f'[COPIA] Cotización SC-{sc.id} - {proveedor_real.nombre}',
+                                    metadata={'solicitud_cotizacion_id': sc.id, 'copia_demo': True},
+                                )
+                            except Exception:
+                                pass
                     else:
-                        logger.warning('Error enviando SC a %s: %s', proveedor.email, err)
+                        logger.warning('Error enviando SC a %s: %s', proveedor_real.email, err)
                 except Exception as e:
-                    logger.error('Error creando SC para proveedor %s: %s', proveedor.nombre, e)
+                    logger.error('Error creando SC para proveedor %s: %s', proveedor_real.nombre, e)
+            else:
+                # Fallback: usar proveedores con mejor score
+                scores = (
+                    ScoreProveedor.objects
+                    .select_related('proveedor')
+                    .filter(proveedor__activo=True)
+                    .exclude(proveedor__email__isnull=True)
+                    .exclude(proveedor__email='')
+                    .exclude(proveedor__email__endswith='.local')
+                    .order_by('-score')[:top_n]
+                )
+                proveedores = [s.proveedor for s in scores]
+                for proveedor in proveedores:
+                    try:
+                        sc, ok, err = enviar_solicitud_cotizacion(
+                            proveedor=proveedor,
+                            insumos_cantidades=insumos_libres,
+                            comentario='Solicitud automatica por stock minimo detectado',
+                        )
+                        if ok:
+                            propuestas_creadas += 1
+                            logger.info('SC-%s enviada a %s con %s insumos', sc.id, proveedor.email, len(insumos_libres))
+                        else:
+                            logger.warning('Error enviando SC a %s: %s', proveedor.email, err)
+                    except Exception as e:
+                        logger.error('Error creando SC para proveedor %s: %s', proveedor.nombre, e)
 
         # 7) Auto-aceptación según parámetros si hay respuesta disponible y el proveedor cumple umbral
         auto_aprobar = bool(Parametro.get('AUTO_APROBAR_PROPUESTAS', False))

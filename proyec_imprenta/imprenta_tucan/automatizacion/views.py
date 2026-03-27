@@ -365,6 +365,38 @@ def ejecutar_anticipacion_compras(request):
         return JsonResponse({'ok': False, 'error': str(e)})
 
 
+@login_required
+def ejecutar_cotizacion(request):
+    """
+    Ejecuta el proceso inteligente de cotización:
+    - Detecta insumos con stock bajo
+    - Genera solicitudes de cotización
+    - Envía emails automáticamente al proveedor real
+    - Envía copia a emails de demostración
+    """
+    from django.http import JsonResponse
+    from django.views.decorators.http import require_POST
+    from .tasks import tarea_automatizacion_presupuestos_ponderada
+    from django.utils import timezone
+    
+    try:
+        # Ejecutar tarea de cotización
+        resultado = tarea_automatizacion_presupuestos_ponderada()
+        
+        # Contar propuestas creadas recientemente
+        from automatizacion.models import CompraPropuesta
+        hace_1_minuto = timezone.now() - timezone.timedelta(minutes=1)
+        propuestas_nuevas = CompraPropuesta.objects.filter(creada__gte=hace_1_minuto).count()
+        
+        return JsonResponse({
+            'ok': True,
+            'mensaje': f'Proceso de cotización ejecutado. {resultado}',
+            'propuestas_creadas': propuestas_nuevas
+        })
+    except Exception as e:
+        return JsonResponse({'ok': False, 'error': str(e)})
+
+
 def lista_ordenes(request):
     # Si no hay órdenes sugeridas, generar algunas entradas de demostración automáticamente
     if not OrdenSugerida.objects.exists():

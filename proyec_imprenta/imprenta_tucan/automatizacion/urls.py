@@ -1,4 +1,5 @@
 from django.urls import path
+from django.views.generic import RedirectView
 from . import views
 from . import views_combos
 
@@ -6,6 +7,9 @@ urlpatterns = [
     path('', views.panel, name='automatizacion_panel'),
     path('ordenes/', views.lista_ordenes, name='automatizacion_ordenes'),
     path('anticipacion-compras/', views.ejecutar_anticipacion_compras, name='ejecutar_anticipacion_compras'),
+    path('ejecutar-cotizacion/', views.ejecutar_cotizacion, name='ejecutar_cotizacion'),
+    # Redirect de URL vieja a nueva
+    path('compras/', RedirectView.as_view(url='/automatizacion/cotizacion/', permanent=True)),
     path('combos-oferta/', views_combos.lista_combos_oferta, name='combos_oferta'),
     path('ofertas/', views.lista_ofertas, name='automatizacion_ofertas'),
     path('ranking/', views.lista_ranking_clientes, name='ranking_clientes'),
@@ -31,17 +35,17 @@ urlpatterns = [
     path('oferta/<str:token>/rechazar/', views.rechazar_oferta_token, name='rechazar_oferta_token'),
     path('demo/', views.generar_demo, name='automatizacion_demo'),
     # Automatización de presupuestos ponderados
-    path('compras/', views.compras_propuestas_admin, name='compras_propuestas'),
-        path('compras/crear-propuesta/', views.crear_propuesta_para_insumo, name='crear_propuesta_para_insumo'),
-        path('compras/generar/', views.generar_compras_propuestas_demo, name='generar_compras_propuestas'),
-        path('compras/<int:propuesta_id>/consultar/', views.consultar_stock_propuesta, name='consultar_stock_propuesta'),
-        path('compras/<int:propuesta_id>/aceptar/', views.aceptar_compra_propuesta, name='aceptar_compra_propuesta'),
-        path('compras/<int:propuesta_id>/rechazar/', views.rechazar_compra_propuesta, name='rechazar_compra_propuesta'),
-        path('compras/<int:propuesta_id>/alternativo/', views.recalcular_alternativo_propuesta, name='recalcular_alternativo_propuesta'),
-        # Acciones rápidas
-        path('acciones/recalcular-scores/', views.recalcular_scores_proveedores, name='recalcular_scores_proveedores'),
-        # Webhook externo para proveedores
-        path('webhook/consulta-stock/<int:propuesta_id>/', views.webhook_consulta_stock, name='webhook_consulta_stock'),
+    path('cotizacion/', views.compras_propuestas_admin, name='compras_propuestas'),
+    path('cotizacion/crear-propuesta/', views.crear_propuesta_para_insumo, name='crear_propuesta_para_insumo'),
+    path('cotizacion/generar/', views.generar_compras_propuestas_demo, name='generar_compras_propuestas'),
+    path('cotizacion/<int:propuesta_id>/consultar/', views.consultar_stock_propuesta, name='consultar_stock_propuesta'),
+    path('cotizacion/<int:propuesta_id>/aceptar/', views.aceptar_compra_propuesta, name='aceptar_compra_propuesta'),
+    path('cotizacion/<int:propuesta_id>/rechazar/', views.rechazar_compra_propuesta, name='rechazar_compra_propuesta'),
+    path('cotizacion/<int:propuesta_id>/alternativo/', views.recalcular_alternativo_propuesta, name='recalcular_alternativo_propuesta'),
+    # Acciones rápidas
+    path('acciones/recalcular-scores/', views.recalcular_scores_proveedores, name='recalcular_scores_proveedores'),
+    # Webhook externo para proveedores
+    path('webhook/consulta-stock/<int:propuesta_id>/', views.webhook_consulta_stock, name='webhook_consulta_stock'),
     path('solicitud-cotizacion/<str:token>/confirmar/', views.solicitud_cotizacion_confirmar, name='sc_confirmar'),
     path('solicitud-cotizacion/<str:token>/rechazar/', views.solicitud_cotizacion_rechazar, name='sc_rechazar'),
     path('prediccion/', views.prediccion_demanda_panel, name='prediccion_demanda_panel'),

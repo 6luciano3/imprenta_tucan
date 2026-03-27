@@ -148,6 +148,23 @@
     </div>
     <p class="text-xs text-gray-500 mt-2">Genera ofertas personalizadas, las aprueba y envía emails automáticamente (score >= 96).</p>
   </div>
+  <div class="bg-white border border-purple-200 rounded-xl p-4 shadow-sm">
+    <div class="flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="h-10 w-10 rounded-full bg-purple-50 text-purple-700 grid place-items-center">
+          <span class="material-symbols-outlined">request_quote</span>
+        </div>
+        <div>
+          <p class="text-sm text-gray-500">Proceso Inteligente</p>
+          <p class="text-base font-semibold">Cotización a Proveedores</p>
+        </div>
+      </div>
+      <button id="btnCotizacion" class="text-xs px-3 py-2 rounded bg-purple-600 text-white hover:bg-purple-700">
+        Ejecutar
+      </button>
+    </div>
+    <p class="text-xs text-gray-500 mt-2">Detecta insumos con stock bajo, genera cotizaciones y envía emails automáticamente al proveedor.</p>
+  </div>
 </section>
 
 <!-- Acciones rápidas -->
@@ -221,6 +238,34 @@ document.addEventListener('DOMContentLoaded', function(){
         alert('Error: ' + err);
         btnAnticipacion.disabled = false;
         btnAnticipacion.textContent = 'Ejecutar';
+      });
+    });
+  }
+  
+  // Botón de Cotización
+  const btnCotizacion = document.getElementById('btnCotizacion');
+  if (btnCotizacion) {
+    btnCotizacion.addEventListener('click', function(){
+      if (!confirm('¿Ejecutar Proceso Inteligente de Cotización a Proveedores?')) return;
+      btnCotizacion.disabled = true;
+      btnCotizacion.textContent = 'Ejecutando...';
+      fetch('{% url "ejecutar_cotizacion" %}', {
+        method: 'POST',
+        headers: { 
+          'X-CSRFToken': csrftoken, 
+          'Content-Type': 'application/json' 
+        },
+        body: JSON.stringify({})
+      })
+      .then(r => r.json())
+      .then(data => {
+        alert(data.mensaje + (data.propuestas_creadas ? '\nPropuestas creadas: ' + data.propuestas_creadas : ''));
+        window.location.reload();
+      })
+      .catch(err => {
+        alert('Error: ' + err);
+        btnCotizacion.disabled = false;
+        btnCotizacion.textContent = 'Ejecutar';
       });
     });
   }
