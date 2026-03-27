@@ -33,6 +33,7 @@ def enviar_notificacion(
     html: str | None = None,
     metadata: dict | None = None,
     attachments: list | None = None,
+    reply_to: str | None = None,
 ) -> dict:
     """
     Despacha una notificación al canal indicado.
@@ -44,6 +45,7 @@ def enviar_notificacion(
         asunto:       Asunto (solo email).
         html:         Cuerpo HTML alternativo (solo email).
         metadata:     Datos adicionales registrados en el log interno.
+        reply_to:     Email de respuesta (solo email).
 
     Returns:
         {'ok': True} si la notificación fue enviada correctamente.
@@ -66,7 +68,7 @@ def enviar_notificacion(
         return {'ok': False, 'error': err}
 
     try:
-        resultado = handler(destinatario, mensaje, asunto=asunto, html=html, metadata=metadata, attachments=attachments)
+        resultado = handler(destinatario, mensaje, asunto=asunto, html=html, metadata=metadata, attachments=attachments, reply_to=reply_to)
         _registrar_log(destinatario, canal, mensaje, metadata, exito=resultado.get('ok', False))
         return resultado
     except Exception as exc:
@@ -77,7 +79,7 @@ def enviar_notificacion(
 
 # ── Canal: email ─────────────────────────────────────────────────────────────
 
-def _enviar_email(destinatario, mensaje, *, asunto=None, html=None, metadata=None, attachments=None):
+def _enviar_email(destinatario, mensaje, *, asunto=None, html=None, metadata=None, attachments=None, reply_to=None):
     from django.core.mail import send_mail, EmailMultiAlternatives
     from django.conf import settings
 
@@ -90,9 +92,11 @@ def _enviar_email(destinatario, mensaje, *, asunto=None, html=None, metadata=Non
             msg.attach_alternative(html, 'text/html')
         for att in (attachments or []):
             msg.attach(*att)
+        if reply_to:
+            msg.reply_to = [reply_to]
         msg.send()
     else:
-        send_mail(asunto, mensaje, remitente, [destinatario], fail_silently=False)
+        send_mail(asunto, mensaje, remitente, [destinatario], fail_silently=False, reply_to=[reply_to] if reply_to else None)
 
     logger.info('email enviado a %s: %s', destinatario, asunto)
     return {'ok': True}

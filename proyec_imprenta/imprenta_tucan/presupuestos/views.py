@@ -435,3 +435,48 @@ def imagen_presupuesto(request, token):
     response = HttpResponse(png_bytes, content_type='image/png')
     response['Cache-Control'] = 'public, max-age=3600'
     return response
+
+
+@require_perm('Presupuestos', 'Ver')
+@login_required
+@requiere_permiso("Comercial")
+def recordatorio_presupuestos(request):
+    """Vista para mostrar presupuestos próximos a vencer y enviar recordatorios."""
+    from django.utils import timezone
+    from datetime import timedelta
+    from configuracion.models import Parametro
+
+    dias_antes = 3
+    try:
+        dias_param = Parametro.get('PRESUPUESTO_DIAS_RECORDATORIO')
+        if dias_param:
+            dias_antes = int(dias_param)
+    except Exception:
+        pass
+
+    fecha_hoy = timezone.now().date()
+    fecha_limite = fecha_hoy + timedelta(days=dias_antes)
+
+    presupuestos_proximos = Presupuesto.objects.filter(
+        respuesta_cliente='pendiente',
+        validez__gte=fecha_hoy,
+        validez__lte=fecha_limite,
+        estado='Activo',
+    ).select_related('cliente').order_by('validez')
+
+    mensaje_resultado = None
+    if request.method == 'POST' and 'enviar_recordatorios' in request.POST:
+        from automatizacion.tasks import tarea_recordatorio_presupuestos
+        try:
+            resultado = tarea_recordatorio_presupuestos()
+            mensaje_resultado = resultado
+        except Exception as e:
+            mensaje_resultado = f"Error: {str(e)}"
+
+    context = {
+        'presupuestos_proximos': presupuestos_proximos,
+        'dias_antes': dias_antes,
+        'fecha_hoy': fecha_hoy,
+        'mensaje_resultado': mensaje_resultado,
+    }
+    return render(request, 'presupuestos/recordatorio.html', context)

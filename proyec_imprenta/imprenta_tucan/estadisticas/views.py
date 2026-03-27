@@ -382,7 +382,162 @@ def api_estadistica_compras(request):
 # UTILIDADES DE GRAFICOS CON MATPLOTLIB
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def _grafico_barras(labels, values, titulo, color="#1E3A5F", ancho=14, alto=4):
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# GRAFICOS DESDE API DESCRIPTIVA
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def _get_api_data(view_func, desde=None, hasta=None):
+    from django.test import RequestFactory
+    import json
+    rf = RequestFactory()
+    params = {}
+    if desde: params["desde"] = str(desde)
+    if hasta: params["hasta"] = str(hasta)
+    req = rf.get("/api/", params)
+    resp = view_func(req)
+    return json.loads(resp.content)
+
+
+def _grafico_histograma(bins, titulo, color="#3498DB", ancho=13, alto=4):
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from io import BytesIO
+    labels = [b["label"] for b in bins]
+    values = [b["count"] for b in bins]
+    fig, ax = plt.subplots(figsize=(ancho, alto))
+    ax.bar(labels, values, color=color, edgecolor="white", linewidth=0.5)
+    ax.set_title(titulo, fontsize=10, fontweight="bold", pad=8, color="#1E3A5F")
+    ax.tick_params(axis="x", rotation=35, labelsize=7)
+    ax.tick_params(axis="y", labelsize=7)
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    ax.yaxis.grid(True, alpha=0.3)
+    ax.set_axisbelow(True)
+    plt.tight_layout()
+    buf = BytesIO()
+    fig.savefig(buf, format="png", dpi=130, bbox_inches="tight")
+    plt.close(fig)
+    buf.seek(0)
+    return buf
+
+
+def _grafico_categorico(labels, values, titulo, tipo="bar", ancho=13, alto=4):
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from io import BytesIO
+    COLORS = ["#3498DB","#2ECC71","#E74C3C","#F39C12","#9B59B6",
+              "#1ABC9C","#E67E22","#34495E","#E91E63","#00BCD4"]
+    fig, ax = plt.subplots(figsize=(ancho, alto))
+    if tipo == "barh":
+        ax.barh(labels, values, color=COLORS[:len(labels)], edgecolor="white", linewidth=0.5)
+        ax.tick_params(axis="y", labelsize=7)
+        ax.tick_params(axis="x", labelsize=7)
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+        ax.xaxis.grid(True, alpha=0.3)
+        ax.set_axisbelow(True)
+    elif tipo == "line":
+        ax.plot(range(len(labels)), values, color=COLORS[0], linewidth=2,
+                marker="o", markersize=5, markerfacecolor="white", markeredgewidth=2)
+        ax.fill_between(range(len(labels)), values, alpha=0.1, color=COLORS[0])
+        ax.set_xticks(range(len(labels)))
+        ax.set_xticklabels(labels, rotation=30, fontsize=7)
+        ax.tick_params(axis="y", labelsize=7)
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+        ax.yaxis.grid(True, alpha=0.3)
+    elif tipo == "pie":
+        wedges, texts, autotexts = ax.pie(
+            values, labels=labels, autopct="%1.1f%%",
+            colors=COLORS[:len(labels)], startangle=90,
+            wedgeprops={"edgecolor": "white", "linewidth": 1.5}
+        )
+        for t in texts: t.set_fontsize(8)
+        for at in autotexts:
+            at.set_fontsize(7)
+            at.set_color("white")
+            at.set_fontweight("bold")
+    else:
+        bars = ax.bar(labels, values, color=COLORS[:len(labels)],
+                      edgecolor="white", linewidth=0.5)
+        ax.tick_params(axis="x", rotation=30, labelsize=7)
+        ax.tick_params(axis="y", labelsize=7)
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+        ax.yaxis.grid(True, alpha=0.3)
+        ax.set_axisbelow(True)
+        for bar, val in zip(bars, values):
+            ax.text(bar.get_x() + bar.get_width()/2,
+                    bar.get_height() + max(values)*0.01,
+                    str(val), ha="center", va="bottom", fontsize=7)
+    ax.set_title(titulo, fontsize=10, fontweight="bold", pad=8, color="#1E3A5F")
+    plt.tight_layout()
+    buf = BytesIO()
+    fig.savefig(buf, format="png", dpi=130, bbox_inches="tight")
+    plt.close(fig)
+    buf.seek(0)
+    return buf
+
+
+def _agregar_graficos_api(story, data, st, ancho=10, alto_hist=2.8, alto_cat=2.8, request=None):
+    from reportlab.platypus import Paragraph, Spacer, CondPageBreak
+
+    variables = data.get("variables", {})
+    categoricas = data.get("categoricas", {})
+    cm = st["cm"]
+
+    # Obtener tipos de graficos desde request
+    tipo_global = "bar"
+    tipos_request = {}
+    if request:
+        tipo_global = request.GET.get("tipo_global", "bar")
+        for k, v in request.GET.items():
+            if k.startswith("tipo_"):
+                tipos_request[k[5:]] = v
+
+    # Histogramas de variables numericas
+    for idx_h, (key, vdata) in enumerate(variables.items()):
+        if not vdata or not vdata.get("stats"): continue
+        stats = vdata["stats"]
+        bins = stats.get("histograma", [])
+        if not bins: continue
+        label = vdata.get("label", key)
+        tipo_hist = tipos_request.get(f"hist_{idx_h}", tipos_request.get("tipo_global", tipo_global))
+        story.append(Paragraph(f"Histograma: {label}", st["seccion"]))
+        if tipo_hist in ("pie", "doughnut"):
+            hist_labels = [b["label"] for b in bins]
+            hist_vals = [b["count"] for b in bins]
+            buf = _grafico_categorico(hist_labels, hist_vals, f"Distribucion de {label}", tipo="pie")
+            story.append(_img_flowable(buf, ancho, alto_hist + 2))
+        else:
+            buf = _grafico_histograma(bins, f"Distribucion de {label}")
+            story.append(_img_flowable(buf, ancho, alto_hist))
+        story.append(Spacer(1, 0.3*cm))
+
+    # Graficos categoricos
+    for idx_c, (key, cdata) in enumerate(categoricas.items()):
+        if not cdata: continue
+        labels = cdata.get("labels", [])
+        values = cdata.get("values", [])
+        if not labels or not values: continue
+        titulo = key.replace("_", " ").title()
+        # Usar tipo del request si existe, sino tipo por defecto
+        tipo = tipos_request.get(f"cat_{idx_c}", tipos_request.get("tipo_global", tipo_global))
+        # Normalizar tipos de Chart.js a matplotlib
+        tipo_map = {"horizontalBar": "barh", "doughnut": "pie", "line": "line", "scatter": "bar"}
+        tipo = tipo_map.get(tipo, tipo)
+        story.append(Paragraph(f"Grafico: {titulo}", st["seccion"]))
+        buf = _grafico_categorico(labels, values, titulo, tipo=tipo)
+        h = alto_cat + 1 if tipo == "pie" else alto_cat
+        story.append(_img_flowable(buf, ancho, h))
+        story.append(Spacer(1, 0.3*cm))
+
+
+def _grafico_barras(labels, values, titulo, color="#3498DB", ancho=14, alto=4):
     """Genera un grafico de barras y retorna un ImageReader para ReportLab."""
     import matplotlib
     matplotlib.use("Agg")
@@ -415,7 +570,7 @@ def _grafico_torta(labels, values, titulo, ancho=6, alto=4):
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
     from io import BytesIO
-    COLORS = ["#1E3A5F","#2980B9","#27AE60","#F39C12","#E74C3C","#9B59B6","#1ABC9C","#E67E22"]
+    COLORS = ["#3498DB","#2ECC71","#E74C3C","#F39C12","#9B59B6","#1ABC9C","#E67E22","#34495E"]
     fig, ax = plt.subplots(figsize=(ancho, alto))
     wedges, texts, autotexts = ax.pie(
         values, labels=labels, autopct="%1.1f%%",
@@ -433,7 +588,7 @@ def _grafico_torta(labels, values, titulo, ancho=6, alto=4):
     return buf
 
 
-def _grafico_linea(labels, values, titulo, color="#2980B9", ancho=14, alto=4):
+def _grafico_linea(labels, values, titulo, color="#3498DB", ancho=14, alto=4):
     """Genera un grafico de linea y retorna un ImageReader para ReportLab."""
     import matplotlib
     matplotlib.use("Agg")
@@ -464,7 +619,9 @@ def _img_flowable(buf, ancho_cm, alto_cm):
     from reportlab.platypus import Image as RLImage
     from reportlab.lib.units import cm
     buf.seek(0)
-    return RLImage(buf, width=ancho_cm*cm, height=alto_cm*cm)
+    img = RLImage(buf, width=ancho_cm*cm, height=alto_cm*cm)
+    img.hAlign = "LEFT"
+    return img
 
 
 def _pdf_setup(titulo_informe, request):
@@ -516,6 +673,8 @@ def _pdf_setup(titulo_informe, request):
         "titulo_inf": titulo_informe,
     }
 
+    _total_pages = [0]  # mutable para closure
+
     def _draw_page(canvas_obj, doc_obj):
         from reportlab.lib.pagesizes import A4 as _A4
         from reportlab.lib import colors as _c
@@ -531,12 +690,13 @@ def _pdf_setup(titulo_informe, request):
             "Sistema de Gestion - Imprenta Tucan  |  " + hoy.strftime("%d/%m/%Y"))
         canvas_obj.setFont("Helvetica-Bold", 8)
         canvas_obj.setFillColor(_c.HexColor("#1E3A5F"))
+        total = _total_pages[0] if _total_pages[0] > 0 else "?"
         canvas_obj.drawRightString(_W - 2*cm, 0.42*cm,
             "Pagina " + str(doc_obj.page))
         canvas_obj.restoreState()
 
     frame = Frame(
-        2*cm, 1.5*cm, content_width, H - 3*cm,
+        2*cm, 1.5*cm, content_width, H - 4*cm,
         leftPadding=0, rightPadding=0, topPadding=0, bottomPadding=0, id="main"
     )
     template = PageTemplate(id="main", frames=[frame], onPage=_draw_page)
@@ -545,7 +705,7 @@ def _pdf_setup(titulo_informe, request):
         pageTemplates=[template],
         title=titulo_informe + " - Imprenta Tucan",
     )
-    return buffer, doc, st, content_width
+    return buffer, doc, st, content_width, _total_pages
 
 
 def _pdf_header(st, titulo_informe, periodo_str, usuario_nombre):
@@ -593,16 +753,20 @@ def _tbl_style(st, header_cols=None):
 
 
 def _pdf_firma(st, usuario_nombre):
-    from reportlab.platypus import Table, TableStyle, Paragraph, Spacer, HRFlowable
+    from reportlab.platypus import Spacer, HRFlowable, Paragraph
     from django.utils import timezone
     hoy = timezone.now().date()
-    cm = st["cm"]; cw = st["cw"]
+    cm = st["cm"]
     hr = HRFlowable(width="100%", thickness=1, color=st["azul"], spaceAfter=6, spaceBefore=16)
-    firma = Table([[
-        Table([[Paragraph("<b>Aprobado por:</b>", st["bold"])],[Spacer(1,0.4*cm)],[Paragraph(f"<b>{usuario_nombre}</b>", st["bold"])],[Paragraph("_"*28, st["normal"])],[Paragraph("Firma: _________________", st["normal"])]]),
-        Table([[Paragraph(f"Generado: {hoy.strftime('%d/%m/%Y')}", st["sub"])],[Paragraph("Imprenta Tucan - Sistema de Gestion", st["footer"])]])
-    ]], colWidths=[cw*0.5, cw*0.5])
-    firma.setStyle(TableStyle([("VALIGN",(0,0),(-1,-1),"BOTTOM"),("ALIGN",(1,0),(1,0),"RIGHT")]))
+    firma = [
+        Paragraph("<b>Aprobado por:</b>", st["bold"]),
+        Spacer(1, 0.3*cm),
+        Paragraph(f"<b>{usuario_nombre}</b>", st["bold"]),
+        Paragraph("_" * 30, st["normal"]),
+        Paragraph("Firma: _________________", st["normal"]),
+        Spacer(1, 0.3*cm),
+        Paragraph(f"Generado: {hoy.strftime('%d/%m/%Y')}  |  Imprenta Tucan - Sistema de Gestion", st["footer"]),
+    ]
     return hr, firma
 
 
@@ -635,6 +799,7 @@ from django.contrib.auth.decorators import login_required
 
 @login_required
 def informe_pdf_pedidos(request):
+    from estadisticas.views import api_estadistica_pedidos
     from reportlab.platypus import Paragraph, Spacer, Table, HRFlowable
     from django.db.models import Count, Sum
     from django.db.models.functions import TruncMonth
@@ -642,7 +807,7 @@ def informe_pdf_pedidos(request):
     desde = parse_date(request.GET.get("desde","") or "")
     hasta = parse_date(request.GET.get("hasta","") or "")
     usuario = str(request.user) if request.user.is_authenticated else "Sistema"
-    buffer, doc, st, cw = _pdf_setup("Informe de Pedidos", request)
+    buffer, doc, st, cw, _total_pages = _pdf_setup("Informe de Pedidos", request)
     qs = Pedido.objects.select_related("cliente","estado").all()
     if desde: qs = qs.filter(fecha_pedido__gte=desde)
     if hasta: qs = qs.filter(fecha_pedido__lte=hasta)
@@ -673,75 +838,34 @@ def informe_pdf_pedidos(request):
     for p in recientes:
         rows2.append([Paragraph(str(p.id),st["normal"]),Paragraph(str(p.cliente)[:30],st["normal"]),Paragraph(p.fecha_pedido.strftime("%d/%m/%y"),st["normal"]),Paragraph(str(p.estado),st["normal"]),Paragraph(f"${float(p.monto_total):,.2f}",st["normal"])])
     t3 = Table(rows2, colWidths=[cw*0.08,cw*0.32,cw*0.15,cw*0.2,cw*0.25]); t3.setStyle(_tbl_style(st)); story.append(t3)
-    # Grafico 1: Pedidos por estado (barras)
-    story.append(Paragraph("Grafico: Pedidos por Estado", st["seccion"]))
-    estados_labels = [str(r["estado__nombre"] or "Sin estado") for r in por_estado]
-    estados_vals = [r["n"] for r in por_estado]
-    if estados_labels:
-        img = _grafico_barras(estados_labels, estados_vals, "Pedidos por Estado", "#1E3A5F")
-        story.append(_img_flowable(img, 15, 5))
-    # Grafico 2: Ingresos por mes (linea)
-    from django.db.models.functions import TruncMonth
-    ingresos_mes = qs.annotate(mes=TruncMonth("fecha_pedido")).values("mes").annotate(total=Sum("monto_total")).order_by("mes")
-    mes_labels = [r["mes"].strftime("%b %Y") if r["mes"] else "N/A" for r in ingresos_mes]
-    mes_vals = [float(r["total"] or 0) for r in ingresos_mes]
-    if mes_labels:
-        story.append(Paragraph("Grafico: Ingresos por Mes", st["seccion"]))
-        img2 = _grafico_linea(mes_labels, mes_vals, "Ingresos por Mes ($)", "#2980B9")
-        story.append(_img_flowable(img2, 15, 5))
-    hr2, firma = _pdf_firma(st, usuario); story += [hr2, firma]
-    # Dos pasadas para obtener total de paginas
-    def _contar_paginas(story_items, doc_obj):
-        from io import BytesIO as _BytesIO
-        from reportlab.platypus import BaseDocTemplate, PageTemplate, Frame
-        from reportlab.lib.pagesizes import A4 as _A4
-        from reportlab.lib.units import cm as _cm
-        _W, _H = _A4
-        _buf = _BytesIO()
-        _frame = Frame(2*_cm, 1.5*_cm, _W-4*_cm, _H-3*_cm,
-            leftPadding=0, rightPadding=0, topPadding=0, bottomPadding=0)
-        _tpl = PageTemplate(id="cnt", frames=[_frame], onPage=lambda c,d: None)
-        _doc2 = BaseDocTemplate(_buf, pagesize=_A4, pageTemplates=[_tpl])
-        _doc2.build(story_items)
-        _buf.seek(0)
-        from pypdf import PdfReader as _PR
-        return len(_PR(_buf).pages)
-
-    import copy
-    _total = _contar_paginas(copy.copy(story), doc)
-
-    def _draw_page_nm(canvas_obj, doc_obj):
-        from reportlab.lib.pagesizes import A4 as _A4
-        from reportlab.lib import colors as _c
-        _W, _H = _A4
-        canvas_obj.saveState()
-        canvas_obj.setFillColor(_c.HexColor("#F4F6F8"))
-        canvas_obj.rect(0, 0, _W, 1.2*st["cm"], fill=1, stroke=0)
-        canvas_obj.setStrokeColor(_c.HexColor("#BDC3C7"))
-        canvas_obj.line(0, 1.2*st["cm"], _W, 1.2*st["cm"])
-        canvas_obj.setFont("Helvetica", 7)
-        canvas_obj.setFillColor(_c.HexColor("#7F8C8D"))
-        canvas_obj.drawString(2*st["cm"], 0.42*st["cm"],
-            "Sistema de Gestion - Imprenta Tucan  |  " + st["hoy"].strftime("%d/%m/%Y"))
-        canvas_obj.setFont("Helvetica-Bold", 8)
-        canvas_obj.setFillColor(_c.HexColor("#1E3A5F"))
-        canvas_obj.drawRightString(_W - 2*st["cm"], 0.42*st["cm"],
-            "Pagina " + str(doc_obj.page) + " de " + str(_total))
-        canvas_obj.restoreState()
-
-    from reportlab.platypus import BaseDocTemplate, PageTemplate, Frame
-    from reportlab.lib.pagesizes import A4 as _A42
-    from reportlab.lib.units import cm as _cm2
-    _W2, _H2 = _A42
-    _frame2 = Frame(2*_cm2, 1.5*_cm2, _W2-4*_cm2, _H2-3*_cm2,
-        leftPadding=0, rightPadding=0, topPadding=0, bottomPadding=0, id="main")
-    _tpl2 = PageTemplate(id="main", frames=[_frame2], onPage=_draw_page_nm)
-    from io import BytesIO as _BytesIO2
-    buffer = _BytesIO2()
-    _doc_final = BaseDocTemplate(buffer, pagesize=_A42,
-        pageTemplates=[_tpl2],
-        title=st["titulo_inf"] + " - Imprenta Tucan")
-    _doc_final.build(story)
+    _data_api = _get_api_data(api_estadistica_pedidos, desde, hasta)
+    _agregar_graficos_api(story, _data_api, st, request=request)
+    hr2, firma_items = _pdf_firma(st, usuario); story.append(hr2); story.extend(firma_items)
+    # Primera pasada: contar paginas
+    import copy as _copy
+    from io import BytesIO as _BytesIO3
+    _buf_count = _BytesIO3()
+    _doc_count = __import__('reportlab.platypus', fromlist=['BaseDocTemplate']).BaseDocTemplate(
+        _buf_count, pagesize=__import__('reportlab.lib.pagesizes', fromlist=['A4']).A4,
+        pageTemplates=[__import__('reportlab.platypus', fromlist=['PageTemplate']).PageTemplate(
+            id='cnt',
+            frames=[__import__('reportlab.platypus', fromlist=['Frame']).Frame(
+                2*st['cm'], 1.5*st['cm'],
+                st['cw'], 25*st['cm'],
+                leftPadding=0, rightPadding=0, topPadding=0, bottomPadding=0
+            )],
+            onPage=lambda c,d: None
+        )]
+    )
+    try:
+        _doc_count.build(_copy.copy(story))
+        _buf_count.seek(0)
+        from pypdf import PdfReader as _PRI
+        _total_pages[0] = len(_PRI(_buf_count).pages)
+    except Exception:
+        _total_pages[0] = 1
+    # Segunda pasada: PDF final con total conocido
+    doc.build(story)
     return _pdf_response(buffer, "informe_pedidos", request)
 
 
@@ -750,13 +874,14 @@ def informe_pdf_pedidos(request):
 # ═══════════════════════════════════════════════════════════════════════════════
 @login_required
 def informe_pdf_clientes(request):
+    from estadisticas.views import api_estadistica_clientes
     from reportlab.platypus import Paragraph, Spacer, Table, HRFlowable
     from django.db.models import Count, Sum, Avg
     from django.utils.dateparse import parse_date
     desde = parse_date(request.GET.get("desde","") or "")
     hasta = parse_date(request.GET.get("hasta","") or "")
     usuario = str(request.user) if request.user.is_authenticated else "Sistema"
-    buffer, doc, st, cw = _pdf_setup("Informe de Clientes", request)
+    buffer, doc, st, cw, _total_pages = _pdf_setup("Informe de Clientes", request)
     story = []
     hdr, hr = _pdf_header(st, "Informe de Clientes", _periodo_str(desde, hasta), usuario)
     story += [hdr, hr]
@@ -785,74 +910,34 @@ def informe_pdf_clientes(request):
     for c in top:
         rows2.append([Paragraph(str(c)[:35],st["normal"]),Paragraph(str(c.tipo_cliente or "-"),st["normal"]),Paragraph(str(c.n_pedidos),st["normal"]),Paragraph(f"${float(c.total_ing or 0):,.2f}",st["normal"])])
     t2 = Table(rows2,colWidths=[cw*0.4,cw*0.2,cw*0.15,cw*0.25]); t2.setStyle(_tbl_style(st)); story.append(t2)
-    # Grafico: Top clientes por pedidos (barras)
-    top_nombres = [str(c)[:20] for c in top]
-    top_vals = [c.n_pedidos for c in top]
-    if top_nombres:
-        story.append(Paragraph("Grafico: Top Clientes por Pedidos", st["seccion"]))
-        img = _grafico_barras(top_nombres, top_vals, "Top Clientes por Pedidos", "#27AE60")
-        story.append(_img_flowable(img, 15, 5))
-    # Grafico: por tipo de cliente (torta)
-    tipo_qs = Cliente.objects.values("tipo_cliente").annotate(n=Count("id")).order_by("-n")
-    tipo_labels = [str(r["tipo_cliente"] or "Sin tipo") for r in tipo_qs]
-    tipo_vals = [r["n"] for r in tipo_qs]
-    if tipo_labels:
-        story.append(Paragraph("Grafico: Distribucion por Tipo de Cliente", st["seccion"]))
-        img2 = _grafico_torta(tipo_labels, tipo_vals, "Clientes por Tipo")
-        story.append(_img_flowable(img2, 9, 6))
-    hr2, firma = _pdf_firma(st, usuario); story += [hr2, firma]
-    # Dos pasadas para obtener total de paginas
-    def _contar_paginas(story_items, doc_obj):
-        from io import BytesIO as _BytesIO
-        from reportlab.platypus import BaseDocTemplate, PageTemplate, Frame
-        from reportlab.lib.pagesizes import A4 as _A4
-        from reportlab.lib.units import cm as _cm
-        _W, _H = _A4
-        _buf = _BytesIO()
-        _frame = Frame(2*_cm, 1.5*_cm, _W-4*_cm, _H-3*_cm,
-            leftPadding=0, rightPadding=0, topPadding=0, bottomPadding=0)
-        _tpl = PageTemplate(id="cnt", frames=[_frame], onPage=lambda c,d: None)
-        _doc2 = BaseDocTemplate(_buf, pagesize=_A4, pageTemplates=[_tpl])
-        _doc2.build(story_items)
-        _buf.seek(0)
-        from pypdf import PdfReader as _PR
-        return len(_PR(_buf).pages)
-
-    import copy
-    _total = _contar_paginas(copy.copy(story), doc)
-
-    def _draw_page_nm(canvas_obj, doc_obj):
-        from reportlab.lib.pagesizes import A4 as _A4
-        from reportlab.lib import colors as _c
-        _W, _H = _A4
-        canvas_obj.saveState()
-        canvas_obj.setFillColor(_c.HexColor("#F4F6F8"))
-        canvas_obj.rect(0, 0, _W, 1.2*st["cm"], fill=1, stroke=0)
-        canvas_obj.setStrokeColor(_c.HexColor("#BDC3C7"))
-        canvas_obj.line(0, 1.2*st["cm"], _W, 1.2*st["cm"])
-        canvas_obj.setFont("Helvetica", 7)
-        canvas_obj.setFillColor(_c.HexColor("#7F8C8D"))
-        canvas_obj.drawString(2*st["cm"], 0.42*st["cm"],
-            "Sistema de Gestion - Imprenta Tucan  |  " + st["hoy"].strftime("%d/%m/%Y"))
-        canvas_obj.setFont("Helvetica-Bold", 8)
-        canvas_obj.setFillColor(_c.HexColor("#1E3A5F"))
-        canvas_obj.drawRightString(_W - 2*st["cm"], 0.42*st["cm"],
-            "Pagina " + str(doc_obj.page) + " de " + str(_total))
-        canvas_obj.restoreState()
-
-    from reportlab.platypus import BaseDocTemplate, PageTemplate, Frame
-    from reportlab.lib.pagesizes import A4 as _A42
-    from reportlab.lib.units import cm as _cm2
-    _W2, _H2 = _A42
-    _frame2 = Frame(2*_cm2, 1.5*_cm2, _W2-4*_cm2, _H2-3*_cm2,
-        leftPadding=0, rightPadding=0, topPadding=0, bottomPadding=0, id="main")
-    _tpl2 = PageTemplate(id="main", frames=[_frame2], onPage=_draw_page_nm)
-    from io import BytesIO as _BytesIO2
-    buffer = _BytesIO2()
-    _doc_final = BaseDocTemplate(buffer, pagesize=_A42,
-        pageTemplates=[_tpl2],
-        title=st["titulo_inf"] + " - Imprenta Tucan")
-    _doc_final.build(story)
+    _data_api = _get_api_data(api_estadistica_clientes, desde, hasta)
+    _agregar_graficos_api(story, _data_api, st, request=request)
+    hr2, firma_items = _pdf_firma(st, usuario); story.append(hr2); story.extend(firma_items)
+    # Primera pasada: contar paginas
+    import copy as _copy
+    from io import BytesIO as _BytesIO3
+    _buf_count = _BytesIO3()
+    _doc_count = __import__('reportlab.platypus', fromlist=['BaseDocTemplate']).BaseDocTemplate(
+        _buf_count, pagesize=__import__('reportlab.lib.pagesizes', fromlist=['A4']).A4,
+        pageTemplates=[__import__('reportlab.platypus', fromlist=['PageTemplate']).PageTemplate(
+            id='cnt',
+            frames=[__import__('reportlab.platypus', fromlist=['Frame']).Frame(
+                2*st['cm'], 1.5*st['cm'],
+                st['cw'], 25*st['cm'],
+                leftPadding=0, rightPadding=0, topPadding=0, bottomPadding=0
+            )],
+            onPage=lambda c,d: None
+        )]
+    )
+    try:
+        _doc_count.build(_copy.copy(story))
+        _buf_count.seek(0)
+        from pypdf import PdfReader as _PRI
+        _total_pages[0] = len(_PRI(_buf_count).pages)
+    except Exception:
+        _total_pages[0] = 1
+    # Segunda pasada: PDF final con total conocido
+    doc.build(story)
     return _pdf_response(buffer, "informe_clientes", request)
 
 
@@ -861,13 +946,14 @@ def informe_pdf_clientes(request):
 # ═══════════════════════════════════════════════════════════════════════════════
 @login_required
 def informe_pdf_productos(request):
+    from estadisticas.views import api_estadistica_productos
     from reportlab.platypus import Paragraph, Table
     from django.db.models import Count, Sum
     from django.utils.dateparse import parse_date
     desde = parse_date(request.GET.get("desde","") or "")
     hasta = parse_date(request.GET.get("hasta","") or "")
     usuario = str(request.user) if request.user.is_authenticated else "Sistema"
-    buffer, doc, st, cw = _pdf_setup("Informe de Productos", request)
+    buffer, doc, st, cw, _total_pages = _pdf_setup("Informe de Productos", request)
     story = []
     hdr, hr = _pdf_header(st, "Informe de Productos", _periodo_str(desde, hasta), usuario)
     story += [hdr, hr]
@@ -885,66 +971,34 @@ def informe_pdf_productos(request):
     for i,r in enumerate(top,1):
         rows2.append([Paragraph(str(i),st["normal"]),Paragraph(str(r["producto__nombreProducto"] or "-")[:30],st["normal"]),Paragraph(str(r["producto__categoria"] or "-"),st["normal"]),Paragraph(str(r["veces"]),st["normal"]),Paragraph(f"${float(r['ingresos'] or 0):,.2f}",st["normal"])])
     t2 = Table(rows2,colWidths=[cw*0.06,cw*0.36,cw*0.2,cw*0.12,cw*0.26]); t2.setStyle(_tbl_style(st)); story.append(t2)
-    # Grafico: top productos por ingresos
-    prod_nombres = [str(r["producto__nombreProducto"] or "-")[:20] for r in top]
-    prod_vals = [float(r["ingresos"] or 0) for r in top]
-    if prod_nombres:
-        story.append(Paragraph("Grafico: Top Productos por Ingresos", st["seccion"]))
-        img = _grafico_barras(prod_nombres, prod_vals, "Top Productos por Ingresos ($)", "#8E44AD")
-        story.append(_img_flowable(img, 15, 5))
-    hr2, firma = _pdf_firma(st, usuario); story += [hr2, firma]
-    # Dos pasadas para obtener total de paginas
-    def _contar_paginas(story_items, doc_obj):
-        from io import BytesIO as _BytesIO
-        from reportlab.platypus import BaseDocTemplate, PageTemplate, Frame
-        from reportlab.lib.pagesizes import A4 as _A4
-        from reportlab.lib.units import cm as _cm
-        _W, _H = _A4
-        _buf = _BytesIO()
-        _frame = Frame(2*_cm, 1.5*_cm, _W-4*_cm, _H-3*_cm,
-            leftPadding=0, rightPadding=0, topPadding=0, bottomPadding=0)
-        _tpl = PageTemplate(id="cnt", frames=[_frame], onPage=lambda c,d: None)
-        _doc2 = BaseDocTemplate(_buf, pagesize=_A4, pageTemplates=[_tpl])
-        _doc2.build(story_items)
-        _buf.seek(0)
-        from pypdf import PdfReader as _PR
-        return len(_PR(_buf).pages)
-
-    import copy
-    _total = _contar_paginas(copy.copy(story), doc)
-
-    def _draw_page_nm(canvas_obj, doc_obj):
-        from reportlab.lib.pagesizes import A4 as _A4
-        from reportlab.lib import colors as _c
-        _W, _H = _A4
-        canvas_obj.saveState()
-        canvas_obj.setFillColor(_c.HexColor("#F4F6F8"))
-        canvas_obj.rect(0, 0, _W, 1.2*st["cm"], fill=1, stroke=0)
-        canvas_obj.setStrokeColor(_c.HexColor("#BDC3C7"))
-        canvas_obj.line(0, 1.2*st["cm"], _W, 1.2*st["cm"])
-        canvas_obj.setFont("Helvetica", 7)
-        canvas_obj.setFillColor(_c.HexColor("#7F8C8D"))
-        canvas_obj.drawString(2*st["cm"], 0.42*st["cm"],
-            "Sistema de Gestion - Imprenta Tucan  |  " + st["hoy"].strftime("%d/%m/%Y"))
-        canvas_obj.setFont("Helvetica-Bold", 8)
-        canvas_obj.setFillColor(_c.HexColor("#1E3A5F"))
-        canvas_obj.drawRightString(_W - 2*st["cm"], 0.42*st["cm"],
-            "Pagina " + str(doc_obj.page) + " de " + str(_total))
-        canvas_obj.restoreState()
-
-    from reportlab.platypus import BaseDocTemplate, PageTemplate, Frame
-    from reportlab.lib.pagesizes import A4 as _A42
-    from reportlab.lib.units import cm as _cm2
-    _W2, _H2 = _A42
-    _frame2 = Frame(2*_cm2, 1.5*_cm2, _W2-4*_cm2, _H2-3*_cm2,
-        leftPadding=0, rightPadding=0, topPadding=0, bottomPadding=0, id="main")
-    _tpl2 = PageTemplate(id="main", frames=[_frame2], onPage=_draw_page_nm)
-    from io import BytesIO as _BytesIO2
-    buffer = _BytesIO2()
-    _doc_final = BaseDocTemplate(buffer, pagesize=_A42,
-        pageTemplates=[_tpl2],
-        title=st["titulo_inf"] + " - Imprenta Tucan")
-    _doc_final.build(story)
+    _data_api = _get_api_data(api_estadistica_productos, desde, hasta)
+    _agregar_graficos_api(story, _data_api, st, request=request)
+    hr2, firma_items = _pdf_firma(st, usuario); story.append(hr2); story.extend(firma_items)
+    # Primera pasada: contar paginas
+    import copy as _copy
+    from io import BytesIO as _BytesIO3
+    _buf_count = _BytesIO3()
+    _doc_count = __import__('reportlab.platypus', fromlist=['BaseDocTemplate']).BaseDocTemplate(
+        _buf_count, pagesize=__import__('reportlab.lib.pagesizes', fromlist=['A4']).A4,
+        pageTemplates=[__import__('reportlab.platypus', fromlist=['PageTemplate']).PageTemplate(
+            id='cnt',
+            frames=[__import__('reportlab.platypus', fromlist=['Frame']).Frame(
+                2*st['cm'], 1.5*st['cm'],
+                st['cw'], 25*st['cm'],
+                leftPadding=0, rightPadding=0, topPadding=0, bottomPadding=0
+            )],
+            onPage=lambda c,d: None
+        )]
+    )
+    try:
+        _doc_count.build(_copy.copy(story))
+        _buf_count.seek(0)
+        from pypdf import PdfReader as _PRI
+        _total_pages[0] = len(_PRI(_buf_count).pages)
+    except Exception:
+        _total_pages[0] = 1
+    # Segunda pasada: PDF final con total conocido
+    doc.build(story)
     return _pdf_response(buffer, "informe_productos", request)
 
 
@@ -953,13 +1007,14 @@ def informe_pdf_productos(request):
 # ═══════════════════════════════════════════════════════════════════════════════
 @login_required
 def informe_pdf_proveedores(request):
+    from estadisticas.views import api_estadistica_proveedores
     from reportlab.platypus import Paragraph, Table
     from django.db.models import Count
     from django.utils.dateparse import parse_date
     desde = parse_date(request.GET.get("desde","") or "")
     hasta = parse_date(request.GET.get("hasta","") or "")
     usuario = str(request.user) if request.user.is_authenticated else "Sistema"
-    buffer, doc, st, cw = _pdf_setup("Informe de Proveedores", request)
+    buffer, doc, st, cw, _total_pages = _pdf_setup("Informe de Proveedores", request)
     story = []
     hdr, hr = _pdf_header(st, "Informe de Proveedores", _periodo_str(desde, hasta), usuario)
     story += [hdr, hr]
@@ -976,67 +1031,34 @@ def informe_pdf_proveedores(request):
     for p in provs:
         rows2.append([Paragraph(str(p.nombre)[:35],st["normal"]),Paragraph(str(p.email or "-"),st["normal"]),Paragraph(str(p.n_insumos),st["normal"]),Paragraph("Activo" if p.activo else "Inactivo",st["normal"])])
     t2 = Table(rows2,colWidths=[cw*0.35,cw*0.35,cw*0.15,cw*0.15]); t2.setStyle(_tbl_style(st)); story.append(t2)
-    # Grafico: insumos por proveedor (top 10)
-    top_prov = Proveedor.objects.annotate(n=Count("insumos")).filter(n__gt=0).order_by("-n")[:10]
-    prov_nombres = [str(p.nombre)[:15] for p in top_prov]
-    prov_vals = [p.n for p in top_prov]
-    if prov_nombres:
-        story.append(Paragraph("Grafico: Insumos por Proveedor", st["seccion"]))
-        img = _grafico_barras(prov_nombres, prov_vals, "Top 10 Proveedores por Cantidad de Insumos", "#E67E22")
-        story.append(_img_flowable(img, 15, 5))
-    hr2, firma = _pdf_firma(st, usuario); story += [hr2, firma]
-    # Dos pasadas para obtener total de paginas
-    def _contar_paginas(story_items, doc_obj):
-        from io import BytesIO as _BytesIO
-        from reportlab.platypus import BaseDocTemplate, PageTemplate, Frame
-        from reportlab.lib.pagesizes import A4 as _A4
-        from reportlab.lib.units import cm as _cm
-        _W, _H = _A4
-        _buf = _BytesIO()
-        _frame = Frame(2*_cm, 1.5*_cm, _W-4*_cm, _H-3*_cm,
-            leftPadding=0, rightPadding=0, topPadding=0, bottomPadding=0)
-        _tpl = PageTemplate(id="cnt", frames=[_frame], onPage=lambda c,d: None)
-        _doc2 = BaseDocTemplate(_buf, pagesize=_A4, pageTemplates=[_tpl])
-        _doc2.build(story_items)
-        _buf.seek(0)
-        from pypdf import PdfReader as _PR
-        return len(_PR(_buf).pages)
-
-    import copy
-    _total = _contar_paginas(copy.copy(story), doc)
-
-    def _draw_page_nm(canvas_obj, doc_obj):
-        from reportlab.lib.pagesizes import A4 as _A4
-        from reportlab.lib import colors as _c
-        _W, _H = _A4
-        canvas_obj.saveState()
-        canvas_obj.setFillColor(_c.HexColor("#F4F6F8"))
-        canvas_obj.rect(0, 0, _W, 1.2*st["cm"], fill=1, stroke=0)
-        canvas_obj.setStrokeColor(_c.HexColor("#BDC3C7"))
-        canvas_obj.line(0, 1.2*st["cm"], _W, 1.2*st["cm"])
-        canvas_obj.setFont("Helvetica", 7)
-        canvas_obj.setFillColor(_c.HexColor("#7F8C8D"))
-        canvas_obj.drawString(2*st["cm"], 0.42*st["cm"],
-            "Sistema de Gestion - Imprenta Tucan  |  " + st["hoy"].strftime("%d/%m/%Y"))
-        canvas_obj.setFont("Helvetica-Bold", 8)
-        canvas_obj.setFillColor(_c.HexColor("#1E3A5F"))
-        canvas_obj.drawRightString(_W - 2*st["cm"], 0.42*st["cm"],
-            "Pagina " + str(doc_obj.page) + " de " + str(_total))
-        canvas_obj.restoreState()
-
-    from reportlab.platypus import BaseDocTemplate, PageTemplate, Frame
-    from reportlab.lib.pagesizes import A4 as _A42
-    from reportlab.lib.units import cm as _cm2
-    _W2, _H2 = _A42
-    _frame2 = Frame(2*_cm2, 1.5*_cm2, _W2-4*_cm2, _H2-3*_cm2,
-        leftPadding=0, rightPadding=0, topPadding=0, bottomPadding=0, id="main")
-    _tpl2 = PageTemplate(id="main", frames=[_frame2], onPage=_draw_page_nm)
-    from io import BytesIO as _BytesIO2
-    buffer = _BytesIO2()
-    _doc_final = BaseDocTemplate(buffer, pagesize=_A42,
-        pageTemplates=[_tpl2],
-        title=st["titulo_inf"] + " - Imprenta Tucan")
-    _doc_final.build(story)
+    _data_api = _get_api_data(api_estadistica_proveedores, desde, hasta)
+    _agregar_graficos_api(story, _data_api, st, request=request)
+    hr2, firma_items = _pdf_firma(st, usuario); story.append(hr2); story.extend(firma_items)
+    # Primera pasada: contar paginas
+    import copy as _copy
+    from io import BytesIO as _BytesIO3
+    _buf_count = _BytesIO3()
+    _doc_count = __import__('reportlab.platypus', fromlist=['BaseDocTemplate']).BaseDocTemplate(
+        _buf_count, pagesize=__import__('reportlab.lib.pagesizes', fromlist=['A4']).A4,
+        pageTemplates=[__import__('reportlab.platypus', fromlist=['PageTemplate']).PageTemplate(
+            id='cnt',
+            frames=[__import__('reportlab.platypus', fromlist=['Frame']).Frame(
+                2*st['cm'], 1.5*st['cm'],
+                st['cw'], 25*st['cm'],
+                leftPadding=0, rightPadding=0, topPadding=0, bottomPadding=0
+            )],
+            onPage=lambda c,d: None
+        )]
+    )
+    try:
+        _doc_count.build(_copy.copy(story))
+        _buf_count.seek(0)
+        from pypdf import PdfReader as _PRI
+        _total_pages[0] = len(_PRI(_buf_count).pages)
+    except Exception:
+        _total_pages[0] = 1
+    # Segunda pasada: PDF final con total conocido
+    doc.build(story)
     return _pdf_response(buffer, "informe_proveedores", request)
 
 
@@ -1045,9 +1067,10 @@ def informe_pdf_proveedores(request):
 # ═══════════════════════════════════════════════════════════════════════════════
 @login_required
 def informe_pdf_insumos(request):
+    from estadisticas.views import api_estadistica_insumos
     from reportlab.platypus import Paragraph, Table
     from django.db.models import Count, Sum
-    buffer, doc, st, cw = _pdf_setup("Informe de Insumos y Stock", request)
+    buffer, doc, st, cw, _total_pages = _pdf_setup("Informe de Insumos y Stock", request)
     usuario = str(request.user) if request.user.is_authenticated else "Sistema"
     story = []
     hdr, hr = _pdf_header(st, "Informe de Insumos y Stock", _periodo_str(None, None), usuario)
@@ -1069,77 +1092,34 @@ def informe_pdf_insumos(request):
         rows2.append([Paragraph(str(ins.codigo),st["normal"]),Paragraph(str(ins.nombre)[:35],st["normal"]),Paragraph(str(ins.stock),st["normal"]),Paragraph(f"${float(ins.precio_unitario):,.2f}",st["normal"])])
     if len(rows2)==1: rows2.append([Paragraph("Sin insumos criticos",st["normal"]),Paragraph("-",st["normal"]),Paragraph("-",st["normal"]),Paragraph("-",st["normal"])])
     t2 = Table(rows2,colWidths=[cw*0.2,cw*0.45,cw*0.1,cw*0.25]); t2.setStyle(_tbl_style(st)); story.append(t2)
-    # Grafico: distribucion stock (torta)
-    story.append(Paragraph("Grafico: Estado del Stock", st["seccion"]))
-    stock_labels = ["Stock OK", "Stock Bajo (<=10)", "Sin Stock (=0)"]
-    ok_count = Insumo.objects.filter(activo=True, stock__gt=10).count()
-    stock_vals = [ok_count, bajo_min, sin_stock]
-    stock_vals_filtrado = [(l, v) for l, v in zip(stock_labels, stock_vals) if v > 0]
-    if stock_vals_filtrado:
-        lbs, vls = zip(*stock_vals_filtrado)
-        img = _grafico_torta(list(lbs), list(vls), "Estado del Stock de Insumos")
-        story.append(_img_flowable(img, 9, 6))
-    # Grafico: top 10 insumos con menos stock (barras)
-    top_bajos = Insumo.objects.filter(activo=True, stock__gt=0).order_by("stock")[:10]
-    if top_bajos:
-        story.append(Paragraph("Grafico: Insumos con Menos Stock", st["seccion"]))
-        ins_nombres = [str(i.codigo)[:12] for i in top_bajos]
-        ins_vals = [i.stock for i in top_bajos]
-        img2 = _grafico_barras(ins_nombres, ins_vals, "Insumos con Menos Stock", "#E74C3C")
-        story.append(_img_flowable(img2, 15, 5))
-    hr2, firma = _pdf_firma(st, usuario); story += [hr2, firma]
-    # Dos pasadas para obtener total de paginas
-    def _contar_paginas(story_items, doc_obj):
-        from io import BytesIO as _BytesIO
-        from reportlab.platypus import BaseDocTemplate, PageTemplate, Frame
-        from reportlab.lib.pagesizes import A4 as _A4
-        from reportlab.lib.units import cm as _cm
-        _W, _H = _A4
-        _buf = _BytesIO()
-        _frame = Frame(2*_cm, 1.5*_cm, _W-4*_cm, _H-3*_cm,
-            leftPadding=0, rightPadding=0, topPadding=0, bottomPadding=0)
-        _tpl = PageTemplate(id="cnt", frames=[_frame], onPage=lambda c,d: None)
-        _doc2 = BaseDocTemplate(_buf, pagesize=_A4, pageTemplates=[_tpl])
-        _doc2.build(story_items)
-        _buf.seek(0)
-        from pypdf import PdfReader as _PR
-        return len(_PR(_buf).pages)
-
-    import copy
-    _total = _contar_paginas(copy.copy(story), doc)
-
-    def _draw_page_nm(canvas_obj, doc_obj):
-        from reportlab.lib.pagesizes import A4 as _A4
-        from reportlab.lib import colors as _c
-        _W, _H = _A4
-        canvas_obj.saveState()
-        canvas_obj.setFillColor(_c.HexColor("#F4F6F8"))
-        canvas_obj.rect(0, 0, _W, 1.2*st["cm"], fill=1, stroke=0)
-        canvas_obj.setStrokeColor(_c.HexColor("#BDC3C7"))
-        canvas_obj.line(0, 1.2*st["cm"], _W, 1.2*st["cm"])
-        canvas_obj.setFont("Helvetica", 7)
-        canvas_obj.setFillColor(_c.HexColor("#7F8C8D"))
-        canvas_obj.drawString(2*st["cm"], 0.42*st["cm"],
-            "Sistema de Gestion - Imprenta Tucan  |  " + st["hoy"].strftime("%d/%m/%Y"))
-        canvas_obj.setFont("Helvetica-Bold", 8)
-        canvas_obj.setFillColor(_c.HexColor("#1E3A5F"))
-        canvas_obj.drawRightString(_W - 2*st["cm"], 0.42*st["cm"],
-            "Pagina " + str(doc_obj.page) + " de " + str(_total))
-        canvas_obj.restoreState()
-
-    from reportlab.platypus import BaseDocTemplate, PageTemplate, Frame
-    from reportlab.lib.pagesizes import A4 as _A42
-    from reportlab.lib.units import cm as _cm2
-    _W2, _H2 = _A42
-    _frame2 = Frame(2*_cm2, 1.5*_cm2, _W2-4*_cm2, _H2-3*_cm2,
-        leftPadding=0, rightPadding=0, topPadding=0, bottomPadding=0, id="main")
-    _tpl2 = PageTemplate(id="main", frames=[_frame2], onPage=_draw_page_nm)
-    from io import BytesIO as _BytesIO2
-    buffer = _BytesIO2()
-    _doc_final = BaseDocTemplate(buffer, pagesize=_A42,
-        pageTemplates=[_tpl2],
-        title=st["titulo_inf"] + " - Imprenta Tucan")
-    _doc_final.build(story)
+    _data_api = _get_api_data(api_estadistica_insumos)
+    _agregar_graficos_api(story, _data_api, st, request=request)
+    hr2, firma_items = _pdf_firma(st, usuario); story.append(hr2); story.extend(firma_items)
+    # Primera pasada: contar paginas
+    import copy as _copy
+    from io import BytesIO as _BytesIO3
+    _buf_count = _BytesIO3()
+    _doc_count = __import__('reportlab.platypus', fromlist=['BaseDocTemplate']).BaseDocTemplate(
+        _buf_count, pagesize=__import__('reportlab.lib.pagesizes', fromlist=['A4']).A4,
+        pageTemplates=[__import__('reportlab.platypus', fromlist=['PageTemplate']).PageTemplate(
+            id='cnt',
+            frames=[__import__('reportlab.platypus', fromlist=['Frame']).Frame(
+                2*st['cm'], 1.5*st['cm'],
+                st['cw'], 25*st['cm'],
+                leftPadding=0, rightPadding=0, topPadding=0, bottomPadding=0
+            )],
+            onPage=lambda c,d: None
+        )]
+    )
+    try:
+        _doc_count.build(_copy.copy(story))
+        _buf_count.seek(0)
+        from pypdf import PdfReader as _PRI
+        _total_pages[0] = len(_PRI(_buf_count).pages)
+    except Exception:
+        _total_pages[0] = 1
+    # Segunda pasada: PDF final con total conocido
+    doc.build(story)
     return _pdf_response(buffer, "informe_insumos", request)
 
 
@@ -1148,6 +1128,7 @@ def informe_pdf_insumos(request):
 # ═══════════════════════════════════════════════════════════════════════════════
 @login_required
 def informe_pdf_compras(request):
+    from estadisticas.views import api_estadistica_compras
     from reportlab.platypus import Paragraph, Table
     from django.db.models import Count, Sum
     from django.utils.dateparse import parse_date
@@ -1155,7 +1136,7 @@ def informe_pdf_compras(request):
     desde = parse_date(request.GET.get("desde","") or "")
     hasta = parse_date(request.GET.get("hasta","") or "")
     usuario = str(request.user) if request.user.is_authenticated else "Sistema"
-    buffer, doc, st, cw = _pdf_setup("Informe de Compras", request)
+    buffer, doc, st, cw, _total_pages = _pdf_setup("Informe de Compras", request)
     story = []
     hdr, hr = _pdf_header(st, "Informe de Compras", _periodo_str(desde, hasta), usuario)
     story += [hdr, hr]
@@ -1185,74 +1166,32 @@ def informe_pdf_compras(request):
         rows3.append([Paragraph(str(rem.numero),st["normal"]),Paragraph(str(rem.proveedor)[:30],st["normal"]),Paragraph(rem.fecha.strftime("%d/%m/%y"),st["normal"]),Paragraph(str(rem.n_items),st["normal"])])
     if len(rows3)==1: rows3.append([Paragraph("Sin remitos",st["normal"]),Paragraph("-",st["normal"]),Paragraph("-",st["normal"]),Paragraph("-",st["normal"])])
     t3 = Table(rows3,colWidths=[cw*0.2,cw*0.45,cw*0.2,cw*0.15]); t3.setStyle(_tbl_style(st)); story.append(t3)
-    # Grafico: ordenes por estado (torta)
-    oc_estados = qs_oc.values("estado__nombre").annotate(n=Count("id")).order_by("-n")
-    oc_labels = [str(r["estado__nombre"] or "-") for r in oc_estados]
-    oc_vals = [r["n"] for r in oc_estados]
-    if oc_labels:
-        story.append(Paragraph("Grafico: Ordenes de Compra por Estado", st["seccion"]))
-        img = _grafico_torta(oc_labels, oc_vals, "Ordenes de Compra por Estado")
-        story.append(_img_flowable(img, 9, 6))
-    # Grafico: movimientos de stock por tipo
-    from compras.models import MovimientoStock
-    mov_tipos = MovimientoStock.objects.values("tipo").annotate(n=Count("id")).order_by("-n")
-    mov_labels = [str(r["tipo"]) for r in mov_tipos]
-    mov_vals = [r["n"] for r in mov_tipos]
-    if mov_labels:
-        story.append(Paragraph("Grafico: Movimientos de Stock por Tipo", st["seccion"]))
-        img2 = _grafico_barras(mov_labels, mov_vals, "Movimientos de Stock por Tipo", "#1E3A5F")
-        story.append(_img_flowable(img2, 12, 4))
-    hr2, firma = _pdf_firma(st, usuario); story += [hr2, firma]
-    # Dos pasadas para obtener total de paginas
-    def _contar_paginas(story_items, doc_obj):
-        from io import BytesIO as _BytesIO
-        from reportlab.platypus import BaseDocTemplate, PageTemplate, Frame
-        from reportlab.lib.pagesizes import A4 as _A4
-        from reportlab.lib.units import cm as _cm
-        _W, _H = _A4
-        _buf = _BytesIO()
-        _frame = Frame(2*_cm, 1.5*_cm, _W-4*_cm, _H-3*_cm,
-            leftPadding=0, rightPadding=0, topPadding=0, bottomPadding=0)
-        _tpl = PageTemplate(id="cnt", frames=[_frame], onPage=lambda c,d: None)
-        _doc2 = BaseDocTemplate(_buf, pagesize=_A4, pageTemplates=[_tpl])
-        _doc2.build(story_items)
-        _buf.seek(0)
-        from pypdf import PdfReader as _PR
-        return len(_PR(_buf).pages)
-
-    import copy
-    _total = _contar_paginas(copy.copy(story), doc)
-
-    def _draw_page_nm(canvas_obj, doc_obj):
-        from reportlab.lib.pagesizes import A4 as _A4
-        from reportlab.lib import colors as _c
-        _W, _H = _A4
-        canvas_obj.saveState()
-        canvas_obj.setFillColor(_c.HexColor("#F4F6F8"))
-        canvas_obj.rect(0, 0, _W, 1.2*st["cm"], fill=1, stroke=0)
-        canvas_obj.setStrokeColor(_c.HexColor("#BDC3C7"))
-        canvas_obj.line(0, 1.2*st["cm"], _W, 1.2*st["cm"])
-        canvas_obj.setFont("Helvetica", 7)
-        canvas_obj.setFillColor(_c.HexColor("#7F8C8D"))
-        canvas_obj.drawString(2*st["cm"], 0.42*st["cm"],
-            "Sistema de Gestion - Imprenta Tucan  |  " + st["hoy"].strftime("%d/%m/%Y"))
-        canvas_obj.setFont("Helvetica-Bold", 8)
-        canvas_obj.setFillColor(_c.HexColor("#1E3A5F"))
-        canvas_obj.drawRightString(_W - 2*st["cm"], 0.42*st["cm"],
-            "Pagina " + str(doc_obj.page) + " de " + str(_total))
-        canvas_obj.restoreState()
-
-    from reportlab.platypus import BaseDocTemplate, PageTemplate, Frame
-    from reportlab.lib.pagesizes import A4 as _A42
-    from reportlab.lib.units import cm as _cm2
-    _W2, _H2 = _A42
-    _frame2 = Frame(2*_cm2, 1.5*_cm2, _W2-4*_cm2, _H2-3*_cm2,
-        leftPadding=0, rightPadding=0, topPadding=0, bottomPadding=0, id="main")
-    _tpl2 = PageTemplate(id="main", frames=[_frame2], onPage=_draw_page_nm)
-    from io import BytesIO as _BytesIO2
-    buffer = _BytesIO2()
-    _doc_final = BaseDocTemplate(buffer, pagesize=_A42,
-        pageTemplates=[_tpl2],
-        title=st["titulo_inf"] + " - Imprenta Tucan")
-    _doc_final.build(story)
+    _data_api = _get_api_data(api_estadistica_compras, desde, hasta)
+    _agregar_graficos_api(story, _data_api, st, request=request)
+    hr2, firma_items = _pdf_firma(st, usuario); story.append(hr2); story.extend(firma_items)
+    # Primera pasada: contar paginas
+    import copy as _copy
+    from io import BytesIO as _BytesIO3
+    _buf_count = _BytesIO3()
+    _doc_count = __import__('reportlab.platypus', fromlist=['BaseDocTemplate']).BaseDocTemplate(
+        _buf_count, pagesize=__import__('reportlab.lib.pagesizes', fromlist=['A4']).A4,
+        pageTemplates=[__import__('reportlab.platypus', fromlist=['PageTemplate']).PageTemplate(
+            id='cnt',
+            frames=[__import__('reportlab.platypus', fromlist=['Frame']).Frame(
+                2*st['cm'], 1.5*st['cm'],
+                st['cw'], 25*st['cm'],
+                leftPadding=0, rightPadding=0, topPadding=0, bottomPadding=0
+            )],
+            onPage=lambda c,d: None
+        )]
+    )
+    try:
+        _doc_count.build(_copy.copy(story))
+        _buf_count.seek(0)
+        from pypdf import PdfReader as _PRI
+        _total_pages[0] = len(_PRI(_buf_count).pages)
+    except Exception:
+        _total_pages[0] = 1
+    # Segunda pasada: PDF final con total conocido
+    doc.build(story)
     return _pdf_response(buffer, "informe_compras", request)

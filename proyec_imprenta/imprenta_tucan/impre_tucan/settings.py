@@ -211,6 +211,14 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'insumos.tasks.generar_proyecciones_insumos',
         'schedule': 24 * 60 * 60,  # cada 24 horas
     },
+    'recordatorio-presupuestos-diario': {
+        'task': 'automatizacion.tasks.tarea_recordatorio_presupuestos',
+        'schedule': 24 * 60 * 60,  # cada día a las 8 AM (configurable con crontab)
+    },
+    'clientes-inactivos-semanal': {
+        'task': 'automatizacion.tasks.tarea_clientes_inactivos',
+        'schedule': 24 * 60 * 60 * 7,  # cada semana
+    },
 }
 
 from .celery import app as celery_app

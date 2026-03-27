@@ -800,3 +800,232 @@ def tarea_prediccion_demanda_semanal():
     y notificar al administrador con el reporte de proyecciones.
     """
     return tarea_prediccion_demanda()
+
+
+@shared_task
+def tarea_recordatorio_presupuestos():
+    """
+    Envía recordatorios automáticos a clientes cuando sus presupuestos están próximos a vencer.
+    Busca presupuestos con validez = hoy + DIAS_ANTES_VENCIMIENTO (default 3 días),
+    cuyo estado de respuesta sea 'pendiente'.
+    """
+    from presupuestos.models import Presupuesto
+    from django.utils import timezone
+    from datetime import timedelta
+    from automatizacion.models import AutomationLog
+    from django.conf import settings
+    from configuracion.models import Parametro
+
+    try:
+        dias_antes = int(Parametro.get('PRESUPUESTO_DIAS_RECORDATORIO', 3))
+    except Exception:
+        dias_antes = 3
+
+    fecha_limite = timezone.now().date() + timedelta(days=dias_antes)
+    fecha_hoy = timezone.now().date()
+
+    presupuestos = Presupuesto.objects.filter(
+        respuesta_cliente='pendiente',
+        validez__gte=fecha_hoy,
+        validez__lte=fecha_limite,
+        estado='Activo',
+    ).select_related('cliente')
+
+    total = presupuestos.count()
+    if total == 0:
+        return 'recordatorio_presupuestos: no hay presupuestos próximos a vencer'
+
+    enviados = 0
+    errores = 0
+
+    for presupuesto in presupuestos:
+        try:
+            cliente = presupuesto.cliente
+            if not cliente.email:
+                errores += 1
+                continue
+
+            link_presupuesto = f"{getattr(settings, 'BASE_URL', 'http://localhost:8000')}/presupuestos/ver/{presupuesto.token}/"
+
+            mensaje = (
+                f"Hola {cliente.nombre},\n\n"
+                f"Te recordamos que tu presupuesto #{presupuesto.numero} está próximo a vencer "
+                f"el {presupuesto.validez.strftime('%d/%m/%Y')}.\n\n"
+                f"Detalles:\n"
+                f"- Total: ${presupuesto.total}\n"
+                f"- Válido hasta: {presupuesto.validez.strftime('%d/%m/%Y')}\n\n"
+                f"Si te interesa, podés aceptarlo o rechazarlo desde este enlace:\n"
+                f"{link_presupuesto}\n\n"
+                f"¿Tenés alguna consulta? Respondé este email o llamanos.\n\n"
+                f"Saludos,\nEquipo Imprenta Tucán"
+            )
+
+            try:
+                from core.notifications.engine import enviar_notificacion
+                enviar_notificacion(
+                    destinatario=cliente.email,
+                    canal='email',
+                    asunto=f'Recordatorio: Tu presupuesto #{presupuesto.numero} vence pronto',
+                    mensaje=mensaje,
+                )
+                enviados += 1
+            except Exception as e:
+                logger.warning(f'Error enviando recordatorio presupuesto {presupuesto.id}: {e}')
+                errores += 1
+
+        except Exception as e:
+            logger.warning(f'Error procesando presupuesto {presupuesto.id}: {e}')
+            errores += 1
+
+    AutomationLog.objects.create(
+        evento='recordatorio_presupuestos',
+        descripcion=f'{enviados} recordatorios enviados, {errores} errores (presupuestos próximos a vencer: {total})',
+        datos={'enviados': enviados, 'errores': errores, 'total_presupuestos': total},
+    )
+
+    return f'recordatorio_presupuestos: {enviados} enviados, {errores} errores de {total} presupuestos'
+
+
+@shared_task
+def tarea_clientes_inactivos():
+    """
+    Envía notificaciones automáticas a clientes que no han realizado pedidos en X días.
+    Busca clientes cuyo último pedido tenga más de DIAS_INACTIVIDAD días (default 90).
+    Envía email de reactivación con tracking de apertura, clicks y respuestas.
+    """
+    import uuid
+    from clientes.models import Cliente
+    from pedidos.models import Pedido
+    from django.utils import timezone
+    from datetime import timedelta
+    from automatizacion.models import AutomationLog, EmailTracking
+    from django.conf import settings
+    from django.template.loader import render_to_string
+
+    try:
+        dias_inactividad = int(Parametro.get('CLIENTE_DIAS_INACTIVIDAD', 90))
+    except Exception:
+        dias_inactividad = 90
+
+    fecha_limite = timezone.now().date() - timedelta(days=dias_inactividad)
+
+    clientes_activos = Cliente.objects.filter(estado='Activo').values_list('id', flat=True)
+    
+    clientes_con_pedidos_recientes = Pedido.objects.filter(
+        cliente__in=clientes_activos,
+        fecha_pedido__gt=fecha_limite
+    ).values_list('cliente_id', flat=True).distinct()
+
+    clientes_inactivos = Cliente.objects.filter(
+        estado='Activo'
+    ).exclude(
+        id__in=clientes_con_pedidos_recientes
+    )
+
+    total = clientes_inactivos.count()
+    if total == 0:
+        return 'clientes_inactivos: no hay clientes inactivos'
+
+    base_url = getattr(settings, 'BASE_URL', 'http://localhost:8000')
+    email_pedido = getattr(settings, 'EMAIL_HOST_USER', 'info@imprentaucan.com.ar')
+    reply_to = f"respuestas-{dias_inactividad}@imprentaucan.com.ar"
+
+    enviados = 0
+    errores = 0
+
+    for cliente in clientes_inactivos:
+        try:
+            if not cliente.email:
+                errores += 1
+                continue
+
+            ultimo_pedido = Pedido.objects.filter(cliente=cliente).order_by('-fecha_pedido').first()
+            dias_sin_pedido = 0
+            if ultimo_pedido:
+                dias_sin_pedido = (timezone.now().date() - ultimo_pedido.fecha_pedido).days
+
+            token = uuid.uuid4().hex
+            
+            tracking_url = f"{base_url}/api/tracking/open/{token}/"
+            confirm_url = f"{base_url}/api/tracking/click/{token}/"
+            
+            pixel_tracking = f'<img src="{tracking_url}" width="1" height="1" alt="" />'
+            
+            mensaje_html = f"""
+            <html>
+            <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <div style="background: #1e40af; color: white; padding: 20px; text-align: center;">
+                    <h1>¡Te extrañamos en Imprenta Tucán!</h1>
+                </div>
+                <div style="padding: 20px;">
+                    <p>Hola <strong>{cliente.nombre}</strong>,</p>
+                    
+                    <p>¡Te extrañamos! Han pasado <strong>{dias_sin_pedido} días</strong> desde tu último pedido.</p>
+                    
+                    <p>Queremos ofrecerte un <strong>descuento especial del 10%</strong> en tu próxima orden 
+                    como agradecimiento por tu preferencia.</p>
+                    
+                    <div style="text-align: center; margin: 30px 0;">
+                        <a href="{confirm_url}" style="background: #16a34a; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">
+                            Confirmar que recibí este email
+                        </a>
+                    </div>
+                    
+                    <h3>Nuestros servicios:</h3>
+                    <ul>
+                        <li>Tarjetas de presentación</li>
+                        <li>Volantes y folletos</li>
+                        <li>Banners y cartelería</li>
+                        <li>Impresión de libros y manuales</li>
+                    </ul>
+                    
+                    <p>¿Querés Respondenos a este email con tus consultas o pedidos.</p>
+                    
+                    <p style="margin-top: 30px;">¡Te esperamos de vuelta!</p>
+                    
+                    <p>Saludos,<br><strong>Equipo Imprenta Tucán</strong></p>
+                </div>
+                <div style="background: #f3f4f6; padding: 10px; text-align: center; font-size: 12px; color: #6b7280;">
+                    <p>¿Querés dejar de recibir estos emails? <a href="{base_url}/api/tracking/unsubscribe/{token}/">Unsubscribe</a></p>
+                </div>
+                {pixel_tracking}
+            </body>
+            </html>
+            """
+
+            try:
+                from core.notifications.engine import enviar_notificacion
+                mensaje_texto = f"Hola {cliente.nombre},\n\n¡Te extrañamos! Han pasado {dias_sin_pedido} días desde tu último pedido.\n\nQueremos ofrecerte un descuento especial del 10% en tu próxima orden.\n\nVisita nuestro sitio para más información.\n\n¡Te esperamos de vuelta!\n\nSaludos,\nEquipo Imprenta Tucán"
+                enviar_notificacion(
+                    destinatario=cliente.email,
+                    canal='email',
+                    asunto='¡Te extrañamos! Descuento especial esperando por vos',
+                    mensaje=mensaje_texto,
+                    html=mensaje_html,
+                    reply_to=reply_to,
+                )
+                
+                EmailTracking.objects.create(
+                    cliente=cliente,
+                    tipo='cliente_inactivo',
+                    token=token,
+                    email_enviado=cliente.email,
+                    asunto='¡Te extrañamos! Descuento especial esperando por vos',
+                    estado='enviado',
+                )
+                
+                AutomationLog.objects.create(
+                    evento='cliente_inactivo_notificado',
+                    descripcion=f'Notificación de reactivación enviada a {cliente.email}',
+                    datos={'cliente_id': cliente.id, 'dias_sin_pedido': dias_sin_pedido, 'token': token},
+                )
+                enviados += 1
+            except Exception as e:
+                logger.warning(f'Error enviando notificación a cliente {cliente.id}: {e}')
+                errores += 1
+
+        except Exception as e:
+            logger.warning(f'Error procesando cliente {cliente.id}: {e}')
+            errores += 1
+
+    return f'clientes_inactivos: {enviados} notificaciones enviadas, {errores} errores de {total} clientes inactivos'

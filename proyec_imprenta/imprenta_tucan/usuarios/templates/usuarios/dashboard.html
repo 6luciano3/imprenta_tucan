@@ -199,6 +199,30 @@
                     </div>
                 </div>
             </a>
+            <!-- Recordatorio de Presupuestos -->
+            <a href="{% url 'presupuestos:recordatorio' %}" class="group bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition">
+                <div class="flex items-center gap-4">
+                    <div class="h-12 w-12 rounded-full bg-teal-50 text-teal-700 grid place-items-center">
+                        <span class="material-symbols-outlined">notifications_active</span>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-500">Automatización</p>
+                        <p class="text-lg font-bold group-hover:text-teal-700">Recordatorio de Presupuestos</p>
+                    </div>
+                </div>
+            </a>
+            <!-- Clientes Inactivos -->
+            <a href="{% url 'clientes_inactivos' %}" class="group bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition">
+                <div class="flex items-center gap-4">
+                    <div class="h-12 w-12 rounded-full bg-amber-50 text-amber-700 grid place-items-center">
+                        <span class="material-symbols-outlined">person_off</span>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-500">Automatización</p>
+                        <p class="text-lg font-bold group-hover:text-amber-700">Clientes Inactivos</p>
+                    </div>
+                </div>
+            </a>
         </section>
 
         <h3 class="mt-8 mb-2 text-sm font-semibold text-gray-600">Administración</h3>

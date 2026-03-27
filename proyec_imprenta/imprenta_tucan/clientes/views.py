@@ -168,3 +168,69 @@ def confirmar_eliminacion_cliente(request, id):
         messages.success(request, "El cliente ha sido eliminado exitosamente.")
         return redirect("lista_clientes")
     return render(request, "clientes/confirmar_eliminacion.html", {"cliente": cliente})
+
+
+@require_perm('Clientes', 'Ver')
+@login_required
+def clientes_inactivos(request):
+    """Vista para mostrar clientes inactivos y enviar notificaciones de reactivación."""
+    from django.utils import timezone
+    from datetime import timedelta
+    from pedidos.models import Pedido
+    from configuracion.models import Parametro
+
+    dias_inactividad = 90
+    try:
+        dias_param = Parametro.get('CLIENTE_DIAS_INACTIVIDAD')
+        if dias_param:
+            dias_inactividad = int(dias_param)
+    except Exception:
+        pass
+
+    fecha_limite = timezone.now().date() - timedelta(days=dias_inactividad)
+
+    clientes_activos = Cliente.objects.filter(estado='Activo').values_list('id', flat=True)
+    
+    clientes_con_pedidos_recientes = Pedido.objects.filter(
+        cliente__in=clientes_activos,
+        fecha_pedido__gt=fecha_limite
+    ).values_list('cliente_id', flat=True).distinct()
+
+    clientes_inactivos = Cliente.objects.filter(
+        estado='Activo'
+    ).exclude(
+        id__in=clientes_con_pedidos_recientes
+    ).select_related(None).prefetch_related('pedido_set')
+
+    for cliente in clientes_inactivos:
+        ultimo_pedido = cliente.pedido_set.order_by('-fecha_pedido').first()
+        cliente.dias_sin_pedido = 0
+        if ultimo_pedido:
+            cliente.dias_sin_pedido = (timezone.now().date() - ultimo_pedido.fecha_pedido).days
+
+    mensaje_resultado = None
+    if request.method == 'POST' and 'enviar_notificaciones' in request.POST:
+        from automatizacion.tasks import tarea_clientes_inactivos
+        try:
+            resultado = tarea_clientes_inactivos()
+            mensaje_resultado = resultado
+        except Exception as e:
+            mensaje_resultado = f"Error: {str(e)}"
+
+    from automatizacion.models import RespuestaCliente, EmailTracking
+    from django.db import models
+    
+    respuestas_recientes = RespuestaCliente.objects.select_related('cliente').order_by('-recibido_en')[:20]
+    
+    tracking_stats = EmailTracking.objects.filter(tipo='cliente_inactivo').values(
+        'estado'
+    ).annotate(total=models.Count('id'))
+
+    context = {
+        'clientes_inactivos': clientes_inactivos,
+        'dias_inactividad': dias_inactividad,
+        'mensaje_resultado': mensaje_resultado,
+        'respuestas_recientes': respuestas_recientes,
+        'tracking_stats': tracking_stats,
+    }
+    return render(request, 'clientes/clientes_inactivos.html', context)

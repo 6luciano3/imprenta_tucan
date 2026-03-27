@@ -24,4 +24,7 @@ urlpatterns = [
     # Eliminación
     path('eliminar/<int:id>/', views.eliminar_cliente, name='eliminar_cliente'),
     path('confirmar-eliminacion/<int:id>/', views.confirmar_eliminacion_cliente, name='confirmar_eliminacion_cliente'),
+    
+    # Clientes inactivos
+    path('inactivos/', views.clientes_inactivos, name='clientes_inactivos'),
 ]

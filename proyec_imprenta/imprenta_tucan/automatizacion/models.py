@@ -312,3 +312,53 @@ class SolicitudCotizacionItem(models.Model):
 
     def __str__(self):
         return f"{self.insumo.nombre} x {self.cantidad}"
+
+
+class EmailTracking(models.Model):
+    """Tracking de emails enviados a clientes para medir apertura y clicks."""
+    TIPOS = [
+        ('cliente_inactivo', 'Cliente Inactivo'),
+        ('presupuesto_recordatorio', 'Recordatorio Presupuesto'),
+        ('oferta', 'Oferta Comercial'),
+    ]
+    
+    ESTADOS = [
+        ('enviado', 'Enviado'),
+        ('abierto', 'Abierto'),
+        ('clickeado', 'Clickeado'),
+        ('respondido', 'Respondido'),
+    ]
+
+    cliente = models.ForeignKey('clientes.Cliente', on_delete=models.CASCADE, related_name='email_tracking')
+    tipo = models.CharField(max_length=30, choices=TIPOS)
+    token = models.CharField(max_length=64, unique=True)
+    email_enviado = models.EmailField()
+    asunto = models.CharField(max_length=200)
+    estado = models.CharField(max_length=20, choices=ESTADOS, default='enviado')
+    enviado_en = models.DateTimeField(auto_now_add=True)
+    abierto_en = models.DateTimeField(null=True, blank=True)
+    clickeado_en = models.DateTimeField(null=True, blank=True)
+    respondido_en = models.DateTimeField(null=True, blank=True)
+    respuesta_texto = models.TextField(blank=True, default='')
+
+    def __str__(self):
+        return f"Tracking {self.tipo} - {self.cliente.email} ({self.estado})"
+
+
+class RespuestaCliente(models.Model):
+    """Registro de respuestas de clientes a emails enviados."""
+    TIPOS = [
+        ('cliente_inactivo', 'Cliente Inactivo'),
+        ('presupuesto_recordatorio', 'Recordatorio Presupuesto'),
+    ]
+
+    cliente = models.ForeignKey('clientes.Cliente', on_delete=models.CASCADE, related_name='respuestas')
+    tipo = models.CharField(max_length=30, choices=TIPOS)
+    email_origen = models.EmailField()
+    mensaje = models.TextField()
+    recibido_en = models.DateTimeField(auto_now_add=True)
+    leida = models.BooleanField(default=False)
+    leida_en = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self):
+        return f"Respuesta de {self.cliente.email} - {self.recibido_en.strftime('%d/%m/%Y')}"
