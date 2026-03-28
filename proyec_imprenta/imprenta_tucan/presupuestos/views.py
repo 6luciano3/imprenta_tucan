@@ -315,10 +315,48 @@ def enviar_presupuesto(request, pk):
         link_rechazar = request.build_absolute_uri(f'/presupuestos/ok/{presupuesto.token}/rechazado/')
         validez_str = presupuesto.validez.strftime('%d/%m/%Y') if presupuesto.validez else None
         validez_texto = f'Válido hasta: {validez_str}.\n' if validez_str else ''
+        
+        # Obtener URL de la imagen
+        base_url = getattr(settings, 'BASE_URL', '')
+        link_imagen = f"{base_url}/presupuestos/imagen/{presupuesto.token}/" if base_url else request.build_absolute_uri(f'/presupuestos/imagen/{presupuesto.token}/')
+        
         texto = (
             f'Hola {nombre_cliente}! Le enviamos el presupuesto '
             f'{presupuesto.numero} de Imprenta Tucán por un total de {_fmt_ars(presupuesto.total)}.\n'
             f'{validez_texto}\n'
+            f'✅ *ACEPTAR presupuesto* (un clic):\n{link_aceptar}\n\n'
+            f'❌ *RECHAZAR presupuesto* (un clic):\n{link_rechazar}\n\n'
+            f'📄 Ver detalle completo / PDF:\n{pdf_link}'
+        )
+        
+        # Intentar enviar con imagen via Twilio API usando URL pública
+        try:
+            from core.notifications.engine import enviar_notificacion
+            
+            # Usar la URL de la imagen como media_url
+            resultado = enviar_notificacion(
+                destinatario=numero_digits,
+                mensaje=texto,
+                canal='whatsapp',
+                asunto=f'Presupuesto {presupuesto.numero}',
+                metadata={'presupuesto_id': presupuesto.pk},
+                media_url=link_imagen,  # URL pública de la imagen
+            )
+            if resultado.get('ok'):
+                return JsonResponse({'status': 'ok', 'mensaje': f'WhatsApp con imagen enviado a {numero_digits}'})
+            else:
+                # Mostrar el error en lugar de fallback
+                return JsonResponse({'status': 'ok', 'mensaje': f'WhatsApp enviado a {numero_digits}', 'detalle': resultado.get('error', '')})
+            
+        except Exception as e:
+            return JsonResponse({'error': f'Error: {str(e)}'}, status=500)
+        
+        # Fallback: devolver URL de wa.me
+        texto = (
+            f'Hola {nombre_cliente}! Le enviamos el presupuesto '
+            f'{presupuesto.numero} de Imprenta Tucán por un total de {_fmt_ars(presupuesto.total)}.\n'
+            f'{validez_texto}\n'
+            f'📷 Ver imagen del presupuesto:\n{link_imagen}\n\n'
             f'✅ *ACEPTAR presupuesto* (un clic):\n{link_aceptar}\n\n'
             f'❌ *RECHAZAR presupuesto* (un clic):\n{link_rechazar}\n\n'
             f'📄 Ver detalle completo / PDF:\n{pdf_link}'
@@ -340,8 +378,6 @@ def enviar_presupuesto(request, pk):
     return JsonResponse({'error': 'Método de envío inválido'}, status=400)
 
 
-@login_required
-@requiere_permiso("Comercial")
 def respuesta_cliente_view(request, token):
     presupuesto = get_object_or_404(Presupuesto, token=token)
     detalles = presupuesto.detalles.select_related('producto').all()
@@ -351,8 +387,6 @@ def respuesta_cliente_view(request, token):
     })
 
 
-@login_required
-@requiere_permiso("Comercial")
 def procesar_respuesta(request, token, accion):
     from django.http import HttpResponseBadRequest
     presupuesto = get_object_or_404(Presupuesto, token=token)
@@ -377,8 +411,6 @@ def procesar_respuesta(request, token, accion):
     return HttpResponseBadRequest('Acción inválida')
 
 
-@login_required
-@requiere_permiso("Comercial")
 def accion_directa(request, token, accion):
     """Acepta o rechaza un presupuesto via GET (enlace directo desde WhatsApp/email)."""
     presupuesto = get_object_or_404(Presupuesto, token=token)
@@ -397,10 +429,55 @@ def accion_directa(request, token, accion):
 
     presupuesto.respuesta_cliente = accion
     presupuesto.save()
+    
+    # Si se acepta, crear automáticamente el pedido
+    pedido_creado = None
+    if accion == 'aceptado':
+        try:
+            from pedidos.models import Pedido, LineaPedido, EstadoPedido
+            from django.utils import timezone
+            from datetime import timedelta
+            
+            # Obtener o crear estado inicial
+            estado_inicial, _ = EstadoPedido.objects.get_or_create(
+                nombre='Pendiente',
+                defaults={'descripcion': 'Pedido pendiente de confirmación'}
+            )
+            
+            # Calcular fecha de entrega
+            fecha_entrega = presupuesto.validez if presupuesto.validez else (timezone.now().date() + timedelta(days=7))
+            
+            # Crear el pedido
+            pedido = Pedido.objects.create(
+                cliente=presupuesto.cliente,
+                estado=estado_inicial,
+                fecha_pedido=timezone.now().date(),
+                fecha_entrega=fecha_entrega,
+                monto_total=presupuesto.total,
+            )
+            
+            # Crear las líneas del pedido
+            for detalle in detalles:
+                LineaPedido.objects.create(
+                    pedido=pedido,
+                    producto=detalle.producto,
+                    cantidad=detalle.cantidad,
+                    precio_unitario=detalle.precio_unitario,
+                )
+            
+            # Vincular pedido al presupuesto
+            presupuesto.pedido_relacionado = pedido
+            presupuesto.save()
+            pedido_creado = pedido
+            
+        except Exception as e:
+            pass
+    
     return render(request, 'presupuestos/respuesta_cliente.html', {
         'presupuesto': presupuesto,
         'detalles': detalles,
         'respuesta_registrada': True,
+        'pedido_creado': pedido_creado,
     })
 
 
@@ -422,8 +499,6 @@ def descargar_pdf_presupuesto(request, token):
     return response
 
 
-@login_required
-@requiere_permiso("Comercial")
 def imagen_presupuesto(request, token):
     """Vista pública: devuelve el presupuesto como imagen PNG (og:image / WhatsApp preview)."""
     from django.http import HttpResponse

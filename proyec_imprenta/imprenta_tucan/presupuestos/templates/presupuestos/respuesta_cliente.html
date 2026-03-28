@@ -63,6 +63,9 @@
           <div class="result-icon mb-3">✅</div>
           <h2 class="fw-bold text-success mb-2">¡Presupuesto Aceptado!</h2>
           <p class="text-muted mb-1">Ha aceptado el presupuesto <strong>{{ presupuesto.numero }}</strong>.</p>
+          {% if pedido_creado %}
+          <p class="text-success fw-semibold">📦 Pedido #{{ pedido_creado.id }} creado automáticamente</p>
+          {% endif %}
           <p class="text-muted">Nos pondremos en contacto a la brevedad para coordinar los detalles.</p>
         {% else %}
           <div class="result-icon mb-3">❌</div>

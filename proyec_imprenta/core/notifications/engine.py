@@ -34,6 +34,7 @@ def enviar_notificacion(
     metadata: dict | None = None,
     attachments: list | None = None,
     reply_to: str | None = None,
+    media_url: str | None = None,
 ) -> dict:
     """
     Despacha una notificación al canal indicado.
@@ -46,6 +47,7 @@ def enviar_notificacion(
         html:         Cuerpo HTML alternativo (solo email).
         metadata:     Datos adicionales registrados en el log interno.
         reply_to:     Email de respuesta (solo email).
+        media_url:    URL de imagen para WhatsApp.
 
     Returns:
         {'ok': True} si la notificación fue enviada correctamente.
@@ -68,7 +70,11 @@ def enviar_notificacion(
         return {'ok': False, 'error': err}
 
     try:
-        resultado = handler(destinatario, mensaje, asunto=asunto, html=html, metadata=metadata, attachments=attachments, reply_to=reply_to)
+        # WhatsApp no usa reply_to
+        if canal == 'whatsapp':
+            resultado = handler(destinatario, mensaje, asunto=asunto, html=html, metadata=metadata, attachments=attachments, media_url=media_url)
+        else:
+            resultado = handler(destinatario, mensaje, asunto=asunto, html=html, metadata=metadata, attachments=attachments, reply_to=reply_to)
         _registrar_log(destinatario, canal, mensaje, metadata, exito=resultado.get('ok', False))
         return resultado
     except Exception as exc:
@@ -114,6 +120,30 @@ def _validar_e164(numero: str) -> bool:
     if _E164_RE is None:
         _E164_RE = re.compile(r'^\+[1-9]\d{7,14}$')
     return bool(_E164_RE.match(numero))
+
+
+def _normalizar_numero_e164(numero: str) -> str:
+    """Convierte un número argentino al formato E.164."""
+    import re
+    # Limpiar el número de caracteres no numéricos
+    digits = re.sub(r'\D', '', numero)
+    
+    # Si ya tiene prefijo internacional (54 o 549), agregar +
+    if digits.startswith('549'):
+        return '+' + digits
+    elif digits.startswith('54'):
+        return '+' + digits
+    elif digits.startswith('9') and len(digits) == 10:
+        # 9 followed by 10 digits for Argentina
+        return '+54' + digits
+    elif len(digits) == 10:
+        # Asumir número argentino sin prefijo
+        return '+54' + digits
+    elif digits.startswith('+'):
+        return digits
+    else:
+        # Devolver como está si no se puede determinar
+        return '+' + digits
 
 
 def _enviar_sms(destinatario, mensaje, *, asunto=None, html=None, metadata=None, attachments=None):
@@ -291,7 +321,7 @@ def _enviar_whatsapp_meta(destinatario: str, mensaje: str, phone_number_id: str,
     return {'ok': True, 'message_id': msg_id}
 
 
-def _enviar_whatsapp_twilio(destinatario: str, mensaje: str, account_sid: str, auth_token: str, from_number: str) -> dict:
+def _enviar_whatsapp_twilio(destinatario: str, mensaje: str, account_sid: str, auth_token: str, from_number: str, attachments=None, media_url=None) -> dict:
     try:
         from twilio.rest import Client
         from twilio.base.exceptions import TwilioRestException
@@ -304,7 +334,20 @@ def _enviar_whatsapp_twilio(destinatario: str, mensaje: str, account_sid: str, a
 
     try:
         client  = Client(account_sid, auth_token)
-        message = client.messages.create(body=mensaje, from_=from_wa, to=to_wa)
+        
+        # Preparar parámetros del mensaje
+        msg_params = {
+            'body': mensaje,
+            'from_': from_wa,
+            'to': to_wa,
+        }
+        
+        # Agregar URL de media si se proporciona
+        if media_url:
+            msg_params['media_url'] = [media_url]
+            logger.info('WhatsApp Twilio: enviando con imagen desde %s', media_url)
+        
+        message = client.messages.create(**msg_params)
         logger.info('WhatsApp Twilio enviado a %s — SID: %s, estado: %s',
                     destinatario, message.sid, message.status)
         return {'ok': True, 'sid': message.sid, 'status': message.status}
@@ -325,20 +368,8 @@ def _enviar_whatsapp_twilio(destinatario: str, mensaje: str, account_sid: str, a
 def _whatsapp_sin_credenciales(destinatario: str, mensaje: str, *, faltantes: str, proveedor: str) -> dict:
     """
     Maneja el caso de credenciales incompletas.
-    En DEBUG simula el envío; en producción retorna error descriptivo sin lanzar excepción.
+    Siempre retorna error (no simula) ya que necesitamos que funcione en producción.
     """
-    from django.conf import settings
-    if getattr(settings, 'DEBUG', False):
-        logger.warning(
-            '[WhatsApp SIMULADO — %s] Credenciales no configuradas. '
-            'Destinatario: %s | Mensaje: %.80s',
-            proveedor, destinatario, mensaje,
-        )
-        return {
-            'ok': True,
-            'simulated': True,
-            'warning': f'WhatsApp simulado — {faltantes} no configurados (DEBUG=True).',
-        }
     logger.warning(
         'WhatsApp %s no enviado a %s: faltan %s.',
         proveedor, destinatario, faltantes,
@@ -353,7 +384,7 @@ def _whatsapp_sin_credenciales(destinatario: str, mensaje: str, *, faltantes: st
     }
 
 
-def _enviar_whatsapp(destinatario, mensaje, *, asunto=None, html=None, metadata=None, attachments=None):
+def _enviar_whatsapp(destinatario, mensaje, *, asunto=None, html=None, metadata=None, attachments=None, media_url=None):
     """
     Envía mensaje de WhatsApp Business.
 
@@ -361,8 +392,13 @@ def _enviar_whatsapp(destinatario, mensaje, *, asunto=None, html=None, metadata=
         'meta'   → Meta Cloud API  (por defecto)
         'twilio' → Twilio WhatsApp Business
     """
-    # ── 1. Validar formato del destinatario ─────────────────────────────────
+    # ── 1. Normalizar y validar formato del destinatario ─────────────────────
     numero_limpio = destinatario.removeprefix('whatsapp:')
+    
+    # Intentar normalizar si no está en formato E.164
+    if not _validar_e164(numero_limpio):
+        numero_limpio = _normalizar_numero_e164(numero_limpio)
+    
     if not _validar_e164(numero_limpio):
         err = (
             f'Número de teléfono inválido: {destinatario!r}. '
@@ -379,16 +415,18 @@ def _enviar_whatsapp(destinatario, mensaje, *, asunto=None, html=None, metadata=
         api_token       = Parametro.get('WHATSAPP_API_TOKEN', '')
         phone_number_id = Parametro.get('WHATSAPP_PHONE_NUMBER_ID', '')   # Meta
         account_sid     = Parametro.get('TWILIO_ACCOUNT_SID', '')         # Twilio
+        auth_token      = Parametro.get('TWILIO_AUTH_TOKEN', '')          # Twilio
         from_number     = Parametro.get('TWILIO_WHATSAPP_FROM', '')       # Twilio
     except Exception as e:
         logger.warning('WhatsApp: no se pudo leer config de BD (%s), usando variables de entorno.', e)
-        proveedor = api_token = phone_number_id = account_sid = from_number = ''
+        proveedor = api_token = phone_number_id = account_sid = auth_token = from_number = ''
 
     # Variables de entorno como fallback
-    proveedor       = (proveedor       or os.environ.get('WHATSAPP_PROVIDER', 'meta')).lower().strip()
+    proveedor       = (proveedor       or os.environ.get('WHATSAPP_PROVIDER', 'twilio')).lower().strip()
     api_token       = api_token        or os.environ.get('WHATSAPP_API_TOKEN', '')
     phone_number_id = phone_number_id  or os.environ.get('WHATSAPP_PHONE_NUMBER_ID', '')
     account_sid     = account_sid      or os.environ.get('TWILIO_ACCOUNT_SID', '')
+    auth_token      = auth_token       or os.environ.get('TWILIO_AUTH_TOKEN', '')
     from_number     = from_number      or os.environ.get('TWILIO_WHATSAPP_FROM', '')
 
     # ── 3. Delegar al proveedor seleccionado ─────────────────────────────────
@@ -402,13 +440,13 @@ def _enviar_whatsapp(destinatario, mensaje, *, asunto=None, html=None, metadata=
         return _enviar_whatsapp_meta(numero_limpio, mensaje, phone_number_id, api_token)
 
     elif proveedor == 'twilio':
-        if not account_sid or not api_token or not from_number:
+        if not account_sid or not auth_token or not from_number:
             return _whatsapp_sin_credenciales(
                 destinatario, mensaje,
-                faltantes='TWILIO_ACCOUNT_SID, WHATSAPP_API_TOKEN y TWILIO_WHATSAPP_FROM',
+                faltantes='TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN y TWILIO_WHATSAPP_FROM',
                 proveedor='Twilio',
             )
-        return _enviar_whatsapp_twilio(numero_limpio, mensaje, account_sid, api_token, from_number)
+        return _enviar_whatsapp_twilio(numero_limpio, mensaje, account_sid, auth_token, from_number, media_url=media_url)
 
     else:
         err = f'Proveedor WhatsApp desconocido: {proveedor!r}. Valores válidos: "meta", "twilio".'

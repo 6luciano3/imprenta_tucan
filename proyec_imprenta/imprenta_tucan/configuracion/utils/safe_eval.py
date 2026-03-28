@@ -3,7 +3,7 @@ import operator as op
 import math
 
 ALLOWED_NODES = {
-    ast.Expression, ast.BinOp, ast.UnaryOp, ast.Num, ast.Name, ast.Load,
+    ast.Expression, ast.BinOp, ast.UnaryOp, ast.Name, ast.Load,
     ast.Add, ast.Sub, ast.Mult, ast.Div, ast.Pow, ast.Mod, ast.UAdd, ast.USub,
     ast.Call, ast.Tuple, ast.List, ast.Constant
 }

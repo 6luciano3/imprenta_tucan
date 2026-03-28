@@ -26,6 +26,14 @@ class Presupuesto(models.Model):
         default='pendiente',
         verbose_name='Respuesta del cliente',
     )
+    pedido_relacionado = models.ForeignKey(
+        'pedidos.Pedido',
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name='presupuestos_origen',
+        verbose_name='Pedido generado',
+    )
 
 
 class PresupuestoDetalle(models.Model):
