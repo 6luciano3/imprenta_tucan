@@ -84,8 +84,8 @@ class Cliente(models.Model):
         return self.whatsapp or self.telefono_e164
 
     def puede_eliminarse(self):
-        return not self.pedido_set.filter(estado__nombre__in=ESTADOS_BLOQUEANTES).exists()
+        return not self.pedido_set.exists()
 
     def pedidos_bloqueantes(self):
-        return self.pedido_set.filter(estado__nombre__in=ESTADOS_BLOQUEANTES)
+        return self.pedido_set.all()
 

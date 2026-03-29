@@ -169,7 +169,7 @@ Monto: ${pedido.monto_total}
 
 ¿Necesitás más información?"""
     
-    if 'pendiente' in texto.lower():
+    if 'pendiente' in texto.lower() or 'sin confirmar' in texto.lower() or 'sin aprobar' in texto.lower():
         estados = EstadoPedido.objects.filter(nombre__icontains='pendiente') if EstadoPedido else []
         if estados:
             pedidos = list(Pedido.objects.filter(estado__in=estados)[:5])
@@ -180,6 +180,20 @@ Monto: ${pedido.monto_total}
             lista = "\n".join([f"• #{p.id} - {p.cliente.nombre} {p.cliente.apellido} - ${p.monto_total}" for p in pedidos])
             return f"📋 PEDIDOS PENDIENTES:\n\n{lista}\n\nTotal: {len(pedidos)} pedidos"
         return "No hay pedidos pendientes 🎉"
+    
+    if 'confirmado' in texto.lower() or 'aprobado' in texto.lower():
+        estados = EstadoPedido.objects.filter(nombre__icontains='confirmado') if EstadoPedido else []
+        if not estados:
+            estados = EstadoPedido.objects.filter(nombre__icontains='aprobado') if EstadoPedido else []
+        if estados:
+            pedidos = list(Pedido.objects.filter(estado__in=estados)[:5])
+        else:
+            return "No hay pedidos confirmados actualmente"
+        
+        if pedidos:
+            lista = "\n".join([f"• #{p.id} - {p.cliente.nombre} {p.cliente.apellido} - ${p.monto_total}" for p in pedidos])
+            return f"📋 PEDIDOS CONFIRMADOS:\n\n{lista}\n\nTotal: {len(pedidos)} pedidos"
+        return "No hay pedidos confirmados"
     
     if 'hoy' in texto.lower():
         hoy = timezone.now().date()
@@ -217,6 +231,16 @@ def buscar_cliente(texto):
     if 'cuántos' in texto.lower() and 'cliente' in texto.lower():
         total = Cliente.objects.count()
         return f"👥 Total de clientes: {total}"
+    
+    if 'sin pedido' in texto.lower() or 'no tiene pedido' in texto.lower() or 'no tienen pedido' in texto.lower():
+        if not Pedido:
+            return None
+        clientes_con_pedidos = Pedido.objects.values('cliente').distinct()
+        clientes_sin = Cliente.objects.exclude(id__in=clientes_con_pedidos)[:10]
+        if clientes_sin:
+            lista = "\n".join([f"• {c.nombre} {c.apellido} - {c.email or 'Sin email'}" for c in clientes_sin])
+            return f"👥 CLIENTES SIN PEDIDOS:\n\n{lista}\n\nTotal: {clientes_sin.count()}"
+        return "Todos los clientes tienen al menos un pedido ✓"
     
     return None
 
@@ -314,25 +338,61 @@ def buscar_estadisticas(texto):
 
 
 def buscar_insumos(texto):
-    if not Insumo:
+    try:
+        from insumos.models import Insumo
+    except ImportError:
         return None
     
-    if 'stock de' in texto.lower() or 'papel' in texto.lower():
-        palabra = texto.lower().replace('stock de', '').replace('busca', '').strip()
-        if palabra:
+    texto_lower = texto.lower()
+    
+    if 'stock' in texto_lower or 'hay' in texto_lower or 'tiene' in texto_lower or 'cuanto' in texto_lower:
+        palabra = ''
+        
+        patrones = [
+            r'stock del\s+(.+?)\s*$',
+            r'stock de la\s+(.+?)\s*$',
+            r'stock de\s+(.+?)\s*$',
+            r'stock\s+(.+?)\s*$',
+            r'hay de\s+(.+?)\s*$',
+            r'tiene\s+(.+?)\s*$',
+            r'cuanto\s+(.+?)\s*$',
+        ]
+        
+        for patron in patrones:
+            match = re.search(patron, texto_lower)
+            if match:
+                palabra = match.group(1).strip()
+                break
+        
+        palabra = palabra.rstrip('?').strip()
+        
+        if palabra and len(palabra) > 1:
             insumos = Insumo.objects.filter(nombre__icontains=palabra)[:5]
+            if not insumos:
+                palabras = palabra.split()
+                for p in palabras:
+                    if len(p) > 2:
+                        insumos = Insumo.objects.filter(nombre__icontains=p)[:5]
+                        if insumos:
+                            break
         else:
             insumos = Insumo.objects.all()[:5]
         
         if insumos:
-            lista = "\n".join([f"• {i.nombre} - Stock: {i.stock_actual} {i.unidad}" for i in insumos])
+            lista = "\n".join([f"• {i.nombre} - Stock: {i.stock} {i.unidad_medida or ''}" for i in insumos])
             return f"🛒 INSUMOS:\n\n{lista}"
+        
+        insumos = Insumo.objects.all()[:5]
+        if insumos:
+            lista = "\n".join([f"• {i.nombre} - Stock: {i.stock} {i.unidad_medida or ''}" for i in insumos])
+            return f"🛒 INSUMOS:\n\n{lista}"
+        
         return "No hay insumos registrados"
     
-    if 'bajo' in texto.lower() or 'falta' in texto.lower():
-        insumos = Insumo.objects.filter(stock_actual__lte=10)[:5]
+    if 'bajo' in texto_lower or 'falta' in texto_lower:
+        insumos = Insumo.objects.filter(stock__lte=10)[:5]
         if insumos:
-            lista = "\n".join([f"• {i.nombre} - Stock: {i.stock_actual} {i.unidad}" for i in insumos])
+            lista = "\n".join([f"• {i.nombre} - Stock: {i.stock} {i.unidad_medida or ''}" for i in insumos])
             return f"⚠️ INSUMOS BAJOS:\n\n{lista}\n\n¡Considerar reponer!"
         return "No hay insumos con stock bajo ✓"
     
@@ -349,12 +409,12 @@ def obtener_respuesta(mensaje):
                 return respuesta
     
     funciones = [
-        buscar_pedido,
         buscar_cliente,
+        buscar_pedido,
+        buscar_insumos,
         buscar_producto,
         buscar_presupuesto,
         buscar_estadisticas,
-        buscar_insumos,
     ]
     
     for func in funciones:

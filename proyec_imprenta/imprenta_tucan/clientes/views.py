@@ -110,7 +110,7 @@ def eliminar_cliente(request, id):
     if not cliente.puede_eliminarse():
         messages.error(
             request,
-            f"No se puede eliminar a {cliente.nombre} {cliente.apellido} porque tiene pedidos en estado Pendiente, En Proceso o Completado."
+            f"No se puede eliminar a {cliente.nombre} {cliente.apellido} porque tiene pedidos asociados."
         )
         return redirect("lista_clientes")
     if request.method == "POST":
