@@ -31,6 +31,7 @@ urlpatterns = [
     path('automatizacion/', include('automatizacion.urls')),
     path('configuracion/', include('configuracion.urls')),
     path('reportes/', include('reportes.urls')),
+    path('chatbot/', include('chatbot.urls')),
 
     # Página principal
     path('dashboard/', include('dashboard.urls')),

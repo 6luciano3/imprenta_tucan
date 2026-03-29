@@ -22,7 +22,7 @@ class InsumoForm(forms.ModelForm):
             'categoria': forms.TextInput(attrs={'class': 'form-control'}),
             'tipo': forms.Select(attrs={'class': 'form-select'}),
             # stock widget eliminado - campo excluido del formulario
-            'precio': forms.NumberInput(attrs={'class': 'form-control', 'min': '0', 'step': '0.01'}),
+            'precio': forms.NumberInput(attrs={'class': 'form-control', 'min': '0', 'max': '1000000', 'step': '0.01'}),
         }
 
 
@@ -37,7 +37,7 @@ class AltaInsumoForm(forms.ModelForm):
             "tipo": forms.Select(attrs={"class": "form-select", "required": True}),
             "proveedor": forms.Select(attrs={"class": "form-select", "required": True}),
             # cantidad excluida del form - solo desde App Compras
-            "precio_unitario": forms.NumberInput(attrs={"class": "form-control", "required": True, "min": 0.01, "step": "0.01"}),
+            "precio_unitario": forms.NumberInput(attrs={"class": "form-control", "required": True, "min": 0.01, "max": 1000000, "step": "0.01"}),
         }
 
     def __init__(self, *args, **kwargs):

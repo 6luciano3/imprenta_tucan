@@ -48,14 +48,114 @@
 </head>
 <body class="bg-background-light font-display text-text-light text-base">
 {% if not request.GET.popup %}
-<!-- Header/Navigation (solo 'Imprenta Tucán') -->
+<!-- Header/Navigation -->
 <nav class="bg-blue-600 text-white p-4">
-  <div class="container mx-auto text-center">
-    <h1 class="text-lg md:text-xl font-bold">
+  <div class="container mx-auto flex items-center justify-between">
+    <!-- Botón menú móvil -->
+    <button id="menu-toggle" class="lg:hidden p-2 hover:bg-blue-700 rounded" onclick="toggleMobileMenu()">
+      <span class="material-symbols-outlined text-2xl">menu</span>
+    </button>
+    
+    <!-- Título -->
+    <h1 class="text-lg md:text-xl font-bold flex-1 text-center lg:text-left">
       <a href="{% url 'dashboard' %}" class="hover:text-blue-200">Imprenta Tucán</a>
     </h1>
+    
+    <!-- Espacio para equilibrar en móvil -->
+    <div class="w-10 lg:hidden"></div>
   </div>
 </nav>
+
+<!-- Menú móvil overlay -->
+<div id="mobile-menu" class="fixed inset-0 z-50 hidden">
+  <div class="absolute inset-0 bg-black/50" onclick="toggleMobileMenu()"></div>
+  <aside class="absolute left-0 top-0 bottom-0 w-72 bg-white shadow-lg overflow-y-auto">
+    <div class="p-4 border-b flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-9"
+             style="background-image: url('https://cdn-icons-png.flaticon.com/512/3135/3135715.png');"></div>
+        <div>
+          {% if user.is_authenticated %}
+            <h2 class="font-bold text-gray-800">{{ user.nombre }} {{ user.apellido }}</h2>
+            <p class="text-xs text-gray-500">{% if user.rol %}{{ user.rol.nombreRol }}{% endif %}</p>
+          {% else %}
+            <h2 class="font-bold text-gray-800">Invitado</h2>
+          {% endif %}
+        </div>
+      </div>
+      <button onclick="toggleMobileMenu()" class="p-2 hover:bg-gray-100 rounded">
+        <span class="material-symbols-outlined text-gray-600">close</span>
+      </button>
+    </div>
+    <nav class="p-2 flex flex-col gap-1">
+      <a href="{% url 'lista_auditoria' %}" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100 {% if request.resolver_match.url_name == 'lista_auditoria' %}bg-blue-100 text-blue-700{% endif %}">
+        <span class="material-symbols-outlined">fact_check</span> Auditoría
+      </a>
+      {% if show_usuarios %}
+      <a href="{% url 'lista_usuarios' %}" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100 {% if request.resolver_match.url_name == 'lista_usuarios' %}bg-blue-100 text-blue-700{% endif %}">
+        <span class="material-symbols-outlined">badge</span> Usuarios
+      </a>
+      {% endif %}
+      {% if show_clientes %}
+      <a href="{% url 'lista_clientes' %}" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100 {% if request.resolver_match.url_name == 'lista_clientes' %}bg-blue-100 text-blue-700{% endif %}">
+        <span class="material-symbols-outlined">group</span> Clientes
+      </a>
+      {% endif %}
+      <a href="{% url 'configuracion_home' %}" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100 {% if request.resolver_match.url_name == 'configuracion_home' %}bg-blue-100 text-blue-700{% endif %}">
+        <span class="material-symbols-outlined">settings</span> Configuración
+      </a>
+      <a href="{% url 'dashboard' %}" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100 {% if request.resolver_match.url_name == 'dashboard' %}bg-blue-100 text-blue-700{% endif %}">
+        <span class="material-symbols-outlined">dashboard</span> Dashboard
+      </a>
+      {% if show_insumos %}
+      <a href="{% url 'compras:lista_ordenes_compra' %}" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100">
+        <span class="material-symbols-outlined">package_2</span> Compras
+      </a>
+      {% endif %}
+      {% if show_pedidos %}
+      <a href="{% url 'lista_pedidos' %}" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100 {% if request.resolver_match.url_name == 'lista_pedidos' %}bg-blue-100 text-blue-700{% endif %}">
+        <span class="material-symbols-outlined">receipt_long</span> Pedidos
+      </a>
+      {% endif %}
+      {% if show_productos %}
+      <a href="{% url 'lista_productos' %}" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100 {% if request.resolver_match.url_name == 'lista_productos' %}bg-blue-100 text-blue-700{% endif %}">
+        <span class="material-symbols-outlined">inventory_2</span> Productos
+      </a>
+      {% endif %}
+      <a href="{% url 'presupuestos:lista' %}" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100 {% if request.resolver_match.url_name == 'lista' %}bg-blue-100 text-blue-700{% endif %}">
+        <span class="material-symbols-outlined">request_quote</span> Presupuestos
+      </a>
+      {% if show_proveedores %}
+      <a href="{% url 'lista_proveedores' %}" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100 {% if request.resolver_match.url_name == 'lista_proveedores' %}bg-blue-100 text-blue-700{% endif %}">
+        <span class="material-symbols-outlined">business</span> Proveedores
+      </a>
+      {% endif %}
+      {% if show_roles %}
+      <a href="{% url 'lista_roles' %}" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100 {% if request.resolver_match.url_name == 'lista_roles' %}bg-blue-100 text-blue-700{% endif %}">
+        <span class="material-symbols-outlined">admin_panel_settings</span> Roles
+      </a>
+      {% endif %}
+      {% if show_permisos %}
+      <a href="{% url 'lista_permisos' %}" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100 {% if request.resolver_match.url_name == 'lista_permisos' %}bg-blue-100 text-blue-700{% endif %}">
+        <span class="material-symbols-outlined">lock</span> Permisos
+      </a>
+      {% endif %}
+      {% if show_reportes %}
+      <a href="{% url 'estadisticas:dashboard' %}" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100 {% if request.resolver_match.namespace == 'estadisticas' %}bg-blue-100 text-blue-700{% endif %}">
+        <span class="material-symbols-outlined">monitoring</span> Estadísticas
+      </a>
+      {% endif %}
+    </nav>
+  </aside>
+</div>
+
+<script>
+function toggleMobileMenu() {
+  const menu = document.getElementById('mobile-menu');
+  menu.classList.toggle('hidden');
+  document.body.classList.toggle('overflow-hidden');
+}
+</script>
 {% endif %}
 
 <div class="min-h-screen flex flex-col">
@@ -104,9 +204,6 @@
         {% if show_insumos %}
                 <a href="{% url 'compras:lista_ordenes_compra' %}" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-light">
           <span class="material-symbols-outlined">package_2</span> Compras
-        </a>
-<a href="{% url 'lista_insumos' %}" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-light {% if request.resolver_match.url_name == 'lista_insumos' %}bg-primary text-white{% endif %}">
-          <span class="material-symbols-outlined">construction</span> Insumos
         </a>
         {% endif %}
         {% if show_pedidos %}
@@ -192,5 +289,7 @@
 
 <!-- Sin JS de menú móvil: el encabezado solo muestra "Imprenta Tucán" -->
 {% block extra_js %}{% endblock %}
+
+{% include 'chatbot/chat_widget.html' %}
 </body>
 </html>

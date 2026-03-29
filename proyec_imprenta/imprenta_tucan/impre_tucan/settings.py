@@ -70,6 +70,7 @@ INSTALLED_APPS = [
     'estadisticas',
     'compras',
     'auditoria',
+    'chatbot',
     'configuracion',
     'geo',
     'automatizacion',

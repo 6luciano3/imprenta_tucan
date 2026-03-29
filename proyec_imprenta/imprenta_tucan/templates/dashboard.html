@@ -105,16 +105,7 @@
             </div>
         </div>
         {% endif %}
-        {% if show_insumos %}
-        <div class="bg-purple-600 text-white rounded-2xl p-6 shadow-lg hover:scale-105 transition-transform">
-            <div class="flex flex-col items-center">
-                <span class="material-symbols-outlined text-6xl mb-2">construction</span>
-                <h3 class="text-lg font-semibold">Insumos</h3>
-                <p class="text-3xl font-bold mt-1">{{ total_insumos }}</p>
-                <a href="{% url 'lista_insumos' %}" class="text-sm mt-3 underline">Ver más</a>
-            </div>
-        </div>
-        {% endif %}
+
         {% if show_pedidos %}
         <div class="bg-teal-600 text-white rounded-2xl p-6 shadow-lg hover:scale-105 transition-transform">
             <div class="flex flex-col items-center">
