@@ -29,8 +29,33 @@ def _registrar_auditoria(request, instance, action="create"):
 
 @login_required
 def lista_ordenes(request):
+    from proveedores.models import Proveedor
+    
     ordenes = OrdenCompra.objects.select_related("proveedor", "estado", "usuario").prefetch_related("detalles__insumo")
-    return render(request, "compras/lista_ordenes.html", {"ordenes": ordenes})
+    
+    # Filtros
+    proveedor_id = request.GET.get('proveedor')
+    estado_id = request.GET.get('estado')
+    fecha_desde = request.GET.get('fecha_desde')
+    fecha_hasta = request.GET.get('fecha_hasta')
+    
+    if proveedor_id:
+        ordenes = ordenes.filter(proveedor_id=proveedor_id)
+    if estado_id:
+        ordenes = ordenes.filter(estado_id=estado_id)
+    if fecha_desde:
+        ordenes = ordenes.filter(fecha_creacion__gte=fecha_desde)
+    if fecha_hasta:
+        ordenes = ordenes.filter(fecha_creacion__lte=fecha_hasta)
+    
+    proveedores = Proveedor.objects.filter(activo=True).order_by('nombre')
+    estados = EstadoCompra.objects.all()
+    
+    return render(request, "compras/lista_ordenes.html", {
+        "ordenes": ordenes,
+        "proveedores": proveedores,
+        "estados": estados,
+    })
 
 
 @login_required
@@ -92,10 +117,14 @@ def detalle_orden_json(request, pk):
     iva = subtotal * 0.21
     total = subtotal + iva
     
+    # Obtener texto de condición de pago
+    condicion_pago_text = dict(OrdenCompra.CONDICIONES_PAGO).get(orden.condicion_pago, 'Contado')
+    
     return JsonResponse({
         'id': orden.pk,
         'fecha': orden.fecha_creacion.strftime('%d/%m/%Y'),
-        'fecha_entrega': orden.fecha_recepcion.strftime('%d/%m/%Y') if orden.fecha_recepcion else '',
+        'fecha_entrega': orden.fecha_entrega.strftime('%d/%m/%Y') if orden.fecha_entrega else '',
+        'fecha_recepcion': orden.fecha_recepcion.strftime('%d/%m/%Y') if orden.fecha_recepcion else '',
         
         # Empresa
         'empresa': {
@@ -117,7 +146,7 @@ def detalle_orden_json(request, pk):
         },
         
         # Condiciones
-        'condicion_pago': 'Contado',
+        'condicion_pago': condicion_pago_text,
         'moneda': 'ARS',
         'entrega': 'Depósito Gráfica Tucán',
         'observaciones': orden.observaciones or '',
@@ -352,6 +381,19 @@ def confirmar_orden_publico(request, pk):
             orden.fecha_recepcion = timezone.now().date()
             orden.save(update_fields=['estado', 'fecha_recepcion', 'actualizado_en'])
             
+            # 5. Enviar notificación interna
+            try:
+                from core.notifications.engine import enviar_notificacion
+                enviar_notificacion(
+                    titulo=f"OC-{orden.pk:04d} confirmada por proveedor",
+                    mensaje=f"El proveedor {orden.proveedor.nombre} ha confirmado la orden de compra. Stock actualizado automáticamente.",
+                    tipo="success",
+                    importancia="alta",
+                    enlace=f"/compras/ordenes/{orden.pk}/"
+                )
+            except Exception as e:
+                pass  # No fallar si no se puede enviar notificación
+            
             mensaje = f"Orden confirmada y mercadería recibida. Stock actualizado: {', '.join(detalles_creados[:3])}"
             if len(detalles_creados) > 3:
                 mensaje += f" y {len(detalles_creados) - 3} más"
@@ -373,6 +415,20 @@ def rechazar_orden_publico(request, pk):
         estado_rechazado = EstadoCompra.objects.get(nombre__icontains='rechazado')
         orden.estado = estado_rechazado
         orden.save(update_fields=['estado', 'actualizado_en'])
+        
+        # Enviar notificación interna
+        try:
+            from core.notifications.engine import enviar_notificacion
+            enviar_notificacion(
+                titulo=f"OC-{orden.pk:04d} rechazada por proveedor",
+                mensaje=f"El proveedor {orden.proveedor.nombre} ha rechazado la orden de compra.",
+                tipo="warning",
+                importancia="alta",
+                enlace=f"/compras/ordenes/{orden.pk}/"
+            )
+        except Exception:
+            pass
+        
         mensaje = "Orden rechazada. Si tiene alguna consulta, contacte a Imprenta Tucán."
     except EstadoCompra.DoesNotExist:
         mensaje = "Error al rechazar la orden. Contacte a Imprenta Tucán."
@@ -468,6 +524,18 @@ def _generar_numero_remito():
 
 @login_required
 def nuevo_remito(request):
+    orden_id = request.GET.get('orden')
+    
+    # Validar que si hay una OC vinculada, esté confirmada
+    if orden_id:
+        try:
+            orden = OrdenCompra.objects.get(pk=orden_id)
+            if orden.estado.nombre.lower() not in ['confirmada', 'aprobada', 'recibida']:
+                messages.error(request, f"La orden de compra {orden.pk:04d} debe estar confirmada para registrar un remito.")
+                return redirect('compras:nuevo_remito_compra')
+        except OrdenCompra.DoesNotExist:
+            pass
+    
     if request.method == "POST":
         form = RemitoForm(request.POST)
         formset = DetalleRemitoFormSet(request.POST, prefix="detalles")
@@ -863,3 +931,101 @@ def api_items_orden(request, pk):
     except Exception as e:
         from django.http import JsonResponse
         return JsonResponse({"ok": False, "error": str(e)}, status=404)
+
+
+@login_required
+def orden_pdf(request, pk):
+    from django.http import HttpResponse
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import A4
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import cm
+    
+    orden = get_object_or_404(OrdenCompra.objects.select_related("proveedor").prefetch_related("detalles__insumo"), pk=pk)
+    
+    response = HttpResponse(content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="OC-{orden.pk:04d}.pdf"'
+    
+    doc = SimpleDocTemplate(response, pagesize=A4, topMargin=2*cm, bottomMargin=2*cm)
+    elements = []
+    styles = getSampleStyleSheet()
+    
+    # Título
+    elements.append(Paragraph(f"ORDEN DE COMPRA", styles['Title']))
+    elements.append(Spacer(1, 0.5*cm))
+    
+    # Datos de la orden
+    condicion_pago_text = dict(OrdenCompra.CONDICIONES_PAGO).get(orden.condicion_pago, 'Contado')
+    data = [
+        ["Orden:", f"OC-{orden.pk:04d}"],
+        ["Fecha:", orden.fecha_creacion.strftime('%d/%m/%Y')],
+        ["Condición de pago:", condicion_pago_text],
+        ["Fecha entrega:", orden.fecha_entrega.strftime('%d/%m/%Y') if orden.fecha_entrega else 'A convenir'],
+    ]
+    
+    t = Table(data, colWidths=[5*cm, 10*cm])
+    t.setStyle(TableStyle([
+        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+        ('FONTNAME', (1, 0), (1, -1), 'Helvetica'),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+    ]))
+    elements.append(t)
+    elements.append(Spacer(1, 0.5*cm))
+    
+    # Proveedor
+    elements.append(Paragraph("<b>Proveedor:</b>", styles['Normal']))
+    elements.append(Paragraph(f"{orden.proveedor.nombre}", styles['Normal']))
+    elements.append(Paragraph(f"CUIT: {orden.proveedor.cuit or '-'}", styles['Normal']))
+    elements.append(Paragraph(f"{orden.proveedor.direccion or '-'}", styles['Normal']))
+    elements.append(Spacer(1, 0.5*cm))
+    
+    # Detalles
+    elements.append(Paragraph("<b>Detalle:</b>", styles['Normal']))
+    data = [["#", "Código", "Descripción", "Cant.", "Unidad", "P. Unit.", "Subtotal"]]
+    num = 1
+    for d in orden.detalles.all():
+        codigo = getattr(d.insumo, 'codigo', None) or f"IN-{d.insumo.pk:03d}"
+        unidad = getattr(d.insumo, 'unidad_medida', None) or 'un'
+        data.append([
+            str(num),
+            codigo,
+            d.insumo.nombre[:30],
+            str(d.cantidad),
+            unidad,
+            f"$ {d.precio_unitario}",
+            f"$ {d.subtotal()}"
+        ])
+        num += 1
+    
+    # Totales
+    subtotal = float(orden.monto_total)
+    iva = subtotal * 0.21
+    total = subtotal + iva
+    
+    data.append(["", "", "", "", "Subtotal", f"$ {subtotal:.2f}"])
+    data.append(["", "", "", "", "IVA 21%", f"$ {iva:.2f}"])
+    data.append(["", "", "", "", "<b>Total</b>", f"<b>$ {total:.2f}</b>"])
+    
+    t = Table(data, colWidths=[1*cm, 2*cm, 5*cm, 1.5*cm, 2*cm, 2.5*cm, 2.5*cm])
+    t.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 8),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('GRID', (0, 0), (-1, -2), 1, colors.black),
+        ('ALIGN', (3, 0), (3, -1), 'CENTER'),
+        ('ALIGN', (4, 0), (-1, -1), 'RIGHT'),
+    ]))
+    elements.append(t)
+    
+    # Observaciones
+    if orden.observaciones:
+        elements.append(Spacer(1, 0.5*cm))
+        elements.append(Paragraph("<b>Observaciones:</b>", styles['Normal']))
+        elements.append(Paragraph(orden.observaciones, styles['Normal']))
+    
+    doc.build(elements)
+    return response

@@ -13,6 +13,14 @@ class EstadoCompra(models.Model):
 
 
 class OrdenCompra(models.Model):
+    CONDICIONES_PAGO = [
+        ('contado', 'Contado'),
+        ('15_dias', '15 días'),
+        ('30_dias', '30 días'),
+        ('60_dias', '60 días'),
+        ('90_dias', '90 días'),
+    ]
+    
     proveedor = models.ForeignKey(
         "proveedores.Proveedor", on_delete=models.CASCADE, related_name="ordenes_compra_app"
     )
@@ -21,6 +29,8 @@ class OrdenCompra(models.Model):
     )
     fecha_creacion = models.DateField(auto_now_add=True)
     fecha_recepcion = models.DateField(null=True, blank=True)
+    fecha_entrega = models.DateField(null=True, blank=True, help_text="Fecha estimada de entrega")
+    condicion_pago = models.CharField(max_length=20, choices=CONDICIONES_PAGO, default='contado')
     monto_total = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     observaciones = models.TextField(blank=True)
     usuario = models.ForeignKey(
