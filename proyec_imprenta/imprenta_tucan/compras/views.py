@@ -268,22 +268,53 @@ def ajuste_masivo_precios(request):
     from insumos.models import Insumo
     from django.db.models import Q
     from django.contrib import messages
+    from decimal import Decimal
     
     mensaje_resultado = None
     insumos_actualizados = 0
     
+    categorias = Insumo.objects.filter(activo=True).values_list('categoria', flat=True).distinct()
+    from proveedores.models import Proveedor
+    proveedores = Proveedor.objects.filter(activo=True)
+    
+    ultimos_insumos = Insumo.objects.filter(activo=True).exclude(precio=0).exclude(precio__isnull=True).order_by('-idInsumo')[:10]
+    
+    for insumo in ultimos_insumos:
+        if insumo.precio:
+            insumo.precio_mas_10 = insumo.precio * Decimal('1.10')
+        else:
+            insumo.precio_mas_10 = 0
+    
+    insumos_count = Insumo.objects.filter(activo=True).count()
+    
     if request.method == 'POST':
-        porcentaje = request.POST.get('porcentaje', '0').replace(',', '.')
+        porcentaje_str = request.POST.get('porcentaje', '0').replace(',', '.')
         try:
-            porcentaje = float(porcentaje)
+            porcentaje = float(porcentaje_str)
         except ValueError:
-            porcentaje = 0
+            messages.error(request, "Porcentaje inválido. Debe ser un número.")
+            porcentaje = None
+        
+        if porcentaje is not None:
+            if porcentaje < -30:
+                messages.error(request, "El porcentaje no puede ser menor a -30%")
+                porcentaje = None
+            elif porcentaje > 100:
+                messages.error(request, "El porcentaje no puede ser mayor a 100%")
+                porcentaje = None
+        
+        if porcentaje is None:
+            return render(request, "compras/ajuste_masivo_precios.html", {
+                'categorias': categorias,
+                'proveedores': proveedores,
+                'ultimos_insumos': ultimos_insumos,
+                'insumos_count': insumos_count,
+            })
         
         filtro_categoria = request.POST.get('categoria', '')
         filtro_proveedor = request.POST.get('proveedor', '')
         filtro_tipo = request.POST.get('filtro_tipo', 'todos')
         
-        # Construir query base
         queryset = Insumo.objects.filter(activo=True)
         
         if filtro_categoria:
@@ -295,27 +326,33 @@ def ajuste_masivo_precios(request):
         if filtro_tipo == 'con_precio':
             queryset = queryset.filter(precio__isnull=False, precio__gt=0)
         
-        # Aplicar ajuste
         from decimal import Decimal
+        from django.db import transaction
+        
         factor = Decimal('1') + Decimal(str(porcentaje)) / Decimal('100')
         
-        insumos_actualizados = queryset.count()
+        insumos_actualizados = 0
+        errores = []
         
-        for insumo in queryset:
-            if insumo.precio:
-                insumo.precio = (insumo.precio * factor).quantize(Decimal('0.01'))
-                insumo.save(update_fields=['precio'])
+        with transaction.atomic():
+            for insumo in queryset:
+                try:
+                    if insumo.precio:
+                        nuevo_precio = (insumo.precio * factor).quantize(Decimal('0.01'))
+                        if nuevo_precio < 0:
+                            errores.append(f"{insumo.nombre}: precio no puede ser negativo")
+                            continue
+                        insumo.precio = nuevo_precio
+                        insumo.save(update_fields=['precio'])
+                        insumos_actualizados += 1
+                except Exception as e:
+                    errores.append(f"{insumo.nombre}: {str(e)}")
         
-        mensaje_resultado = f"Se actualizaron {insumos_actualizados} insumos con un {'aumento' if porcentaje > 0 else 'descuento'} del {abs(porcentaje)}%"
-        messages.success(request, mensaje_resultado)
-    
-    # Obtener datos para los filtros
-    categorias = Insumo.objects.filter(activo=True).values_list('categoria', flat=True).distinct()
-    from proveedores.models import Proveedor
-    proveedores = Proveedor.objects.filter(activo=True)
-    
-    ultimos_insumos = Insumo.objects.filter(activo=True).exclude(precio=0).exclude(precio__isnull=True).order_by('-idInsumo')[:10]
-    insumos_count = Insumo.objects.filter(activo=True).count()
+        if errores:
+            messages.warning(request, f"Actualizados {insumos_actualizados} insumos. Errores: {', '.join(errores[:5])}")
+        else:
+            mensaje_resultado = f"Se actualizaron {insumos_actualizados} insumos con un {'aumento' if porcentaje > 0 else 'descuento'} del {abs(porcentaje)}%"
+            messages.success(request, mensaje_resultado)
     
     context = {
         'categorias': categorias,
