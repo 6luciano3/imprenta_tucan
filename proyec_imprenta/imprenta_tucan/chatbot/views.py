@@ -232,6 +232,8 @@ def buscar_pedido(texto):
     if not Pedido:
         return None
     
+    texto_lower = texto.lower()
+    
     numeros = re.findall(r'\d+', texto)
     if numeros:
         num = numeros[0]
@@ -248,7 +250,33 @@ Monto: ${pedido.monto_total}
 
 ¿Necesitás más información?"""
     
-    if 'pendiente' in texto.lower() or 'sin confirmar' in texto.lower() or 'sin aprobar' in texto.lower():
+    if 'pedido' in texto_lower and ('cliente' in texto_lower or 'de' in texto_lower or 'tiene' in texto_lower):
+        match = re.search(r'(?:pedido[s]?|de|cliente|del?|para)\s+(?:el?|la?|los?|las?)?\s*(.+?)(?:\?|$)', texto_lower)
+        if match:
+            nombre = match.group(1).strip()
+            if nombre and len(nombre) > 1:
+                pedidos = Pedido.objects.filter(
+                    Q(cliente__nombre__icontains=nombre) | 
+                    Q(cliente__apellido__icontains=nombre)
+                )[:5]
+                if pedidos:
+                    lista = "\n".join([f"• #{p.id} - {p.cliente.nombre} {p.cliente.apellido} - {p.estado.nombre if p.estado else 'Sin estado'} - ${p.monto_total}" for p in pedidos])
+                    return f"📋 PEDIDOS DE '{nombre}':\n\n{lista}\n\nTotal: {len(pedidos)} pedidos"
+                return f"No encontré pedidos de '{nombre}'"
+    
+    if 'pedido' in texto_lower and ('luciano' in texto_lower or 'cliente' in texto_lower):
+        match = re.search(r'(?:luciano|cliente)\s*(\w+)', texto_lower)
+        if match:
+            nombre = match.group(1)
+            pedidos = Pedido.objects.filter(
+                Q(cliente__nombre__icontains=nombre) | 
+                Q(cliente__apellido__icontains=nombre)
+            )[:5]
+            if pedidos:
+                lista = "\n".join([f"• #{p.id} - {p.cliente.nombre} {p.cliente.apellido} - {p.estado.nombre if p.estado else 'Sin estado'} - ${p.monto_total}" for p in pedidos])
+                return f"📋 PEDIDOS DE '{nombre}':\n\n{lista}\n\nTotal: {len(pedidos)} pedidos"
+    
+    if 'pendiente' in texto_lower or 'sin confirmar' in texto_lower or 'sin aprobar' in texto_lower:
         estados = EstadoPedido.objects.filter(nombre__icontains='pendiente') if EstadoPedido else []
         if estados:
             pedidos = list(Pedido.objects.filter(estado__in=estados)[:5])
@@ -488,8 +516,8 @@ def obtener_respuesta(mensaje):
                 return respuesta
     
     funciones = [
-        buscar_cliente,
         buscar_pedido,
+        buscar_cliente,
         buscar_insumos,
         buscar_producto,
         buscar_presupuesto,
