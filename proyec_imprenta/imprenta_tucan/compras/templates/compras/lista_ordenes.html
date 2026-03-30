@@ -99,15 +99,14 @@
 <!-- Modal Orden de Compra -->
 <div id="modalOrden" class="fixed inset-0 z-50 hidden">
   <div class="absolute inset-0 bg-black/50" onclick="cerrarModalOrden()"></div>
-  <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full max-w-2xl max-h-[90vh] bg-white rounded-xl shadow-2xl overflow-hidden">
-    <div class="h-full overflow-y-auto p-6">
-      <div class="flex justify-between items-start mb-4">
-        <h2 class="text-xl font-bold text-gray-800">ORDEN DE COMPRA</h2>
-        <button onclick="cerrarModalOrden()" class="text-gray-400 hover:text-gray-600">
-          <span class="material-symbols-outlined">close</span>
-        </button>
-      </div>
-      
+  <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full max-w-2xl max-h-[90vh] bg-white rounded-xl shadow-2xl flex flex-col">
+    <div class="flex-none p-4 border-b border-gray-200 flex justify-between items-center">
+      <h2 class="text-xl font-bold text-gray-800">ORDEN DE COMPRA</h2>
+      <button onclick="cerrarModalOrden()" class="text-gray-400 hover:text-gray-600">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+    <div class="flex-1 overflow-y-auto p-6">
       <div id="contenidoModalOrden" class="space-y-4">
         <!-- Loading -->
         <div class="text-center py-8">
@@ -124,9 +123,14 @@ function abrirModalOrden(pk) {
   document.getElementById('modalOrden').classList.remove('hidden');
   document.getElementById('contenidoModalOrden').innerHTML = '<div class="text-center py-8"><span class="material-symbols-outlined text-4xl text-blue-600 animate-spin">sync</span><p class="text-gray-500 mt-2">Cargando...</p></div>';
   
+  console.log('Cargando orden:', pk);
   fetch('/compras/ordenes/' + pk + '/json/')
-    .then(r => r.json())
+    .then(r => {
+      console.log('Response status:', r.status);
+      return r.json();
+    })
     .then(data => {
+      console.log('Data received:', data);
       let detalles = '';
       let num = 1;
       data.detalles.forEach(d => {
@@ -246,16 +250,16 @@ function abrirModalOrden(pk) {
         </div>
         
         <!-- Botones de Envío -->
-        <div class="mt-6 flex justify-center gap-4">
-          <a href="/compras/ordenes/${data.id}/pdf/" target="_blank" class="inline-flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium">
+        <div class="mt-6 pt-4 border-t border-gray-200 flex justify-center gap-4 flex-wrap">
+          <a href="/compras/ordenes/${data.id}/pdf/" target="_blank" class="inline-flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium shadow">
             <span class="material-symbols-outlined text-sm">picture_as_pdf</span>
             Descargar PDF
           </a>
-          <button onclick="enviarOrdenEmail(${data.id}, '${data.proveedor.email}')" class="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium">
+          <button type="button" onclick="enviarOrdenEmail(${data.id}, '${data.proveedor.email}')" class="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium shadow">
             <span class="material-symbols-outlined text-sm">email</span>
             Enviar por Email
           </button>
-          <button onclick="enviarOrdenWhatsApp(${data.id}, '${data.proveedor.contacto}')" class="inline-flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium">
+          <button type="button" onclick="enviarOrdenWhatsApp(${data.id}, '${data.proveedor.contacto}')" class="inline-flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium shadow">
             <span class="material-symbols-outlined text-sm">chat</span>
             Enviar por WhatsApp
           </button>

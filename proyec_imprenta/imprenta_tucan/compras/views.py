@@ -99,7 +99,14 @@ def detalle_orden(request, pk):
 @login_required
 def detalle_orden_json(request, pk):
     from django.http import JsonResponse
-    orden = get_object_or_404(OrdenCompra.objects.select_related("proveedor").prefetch_related("detalles__insumo"), pk=pk)
+    orden = get_object_or_404(OrdenCompra.objects.select_related("proveedor", "estado").prefetch_related("detalles__insumo"), pk=pk)
+    
+    # Recalcular monto_total si es 0 pero hay detalles
+    if orden.monto_total == 0:
+        total = sum(d.subtotal() for d in orden.detalles.all())
+        if total > 0:
+            orden.monto_total = total
+            orden.save(update_fields=["monto_total"])
     
     detalles = []
     for d in orden.detalles.all():
@@ -125,6 +132,7 @@ def detalle_orden_json(request, pk):
         'fecha': orden.fecha_creacion.strftime('%d/%m/%Y'),
         'fecha_entrega': orden.fecha_entrega.strftime('%d/%m/%Y') if orden.fecha_entrega else '',
         'fecha_recepcion': orden.fecha_recepcion.strftime('%d/%m/%Y') if orden.fecha_recepcion else '',
+        'estado': orden.estado.nombre if orden.estado else '',
         
         # Empresa
         'empresa': {
@@ -171,6 +179,12 @@ def enviar_orden_email(request, pk):
     
     if not proveedor.email:
         return JsonResponse({'ok': False, 'error': 'Proveedor sin email'}, status=400)
+    
+    if orden.monto_total == 0:
+        total = sum(d.subtotal() for d in orden.detalles.all())
+        if total > 0:
+            orden.monto_total = total
+            orden.save(update_fields=["monto_total"])
     
     subtotal = float(orden.monto_total)
     iva = subtotal * 0.21
@@ -456,6 +470,12 @@ def enviar_orden_whatsapp(request, pk):
     telefono = telefono.replace('+', '').replace(' ', '').replace('-', '')
     if not telefono.startswith('54'):
         telefono = '54' + telefono
+    
+    if orden.monto_total == 0:
+        total = sum(d.subtotal() for d in orden.detalles.all())
+        if total > 0:
+            orden.monto_total = total
+            orden.save(update_fields=["monto_total"])
     
     subtotal = float(orden.monto_total)
     iva = subtotal * 0.21
@@ -943,6 +963,12 @@ def orden_pdf(request, pk):
     from reportlab.lib.units import cm
     
     orden = get_object_or_404(OrdenCompra.objects.select_related("proveedor").prefetch_related("detalles__insumo"), pk=pk)
+    
+    if orden.monto_total == 0:
+        total = sum(d.subtotal() for d in orden.detalles.all())
+        if total > 0:
+            orden.monto_total = total
+            orden.save(update_fields=["monto_total"])
     
     response = HttpResponse(content_type='application/pdf')
     response['Content-Disposition'] = f'attachment; filename="OC-{orden.pk:04d}.pdf"'
