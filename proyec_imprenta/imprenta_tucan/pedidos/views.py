@@ -86,6 +86,7 @@ def lista_pedidos(request):
             "query": query,
             "order_by": order_by,
             "direction": direction,
+            "estados": EstadoPedido.objects.all(),
         },
     )
 
@@ -715,3 +716,34 @@ def orden_compra_detalle(request, pk):
         'stock_minimo': getattr(orden.insumo, 'stock_minimo', None),
     }
     return render(request, 'pedidos/orden_compra_detalle.html', context)
+
+
+@require_POST
+@login_required
+@requiere_permiso("Pedidos")
+def cambiar_estado_pedido(request, idPedido: int):
+    """Cambia el estado de un pedido desde la lista de pedidos."""
+    nuevo_estado_id = request.POST.get('nuevo_estado')
+    
+    if not nuevo_estado_id:
+        messages.error(request, "Debe seleccionar un estado.")
+        return redirect('lista_pedidos')
+    
+    try:
+        pedido = Pedido.objects.get(pk=idPedido)
+        nuevo_estado = EstadoPedido.objects.get(pk=nuevo_estado_id)
+        
+        estado_anterior = pedido.estado
+        pedido.estado = nuevo_estado
+        pedido.save()
+        
+        messages.success(request, f"Pedido #{pedido.id} cambiado de '{estado_anterior.nombre}' a '{nuevo_estado.nombre}'")
+        
+    except Pedido.DoesNotExist:
+        messages.error(request, "Pedido no encontrado.")
+    except EstadoPedido.DoesNotExist:
+        messages.error(request, "Estado no válido.")
+    except Exception as e:
+        messages.error(request, f"Error al cambiar estado: {str(e)}")
+    
+    return redirect('lista_pedidos')
