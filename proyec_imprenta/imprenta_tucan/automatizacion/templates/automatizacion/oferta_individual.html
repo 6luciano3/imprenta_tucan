@@ -26,7 +26,15 @@
         <div class="mb-4">
             <div class="font-bold text-lg mb-1">{{ oferta.titulo }}</div>
             <div class="text-gray-600 mb-2">{{ oferta.descripcion }}</div>
-            <div class="text-sm text-gray-500">Tipo: {{ oferta.get_tipo_display }}</div>
+            {% with oferta.parametros as params %}
+            {% if params.descuento %}
+            <div class="mt-3 inline-flex items-center px-3 py-1.5 rounded-lg bg-emerald-100 text-emerald-800 font-semibold text-sm">
+                <span class="material-symbols-outlined text-sm mr-1">sell</span>
+                {{ params.descuento }}% de descuento
+            </div>
+            {% endif %}
+            {% endwith %}
+            <div class="text-sm text-gray-500 mt-2">Tipo: {{ oferta.get_tipo_display }}</div>
             <div class="text-sm text-gray-500">Estado: {{ oferta.get_estado_display }}</div>
         </div>
         {% if accion_realizada == 'aceptada' %}

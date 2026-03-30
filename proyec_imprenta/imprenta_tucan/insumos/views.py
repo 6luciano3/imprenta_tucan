@@ -345,7 +345,10 @@ def lista_proyecciones(request):
     # T-06: la generacion de proyecciones fue movida a insumos.tasks.generar_proyecciones_insumos
     # que Celery ejecuta diariamente. Esta vista es solo lectura.
     from configuracion.services import get_page_size
-    periodo_actual = timezone.now().strftime('%Y-%m')
+    
+    # Obtener el último período con proyecciones
+    ultimo_periodo = ProyeccionInsumo.objects.order_by('-periodo').values_list('periodo', flat=True).first()
+    periodo_actual = ultimo_periodo or timezone.now().strftime('%Y-%m')
     proyecciones_qs = ProyeccionInsumo.objects.filter(periodo=periodo_actual)
 
     # Obtener prediccion para cada proyeccion (solo lectura, sin escribir en BD)

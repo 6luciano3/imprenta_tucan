@@ -55,8 +55,14 @@ def enviar_oferta_email(oferta, request=None, force=False):
     nombre = getattr(cliente,'nombre','') or getattr(cliente,'razon_social','') or 'Cliente'
     from automatizacion.views_combos import generar_combo_para_cliente
     combo = generar_combo_para_cliente(cliente)
+    descuento_oferta = float(oferta.parametros.get('descuento', 0)) if oferta.parametros else 0
     if combo and combo.comboofertaproducto_set.exists():
         filas, subtotal, descuento, desc_valor, total = _html_tabla_combo(combo)
+        if descuento_oferta > 0:
+            descuento = descuento_oferta
+            descuento_valor = subtotal * descuento / 100
+            total = subtotal - descuento_valor
+            desc_valor = descuento_valor
         subtotal_str  = '${}'.format("{:,.0f}".format(subtotal).replace(',', '.'))
         desc_val_str = '${}'.format("{:,.0f}".format(desc_valor).replace(',', '.'))
         total_str    = '${}'.format("{:,.0f}".format(total).replace(',', '.'))
