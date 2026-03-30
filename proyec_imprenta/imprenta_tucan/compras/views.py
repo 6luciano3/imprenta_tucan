@@ -1,6 +1,7 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.views.decorators.http import require_POST
 from django.utils import timezone
 from .models import OrdenCompra, DetalleOrdenCompra, Remito, DetalleRemito, EstadoCompra
 from .forms import OrdenCompraForm, DetalleOrdenCompraFormSet, RemitoForm, DetalleRemitoFormSet
@@ -68,6 +69,360 @@ def nueva_orden(request):
 def detalle_orden(request, pk):
     orden = get_object_or_404(OrdenCompra.objects.select_related("proveedor", "estado", "usuario").prefetch_related("detalles__insumo", "remitos"), pk=pk)
     return render(request, "compras/detalle_orden.html", {"orden": orden})
+
+
+@login_required
+def detalle_orden_json(request, pk):
+    from django.http import JsonResponse
+    orden = get_object_or_404(OrdenCompra.objects.select_related("proveedor").prefetch_related("detalles__insumo"), pk=pk)
+    
+    detalles = []
+    for d in orden.detalles.all():
+        codigo = getattr(d.insumo, 'codigo', None) or f"IN-{d.insumo.pk:03d}"
+        detalles.append({
+            'codigo': codigo,
+            'insumo': d.insumo.nombre,
+            'cantidad': d.cantidad,
+            'unidad': getattr(d.insumo, 'unidad_medida', None) or 'un',
+            'precio': float(d.precio_unitario),
+            'subtotal': float(d.subtotal()),
+        })
+    
+    subtotal = float(orden.monto_total)
+    iva = subtotal * 0.21
+    total = subtotal + iva
+    
+    return JsonResponse({
+        'id': orden.pk,
+        'fecha': orden.fecha_creacion.strftime('%d/%m/%Y'),
+        'fecha_entrega': orden.fecha_recepcion.strftime('%d/%m/%Y') if orden.fecha_recepcion else '',
+        
+        # Empresa
+        'empresa': {
+            'nombre': 'Imprenta Tucán S.A.',
+            'cuit': '30-12345678-9',
+            'domicilio': 'Av. Principal 123, Tucumán',
+            'telefono': '381-4000000',
+            'email': 'info@imprentatucan.com',
+            'iva': 'Responsable Inscripto',
+        },
+        
+        # Proveedor
+        'proveedor': {
+            'nombre': orden.proveedor.nombre,
+            'cuit': orden.proveedor.cuit or '',
+            'direccion': orden.proveedor.direccion or '',
+            'contacto': orden.proveedor.telefono or '',
+            'email': orden.proveedor.email or '',
+        },
+        
+        # Condiciones
+        'condicion_pago': 'Contado',
+        'moneda': 'ARS',
+        'entrega': 'Depósito Gráfica Tucán',
+        'observaciones': orden.observaciones or '',
+        
+        # Totales
+        'subtotal': subtotal,
+        'iva': iva,
+        'total': total,
+        
+        'detalles': detalles,
+    })
+
+
+@require_POST
+@login_required
+def enviar_orden_email(request, pk):
+    from django.core.mail import send_mail
+    from django.conf import settings
+    
+    orden = get_object_or_404(OrdenCompra.objects.select_related("proveedor").prefetch_related("detalles__insumo"), pk=pk)
+    proveedor = orden.proveedor
+    
+    if not proveedor.email:
+        return JsonResponse({'ok': False, 'error': 'Proveedor sin email'}, status=400)
+    
+    subtotal = float(orden.monto_total)
+    iva = subtotal * 0.21
+    total = subtotal + iva
+    
+    detalles_html = ""
+    num = 1
+    for d in orden.detalles.all():
+        codigo = getattr(d.insumo, 'codigo', None) or f"IN-{d.insumo.pk:03d}"
+        unidad = getattr(d.insumo, 'unidad_medida', None) or 'un'
+        detalles_html += f"""
+        <tr style="border-bottom: 1px solid #eee;">
+            <td style="padding: 8px; text-align: center; color: #666;">{num}</td>
+            <td style="padding: 8px; color: #333;">{codigo}</td>
+            <td style="padding: 8px; color: #333;">{d.insumo.nombre}</td>
+            <td style="padding: 8px; text-align: center; color: #333;">{d.cantidad}</td>
+            <td style="padding: 8px; text-align: center; color: #333;">{unidad}</td>
+            <td style="padding: 8px; text-align: right; color: #333;">$ {float(d.precio_unitario):.2f}</td>
+            <td style="padding: 8px; text-align: right; font-weight: bold; color: #333;">$ {float(d.subtotal()):.2f}</td>
+        </tr>
+        """
+        num += 1
+    
+    dominio = request.get_host()
+    protocolo = 'http' if 'localhost' in dominio or '127.0.0.1' in dominio else 'https'
+    url_verificar = f"{protocolo}://{dominio}/compras/ordenes/{orden.pk}/"
+    
+    html_message = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <style>
+            body {{ font-family: Arial, sans-serif; margin: 0; padding: 0; background: #f5f5f5; }}
+            .container {{ max-width: 700px; margin: 0 auto; background: white; }}
+            .header {{ background: #2563eb; color: white; padding: 20px; }}
+            .header h1 {{ margin: 0; font-size: 24px; }}
+            .header .orden-num {{ font-size: 18px; margin-top: 5px; }}
+            .content {{ padding: 20px; }}
+            .info-grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; }}
+            .info-box {{ background: #f8f9fa; padding: 12px; border-radius: 8px; }}
+            .info-box h4 {{ margin: 0 0 8px 0; color: #666; font-size: 11px; text-transform: uppercase; }}
+            .info-box p {{ margin: 0; color: #333; }}
+            table {{ width: 100%; border-collapse: collapse; margin: 20px 0; }}
+            th {{ background: #f3f4f6; padding: 10px; text-align: left; font-size: 11px; color: #666; text-transform: uppercase; }}
+            .totals {{ margin-top: 20px; text-align: right; }}
+            .totals .row {{ display: flex; justify-content: flex-end; gap: 30px; padding: 5px 0; }}
+            .totals .total {{ font-size: 18px; font-weight: bold; color: #16a34a; border-top: 2px solid #333; padding-top: 10px; }}
+            .observaciones {{ background: #f8f9fa; padding: 12px; border-radius: 8px; margin-top: 20px; }}
+            .botones {{ padding: 20px; text-align: center; background: #f5f5f5; }}
+            .btn {{ display: inline-block; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: bold; margin: 5px; }}
+            .btn-primary {{ background: #2563eb; color: white; }}
+            .btn-success {{ background: #16a34a; color: white; }}
+            .btn-warning {{ background: #f59e0b; color: white; }}
+            .footer {{ text-align: center; padding: 15px; color: #666; font-size: 12px; }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <h1>IMPRENTA TUCÁN S.A.</h1>
+                <div class="orden-num">ORDEN DE COMPRA Nº {orden.pk:04d}</div>
+            </div>
+            
+            <div class="content">
+                <div class="info-grid">
+                    <div class="info-box">
+                        <h4>Fecha de Emisión</h4>
+                        <p>{orden.fecha_creacion.strftime('%d/%m/%Y')}</p>
+                    </div>
+                    <div class="info-box">
+                        <h4>Condición de Pago</h4>
+                        <p>Contado</p>
+                    </div>
+                    <div class="info-box">
+                        <h4>Moneda</h4>
+                        <p>ARS</p>
+                    </div>
+                    <div class="info-box">
+                        <h4>Fecha Entrega</h4>
+                        <p>{orden.fecha_recepcion.strftime('%d/%m/%Y') if orden.fecha_recepcion else 'A convenir'}</p>
+                    </div>
+                </div>
+                
+                <div class="info-box">
+                    <h4>Proveedor</h4>
+                    <p style="font-weight: bold;">{proveedor.nombre}</p>
+                    <p>CUIT: {proveedor.cuit or ' - '}</p>
+                    <p>{proveedor.direccion or ''}</p>
+                    <p>Tel: {proveedor.telefono or ''} | Email: {proveedor.email}</p>
+                </div>
+                
+                <table>
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Código</th>
+                            <th>Descripción</th>
+                            <th>Cant.</th>
+                            <th>Unidad</th>
+                            <th>P. Unit.</th>
+                            <th>Subtotal</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {detalles_html}
+                    </tbody>
+                </table>
+                
+                <div class="totals">
+                    <div class="row"><span>Subtotal:</span><span>$ {subtotal:.2f}</span></div>
+                    <div class="row"><span>IVA 21%:</span><span>$ {iva:.2f}</span></div>
+                    <div class="row total"><span>TOTAL:</span><span>$ {total:.2f}</span></div>
+                </div>
+                
+                <div class="observaciones">
+                    <h4 style="margin: 0 0 8px 0; color: #666; font-size: 11px; text-transform: uppercase;">Condiciones de Entrega</h4>
+                    <p><strong>Lugar:</strong> Depósito Gráfica Tucán</p>
+                    <p><strong>Observaciones:</strong> {orden.observaciones or 'Sin observaciones'}</p>
+                </div>
+            </div>
+            
+            <div class="botones">
+                <p style="margin-bottom: 15px; color: #666;">¿Qué deseas hacer con esta orden?</p>
+                <a href="{url_verificar}" class="btn btn-primary">VER EN WEB</a>
+                <a href="{url_verificar}confirmar/" class="btn btn-success">CONFIRMAR ORDEN</a>
+                <a href="{url_verificar}rechazar/" class="btn btn-warning">RECHAZAR</a>
+            </div>
+            
+            <div class="footer">
+                <p>Imprenta Tucán S.A. | info@imprentatucan.com | 381-4000000</p>
+                <p>Este es un mensaje automático. Por favor no responder a este email.</p>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+    
+    try:
+        send_mail(
+            subject=f'Orden de Compra OC-{orden.pk:04d} - Imprenta Tucán',
+            message='Orden de Compra',
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[proveedor.email],
+            html_message=html_message,
+            fail_silently=False,
+        )
+        return JsonResponse({'ok': True, 'message': 'Email enviado'})
+    except Exception as e:
+        return JsonResponse({'ok': False, 'error': str(e)}, status=500)
+
+
+def confirmar_orden_publico(request, pk):
+    from django.utils import timezone
+    from django.db import transaction
+    
+    orden = get_object_or_404(OrdenCompra.objects.prefetch_related("detalles"), pk=pk)
+    
+    try:
+        with transaction.atomic():
+            # 1. Cambiar estado a confirmada
+            estado_confirmado = EstadoCompra.objects.get(nombre__icontains='confirmado')
+            orden.estado = estado_confirmado
+            
+            # 2. Crear remito automáticamente
+            from .models import Remito, DetalleRemito, MovimientoStock
+            
+            numero_remito = f"OC-{orden.pk:04d}"
+            remito = Remito.objects.create(
+                orden_compra=orden,
+                proveedor=orden.proveedor,
+                numero=numero_remito,
+                fecha=timezone.now().date(),
+                observaciones="Remito generado automáticamente al confirmar orden desde email del proveedor."
+            )
+            
+            # 3. Registrar detalles y aumentar stock
+            detalles_creados = []
+            for detalle in orden.detalles.all():
+                # Crear detalle del remito
+                DetalleRemito.objects.create(
+                    remito=remito,
+                    insumo=detalle.insumo,
+                    cantidad=detalle.cantidad
+                )
+                
+                # Aumentar stock
+                stock_anterior = detalle.insumo.stock or 0
+                detalle.insumo.stock = stock_anterior + detalle.cantidad
+                detalle.insumo.save(update_fields=['stock', 'updated_at'])
+                
+                # Registrar movimiento de stock (Kardex)
+                MovimientoStock.objects.create(
+                    insumo=detalle.insumo,
+                    tipo="entrada",
+                    origen="remito",
+                    cantidad=detalle.cantidad,
+                    stock_anterior=stock_anterior,
+                    stock_posterior=detalle.insumo.stock,
+                    referencia=f"Remito {remito.numero} (OC-{orden.pk:04d})",
+                    remito=remito,
+                    fecha=timezone.now().date(),
+                )
+                
+                detalles_creados.append(f"{detalle.insumo.nombre} (+{detalle.cantidad})")
+            
+            # 4. Marcar orden como recibida
+            orden.fecha_recepcion = timezone.now().date()
+            orden.save(update_fields=['estado', 'fecha_recepcion', 'actualizado_en'])
+            
+            mensaje = f"Orden confirmada y mercadería recibida. Stock actualizado: {', '.join(detalles_creados[:3])}"
+            if len(detalles_creados) > 3:
+                mensaje += f" y {len(detalles_creados) - 3} más"
+                
+    except Exception as e:
+        mensaje = f"Error al confirmar la orden: {str(e)}. Contacte a Imprenta Tucán."
+    
+    return render(request, "compras/respuesta_proveedor.html", {
+        "orden": orden,
+        "accion": "confirmada",
+        "mensaje": mensaje,
+    })
+
+
+def rechazar_orden_publico(request, pk):
+    orden = get_object_or_404(OrdenCompra, pk=pk)
+    
+    try:
+        estado_rechazado = EstadoCompra.objects.get(nombre__icontains='rechazado')
+        orden.estado = estado_rechazado
+        orden.save(update_fields=['estado', 'actualizado_en'])
+        mensaje = "Orden rechazada. Si tiene alguna consulta, contacte a Imprenta Tucán."
+    except EstadoCompra.DoesNotExist:
+        mensaje = "Error al rechazar la orden. Contacte a Imprenta Tucán."
+    
+    return render(request, "compras/respuesta_proveedor.html", {
+        "orden": orden,
+        "accion": "rechazada",
+        "mensaje": mensaje,
+    })
+
+
+@require_POST
+@login_required
+def enviar_orden_whatsapp(request, pk):
+    import urllib.parse
+    
+    orden = get_object_or_404(OrdenCompra.objects.select_related("proveedor").prefetch_related("detalles__insumo"), pk=pk)
+    proveedor = orden.proveedor
+    
+    telefono = proveedor.whatsapp or proveedor.telefono_e164 or proveedor.telefono
+    
+    if not telefono:
+        return JsonResponse({'ok': False, 'error': 'Proveedor sin teléfono'}, status=400)
+    
+    telefono = telefono.replace('+', '').replace(' ', '').replace('-', '')
+    if not telefono.startswith('54'):
+        telefono = '54' + telefono
+    
+    subtotal = float(orden.monto_total)
+    iva = subtotal * 0.21
+    total = subtotal + iva
+    
+    mensaje = f"*ORDEN DE COMPRA*\n"
+    mensaje += f"*Nº {orden.pk:04d}*\n\n"
+    mensaje += f"*Fecha:* {orden.fecha_creacion.strftime('%d/%m/%Y')}\n\n"
+    mensaje += f"*Proveedor:* {proveedor.nombre}\n\n"
+    mensaje += f"*DETALLE:*\n"
+    
+    for d in orden.detalles.all():
+        mensaje += f"• {d.cantidad} {getattr(d.insumo, 'unidad_medida', '') or 'un'} {d.insumo.nombre} - $ {d.subtotal():.2f}\n"
+    
+    mensaje += f"\n*Subtotal:* $ {subtotal:.2f}\n"
+    mensaje += f"*IVA 21%:* $ {iva:.2f}\n"
+    mensaje += f"*TOTAL:* $ {total:.2f}\n\n"
+    mensaje += f"*Entrega:* Depósito Gráfica Tucán"
+    
+    mensaje编码 = urllib.parse.quote(mensaje)
+    url_whatsapp = f"https://wa.me/{telefono}?text={mensaje编码}"
+    
+    return JsonResponse({'ok': True, 'url': url_whatsapp})
 
 
 @login_required

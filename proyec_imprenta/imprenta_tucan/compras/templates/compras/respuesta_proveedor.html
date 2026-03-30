@@ -1,0 +1,32 @@
+{% extends 'base.html' %}
+{% block title %}Respuesta Orden de Compra{% endblock %}
+{% block content %}
+<div class="min-h-screen flex items-center justify-center bg-gray-100">
+  <div class="max-w-md w-full bg-white rounded-xl shadow-lg p-8 text-center">
+    {% if accion == 'confirmada' %}
+    <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+      <span class="material-symbols-outlined text-green-600 text-4xl">check_circle</span>
+    </div>
+    <h1 class="text-2xl font-bold text-green-600 mb-2">Orden Confirmada</h1>
+    {% else %}
+    <div class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+      <span class="material-symbols-outlined text-red-600 text-4xl">cancel</span>
+    </div>
+    <h1 class="text-2xl font-bold text-red-600 mb-2">Orden Rechazada</h1>
+    {% endif %}
+    
+    <p class="text-gray-600 mb-6">{{ mensaje }}</p>
+    
+    <div class="bg-gray-50 rounded-lg p-4 mb-6 text-left">
+      <p class="text-sm text-gray-500">Orden de Compra</p>
+      <p class="font-bold text-lg">OC-{{ orden.pk|stringformat:"04d" }}</p>
+      <p class="text-sm text-gray-500 mt-2">Proveedor: {{ orden.proveedor.nombre }}</p>
+      <p class="text-sm text-gray-500">Total: ${{ orden.monto_total|floatformat:2 }}</p>
+    </div>
+    
+    <a href="/" class="inline-block bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-lg">
+      Volver al Inicio
+    </a>
+  </div>
+</div>
+{% endblock %}

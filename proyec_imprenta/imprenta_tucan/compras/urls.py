@@ -9,7 +9,13 @@ urlpatterns = [
     path("ordenes/", views.lista_ordenes, name="lista_ordenes_compra"),
     path("ordenes/nueva/", views.nueva_orden, name="nueva_orden_compra"),
     path("ordenes/<int:pk>/", views.detalle_orden, name="detalle_orden_compra"),
+    path("ordenes/<int:pk>/json/", views.detalle_orden_json, name="detalle_orden_json"),
     path("ordenes/<int:pk>/estado/", views.cambiar_estado_orden, name="cambiar_estado_orden"),
+    path("ordenes/<int:pk>/enviar-email/", views.enviar_orden_email, name="enviar_orden_email"),
+    path("ordenes/<int:pk>/enviar-whatsapp/", views.enviar_orden_whatsapp, name="enviar_orden_whatsapp"),
+    # Vistas públicas para proveedores
+    path("ordenes/<int:pk>/confirmar/", views.confirmar_orden_publico, name="confirmar_orden_publico"),
+    path("ordenes/<int:pk>/rechazar/", views.rechazar_orden_publico, name="rechazar_orden_publico"),
     path("remitos/", views.lista_remitos, name="lista_remitos_compra"),
     path("remitos/nuevo/", views.nuevo_remito, name="nuevo_remito_compra"),
     path("api/solicitud/<int:pk>/items/", views.api_items_solicitud, name="api_items_solicitud"),
