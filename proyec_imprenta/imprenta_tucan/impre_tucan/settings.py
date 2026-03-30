@@ -238,6 +238,9 @@ EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
 # Setear en producción vía variable de entorno AUTOMATION_WEBHOOK_SECRET.
 AUTOMATION_WEBHOOK_SECRET = os.environ.get('AUTOMATION_WEBHOOK_SECRET', '')
 
+# OpenAI - Chatbot Intelligence
+OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '')
+
 if EMAIL_HOST_PASSWORD:
     EMAIL_BACKEND  = 'django.core.mail.backends.smtp.EmailBackend'
     EMAIL_HOST     = 'smtp.gmail.com'

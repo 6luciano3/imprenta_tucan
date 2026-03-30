@@ -3,11 +3,19 @@ import re
 import uuid
 from datetime import timedelta
 from django.http import JsonResponse
+from django.contrib.auth.decorators import login_required
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from django.utils import timezone
 from django.db.models import Count, Sum, Q
-from .models import ConversacionChatbot
+from django.conf import settings
+import unicodedata
+
+try:
+    import openai
+    OPENAI_AVAILABLE = True
+except ImportError:
+    OPENAI_AVAILABLE = False
 
 try:
     from pedidos.models import Pedido, EstadoPedido
@@ -34,6 +42,77 @@ try:
     from presupuestos.models import Presupuesto
 except ImportError:
     Presupuesto = None
+
+try:
+    from chatbot.models import ConversacionChatbot
+except ImportError:
+    ConversacionChatbot = None
+
+
+def obtener_respuesta_openai(mensaje, historial=None):
+    api_key = getattr(settings, 'OPENAI_API_KEY', '')
+    
+    if not api_key or api_key == 'tu-openai-api-key-aqui':
+        return None
+    
+    if not OPENAI_AVAILABLE:
+        return None
+    
+    try:
+        client = openai.OpenAI(api_key=api_key)
+        
+        messages = [
+            {
+                "role": "system",
+                "content": """Eres el asistente virtual de Imprenta Tucan, una imprenta ubicada en Argentina.
+
+CARACTERÍSTICAS DEL NEGOCIO:
+- Imprenta comercial: tarjetas, volantes, folletos, facturas, talonarios, sobres, stickers, etc.
+- Ubicación: Argentina
+- Moneda: Pesos argentinos ($)
+- Horario: Lunes a viernes de 8:00 a 18:00, sábados de 9:00 a 13:00
+
+INFORMACIÓN DEL SISTEMA:
+El sistema puede manejar:
+- PEDIDOS: seguimiento, estados, historial de pedidos
+- CLIENTES: búsqueda, información de contacto
+- PRODUCTOS/SERVICIOS: precios, características
+- PRESUPUESTOS: cotizaciones, estados (pendiente, aceptado, rechazado)
+- INSUMOS: stock de materiales (papel, tinta, etc.)
+- ESTADÍSTICAS: ventas, clientes frecuentes
+
+REGLAS DE RESPUESTA:
+1. Responde siempre en español de forma clara y concisa
+2. Usa un tono amigable y profesional
+3. Si no puedes realizar una acción, explica qué necesitas
+4. Para consultas específicas de datos, indica que el usuario puede verlo en el sistema
+5. No inventes información sobre pedidos o clientes específicos
+6. Usa emojis sparingly para hacer las respuestas más amigables
+7. Si el usuario pregunta algo que no tiene que ver con la imprenta, redirígelo amablemente a nuestros servicios"""
+            }
+        ]
+        
+        if historial:
+            for msg in historial[-6:]:
+                if msg.es_cliente:
+                    messages.append({"role": "user", "content": msg.mensaje})
+                else:
+                    messages.append({"role": "assistant", "content": msg.respuesta})
+        
+        messages.append({"role": "user", "content": mensaje})
+        
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=messages,
+            max_tokens=500,
+            temperature=0.7
+        )
+        
+        return response.choices[0].message.content
+        
+    except Exception as e:
+        print(f"Error OpenAI: {e}")
+        return None
 
 
 RESPUESTAS = {
@@ -425,6 +504,7 @@ def obtener_respuesta(mensaje):
     return RESPUESTAS['default'][1]
 
 
+@login_required
 @csrf_exempt
 @require_http_methods(["POST"])
 def chatbot_api(request):
@@ -439,21 +519,31 @@ def chatbot_api(request):
         if not mensaje:
             return JsonResponse({'error': 'Mensaje vacío'}, status=400)
         
-        respuesta = obtener_respuesta(mensaje)
+        historial = None
+        if session_id and ConversacionChatbot:
+            historial = list(ConversacionChatbot.objects.filter(
+                session_id=session_id
+            ).order_by('-fecha')[:6])
         
-        ConversacionChatbot.objects.create(
-            session_id=session_id,
-            mensaje=mensaje,
-            respuesta=respuesta,
-            es_cliente=True
-        )
+        respuesta = obtener_respuesta_openai(mensaje, historial)
         
-        ConversacionChatbot.objects.create(
-            session_id=session_id,
-            mensaje=respuesta,
-            respuesta='',
-            es_cliente=False
-        )
+        if not respuesta:
+            respuesta = obtener_respuesta(mensaje)
+        
+        if ConversacionChatbot:
+            ConversacionChatbot.objects.create(
+                session_id=session_id,
+                mensaje=mensaje,
+                respuesta=respuesta,
+                es_cliente=True
+            )
+            
+            ConversacionChatbot.objects.create(
+                session_id=session_id,
+                mensaje=respuesta,
+                respuesta='',
+                es_cliente=False
+            )
         
         return JsonResponse({
             'respuesta': respuesta,

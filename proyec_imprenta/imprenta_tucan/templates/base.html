@@ -290,6 +290,8 @@ function toggleMobileMenu() {
 <!-- Sin JS de menú móvil: el encabezado solo muestra "Imprenta Tucán" -->
 {% block extra_js %}{% endblock %}
 
+{% if user.is_authenticated %}
 {% include 'chatbot/chat_widget.html' %}
+{% endif %}
 </body>
 </html>
