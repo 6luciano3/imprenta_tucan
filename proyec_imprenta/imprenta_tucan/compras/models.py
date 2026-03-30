@@ -42,6 +42,8 @@ class OrdenCompra(models.Model):
         related_name="ordenes_compra",
         help_text="Solicitud de cotizacion confirmada que origino esta orden"
     )
+    enviada = models.BooleanField(default=False, help_text="Indica si la orden fue enviada al proveedor")
+    fecha_envio = models.DateTimeField(null=True, blank=True, help_text="Fecha en que se envió la orden al proveedor")
     creado_en = models.DateTimeField(auto_now_add=True)
     actualizado_en = models.DateTimeField(auto_now=True)
 

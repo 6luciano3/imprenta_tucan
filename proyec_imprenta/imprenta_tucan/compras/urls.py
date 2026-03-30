@@ -39,4 +39,7 @@ urlpatterns = [
     
     # Ajuste masivo de precios
     path("ajuste-masivo/", views.ajuste_masivo_precios, name="ajuste_masivo_precios"),
+    
+    # Exportar órdenes
+    path("ordenes/exportar/", views.exportar_ordenes_excel, name="exportar_ordenes"),
 ]

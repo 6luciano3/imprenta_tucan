@@ -29,6 +29,8 @@ def _registrar_auditoria(request, instance, action="create"):
 
 @login_required
 def lista_ordenes(request):
+    from django.core.paginator import Paginator, EmptyPage
+    from django.db import models
     from proveedores.models import Proveedor
     
     ordenes = OrdenCompra.objects.select_related("proveedor", "estado", "usuario").prefetch_related("detalles__insumo")
@@ -38,6 +40,7 @@ def lista_ordenes(request):
     estado_id = request.GET.get('estado')
     fecha_desde = request.GET.get('fecha_desde')
     fecha_hasta = request.GET.get('fecha_hasta')
+    buscar = request.GET.get('buscar')
     
     if proveedor_id:
         ordenes = ordenes.filter(proveedor_id=proveedor_id)
@@ -47,14 +50,40 @@ def lista_ordenes(request):
         ordenes = ordenes.filter(fecha_creacion__gte=fecha_desde)
     if fecha_hasta:
         ordenes = ordenes.filter(fecha_creacion__lte=fecha_hasta)
+    if buscar:
+        ordenes = ordenes.filter(
+            models.Q(pk__icontains=buscar) |
+            models.Q(proveedor__nombre__icontains=buscar)
+        )
+    
+    # Resumen de estados
+    resumen_estados = []
+    for estado in EstadoCompra.objects.all():
+        count = OrdenCompra.objects.filter(estado=estado).count()
+        if count > 0:
+            resumen_estados.append({
+                'nombre': estado.nombre,
+                'count': count,
+                'id': estado.pk,
+            })
+    
+    # Paginación
+    paginator = Paginator(ordenes, 15)
+    page = request.GET.get('page', 1)
+    try:
+        ordenes_page = paginator.page(page)
+    except EmptyPage:
+        ordenes_page = paginator.page(paginator.num_pages)
     
     proveedores = Proveedor.objects.filter(activo=True).order_by('nombre')
     estados = EstadoCompra.objects.all()
     
     return render(request, "compras/lista_ordenes.html", {
-        "ordenes": ordenes,
+        "ordenes": ordenes_page,
         "proveedores": proveedores,
         "estados": estados,
+        "resumen_estados": resumen_estados,
+        "buscar": buscar or '',
     })
 
 
@@ -133,6 +162,8 @@ def detalle_orden_json(request, pk):
         'fecha_entrega': orden.fecha_entrega.strftime('%d/%m/%Y') if orden.fecha_entrega else '',
         'fecha_recepcion': orden.fecha_recepcion.strftime('%d/%m/%Y') if orden.fecha_recepcion else '',
         'estado': orden.estado.nombre if orden.estado else '',
+        'enviada': orden.enviada,
+        'fecha_envio': orden.fecha_envio.strftime('%d/%m/%Y %H:%M') if orden.fecha_envio else '',
         
         # Empresa
         'empresa': {
@@ -332,6 +363,11 @@ def enviar_orden_email(request, pk):
             html_message=html_message,
             fail_silently=False,
         )
+        # Marcar orden como enviada
+        from django.utils import timezone
+        orden.enviada = True
+        orden.fecha_envio = timezone.now()
+        orden.save(update_fields=['enviada', 'fecha_envio'])
         return JsonResponse({'ok': True, 'message': 'Email enviado'})
     except Exception as e:
         return JsonResponse({'ok': False, 'error': str(e)}, status=500)
@@ -497,6 +533,12 @@ def enviar_orden_whatsapp(request, pk):
     
     mensaje编码 = urllib.parse.quote(mensaje)
     url_whatsapp = f"https://wa.me/{telefono}?text={mensaje编码}"
+    
+    # Marcar orden como enviada
+    from django.utils import timezone
+    orden.enviada = True
+    orden.fecha_envio = timezone.now()
+    orden.save(update_fields=['enviada', 'fecha_envio'])
     
     return JsonResponse({'ok': True, 'url': url_whatsapp})
 
@@ -1054,4 +1096,40 @@ def orden_pdf(request, pk):
         elements.append(Paragraph(orden.observaciones, styles['Normal']))
     
     doc.build(elements)
+    return response
+
+
+@login_required
+def exportar_ordenes_excel(request):
+    import csv
+    from django.http import HttpResponse
+    
+    ids = request.GET.get('ids', '').split(',')
+    if not ids or ids == ['']:
+        ordenes = OrdenCompra.objects.select_related('proveedor', 'estado').all()
+    else:
+        ordenes = OrdenCompra.objects.select_related('proveedor', 'estado').filter(pk__in=ids)
+    
+    response = HttpResponse(content_type='text/csv; charset=utf-8')
+    response['Content-Disposition'] = 'attachment; filename="ordenes_compra.csv"'
+    
+    writer = csv.writer(response)
+    writer.writerow(['Nº Orden', 'Proveedor', 'CUIT Proveedor', 'Condición Pago', 'Estado', 'Enviada', 'Fecha Creación', 'Fecha Entrega', 'Fecha Recepción', 'Total', 'Usuario', 'Observaciones'])
+    
+    for orden in ordenes:
+        writer.writerow([
+            f'OC-{orden.pk:04d}',
+            orden.proveedor.nombre,
+            orden.proveedor.cuit or '',
+            orden.get_condicion_pago_display(),
+            orden.estado.nombre,
+            'Sí' if orden.enviada else 'No',
+            orden.fecha_creacion.strftime('%d/%m/%Y'),
+            orden.fecha_entrega.strftime('%d/%m/%Y') if orden.fecha_entrega else '',
+            orden.fecha_recepcion.strftime('%d/%m/%Y') if orden.fecha_recepcion else '',
+            str(orden.monto_total),
+            orden.usuario.get_full_name() if orden.usuario else '',
+            orden.observaciones or '',
+        ])
+    
     return response

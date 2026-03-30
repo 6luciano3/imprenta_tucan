@@ -6,23 +6,42 @@
     <span class="material-symbols-outlined text-blue-600">shopping_cart</span>
     Ordenes de Compra
   </h1>
-  <a href="{% url 'compras:nueva_orden_compra' %}" class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold">
-    <span class="material-symbols-outlined text-base">add</span> Nueva Orden
-  </a>
+  <div class="flex gap-2">
+    <a href="{% url 'compras:nueva_orden_compra' %}" class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold">
+      <span class="material-symbols-outlined text-base">add</span> Nueva Orden
+    </a>
+  </div>
 </div>
+
 {% if messages %}{% for msg in messages %}
 <div class="mb-4 px-4 py-3 rounded-lg {% if msg.tags == 'error' %}bg-red-50 text-red-700 border border-red-200{% else %}bg-green-50 text-green-700 border border-green-200{% endif %}">{{ msg }}</div>
 {% endfor %}{% endif %}
 
-<!-- Filtros -->
+<!-- Resumen de Estados -->
+{% if resumen_estados %}
+<div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3 mb-4">
+  {% for est in resumen_estados %}
+  <a href="?estado={{ est.id }}" class="bg-white rounded-lg border border-gray-200 p-3 hover:shadow-md transition-shadow cursor-pointer">
+    <div class="text-2xl font-bold {% if est.nombre == 'Recibida' %}text-green-600{% elif est.nombre == 'Cancelada' %}text-red-600{% elif est.nombre == 'Confirmada' %}text-blue-600{% else %}text-yellow-600{% endif %}">{{ est.count }}</div>
+    <div class="text-xs text-gray-500">{{ est.nombre }}</div>
+  </a>
+  {% endfor %}
+</div>
+{% endif %}
+
+<!-- Filtros y Buscador -->
 <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-4">
   <form method="GET" class="flex flex-wrap gap-4 items-end">
+    <div class="flex-1 min-w-[200px]">
+      <label class="block text-xs text-gray-500 mb-1">Buscar</label>
+      <input type="text" name="buscar" value="{{ buscar }}" placeholder="Nº orden o proveedor..." class="w-full border border-gray-300 rounded px-3 py-2 text-sm">
+    </div>
     <div>
       <label class="block text-xs text-gray-500 mb-1">Proveedor</label>
       <select name="proveedor" class="border border-gray-300 rounded px-3 py-2 text-sm">
         <option value="">Todos</option>
         {% for p in proveedores %}
-        <option value="{{ p.id }}">{{ p.nombre }}</option>
+        <option value="{{ p.id }}" {% if request.GET.proveedor == p.id|stringformat:"s" %}selected{% endif %}>{{ p.nombre }}</option>
         {% endfor %}
       </select>
     </div>
@@ -31,17 +50,17 @@
       <select name="estado" class="border border-gray-300 rounded px-3 py-2 text-sm">
         <option value="">Todos</option>
         {% for e in estados %}
-        <option value="{{ e.id }}">{{ e.nombre }}</option>
+        <option value="{{ e.id }}" {% if request.GET.estado == e.id|stringformat:"s" %}selected{% endif %}>{{ e.nombre }}</option>
         {% endfor %}
       </select>
     </div>
     <div>
       <label class="block text-xs text-gray-500 mb-1">Fecha desde</label>
-      <input type="date" name="fecha_desde" class="border border-gray-300 rounded px-3 py-2 text-sm">
+      <input type="date" name="fecha_desde" value="{{ request.GET.fecha_desde }}" class="border border-gray-300 rounded px-3 py-2 text-sm">
     </div>
     <div>
       <label class="block text-xs text-gray-500 mb-1">Fecha hasta</label>
-      <input type="date" name="fecha_hasta" class="border border-gray-300 rounded px-3 py-2 text-sm">
+      <input type="date" name="fecha_hasta" value="{{ request.GET.fecha_hasta }}" class="border border-gray-300 rounded px-3 py-2 text-sm">
     </div>
     <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded text-sm font-medium">
       Filtrar
@@ -52,49 +71,116 @@
   </form>
 </div>
 
-<div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-  <table class="w-full text-sm text-left">
-    <thead class="bg-gray-50 border-b border-gray-200">
-      <tr>
-        <th class="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">Orden</th>
-        <th class="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">Proveedor</th>
-        <th class="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">Estado</th>
-        <th class="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">Fecha</th>
-        <th class="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">Total</th>
-        <th class="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">Acciones</th>
-      </tr>
-    </thead>
-    <tbody class="divide-y divide-gray-100">
-      {% for orden in ordenes %}
-      <tr class="hover:bg-gray-50 transition-colors">
-        <td class="px-4 py-3 font-medium text-gray-800">OC-{{ orden.pk|stringformat:"04d" }}</td>
-        <td class="px-4 py-3 text-gray-700">{{ orden.proveedor }}</td>
-        <td class="px-4 py-3">
-          <span class="px-2 py-0.5 rounded-full text-xs font-semibold
-            {% if orden.estado.nombre == 'Recibida' %}bg-green-100 text-green-700
-            {% elif orden.estado.nombre == 'Cancelada' %}bg-red-100 text-red-700
-            {% elif orden.estado.nombre == 'Aprobada' %}bg-blue-100 text-blue-700
-            {% else %}bg-yellow-100 text-yellow-700{% endif %}">
-            {{ orden.estado }}
-          </span>
-        </td>
-        <td class="px-4 py-3 text-gray-500 text-xs">{{ orden.fecha_creacion|date:'d/m/Y' }}</td>
-        <td class="px-4 py-3 text-gray-700 font-mono">${{ orden.monto_total|floatformat:2 }}</td>
-        <td class="px-4 py-3">
-          <button onclick="abrirModalOrden({{ orden.pk }})" class="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 text-xs font-medium">
-            <span class="material-symbols-outlined text-sm">open_in_new</span> Ver
-          </button>
-        </td>
-      </tr>
-      {% empty %}
-      <tr><td colspan="6" class="px-4 py-12 text-center text-gray-400">
-        <span class="material-symbols-outlined text-5xl block mb-2">shopping_cart</span>
-        No hay ordenes de compra registradas.
-      </td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
+<!-- Acciones masivas -->
+<div class="flex justify-between items-center mb-2">
+  <label class="flex items-center gap-2 text-sm text-gray-600">
+    <input type="checkbox" id="seleccionar_todas" class="rounded border-gray-300">
+    Seleccionar todas
+  </label>
+  <div class="flex gap-2">
+    <button onclick="exportarExcel()" class="inline-flex items-center gap-1 px-3 py-1.5 rounded bg-green-600 hover:bg-green-700 text-white text-xs font-medium">
+      <span class="material-symbols-outlined text-sm">description</span> Excel
+    </button>
+  </div>
 </div>
+
+<div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm text-left">
+      <thead class="bg-gray-50 border-b border-gray-200">
+        <tr>
+          <th class="px-2 py-3 text-xs font-semibold text-gray-600 w-8"></th>
+          <th class="px-3 py-3 text-xs font-semibold text-gray-600">Orden</th>
+          <th class="px-3 py-3 text-xs font-semibold text-gray-600">Proveedor</th>
+          <th class="px-3 py-3 text-xs font-semibold text-gray-600">Cond. Pago</th>
+          <th class="px-3 py-3 text-xs font-semibold text-gray-600">Estado</th>
+          <th class="px-3 py-3 text-xs font-semibold text-gray-600">Enviada</th>
+          <th class="px-3 py-3 text-xs font-semibold text-gray-600">Fecha</th>
+          <th class="px-3 py-3 text-xs font-semibold text-gray-600">Entrega</th>
+          <th class="px-3 py-3 text-xs font-semibold text-gray-600">Total</th>
+          <th class="px-3 py-3 text-xs font-semibold text-gray-600">Acciones</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-100">
+        {% for orden in ordenes %}
+        <tr class="hover:bg-gray-50 transition-colors">
+          <td class="px-2 py-3">
+            <input type="checkbox" class="orden-checkbox rounded border-gray-300" value="{{ orden.pk }}">
+          </td>
+          <td class="px-3 py-3 font-medium text-gray-800">OC-{{ orden.pk|stringformat:"04d" }}</td>
+          <td class="px-3 py-3 text-gray-700 max-w-[150px] truncate" title="{{ orden.proveedor.nombre }}">{{ orden.proveedor.nombre }}</td>
+          <td class="px-3 py-3 text-gray-600 text-xs">{{ orden.get_condicion_pago_display }}</td>
+          <td class="px-3 py-3">
+            <span class="px-2 py-0.5 rounded-full text-xs font-semibold
+              {% if orden.estado.nombre == 'Recibida' %}bg-green-100 text-green-700
+              {% elif orden.estado.nombre == 'Cancelada' %}bg-red-100 text-red-700
+              {% elif orden.estado.nombre == 'Confirmada' %}bg-blue-100 text-blue-700
+              {% else %}bg-yellow-100 text-yellow-700{% endif %}">
+              {{ orden.estado }}
+            </span>
+          </td>
+          <td class="px-3 py-3">
+            {% if orden.enviada %}
+            <span class="inline-flex items-center gap-1 text-green-600 text-xs">
+              <span class="material-symbols-outlined text-sm">check_circle</span> Sí
+            </span>
+            {% else %}
+            <span class="inline-flex items-center gap-1 text-gray-400 text-xs">
+              <span class="material-symbols-outlined text-sm">radio_button_unchecked</span> No
+            </span>
+            {% endif %}
+          </td>
+          <td class="px-3 py-3 text-gray-500 text-xs">{{ orden.fecha_creacion|date:'d/m/Y' }}</td>
+          <td class="px-3 py-3 text-gray-500 text-xs">{% if orden.fecha_entrega %}{{ orden.fecha_entrega|date:'d/m/Y' }}{% else %}-{% endif %}</td>
+          <td class="px-3 py-3 text-gray-700 font-mono">${{ orden.monto_total|floatformat:2 }}</td>
+          <td class="px-3 py-3">
+            <div class="flex items-center gap-1">
+              <button onclick="abrirModalOrden({{ orden.pk }})" class="p-1.5 text-blue-600 hover:bg-blue-50 rounded" title="Ver detalles">
+                <span class="material-symbols-outlined text-sm">open_in_new</span>
+              </button>
+              <a href="/compras/ordenes/{{ orden.pk }}/pdf/" target="_blank" class="p-1.5 text-red-600 hover:bg-red-50 rounded" title="Descargar PDF">
+                <span class="material-symbols-outlined text-sm">picture_as_pdf</span>
+              </a>
+              {% if not orden.enviada and orden.estado.nombre != 'Recibida' %}
+              <button onclick="enviarOrdenDirecto({{ orden.pk }})" class="p-1.5 text-green-600 hover:bg-green-50 rounded" title="Enviar al proveedor">
+                <span class="material-symbols-outlined text-sm">send</span>
+              </button>
+              {% endif %}
+              {% if orden.estado.nombre == 'Confirmada' or orden.estado.nombre == 'Recibida' %}
+              <a href="/compras/remitos/nuevo/?orden={{ orden.pk }}" class="p-1.5 text-purple-600 hover:bg-purple-50 rounded" title="Crear remito">
+                <span class="material-symbols-outlined text-sm">receipt</span>
+              </a>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="10" class="px-4 py-12 text-center text-gray-400">
+          <span class="material-symbols-outlined text-5xl block mb-2">shopping_cart</span>
+          No hay ordenes de compra registradas.
+        </td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Paginación -->
+{% if ordenes.has_other_pages %}
+<div class="flex justify-center items-center gap-2 mt-4">
+  {% if ordenes.has_previous %}
+  <a href="?page=1{% if request.GET.buscar %}&buscar={{ request.GET.buscar }}{% endif %}{% if request.GET.proveedor %}&proveedor={{ request.GET.proveedor }}{% endif %}{% if request.GET.estado %}&estado={{ request.GET.estado }}{% endif %}{% if request.GET.fecha_desde %}&fecha_desde={{ request.GET.fecha_desde }}{% endif %}{% if request.GET.fecha_hasta %}&fecha_hasta={{ request.GET.fecha_hasta }}{% endif %}" class="px-3 py-1 rounded bg-gray-200 text-gray-700 hover:bg-gray-300 text-sm">&laquo; Primera</a>
+  <a href="?page={{ ordenes.previous_page_number }}{% if request.GET.buscar %}&buscar={{ request.GET.buscar }}{% endif %}{% if request.GET.proveedor %}&proveedor={{ request.GET.proveedor }}{% endif %}{% if request.GET.estado %}&estado={{ request.GET.estado }}{% endif %}{% if request.GET.fecha_desde %}&fecha_desde={{ request.GET.fecha_desde }}{% endif %}{% if request.GET.fecha_hasta %}&fecha_hasta={{ request.GET.fecha_hasta }}{% endif %}" class="px-3 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 text-sm">Anterior</a>
+  {% endif %}
+  
+  <span class="px-3 py-1 text-gray-600 text-sm">Página {{ ordenes.number }} de {{ ordenes.paginator.num_pages }}</span>
+  
+  {% if ordenes.has_next %}
+  <a href="?page={{ ordenes.next_page_number }}{% if request.GET.buscar %}&buscar={{ request.GET.buscar }}{% endif %}{% if request.GET.proveedor %}&proveedor={{ request.GET.proveedor }}{% endif %}{% if request.GET.estado %}&estado={{ request.GET.estado }}{% endif %}{% if request.GET.fecha_desde %}&fecha_desde={{ request.GET.fecha_desde }}{% endif %}{% if request.GET.fecha_hasta %}&fecha_hasta={{ request.GET.fecha_hasta }}{% endif %}" class="px-3 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 text-sm">Siguiente</a>
+  <a href="?page={{ ordenes.paginator.num_pages }}{% if request.GET.buscar %}&buscar={{ request.GET.buscar }}{% endif %}{% if request.GET.proveedor %}&proveedor={{ request.GET.proveedor }}{% endif %}{% if request.GET.estado %}&estado={{ request.GET.estado }}{% endif %}{% if request.GET.fecha_desde %}&fecha_desde={{ request.GET.fecha_desde }}{% endif %}{% if request.GET.fecha_hasta %}&fecha_hasta={{ request.GET.fecha_hasta }}{% endif %}" class="px-3 py-1 rounded bg-gray-200 text-gray-700 hover:bg-gray-300 text-sm">&raquo; Última</a>
+  {% endif %}
+</div>
+{% endif %}
 
 <!-- Modal Orden de Compra -->
 <div id="modalOrden" class="fixed inset-0 z-50 hidden">
@@ -108,7 +194,6 @@
     </div>
     <div class="flex-1 overflow-y-auto p-6">
       <div id="contenidoModalOrden" class="space-y-4">
-        <!-- Loading -->
         <div class="text-center py-8">
           <span class="material-symbols-outlined text-4xl text-blue-600 animate-spin">sync</span>
           <p class="text-gray-500 mt-2">Cargando...</p>
@@ -123,14 +208,9 @@ function abrirModalOrden(pk) {
   document.getElementById('modalOrden').classList.remove('hidden');
   document.getElementById('contenidoModalOrden').innerHTML = '<div class="text-center py-8"><span class="material-symbols-outlined text-4xl text-blue-600 animate-spin">sync</span><p class="text-gray-500 mt-2">Cargando...</p></div>';
   
-  console.log('Cargando orden:', pk);
   fetch('/compras/ordenes/' + pk + '/json/')
-    .then(r => {
-      console.log('Response status:', r.status);
-      return r.json();
-    })
+    .then(r => r.json())
     .then(data => {
-      console.log('Data received:', data);
       let detalles = '';
       let num = 1;
       data.detalles.forEach(d => {
@@ -148,7 +228,6 @@ function abrirModalOrden(pk) {
       const formatNumber = (n) => n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
       
       document.getElementById('contenidoModalOrden').innerHTML = `
-        <!-- Encabezado Empresa -->
         <div class="bg-blue-600 text-white p-4 rounded-t-lg -mx-6 -mt-6 mb-4">
           <div class="flex justify-between items-start">
             <div>
@@ -165,7 +244,6 @@ function abrirModalOrden(pk) {
           </div>
         </div>
         
-        <!-- Datos del Documento -->
         <div class="grid grid-cols-2 gap-4 mb-4 text-sm">
           <div>
             <p class="text-gray-500 text-xs uppercase">Fecha de emisión</p>
@@ -185,7 +263,6 @@ function abrirModalOrden(pk) {
           </div>
         </div>
         
-        <!-- Datos del Proveedor -->
         <div class="bg-gray-50 p-3 rounded-lg mb-4 text-sm">
           <p class="text-gray-500 text-xs uppercase mb-1">Proveedor</p>
           <p class="font-bold">${data.proveedor.nombre}</p>
@@ -194,7 +271,6 @@ function abrirModalOrden(pk) {
           <p>Tel: ${data.proveedor.contacto} | Email: ${data.proveedor.email}</p>
         </div>
         
-        <!-- Tabla de Detalle -->
         <div class="mb-4 overflow-x-auto">
           <table class="w-full text-sm border border-gray-200">
             <thead class="bg-gray-100">
@@ -212,7 +288,6 @@ function abrirModalOrden(pk) {
           </table>
         </div>
         
-        <!-- Totales -->
         <div class="flex justify-end mb-4">
           <div class="w-64 space-y-2 text-sm">
             <div class="flex justify-between">
@@ -230,14 +305,12 @@ function abrirModalOrden(pk) {
           </div>
         </div>
         
-        <!-- Condiciones de Entrega -->
         <div class="bg-gray-50 p-3 rounded-lg mb-4 text-sm">
           <p class="text-gray-500 text-xs uppercase mb-1">Condiciones de Entrega</p>
           <p><strong>Lugar:</strong> ${data.entrega}</p>
           ${data.observaciones ? `<p><strong>Observaciones:</strong> ${data.observaciones}</p>` : ''}
         </div>
         
-        <!-- Firmas -->
         <div class="grid grid-cols-2 gap-8 mt-8 pt-4 border-t border-gray-200">
           <div>
             <div class="border-b border-gray-300 h-16"></div>
@@ -249,17 +322,16 @@ function abrirModalOrden(pk) {
           </div>
         </div>
         
-        <!-- Botones de Envío -->
         <div class="mt-6 pt-4 border-t border-gray-200 flex justify-center gap-4 flex-wrap">
           <a href="/compras/ordenes/${data.id}/pdf/" target="_blank" class="inline-flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium shadow">
             <span class="material-symbols-outlined text-sm">picture_as_pdf</span>
             Descargar PDF
           </a>
-          <button type="button" onclick="enviarOrdenEmail(${data.id}, '${data.proveedor.email}')" class="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium shadow">
+          <button onclick="enviarOrdenEmail(${data.id}, '${data.proveedor.email}')" class="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium shadow">
             <span class="material-symbols-outlined text-sm">email</span>
             Enviar por Email
           </button>
-          <button type="button" onclick="enviarOrdenWhatsApp(${data.id}, '${data.proveedor.contacto}')" class="inline-flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium shadow">
+          <button onclick="enviarOrdenWhatsApp(${data.id}, '${data.proveedor.contacto}')" class="inline-flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium shadow">
             <span class="material-symbols-outlined text-sm">chat</span>
             Enviar por WhatsApp
           </button>
@@ -290,6 +362,7 @@ function enviarOrdenEmail(ordenId, email) {
   .then(data => {
     if (data.ok) {
       alert('Orden enviada por email correctamente');
+      location.reload();
     } else {
       alert('Error: ' + data.error);
     }
@@ -303,38 +376,54 @@ function enviarOrdenWhatsApp(ordenId, telefono) {
     return;
   }
   
-  telefono = telefono.replace('+', '').replace(' ', '').replace('-', '');
-  if (!telefono.startsWith('54')) {
-    telefono = '54' + telefono;
-  }
+  fetch('/compras/ordenes/' + ordenId + '/enviar-whatsapp/', {
+    method: 'POST',
+    headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.ok) {
+      window.open(data.url, '_blank');
+      location.reload();
+    } else {
+      alert('Error: ' + data.error);
+    }
+  })
+  .catch(err => alert('Error al generar enlace WhatsApp'));
+}
+
+function enviarOrdenDirecto(ordenId) {
+  if (!confirm('¿Enviar orden de compra al proveedor?')) return;
   
-  fetch('/compras/ordenes/' + ordenId + '/json/')
-    .then(r => r.json())
-    .then(data => {
-      const formatNumber = (n) => n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-      
-      let mensaje = `*ORDEN DE COMPRA*\n`;
-      mensaje += `*Nº ${String(data.id).padStart(4, '0')}*\n\n`;
-      mensaje += `*Fecha:* ${data.fecha}\n\n`;
-      mensaje += `*Proveedor:* ${data.proveedor.nombre}\n\n`;
-      mensaje += `*DETALLE:*\n`;
-      
-      let num = 1;
-      data.detalles.forEach(d => {
-        mensaje += `${num++}. ${d.cantidad} ${d.unidad} ${d.insumo} - $ ${formatNumber(d.subtotal)}\n`;
-      });
-      
-      mensaje += `\n*Subtotal:* $ ${formatNumber(data.subtotal)}\n`;
-      mensaje += `*IVA 21%:* $ ${formatNumber(data.iva)}\n`;
-      mensaje += `*TOTAL:* $ ${formatNumber(data.total)}\n\n`;
-      mensaje += `*Entrega:* ${data.entrega}`;
-      
-      const mensajeEncoded = encodeURIComponent(mensaje);
-      const urlWhatsApp = `https://wa.me/${telefono}?text=${mensajeEncoded}`;
-      
-      window.open(urlWhatsApp, '_blank');
-    })
-    .catch(err => alert('Error al generar mensaje'));
+  fetch('/compras/ordenes/' + ordenId + '/enviar-email/', {
+    method: 'POST',
+    headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.ok) {
+      alert('Orden enviada correctamente');
+      location.reload();
+    } else {
+      alert('Error: ' + data.error);
+    }
+  })
+  .catch(err => alert('Error al enviar'));
+}
+
+// Selección múltiple
+document.getElementById('seleccionar_todas').addEventListener('change', function() {
+  document.querySelectorAll('.orden-checkbox').forEach(cb => cb.checked = this.checked);
+});
+
+function exportarExcel() {
+  const checkboxes = document.querySelectorAll('.orden-checkbox:checked');
+  if (checkboxes.length === 0) {
+    alert('Seleccione al menos una orden para exportar');
+    return;
+  }
+  const ids = Array.from(checkboxes).map(cb => cb.value).join(',');
+  window.location.href = '/compras/ordenes/exportar/?ids=' + ids;
 }
 </script>
 {% endblock %}
