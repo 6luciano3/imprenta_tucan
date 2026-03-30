@@ -1395,30 +1395,27 @@ def webhook_consulta_stock(request, propuesta_id):
 def generar_ofertas_ahora(request):
     """
     PROCESO INTELIGENTE AUTOMÁTICO COMPLETO:
-    1. Genera nuevas ofertas para clientes
+    1. Envía ofertas pendientes que no han sido enviadas aún
     2. Aprueba automáticamente las ofertas (cambia estado: pendiente → enviada)
     3. Envía emails automáticamente a los correos reales configurados
     """
     try:
-        from core.ai_ml.ofertas import generar_ofertas_segmentadas
         from automatizacion.models import OfertaPropuesta, MensajeOferta
         from automatizacion.services import enviar_oferta_email
         from django.utils import timezone
         
-        # Paso 1: Generar ofertas
-        antes = timezone.now()
-        result = generar_ofertas_segmentadas()
-        generadas = result.get('generadas', 0)
-        
-        # Paso 2 y 3: Aprobar y enviar automáticamente las ofertas con score >= 96
-        SCORE_MINIMO = 96
+        # Obtener ofertas pendientes que no han sido enviadas aún (solo emails reales = no .local)
         ofertas_nuevas = OfertaPropuesta.objects.filter(
             estado='pendiente',
-            score_al_generar__gte=SCORE_MINIMO,
             cliente__isnull=False,
             cliente__email__isnull=False,
-        ).exclude(cliente__email='')[:50]
+        ).exclude(cliente__email='').exclude(
+            cliente__email__endswith='.local'
+        ).exclude(
+            id__in=MensajeOferta.objects.values_list('oferta_id', flat=True)
+        )[:50]
         
+        generadas = ofertas_nuevas.count()
         enviados = 0
         errores = 0
         destinatarios = []
@@ -1439,9 +1436,8 @@ def generar_ofertas_ahora(request):
                         oferta=oferta,
                         cliente=oferta.cliente,
                         estado='enviado',
-                        detalle='Generada y enviada automáticamente por Proceso Inteligente',
+                        detalle='Enviada automáticamente por Proceso Inteligente',
                     )
-                    # Usar emails reales configurados
                     destinatarios.append(f"{oferta.cliente.nombre}")
                     enviados += 1
                 else:
@@ -1449,7 +1445,7 @@ def generar_ofertas_ahora(request):
             except Exception as e:
                 errores += 1
         
-        msg = f"Proceso Inteligente: {generadas} generadas, {enviados} enviadas a {', '.join(destinatarios) or 'emails reales'}, {errores} errores"
+        msg = f"Proceso Inteligente: {generadas} pendientes, {enviados} enviadas a {', '.join(destinatarios) or 'emails reales'}, {errores} errores"
         from urllib.parse import urlencode
         params = urlencode({'ok': '1', 'msg': msg})
     except Exception as e:

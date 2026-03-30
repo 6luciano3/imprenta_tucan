@@ -44,6 +44,11 @@ except ImportError:
     Presupuesto = None
 
 try:
+    from automatizacion.models import SolicitudCotizacion
+except ImportError:
+    SolicitudCotizacion = None
+
+try:
     from chatbot.models import ConversacionChatbot
 except ImportError:
     ConversacionChatbot = None
@@ -78,6 +83,7 @@ El sistema puede manejar:
 - CLIENTES: búsqueda, información de contacto
 - PRODUCTOS/SERVICIOS: precios, características
 - PRESUPUESTOS: cotizaciones, estados (pendiente, aceptado, rechazado)
+- COTIZACIONES (Solicitudes de Cotización): solicitudes de materiales/insumos de clientes, estados, proveedor asignado
 - INSUMOS: stock de materiales (papel, tinta, etc.)
 - ESTADÍSTICAS: ventas, clientes frecuentes
 
@@ -409,6 +415,62 @@ def buscar_presupuesto(texto):
     return None
 
 
+def buscar_cotizacion(texto):
+    if not SolicitudCotizacion:
+        return None
+    
+    texto_lower = texto.lower()
+    
+    if 'hoy' in texto_lower:
+        hoy = timezone.now().date()
+        cotizaciones = SolicitudCotizacion.objects.filter(creada__date=hoy)[:5]
+        if cotizaciones:
+            lista = "\n".join([f"• SC-{c.id:04d} - {c.proveedor.nombre} ({c.get_estado_display()})" for c in cotizaciones])
+            return f"📋 COTIZACIONES DE HOY:\n\n{lista}\n\nTotal: {cotizaciones.count()}"
+        return "No hay cotizaciones hoy 📭"
+    
+    if 'pendiente' in texto_lower:
+        cotizaciones = SolicitudCotizacion.objects.filter(estado='pendiente')[:5]
+        if cotizaciones:
+            lista = "\n".join([f"• SC-{c.id:04d} - {c.proveedor.nombre}" for c in cotizaciones])
+            return f"📋 COTIZACIONES PENDIENTES:\n\n{lista}\n\nTotal: {cotizaciones.count()}"
+        return "No hay cotizaciones pendientes 🎉"
+    
+    if 'confirmada' in texto_lower or 'aprobada' in texto_lower:
+        cotizaciones = SolicitudCotizacion.objects.filter(estado='confirmada')[:5]
+        if cotizaciones:
+            lista = "\n".join([f"• SC-{c.id:04d} - {c.proveedor.nombre}" for c in cotizaciones])
+            return f"📋 COTIZACIONES CONFIRMADAS:\n\n{lista}\n\nTotal: {cotizaciones.count()}"
+        return "No hay cotizaciones confirmadas"
+    
+    if 'rechazada' in texto_lower:
+        cotizaciones = SolicitudCotizacion.objects.filter(estado='rechazada')[:5]
+        if cotizaciones:
+            lista = "\n".join([f"• SC-{c.id:04d} - {c.proveedor.nombre}" for c in cotizaciones])
+            return f"📋 COTIZACIONES RECHAZADAS:\n\n{lista}\n\nTotal: {cotizaciones.count()}"
+        return "No hay cotizaciones rechazadas"
+    
+    # Buscar por proveedor
+    if 'proveedor' in texto_lower:
+        # Extraer nombre del proveedor del texto
+        import re
+        match = re.search(r'proveedor\s+(\w+)', texto_lower)
+        if match:
+            nombre_proveedor = match.group(1)
+            cotizaciones = SolicitudCotizacion.objects.filter(proveedor__nombre__icontains=nombre_proveedor)[:5]
+            if cotizaciones:
+                lista = "\n".join([f"• SC-{c.id:04d} - {c.get_estado_display()}" for c in cotizaciones])
+                return f"📋 COTIZACIONES DE PROVEEDOR:\n\n{lista}\n\nTotal: {cotizaciones.count()}"
+    
+    # Listar todas las cotizaciones recientes
+    cotizaciones = SolicitudCotizacion.objects.all()[:5]
+    if cotizaciones:
+        lista = "\n".join([f"• SC-{c.id:04d} - {c.proveedor.nombre} ({c.get_estado_display()})" for c in cotizaciones])
+        return f"📋 COTIZACIONES RECIENTES:\n\n{lista}\n\nTotal: {cotizaciones.count()}"
+    
+    return None
+
+
 def buscar_estadisticas(texto):
     if not Pedido or not Cliente or not Presupuesto:
         return None
@@ -518,6 +580,7 @@ def obtener_respuesta(mensaje):
         buscar_insumos,
         buscar_producto,
         buscar_presupuesto,
+        buscar_cotizacion,
         buscar_estadisticas,
     ]
     

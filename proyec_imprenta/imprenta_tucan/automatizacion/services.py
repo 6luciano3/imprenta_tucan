@@ -24,15 +24,20 @@ def enviar_oferta_email(oferta, request=None, force=False):
     """
     from django.conf import settings
     
+    # Si force=True, omitir verificaciones de email
+    if not force:
+        force = getattr(settings, 'DEBUG', False)
+    
     if not oferta.cliente or not oferta.cliente.email:
         return False, 'Cliente sin email definido'
     # Verificar que el email tiene formato valido
     import re
     if not re.match(r'^[^@]+@[^@]+\.[^@]+$', oferta.cliente.email):
         return False, f'Email invalido: {oferta.cliente.email}'
-    # Verificar que el email fue verificado (salvo que force=True)
-    if not force and not getattr(oferta.cliente, 'email_verificado', False):
-        return False, f'Email no verificado: {oferta.cliente.email}'
+    # Verificar que el email fue verificado (omitir si force=True)
+    if not force:
+        if not getattr(oferta.cliente, 'email_verificado', False):
+            return False, f'Email no verificado: {oferta.cliente.email}'
     # En modo debug, permitir envío sin verificación
     if getattr(settings, 'DEBUG', False):
         force = True
