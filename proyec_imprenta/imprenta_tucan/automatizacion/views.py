@@ -1404,14 +1404,12 @@ def generar_ofertas_ahora(request):
         from automatizacion.services import enviar_oferta_email
         from django.utils import timezone
         
-        # Obtener ofertas pendientes que no han sido enviadas aún (solo emails reales = no .local)
+        # Obtener ofertas pendientes que no han sido enviadas aún
         ofertas_nuevas = OfertaPropuesta.objects.filter(
             estado='pendiente',
             cliente__isnull=False,
             cliente__email__isnull=False,
         ).exclude(cliente__email='').exclude(
-            cliente__email__endswith='.local'
-        ).exclude(
             id__in=MensajeOferta.objects.values_list('oferta_id', flat=True)
         )[:50]
         

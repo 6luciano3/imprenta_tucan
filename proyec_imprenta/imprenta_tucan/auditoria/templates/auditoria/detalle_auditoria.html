@@ -123,11 +123,7 @@ window.addEventListener('load', function() {
       {% for key, val in extra_parsed.items %}
       <div class="flex gap-2 flex-wrap items-start">
         <dt class="text-gray-500 text-xs shrink-0 w-20">{{ key }}</dt>
-        {% if val|length > 1 and val|stringformat:"s" starts_with "{" %}
-          <dd class="font-mono text-xs text-gray-700 bg-gray-50 px-1.5 py-0.5 rounded break-all">{{ val }}</dd>
-        {% else %}
-          <dd class="font-mono text-xs text-gray-700 bg-gray-50 px-1.5 py-0.5 rounded break-all">{{ val }}</dd>
-        {% endif %}
+        <dd class="font-mono text-xs text-gray-700 bg-gray-50 px-1.5 py-0.5 rounded break-all">{{ val }}</dd>
       </div>
       {% endfor %}
       {% if extra_parsed.source %}
