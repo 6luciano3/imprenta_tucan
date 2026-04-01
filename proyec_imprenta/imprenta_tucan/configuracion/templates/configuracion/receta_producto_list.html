@@ -2,7 +2,16 @@
 
 {% block list_icon %}{% endblock %}
 {% block list_title_text %}Recetas de Productos{% endblock %}
-{% block new_button %}{% endblock %}
+{% block new_button %}
+<form method="POST" action="{% url 'sync_bom_all' %}" onsubmit="return confirm('¿Sincronizar el BOM de TODAS las recetas? Esto actualizará los Insumos Requeridos de todos los productos.')">
+  {% csrf_token %}
+  <button type="submit"
+          class="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-lg shadow hover:bg-emerald-700">
+    <span class="material-symbols-outlined">sync</span>
+    Sincronizar todos los BOM
+  </button>
+</form>
+{% endblock %}
 {% block search_placeholder %}Producto, insumo, descripción...{% endblock %}
 {% block clear_url %}{% url 'receta_producto_list' %}{% endblock %}
 {% block order_fields_options %}
@@ -42,8 +51,18 @@
                 <td class="py-2 px-5">{{ receta.descripcion|default:'-' }}</td>
                 <td class="py-2 px-5">{{ receta.activo|yesno:"Sí,No" }}</td>
                 <td class="py-2 px-5 text-center">
+                    <a href="{% url 'gestionar_receta' receta.producto.idProducto %}"
+                         class="px-3 py-1 bg-indigo-500 text-white rounded hover:bg-indigo-600 transition text-xs inline-flex items-center justify-center"
+                         title="Ver BOM del producto">
+                        <span class="material-symbols-outlined text-base">format_list_bulleted</span>
+                    </a>
+                    <a href="{% url 'sync_bom_one' receta.pk %}"
+                         class="px-3 py-1 bg-emerald-500 text-white rounded hover:bg-emerald-600 transition text-xs inline-flex items-center justify-center ml-2"
+                         title="Sincronizar Insumos Requeridos de este producto">
+                        <span class="material-symbols-outlined text-base">sync</span>
+                    </a>
                     <a href="{% url 'receta_producto_update' receta.pk %}"
-                         class="px-3 py-1 bg-yellow-400 text-white rounded hover:bg-yellow-500 transition text-xs inline-flex items-center justify-center">
+                         class="px-3 py-1 bg-yellow-400 text-white rounded hover:bg-yellow-500 transition text-xs inline-flex items-center justify-center ml-2">
                         <span class="material-symbols-outlined text-base">edit</span>
                     </a>
                     <a href="{% url 'receta_producto_delete' receta.pk %}"

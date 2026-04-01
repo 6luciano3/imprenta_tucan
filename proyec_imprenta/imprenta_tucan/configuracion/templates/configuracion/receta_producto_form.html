@@ -4,6 +4,7 @@
   <h2 class="text-xl font-bold mb-6">{{ form.instance.pk|yesno:"Editar Receta,Nueva Receta" }}</h2>
   <form method="post" class="space-y-5">
     {% csrf_token %}
+    {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
     <div>
       <label for="id_producto" class="block font-semibold mb-1">Producto</label>
       {{ form.producto }}

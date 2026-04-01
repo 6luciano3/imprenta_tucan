@@ -441,12 +441,15 @@ def receta_insumos(request, producto_id: int):
 @requiere_permiso("Productos")
 def gestionar_receta(request, idProducto):
     """Vista principal para gestionar la receta de un producto (lista de insumos requeridos)."""
+    from configuracion.models import RecetaProducto
     producto = get_object_or_404(Producto, idProducto=idProducto)
     receta = ProductoInsumo.objects.filter(producto=producto).select_related('insumo').order_by('insumo__nombre')
-    
+    receta_config = RecetaProducto.objects.filter(producto=producto).prefetch_related('insumos').first()
+
     context = {
         'producto': producto,
         'receta': receta,
+        'receta_config': receta_config,
     }
     return render(request, 'productos/gestionar_receta.html', context)
 

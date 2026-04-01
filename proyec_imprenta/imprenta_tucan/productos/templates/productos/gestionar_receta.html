@@ -57,6 +57,70 @@
     </div>
   </div>
 
+  <!-- Configuración de Receta (configuracion/RecetaProducto) -->
+  <div class="bg-white shadow rounded-xl p-6 mb-6 border-l-4 {% if receta_config %}border-blue-500{% else %}border-gray-300{% endif %}">
+    <div class="flex items-center justify-between mb-3">
+      <h2 class="text-xl font-bold flex items-center gap-2">
+        <span class="material-symbols-outlined text-blue-600">calculate</span>
+        Configuración de Receta
+        <span class="text-sm font-normal text-gray-500">(Fórmulas y asignación de insumos)</span>
+      </h2>
+      {% if receta_config %}
+        <a href="{% url 'receta_producto_update' receta_config.pk %}?next={% url 'gestionar_receta' producto.idProducto %}"
+           class="flex items-center gap-1 bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded-lg text-sm shadow transition">
+          <span class="material-symbols-outlined text-base">edit</span>
+          Editar en Configuración
+        </a>
+      {% else %}
+        <a href="{% url 'receta_producto_create' %}?next={% url 'gestionar_receta' producto.idProducto %}"
+           class="flex items-center gap-1 bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded-lg text-sm shadow transition">
+          <span class="material-symbols-outlined text-base">add</span>
+          Crear en Configuración
+        </a>
+      {% endif %}
+    </div>
+    {% if receta_config %}
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+      <div>
+        <span class="text-gray-600">Fórmula asignada:</span>
+        <span class="font-semibold ml-2">{{ producto.formula|default:"-" }}</span>
+      </div>
+      <div>
+        <span class="text-gray-600">Estado:</span>
+        <span class="ml-2 font-semibold {% if receta_config.activo %}text-green-600{% else %}text-red-500{% endif %}">
+          {% if receta_config.activo %}Activa{% else %}Inactiva{% endif %}
+        </span>
+      </div>
+      <div>
+        <span class="text-gray-600">Última actualización:</span>
+        <span class="font-semibold ml-2">{{ receta_config.actualizado_en|date:"d/m/Y H:i" }}</span>
+      </div>
+    </div>
+    {% if receta_config.insumos.exists %}
+    <div class="mt-3">
+      <span class="text-gray-600 text-sm">Insumos M2M asignados:</span>
+      <div class="flex flex-wrap gap-2 mt-1">
+        {% for ins in receta_config.insumos.all %}
+          <span class="inline-flex items-center gap-1 bg-blue-50 text-blue-800 text-xs px-2 py-1 rounded-full border border-blue-200">
+            {{ ins.codigo }} — {{ ins.nombre }}
+          </span>
+        {% endfor %}
+      </div>
+    </div>
+    {% else %}
+    <p class="text-sm text-gray-500 mt-2">Sin insumos M2M asignados. <a href="{% url 'receta_producto_update' receta_config.pk %}" class="text-blue-600 underline">Asignar desde Configuración</a>.</p>
+    {% endif %}
+    {% if receta_config.descripcion %}
+    <p class="text-sm text-gray-600 mt-2">{{ receta_config.descripcion }}</p>
+    {% endif %}
+    {% else %}
+    <div class="flex items-center gap-3 text-gray-500 text-sm py-2">
+      <span class="material-symbols-outlined text-gray-400">info</span>
+      Este producto no tiene configuración de receta en el módulo de Configuración. Podés crear una para asignarle una fórmula de cálculo.
+    </div>
+    {% endif %}
+  </div>
+
   <!-- Lista de insumos (receta) -->
   <div class="bg-white shadow rounded-xl overflow-hidden">
     <div class="flex items-center justify-between px-6 py-4 border-b">
@@ -66,13 +130,6 @@
         <span class="text-sm font-normal text-gray-500">({{ receta|length }})</span>
       </h2>
       <div class="flex gap-2">
-        {% if can_productos_editar %}
-        <a href="{% url 'revisar_recetas_indirectos' producto.idProducto %}"
-           class="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg shadow transition">
-          <span class="material-symbols-outlined">warning</span>
-          Auditar Indirectos
-        </a>
-        {% endif %}
         {% if can_productos_editar %}
         <a href="{% url 'agregar_insumo_receta' producto.idProducto %}"
            class="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg shadow transition">
@@ -106,7 +163,7 @@
               <span class="ml-1 text-xs text-orange-600" title="Insumo indirecto: no se incorpora al producto final">⚠️</span>
               {% endif %}
             </td>
-            <td class="py-3 px-5">{{ item.insumo.unidadMedida|default:"-" }}</td>
+            <td class="py-3 px-5">{{ item.insumo.unidad_medida|default:"-" }}</td>
             <td class="py-3 px-5 text-right font-semibold">{{ item.cantidad_por_unidad }}</td>
             <td class="py-3 px-5 text-center">
               {% if item.insumo.tipo == 'directo' %}

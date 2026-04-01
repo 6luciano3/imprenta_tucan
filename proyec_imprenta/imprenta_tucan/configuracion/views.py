@@ -1,4 +1,5 @@
 ﻿from django.http import HttpResponseRedirect
+from django.contrib import messages
 from permisos.decorators import requiere_permiso
 
 from django.shortcuts import redirect
@@ -398,31 +399,60 @@ def receta_producto_list(request):
     })
 
 
+def _sync_bom_desde_receta_config(receta):
+    """Sincroniza ProductoInsumo (BOM) a partir del M2M de RecetaProducto.
+    - Crea entradas faltantes con cantidad_por_unidad=1 (no sobreescribe cantidades existentes).
+    - Elimina entradas del BOM cuyos insumos ya no están en la config.
+    """
+    from productos.models import ProductoInsumo
+    producto = receta.producto
+    insumos_config = set(receta.insumos.values_list('idInsumo', flat=True))
+
+    # Agregar insumos nuevos con cantidad por defecto
+    for insumo_id in insumos_config:
+        ProductoInsumo.objects.get_or_create(
+            producto=producto,
+            insumo_id=insumo_id,
+            defaults={'cantidad_por_unidad': 1, 'es_costo_fijo': False},
+        )
+
+    # Eliminar insumos que ya no están en la config
+    ProductoInsumo.objects.filter(producto=producto).exclude(insumo_id__in=insumos_config).delete()
+
+
 @login_required
 @require_perm('Recetas', 'Crear')
 def receta_producto_create(request):
+    next_url = request.GET.get('next', '')
     if request.method == 'POST':
         form = RecetaProductoForm(request.POST)
         if form.is_valid():
-            form.save()
-            return redirect('receta_producto_list')
+            receta = form.save()
+            _sync_bom_desde_receta_config(receta)
+            if next_url:
+                return redirect(next_url)
+            return redirect('gestionar_receta', idProducto=receta.producto.idProducto)
     else:
         form = RecetaProductoForm()
-    return render(request, 'configuracion/receta_producto_form.html', {'form': form})
+    return render(request, 'configuracion/receta_producto_form.html', {'form': form, 'next': next_url})
 
 
 @login_required
 @require_perm('Recetas', 'Editar')
 def receta_producto_update(request, pk):
     receta = get_object_or_404(RecetaProducto, pk=pk)
+    next_url = request.GET.get('next', '')
     if request.method == 'POST':
         form = RecetaProductoForm(request.POST, instance=receta)
         if form.is_valid():
-            form.save()
-            return redirect('receta_producto_list')
+            receta = form.save()
+            _sync_bom_desde_receta_config(receta)
+            if next_url:
+                return redirect(next_url)
+            return redirect('gestionar_receta', idProducto=receta.producto.idProducto)
     else:
         form = RecetaProductoForm(instance=receta)
-    return render(request, 'configuracion/receta_producto_form.html', {'form': form, 'receta': receta})
+    return render(request, 'configuracion/receta_producto_form.html', {'form': form, 'receta': receta, 'next': next_url})
 
 
 @login_required
@@ -433,6 +463,31 @@ def receta_producto_delete(request, pk):
         receta.delete()
         return redirect('receta_producto_list')
     return render(request, 'configuracion/receta_producto_confirm_delete.html', {'receta': receta})
+
+
+@login_required
+@require_perm('Recetas', 'Editar')
+def sync_bom_one(request, pk):
+    """Sincroniza el BOM (ProductoInsumo) de una sola RecetaProducto."""
+    receta = get_object_or_404(RecetaProducto, pk=pk)
+    _sync_bom_desde_receta_config(receta)
+    messages.success(request, f'BOM de "{receta.producto.nombreProducto}" sincronizado correctamente.')
+    return redirect('receta_producto_list')
+
+
+@login_required
+@require_perm('Recetas', 'Editar')
+def sync_bom_all(request):
+    """Sincroniza el BOM de TODAS las RecetaProducto existentes."""
+    if request.method != 'POST':
+        return redirect('receta_producto_list')
+    recetas = RecetaProducto.objects.prefetch_related('insumos').select_related('producto')
+    count = 0
+    for receta in recetas:
+        _sync_bom_desde_receta_config(receta)
+        count += 1
+    messages.success(request, f'BOM sincronizado para {count} receta(s). Los "Insumos Requeridos" ahora coinciden con Configuración.')
+    return redirect('receta_producto_list')
 
 
 def lista_recetas_productos(request):
