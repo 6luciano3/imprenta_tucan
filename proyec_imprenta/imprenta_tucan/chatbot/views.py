@@ -4,7 +4,6 @@ import uuid
 from datetime import timedelta
 from django.http import JsonResponse
 from django.contrib.auth.decorators import login_required
-from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from django.utils import timezone
 from django.db.models import Count, Sum, Q
@@ -99,7 +98,7 @@ REGLAS DE RESPUESTA:
         ]
         
         if historial:
-            for msg in historial[-6:]:
+            for msg in reversed(historial):
                 if msg.es_cliente:
                     messages.append({"role": "user", "content": msg.mensaje})
                 else:
@@ -593,7 +592,6 @@ def obtener_respuesta(mensaje):
 
 
 @login_required
-@csrf_exempt
 @require_http_methods(["POST"])
 def chatbot_api(request):
     try:
@@ -614,9 +612,11 @@ def chatbot_api(request):
             ).order_by('-fecha')[:6])
         
         respuesta = obtener_respuesta_openai(mensaje, historial)
-        
+        modo = 'ia'
+
         if not respuesta:
             respuesta = obtener_respuesta(mensaje)
+            modo = 'local'
         
         if ConversacionChatbot:
             ConversacionChatbot.objects.create(
@@ -636,7 +636,8 @@ def chatbot_api(request):
         return JsonResponse({
             'respuesta': respuesta,
             'session_id': session_id,
-            'timestamp': timezone.now().isoformat()
+            'timestamp': timezone.now().isoformat(),
+            'modo': modo,
         })
         
     except json.JSONDecodeError:

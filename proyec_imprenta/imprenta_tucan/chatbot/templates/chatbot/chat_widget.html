@@ -188,16 +188,28 @@ if (!session_id) {
     localStorage.setItem('chatbot_session', session_id);
 }
 
+function getCsrfToken() {
+    const name = 'csrftoken';
+    const cookie = document.cookie.split(';').find(c => c.trim().startsWith(name + '='));
+    return cookie ? decodeURIComponent(cookie.trim().slice(name.length + 1)) : '';
+}
+
 function toggleChat() {
     const window = document.getElementById('chatbot-window');
     window.classList.toggle('show');
 }
 
-function agregarMensaje(texto, esUsuario) {
+function agregarMensaje(texto, esUsuario, esFallback = false) {
     const container = document.getElementById('chatbot-messages');
     const div = document.createElement('div');
     div.className = 'message ' + (esUsuario ? 'user' : 'bot');
     div.textContent = texto;
+    if (!esUsuario && esFallback) {
+        const badge = document.createElement('div');
+        badge.style.cssText = 'font-size:10px;color:#999;margin-top:4px;';
+        badge.textContent = '⚙ Modo sin conexión a IA';
+        div.appendChild(badge);
+    }
     container.appendChild(div);
     container.scrollTop = container.scrollHeight;
 }
@@ -221,6 +233,7 @@ async function enviarMensaje() {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                'X-CSRFToken': getCsrfToken(),
             },
             body: JSON.stringify({
                 mensaje: mensaje,
@@ -232,7 +245,7 @@ async function enviarMensaje() {
         mostrarTyping(false);
         
         if (data.respuesta) {
-            agregarMensaje(data.respuesta, false);
+            agregarMensaje(data.respuesta, false, data.modo === 'local');
         } else if (data.error) {
             agregarMensaje('Error: ' + data.error, false);
         }
