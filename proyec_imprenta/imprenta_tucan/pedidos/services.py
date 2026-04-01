@@ -21,10 +21,8 @@ def calcular_consumo_producto(producto, cantidad: int) -> dict:
 
     # Fallback: BOM estatico (ProductoInsumo)
     from productos.models import ProductoInsumo
-    import math
-    for r in ProductoInsumo.objects.filter(producto=producto).select_related("insumo"):
-        nombre = (r.insumo.nombre or "").lower()
-        if "plancha" in nombre:
+    for r in ProductoInsumo.objects.filter(producto=producto):
+        if r.es_costo_fijo:
             req[r.insumo_id] += Decimal(r.cantidad_por_unidad)
         else:
             req[r.insumo_id] += Decimal(r.cantidad_por_unidad) * Decimal(cantidad)

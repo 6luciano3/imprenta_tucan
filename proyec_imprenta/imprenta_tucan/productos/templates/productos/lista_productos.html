@@ -25,6 +25,22 @@
 
 {% block list_content %}
 
+<div class="mb-3 flex items-center gap-3">
+  {% if mostrar_inactivos %}
+    <a href="{% url 'lista_productos' %}?q={{ query }}&order_by={{ order_by }}&direction={{ direction }}"
+       class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-100 text-orange-800 text-sm font-medium hover:bg-orange-200">
+      <span class="material-symbols-outlined text-base">visibility_off</span>
+      Mostrando inactivos — ocultar
+    </a>
+  {% else %}
+    <a href="{% url 'lista_productos' %}?q={{ query }}&order_by={{ order_by }}&direction={{ direction }}&mostrar_inactivos=1"
+       class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-100 text-gray-600 text-sm hover:bg-gray-200">
+      <span class="material-symbols-outlined text-base">visibility</span>
+      Mostrar inactivos
+    </a>
+  {% endif %}
+</div>
+
 <div class="bg-white shadow rounded-xl overflow-hidden table-responsive">
   <table class="w-full min-w-[980px] text-left text-sm">
     <thead class="bg-gray-100 text-gray-700">
@@ -41,9 +57,14 @@
     </thead>
     <tbody>
       {% for producto in productos %}
-      <tr class="border-b hover:bg-gray-50">
+      <tr class="border-b hover:bg-gray-50 {% if not producto.activo %}opacity-60{% endif %}">
         <td class="py-3 px-5 font-medium">{{ producto.idProducto }}</td>
-        <td class="py-3 px-5">{{ producto.nombreProducto }}</td>
+        <td class="py-3 px-5">
+          {{ producto.nombreProducto }}
+          {% if not producto.activo %}
+            <span class="ml-1 inline-block text-xs bg-gray-200 text-gray-600 rounded px-1 py-0.5">Inactivo</span>
+          {% endif %}
+        </td>
         <td class="py-3 px-5 hidden lg:table-cell">{{ producto.descripcion|default:'-' }}</td>
         <td class="py-3 px-5">${{ producto.precioUnitario }}</td>
         <td class="py-3 px-5 hidden md:table-cell">{{ producto.categoriaProducto }}</td>
@@ -111,16 +132,6 @@
         <h3 class="font-semibold" id="mdi-title">Detalle de insumos</h3>
         <button type="button" class="material-symbols-outlined text-gray-600 hover:text-gray-800" id="mdi-close">close</button>
       
-  <div class="flex gap-2">
-    <a href="{% url 'estadisticas:informe_pdf_productos' %}" target="_blank"
-       class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-semibold shadow-sm">
-      <span class="material-symbols-outlined text-base">picture_as_pdf</span> PDF
-    </a>
-    <a href="{% url 'estadisticas:informe_pdf_productos' %}" download
-       class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gray-700 hover:bg-gray-800 text-white text-sm font-semibold shadow-sm">
-      <span class="material-symbols-outlined text-base">download</span> Descargar
-    </a>
-  </div>
 </div>
       <div class="px-4 py-3 space-y-3">
         <div class="flex items-end gap-3">
@@ -130,7 +141,7 @@
           </div>
           <div>
             <label for="mdi-cantidad" class="block text-sm text-gray-700">Cantidad</label>
-            <input id="mdi-cantidad" type="number" min="1" value="1" class="border rounded px-2 py-1 w-24 text-black dark:text-black">
+            <input id="mdi-cantidad" type="number" min="1" max="1000000" value="1" class="border rounded px-2 py-1 w-24 text-black dark:text-black">
           </div>
           <button id="mdi-recalcular" class="bg-indigo-600 text-white px-3 py-2 rounded-lg hover:bg-indigo-700">Calcular</button>
         </div>
@@ -142,6 +153,7 @@
               <tr>
                 <th class="py-2 px-3">Código</th>
                 <th class="py-2 px-3">Insumo</th>
+                <th class="py-2 px-3">Unidad</th>
                 <th class="py-2 px-3 text-right">Requerido</th>
                 <th class="py-2 px-3 text-right">Stock</th>
                 <th class="py-2 px-3 text-right">Faltan</th>
@@ -194,17 +206,24 @@
     }
 
     async function calcular() {
+      alertEl.classList.add('hidden');
+      alertEl.className = 'hidden text-sm';
       try {
-        const cant = Math.max(1, Number(cantidadEl.value) || 1);
+        const cant = Math.min(1000000, Math.max(1, Math.trunc(Number(cantidadEl.value) || 1)));
         const url = urlTpl.replace('/0/0/', `/${currentProductoId}/${cant}/`);
         const resp = await fetch(url);
-        if (!resp.ok) throw new Error('No se pudo obtener el detalle');
+        if (!resp.ok) throw new Error(`Error del servidor (${resp.status})`);
         const data = await resp.json();
+        if (!data.success) throw new Error(data.error || 'Error al calcular consumo');
         productoEl.textContent = data.producto || productoEl.textContent;
+        if (data.ok === false) {
+          alertEl.textContent = '⚠ Stock insuficiente para cubrir esta cantidad.';
+          alertEl.className = 'text-sm bg-orange-50 border border-orange-200 text-orange-800 rounded px-3 py-2';
+        }
         renderDetalle(data);
       } catch (err) {
-        alertEl.textContent = err?.message || String(err);
-        alertEl.classList.remove('hidden');
+        alertEl.textContent = '⚠ ' + (err?.message || 'No se pudo calcular el consumo');
+        alertEl.className = 'text-sm bg-red-50 border border-red-200 text-red-700 rounded px-3 py-2';
       }
     }
 
@@ -214,26 +233,31 @@
       try {
         const url = urlRecetaTpl.replace('/0', `/${currentProductoId}`);
         const resp = await fetch(url);
-        if (!resp.ok) return;
+        if (!resp.ok) {
+          recetaEl.textContent = 'No se pudo cargar la receta.';
+          return;
+        }
         const data = await resp.json();
+        if (!data.success) {
+          recetaEl.textContent = data.error || 'Sin receta disponible.';
+          return;
+        }
         recetaItems = Array.isArray(data.insumos) ? data.insumos : [];
         if (recetaItems.length) {
           const nombres = recetaItems.map(i => i.codigo ? `${i.codigo}` : (i.nombre || '')).filter(Boolean);
           recetaEl.textContent = `Receta: ${nombres.join(', ')}`;
         }
-      } catch (_) { /* noop */ }
+      } catch (_) {
+        recetaEl.textContent = 'No se pudo cargar la receta.';
+      }
     }
 
     function renderDetalle(data) {
       const byIdCons = {};
       (data.consumo || []).forEach(item => { if (item.id) byIdCons[item.id] = item; });
       // Merge receta items ensuring presence
-      const merged = [...(data.consumo || [])];
-      recetaItems.forEach(r => {
-        if (r.id && !byIdCons[r.id]) {
-          merged.push({ id: r.id, codigo: r.codigo, nombre: r.nombre, requerido: 0, stock: '', faltan: 0 });
-        }
-      });
+      // Solo incluir insumos que tengan cantidad requerida > 0
+      const merged = (data.consumo || []).filter(item => Number(item.requerido || 0) > 0);
 
       const rows = merged.map(item => {
         const req = Number(item.requerido || 0);
@@ -244,13 +268,14 @@
           <tr class="border-b">
             <td class="py-2 px-3">${item.codigo || ''}</td>
             <td class="py-2 px-3">${item.nombre || ''}</td>
+            <td class="py-2 px-3 text-gray-500">${item.unidad || ''}</td>
             <td class="py-2 px-3 text-right">${req.toLocaleString()}</td>
             <td class="py-2 px-3 text-right">${stk.toLocaleString()}</td>
             <td class="py-2 px-3 text-right ${cls}">${falt.toLocaleString()}</td>
           </tr>
         `;
       }).join('');
-      bodyEl.innerHTML = rows || '<tr><td colspan="5" class="py-3 px-3 text-center text-gray-500">Sin receta definida para este producto.</td></tr>';
+      bodyEl.innerHTML = rows || '<tr><td colspan="6" class="py-3 px-3 text-center text-gray-500">Sin receta definida para este producto.</td></tr>';
     }
 
     document.querySelectorAll('.btn-ver-insumos').forEach(btn => {

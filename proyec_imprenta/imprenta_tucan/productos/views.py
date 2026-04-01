@@ -1,11 +1,11 @@
-from permisos.decorators import requiere_permiso
-from django.contrib.auth.decorators import login_required
 # productos/views.py
 from django.http import JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.core.paginator import Paginator
 from django.views.decorators.clickjacking import xframe_options_sameorigin
+from django.contrib.auth.decorators import login_required
+from django.db.models import Q
 from django.urls import reverse
 from .models import Producto, CategoriaProducto, TipoProducto, UnidadMedida, ProductoInsumo
 from .forms import (
@@ -18,17 +18,19 @@ from .forms import (
 from pedidos.models import Pedido, LineaPedido
 from pedidos.services import calcular_consumo_producto, verificar_stock_consumo
 from configuracion.permissions import require_perm
+from configuracion.services import get_page_size
+from permisos.decorators import requiere_permiso
 
 
 # Listar productos
 @require_perm('Productos', 'Listar', redirect_to='lista_productos')
 @login_required
-@requiere_permiso("Productos")
 def lista_productos(request):
-    """Listado de productos con búsqueda, orden y paginación (alineado con otros módulos)."""
-    query = request.GET.get('q', '') or request.GET.get('criterio', '')
+    """Listado de productos con búsqueda, orden y paginación."""
+    query = request.GET.get('q', '')
     order_by = request.GET.get('order_by', 'idProducto')
     direction = request.GET.get('direction', 'asc')
+    mostrar_inactivos = request.GET.get('mostrar_inactivos') == '1'
 
     valid_order_fields = [
         'idProducto', 'nombreProducto', 'precioUnitario',
@@ -37,12 +39,20 @@ def lista_productos(request):
     if order_by not in valid_order_fields:
         order_by = 'idProducto'
 
-    qs = Producto.objects.select_related('categoriaProducto', 'tipoProducto', 'unidadMedida').all()
+    qs = Producto.objects.select_related('categoriaProducto', 'tipoProducto', 'unidadMedida')
+    if not mostrar_inactivos:
+        qs = qs.filter(activo=True)
 
     if query:
-        from django.db.models import Q
-        if order_by == 'idProducto' and query.isdigit():
-            qs = qs.filter(idProducto=int(query))
+        if query.isdigit():
+            qs = qs.filter(
+                Q(idProducto=int(query)) |
+                Q(nombreProducto__icontains=query) |
+                Q(descripcion__icontains=query) |
+                Q(categoriaProducto__nombreCategoria__icontains=query) |
+                Q(tipoProducto__nombreTipoProducto__icontains=query) |
+                Q(unidadMedida__nombreUnidad__icontains=query)
+            )
         else:
             qs = qs.filter(
                 Q(nombreProducto__icontains=query) |
@@ -55,7 +65,6 @@ def lista_productos(request):
     order_field = f'-{order_by}' if direction == 'desc' else order_by
     qs = qs.order_by(order_field)
 
-    from configuracion.services import get_page_size
     paginator = Paginator(qs, get_page_size())
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
@@ -65,6 +74,7 @@ def lista_productos(request):
         'query': query,
         'order_by': order_by,
         'direction': direction,
+        'mostrar_inactivos': mostrar_inactivos,
     }
     return render(request, 'productos/lista_productos.html', context)
 
@@ -372,6 +382,7 @@ def calcular_consumo(request, producto_id: int, cantidad: int):
                 'id': ins.idInsumo,
                 'codigo': ins.codigo,
                 'nombre': ins.nombre,
+                'unidad': ins.unidad_medida or '',
                 'requerido': float(req),
                 'stock': stock,
                 'faltan': faltan,
