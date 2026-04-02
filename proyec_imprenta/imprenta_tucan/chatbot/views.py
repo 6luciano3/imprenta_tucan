@@ -99,9 +99,8 @@ REGLAS DE RESPUESTA:
         
         if historial:
             for msg in reversed(historial):
-                if msg.es_cliente:
-                    messages.append({"role": "user", "content": msg.mensaje})
-                else:
+                messages.append({"role": "user", "content": msg.mensaje})
+                if msg.respuesta:
                     messages.append({"role": "assistant", "content": msg.respuesta})
         
         messages.append({"role": "user", "content": mensaje})
@@ -361,25 +360,25 @@ def buscar_producto(texto):
     if 'qué producto' in texto.lower() or 'productos tienen' in texto:
         productos = Producto.objects.all()[:10]
         if productos:
-            lista = "\n".join([f"• {p.nombre} - ${p.precio}" for p in productos])
+            lista = "\n".join([f"• {p.nombreProducto} - ${p.precioUnitario}" for p in productos])
             return f"📦 PRODUCTOS ({productos.count()}):\n\n{lista}"
         return "No hay productos registrados"
-    
+
     match = re.search(r'busca (.+)', texto.lower())
     if match:
         nombre = match.group(1).strip()
-        productos = Producto.objects.filter(nombre__icontains=nombre)[:5]
+        productos = Producto.objects.filter(nombreProducto__icontains=nombre)[:5]
         if productos:
-            lista = "\n".join([f"• {p.nombre} - ${p.precio}" for p in productos])
+            lista = "\n".join([f"• {p.nombreProducto} - ${p.precioUnitario}" for p in productos])
             return f"📦 PRODUCTOS ENCONTRADOS:\n\n{lista}"
         return f"No encontré productos con '{nombre}'"
-    
+
     match = re.search(r'precio.*?(\d+)', texto.lower())
     if match and 'menor' in texto.lower():
         precio = int(match.group(1))
-        productos = Producto.objects.filter(precio__lt=precio)[:5]
+        productos = Producto.objects.filter(precioUnitario__lt=precio)[:5]
         if productos:
-            lista = "\n".join([f"• {p.nombre} - ${p.precio}" for p in productos])
+            lista = "\n".join([f"• {p.nombreProducto} - ${p.precioUnitario}" for p in productos])
             return f"📦 PRODUCTOS < ${precio}:\n\n{lista}"
     
     return None
@@ -624,13 +623,6 @@ def chatbot_api(request):
                 mensaje=mensaje,
                 respuesta=respuesta,
                 es_cliente=True
-            )
-            
-            ConversacionChatbot.objects.create(
-                session_id=session_id,
-                mensaje=respuesta,
-                respuesta='',
-                es_cliente=False
             )
         
         return JsonResponse({

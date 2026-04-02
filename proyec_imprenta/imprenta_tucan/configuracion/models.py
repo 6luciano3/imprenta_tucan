@@ -290,7 +290,7 @@ class Formula(models.Model):
     actualizado_en = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return self.nombre
+        return self.nombre or self.codigo
 
     def variables(self):
         return self.variables_json or []

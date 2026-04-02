@@ -8,12 +8,14 @@ from django.contrib.auth.decorators import login_required
 from django.db.models import Q
 from django.urls import reverse
 from .models import Producto, CategoriaProducto, TipoProducto, UnidadMedida, ProductoInsumo
+from django.forms import inlineformset_factory
 from .forms import (
     ProductoForm,
     CategoriaProductoForm,
     TipoProductoForm,
     UnidadMedidaForm,
     ProductoInsumoForm,
+    ProductoInsumoAltaForm,
 )
 from pedidos.models import Pedido, LineaPedido
 from pedidos.services import calcular_consumo_producto, verificar_stock_consumo
@@ -81,19 +83,57 @@ def lista_productos(request):
 # Crear producto
 
 
+def _get_insumo_formset(extra=0):
+    return inlineformset_factory(
+        Producto, ProductoInsumo,
+        form=ProductoInsumoAltaForm,
+        extra=extra,
+        can_delete=True,
+        fields=['insumo', 'cantidad_por_unidad', 'es_costo_fijo'],
+    )
+
+
 @require_perm('Productos', 'Crear', redirect_to='lista_productos')
 @login_required
-@requiere_permiso("Productos", "Crear")
 def crear_producto(request):
+    InsumoFormSet = _get_insumo_formset()
     if request.method == 'POST':
         form = ProductoForm(request.POST)
-        if form.is_valid():
-            form.save()
-            messages.success(request, 'Producto registrado exitosamente.')
+        formset = InsumoFormSet(request.POST, prefix='insumos')
+        if form.is_valid() and formset.is_valid():
+            producto = form.save()
+            formset.instance = producto
+            formset.save()
+            messages.success(request, f'Producto "{producto.nombreProducto}" registrado exitosamente.')
             return redirect('lista_productos')
     else:
         form = ProductoForm()
-    return render(request, 'productos/crear_producto.html', {'form': form})
+        formset = InsumoFormSet(prefix='insumos')
+    from insumos.models import Insumo
+    from configuracion.models import Formula
+    import json
+    unidades_insumos_json = json.dumps({
+        str(i['idInsumo']): i['unidad_medida'] or ''
+        for i in Insumo.objects.values('idInsumo', 'unidad_medida')
+    })
+    formulas_json = json.dumps({
+        str(f['id']): {
+            'nombre': f['nombre'] or f['codigo'],
+            'descripcion': f['descripcion'] or '',
+            'expresion': f['expresion'],
+            'variables': f['variables_json'] or [],
+            'insumo': f['insumo__nombre'] or '',
+        }
+        for f in Formula.objects.filter(activo=True).values(
+            'id', 'nombre', 'codigo', 'descripcion', 'expresion', 'variables_json', 'insumo__nombre'
+        )
+    })
+    return render(request, 'productos/crear_producto.html', {
+        'form': form,
+        'formset': formset,
+        'unidades_insumos_json': unidades_insumos_json,
+        'formulas_json': formulas_json,
+    })
 
 # Editar producto
 
@@ -356,6 +396,31 @@ def eliminar_unidad(request, pk):
         'tipo': 'Unidad de Medida',
         'volver': 'lista_unidades'
     })
+
+
+@login_required
+def opciones_categorias(request):
+    """AJAX: devuelve lista de categorías para actualizar el select sin recargar la página."""
+    from django.http import JsonResponse
+    data = list(CategoriaProducto.objects.order_by('nombreCategoria').values('pk', 'nombreCategoria'))
+    return JsonResponse({'opciones': [{'value': c['pk'], 'label': c['nombreCategoria']} for c in data]})
+
+
+@login_required
+def opciones_tipos(request):
+    """AJAX: devuelve lista de tipos de producto para actualizar el select."""
+    from django.http import JsonResponse
+    data = list(TipoProducto.objects.order_by('nombreTipoProducto').values('pk', 'nombreTipoProducto'))
+    return JsonResponse({'opciones': [{'value': t['pk'], 'label': t['nombreTipoProducto']} for t in data]})
+
+
+@login_required
+def opciones_unidades(request):
+    """AJAX: devuelve lista de unidades de medida (configuracion) para actualizar el select."""
+    from django.http import JsonResponse
+    from configuracion.models import UnidadDeMedida
+    data = list(UnidadDeMedida.objects.filter(activo=True).order_by('nombre').values('pk', 'nombre'))
+    return JsonResponse({'opciones': [{'value': u['pk'], 'label': u['nombre']} for u in data]})
 
 
 @login_required

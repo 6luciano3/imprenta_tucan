@@ -8,7 +8,7 @@ class ProductoForm(forms.ModelForm):
         model = Producto
         fields = ['nombreProducto', 'descripcion', 'precioUnitario',
                   'categoriaProducto', 'tipoProducto', 'unidadMedida',
-                  'formula', 'tinta_insumo', 'activo']
+                  'formula', 'activo']
         widgets = {
             'nombreProducto': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Nombre del producto'}),
             'descripcion': forms.Textarea(attrs={'class': 'form-control', 'placeholder': 'Descripción (opcional)', 'rows': 3}),
@@ -17,21 +17,31 @@ class ProductoForm(forms.ModelForm):
             'tipoProducto': forms.Select(attrs={'class': 'form-select'}),
             'unidadMedida': forms.Select(attrs={'class': 'form-select'}),
             'formula': forms.Select(attrs={'class': 'form-select'}),
-            'tinta_insumo': forms.Select(attrs={'class': 'form-select'}),
             'activo': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        from configuracion.models import Formula, UnidadDeMedida
+        self.fields['formula'].queryset = Formula.objects.filter(activo=True).order_by('codigo')
+        self.fields['unidadMedida'].queryset = UnidadDeMedida.objects.filter(activo=True).order_by('nombre')
+
+    def clean_nombreProducto(self):
+        nombre = self.cleaned_data.get('nombreProducto')
+        if not nombre:
+            raise forms.ValidationError('El nombre del producto es obligatorio.')
+        qs = Producto.objects.filter(nombreProducto__iexact=nombre)
+        if self.instance.pk:
+            qs = qs.exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise forms.ValidationError(f'Ya existe un producto con el nombre "{nombre}".')
+        return nombre
 
     def clean_precioUnitario(self):
         precio = self.cleaned_data.get('precioUnitario')
         if precio is None or precio < 0:
             raise forms.ValidationError('El precio unitario debe ser un número positivo.')
         return precio
-
-    def clean_nombreProducto(self):
-        nombre = self.cleaned_data.get('nombreProducto')
-        if not nombre:
-            raise forms.ValidationError('El nombre del producto es obligatorio.')
-        return nombre
 
 
 class CategoriaProductoForm(forms.ModelForm):
@@ -62,6 +72,37 @@ class UnidadMedidaForm(forms.ModelForm):
             'nombreUnidad': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Nombre de la unidad (p. ej., Metro)'}),
             'abreviatura': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Abreviatura (p. ej., m)'}),
         }
+
+
+class ProductoInsumoAltaForm(forms.ModelForm):
+    """Form para agregar insumos inline durante el alta de producto."""
+    class Meta:
+        model = ProductoInsumo
+        fields = ['insumo', 'cantidad_por_unidad', 'es_costo_fijo']
+        widgets = {
+            'insumo': forms.Select(attrs={'class': 'form-select'}),
+            'cantidad_por_unidad': forms.NumberInput(attrs={
+                'class': 'form-control', 'step': '0.001', 'min': '0.001', 'placeholder': 'Cantidad'
+            }),
+            'es_costo_fijo': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+        }
+        labels = {
+            'insumo': 'Insumo',
+            'cantidad_por_unidad': 'Cant. por unidad',
+            'es_costo_fijo': 'Costo fijo',
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        from insumos.models import Insumo
+        self.fields['insumo'].queryset = Insumo.objects.order_by('nombre')
+        self.fields['insumo'].empty_label = '— Seleccionar insumo —'
+
+    def clean_cantidad_por_unidad(self):
+        cantidad = self.cleaned_data.get('cantidad_por_unidad')
+        if cantidad is not None and cantidad <= 0:
+            raise forms.ValidationError('La cantidad debe ser mayor que cero.')
+        return cantidad
 
 
 class ProductoInsumoForm(forms.ModelForm):

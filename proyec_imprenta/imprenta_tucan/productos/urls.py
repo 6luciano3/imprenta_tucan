@@ -22,6 +22,10 @@ urlpatterns = [
     path('alta/unidades/crear/', views.crear_unidad, name='crear_unidad'),
     path('alta/unidades/editar/<int:pk>/', views.editar_unidad, name='editar_unidad'),
     path('alta/unidades/eliminar/<int:pk>/', views.eliminar_unidad, name='eliminar_unidad'),
+    # AJAX: opciones para selects (sin recargar la página)
+    path('alta/ajax/categorias/', views.opciones_categorias, name='ajax_opciones_categorias'),
+    path('alta/ajax/tipos/', views.opciones_tipos, name='ajax_opciones_tipos'),
+    path('alta/ajax/unidades/', views.opciones_unidades, name='ajax_opciones_unidades'),
     path('editar/<int:idProducto>/', views.editar_producto, name='editar_producto'),
     path('modificar/<int:idProducto>/', views.editar_producto, name='modificar_producto'),
     path('activar/<int:idProducto>/', views.activar_producto, name='activar_producto'),

@@ -63,7 +63,7 @@ class Producto(models.Model):
     precioUnitario = models.DecimalField(max_digits=10, decimal_places=2)
     categoriaProducto = models.ForeignKey(CategoriaProducto, on_delete=models.CASCADE, null=True, blank=True)
     tipoProducto = models.ForeignKey(TipoProducto, on_delete=models.CASCADE, null=True, blank=True)
-    unidadMedida = models.ForeignKey(UnidadMedida, on_delete=models.CASCADE, null=True, blank=True)
+    unidadMedida = models.ForeignKey('configuracion.UnidadDeMedida', on_delete=models.SET_NULL, null=True, blank=True)
     activo = models.BooleanField(default=True)
 
     # Relación directa: cada producto tiene exactamente una fórmula asociada

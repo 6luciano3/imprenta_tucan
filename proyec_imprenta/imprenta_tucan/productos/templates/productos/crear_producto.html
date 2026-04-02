@@ -10,59 +10,174 @@
 <form method="post" class="bg-white p-8 rounded-xl shadow max-w-3xl mx-auto space-y-6">
   {% csrf_token %}
 
+  {% if form.non_field_errors %}
+  <div class="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm">
+    {{ form.non_field_errors }}
+  </div>
+  {% endif %}
+
   <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
     <label class="flex flex-col">
       <span class="font-semibold mb-1">Nombre *</span>
       {{ form.nombreProducto }}
+      {% if form.nombreProducto.errors %}
+        <p class="text-red-500 text-sm mt-1">{{ form.nombreProducto.errors|join:", " }}</p>
+      {% endif %}
     </label>
   </div>
 
   <label class="flex flex-col">
     <span class="font-semibold mb-1">Descripción</span>
     {{ form.descripcion }}
+    {% if form.descripcion.errors %}
+      <p class="text-red-500 text-sm mt-1">{{ form.descripcion.errors|join:", " }}</p>
+    {% endif %}
   </label>
 
   <div class="grid grid-cols-2 gap-6">
     <label class="flex flex-col">
       <span class="font-semibold mb-1">Precio Unitario *</span>
       {{ form.precioUnitario }}
+      {% if form.precioUnitario.errors %}
+        <p class="text-red-500 text-sm mt-1">{{ form.precioUnitario.errors|join:", " }}</p>
+      {% endif %}
     </label>
   </div>
 
   <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
     <label class="flex flex-col">
-      <span class="font-semibold mb-1">Categoría *</span>
+      <span class="font-semibold mb-1">Categoría</span>
       {{ form.categoriaProducto }}
-      <a href="{% url 'lista_categorias' %}" class="text-sm text-blue-600 hover:underline mt-1 gestionar-link">Gestionar categorías</a>
+      {% if form.categoriaProducto.errors %}
+        <p class="text-red-500 text-sm mt-1">{{ form.categoriaProducto.errors|join:", " }}</p>
+      {% endif %}
+      <a href="{% url 'lista_categorias' %}" class="text-sm text-blue-600 hover:underline mt-1 gestionar-link" data-select="id_categoriaProducto" data-ajax="{% url 'ajax_opciones_categorias' %}">Gestionar categorías</a>
     </label>
     <label class="flex flex-col">
-      <span class="font-semibold mb-1">Tipo *</span>
+      <span class="font-semibold mb-1">Tipo</span>
       {{ form.tipoProducto }}
-      <a href="{% url 'lista_tipos' %}" class="text-sm text-blue-600 hover:underline mt-1 gestionar-link">Gestionar tipos</a>
+      {% if form.tipoProducto.errors %}
+        <p class="text-red-500 text-sm mt-1">{{ form.tipoProducto.errors|join:", " }}</p>
+      {% endif %}
+      <a href="{% url 'lista_tipos' %}" class="text-sm text-blue-600 hover:underline mt-1 gestionar-link" data-select="id_tipoProducto" data-ajax="{% url 'ajax_opciones_tipos' %}">Gestionar tipos</a>
     </label>
     <label class="flex flex-col">
-      <span class="font-semibold mb-1">Unidad de Medida *</span>
+      <span class="font-semibold mb-1">Unidad de Medida</span>
       {{ form.unidadMedida }}
-      <a href="{% url 'lista_unidades' %}" class="text-sm text-blue-600 hover:underline mt-1 gestionar-link">Gestionar unidades</a>
+      {% if form.unidadMedida.errors %}
+        <p class="text-red-500 text-sm mt-1">{{ form.unidadMedida.errors|join:", " }}</p>
+      {% endif %}
+      <a href="{% url 'unidad_list' %}" class="text-sm text-blue-600 hover:underline mt-1 gestionar-link" data-select="id_unidadMedida" data-ajax="{% url 'ajax_opciones_unidades' %}">Gestionar unidades</a>
     </label>
   </div>
 
-  <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+  <div class="flex flex-col gap-2">
     <label class="flex flex-col">
       <span class="font-semibold mb-1">Fórmula de cálculo *</span>
       {{ form.formula }}
-      {% if form.formula.errors %}<p class="text-red-500 text-sm mt-1">{{ form.formula.errors }}</p>{% endif %}
+      {% if form.formula.errors %}
+        <p class="text-red-500 text-sm mt-1">{{ form.formula.errors|join:", " }}</p>
+      {% endif %}
     </label>
-    <label class="flex flex-col">
-      <span class="font-semibold mb-1">Insumo de tinta (opcional)</span>
-      {{ form.tinta_insumo }}
-    </label>
+    <!-- Panel de detalle de fórmula -->
+    <div id="formula-detalle" class="hidden bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 text-sm space-y-1">
+      <div class="font-semibold text-blue-800" id="fd-nombre"></div>
+      <div class="text-gray-600" id="fd-descripcion"></div>
+      <div class="flex flex-wrap gap-x-4 gap-y-1 mt-1">
+        <span class="text-gray-500">Insumo: <span class="font-medium text-gray-800" id="fd-insumo"></span></span>
+      </div>
+      <div class="bg-white border border-blue-100 rounded px-3 py-1.5 font-mono text-xs text-blue-900 mt-1" id="fd-expresion"></div>
+      <div id="fd-variables" class="flex flex-wrap gap-1 mt-1"></div>
+    </div>
+    <div id="formula-vacio" class="hidden text-sm text-gray-400 italic">Seleccioná una fórmula para ver su descripción.</div>
   </div>
 
   <label class="flex items-center gap-3 cursor-pointer">
     {{ form.activo }}
     <span class="font-semibold">Producto activo</span>
   </label>
+
+  <!-- Insumos requeridos (receta) -->
+  <div class="border border-gray-200 rounded-xl overflow-hidden">
+    <div class="flex items-center justify-between bg-gray-50 px-4 py-3 border-b">
+      <h2 class="font-bold flex items-center gap-2">
+        <span class="material-symbols-outlined text-base">list_alt</span>
+        Insumos Requeridos
+        <span class="text-sm font-normal text-gray-500">(opcional — podés agregarlos ahora o después)</span>
+      </h2>
+      <button type="button" id="btn-agregar-insumo"
+              class="flex items-center gap-1 bg-green-600 text-white text-sm px-3 py-1.5 rounded-lg hover:bg-green-700">
+        <span class="material-symbols-outlined text-base">add</span>
+        Agregar insumo
+      </button>
+    </div>
+
+    {{ formset.management_form }}
+
+    <table class="w-full text-sm" id="insumos-table">
+      <thead class="bg-gray-100 text-gray-600">
+        <tr>
+          <th class="py-2 px-3 text-left w-2/5">Insumo</th>
+          <th class="py-2 px-3 text-left w-28">Unidad</th>
+          <th class="py-2 px-3 text-left w-1/5">Cant. por unidad</th>
+          <th class="py-2 px-3 text-center w-1/6">Costo fijo</th>
+          <th class="py-2 px-3 text-center w-1/6">Quitar</th>
+        </tr>
+      </thead>
+      <tbody id="insumos-body">
+        {% for f in formset %}
+        <tr class="border-t insumo-row" data-form-index="{{ forloop.counter0 }}">
+          <td class="py-2 px-3">
+            {{ f.insumo }}
+            {% if f.insumo.errors %}<p class="text-red-500 text-xs mt-1">{{ f.insumo.errors|join:", " }}</p>{% endif %}
+          </td>
+          <td class="py-2 px-3">
+            <span class="unidad-display text-gray-500 text-xs bg-gray-100 rounded px-2 py-1 whitespace-nowrap">—</span>
+          </td>
+          <td class="py-2 px-3">
+            {{ f.cantidad_por_unidad }}
+            {% if f.cantidad_por_unidad.errors %}<p class="text-red-500 text-xs mt-1">{{ f.cantidad_por_unidad.errors|join:", " }}</p>{% endif %}
+          </td>
+          <td class="py-2 px-3 text-center">
+            {{ f.es_costo_fijo }}
+            <div class="text-xs text-gray-400 mt-0.5">fijo p/trabajo</div>
+          </td>
+          <td class="py-2 px-3 text-center">
+            {{ f.DELETE }}
+            <button type="button" class="btn-quitar-insumo text-red-500 hover:text-red-700" title="Quitar">
+              <span class="material-symbols-outlined text-lg">delete</span>
+            </button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <div id="insumos-vacio" class="{% if formset.forms %}hidden{% endif %} py-6 text-center text-gray-400 text-sm border-t">
+      Sin insumos agregados. Podés agregarlos ahora o desde la receta del producto.
+    </div>
+  </div>
+
+  <!-- Template vacío para JS (oculto) -->
+  <div id="insumo-empty-form" class="hidden">
+    <table><tbody>
+    <tr class="border-t insumo-row">
+      <td class="py-2 px-3">{{ formset.empty_form.insumo }}</td>
+      <td class="py-2 px-3"><span class="unidad-display text-gray-500 text-xs bg-gray-100 rounded px-2 py-1 whitespace-nowrap">—</span></td>
+      <td class="py-2 px-3">{{ formset.empty_form.cantidad_por_unidad }}</td>
+      <td class="py-2 px-3 text-center">
+        {{ formset.empty_form.es_costo_fijo }}
+        <div class="text-xs text-gray-400 mt-0.5">fijo p/trabajo</div>
+      </td>
+      <td class="py-2 px-3 text-center">
+        {{ formset.empty_form.DELETE }}
+        <button type="button" class="btn-quitar-insumo text-red-500 hover:text-red-700" title="Quitar">
+          <span class="material-symbols-outlined text-lg">delete</span>
+        </button>
+      </td>
+    </tr>
+    </tbody></table>
+  </div>
 
   <div class="flex justify-end gap-4 pt-4">
     <a href="{% url 'lista_productos' %}"
@@ -71,12 +186,10 @@
             class="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition">Guardar</button>
   </div>
 </form>
- 
+
 <!-- Modal de gestión de catálogos -->
 <div id="catalogModal" class="hidden fixed inset-0 z-50">
-  <!-- Fondo -->
   <div id="catalogModalBackdrop" class="absolute inset-0 bg-black bg-opacity-50"></div>
-  <!-- Contenedor -->
   <div class="absolute inset-0 flex items-center justify-center p-4">
     <div class="bg-white w-full max-w-5xl h-[80vh] rounded-xl shadow-2xl overflow-hidden flex flex-col">
       <div class="flex items-center justify-between px-4 py-2 border-b">
@@ -94,56 +207,197 @@
       </div>
     </div>
   </div>
-  
-  <script>
-    (function(){
-      const modal = document.getElementById('catalogModal');
-      const backdrop = document.getElementById('catalogModalBackdrop');
-      const frame = document.getElementById('catalogModalFrame');
-      const btnClose = document.getElementById('catalogModalClose');
-      const btnRefresh = document.getElementById('catalogModalRefresh');
-
-      function withPopupParam(url){
-        try {
-          const u = new URL(url, window.location.origin);
-          if(!u.searchParams.has('popup')) u.searchParams.set('popup','1');
-          return u.toString();
-        } catch(e) {
-          // Fallback simple si URL relativa sin base
-          return url + (url.includes('?') ? '&' : '?') + 'popup=1';
-        }
-      }
-
-      function openModal(url){
-        frame.src = withPopupParam(url);
-        modal.classList.remove('hidden');
-      }
-      function closeModal(){
-        modal.classList.add('hidden');
-        frame.src = 'about:blank';
-        // Recargar la página para actualizar los selects con nuevas opciones
-        window.location.reload();
-      }
-      function refreshContent(){
-        if(frame && frame.contentWindow){ frame.contentWindow.location.reload(); }
-      }
-
-      document.querySelectorAll('.gestionar-link').forEach(a => {
-        a.addEventListener('click', function(ev){
-          ev.preventDefault();
-          openModal(this.href);
-        });
-      });
-
-      backdrop.addEventListener('click', closeModal);
-      btnClose.addEventListener('click', closeModal);
-      btnRefresh.addEventListener('click', refreshContent);
-
-      // Cerrar con ESC
-      document.addEventListener('keydown', (e)=>{
-        if(!modal.classList.contains('hidden') && e.key === 'Escape') closeModal();
-      });
-    })();
-  </script>
 </div>
+
+<script>
+// ---- Panel de detalle de fórmula ----
+(function(){
+  const FORMULAS = {{ formulas_json|safe }};
+  const sel = document.getElementById('id_formula');
+  const panel = document.getElementById('formula-detalle');
+  const vaciMsg = document.getElementById('formula-vacio');
+
+  function mostrar(id){
+    const f = FORMULAS[id];
+    if(!f){
+      panel.classList.add('hidden');
+      vaciMsg.classList.remove('hidden');
+      return;
+    }
+    document.getElementById('fd-nombre').textContent = f.nombre;
+    document.getElementById('fd-descripcion').textContent = f.descripcion;
+    document.getElementById('fd-insumo').textContent = f.insumo || '—';
+    document.getElementById('fd-expresion').textContent = f.expresion;
+    const varContainer = document.getElementById('fd-variables');
+    varContainer.innerHTML = '';
+    const vars = Array.isArray(f.variables) ? f.variables : [];
+    vars.forEach(v => {
+      const name = typeof v === 'object' ? (v.nombre || v.name || JSON.stringify(v)) : String(v);
+      const badge = document.createElement('span');
+      badge.className = 'bg-blue-100 text-blue-700 text-xs rounded px-2 py-0.5 font-mono';
+      badge.textContent = name;
+      varContainer.appendChild(badge);
+    });
+    panel.classList.remove('hidden');
+    vaciMsg.classList.add('hidden');
+  }
+
+  if(sel){
+    sel.addEventListener('change', () => mostrar(sel.value));
+    // Inicializar con el valor actual (en edición o error de validación)
+    if(sel.value) mostrar(sel.value);
+    else vaciMsg.classList.remove('hidden');
+  }
+})();
+
+// ---- Formset dinámico de insumos ----
+(function(){
+  const UNIDADES = {{ unidades_insumos_json|safe }};
+  const body = document.getElementById('insumos-body');
+  const emptyContainer = document.getElementById('insumo-empty-form');
+  const totalFormsInput = document.getElementById('id_insumos-TOTAL_FORMS');
+  const vacioMsg = document.getElementById('insumos-vacio');
+
+  function actualizarUnidad(row){
+    const sel = row.querySelector('select[name$="-insumo"]');
+    const span = row.querySelector('.unidad-display');
+    if(!sel || !span) return;
+    const unidad = UNIDADES[sel.value] || '—';
+    span.textContent = unidad;
+  }
+
+  function getTotal(){ return parseInt(totalFormsInput.value, 10); }
+  function setTotal(n){ totalFormsInput.value = n; }
+
+  function updateVacio(){
+    const visibles = body.querySelectorAll('tr.insumo-row:not(.row-deleted)');
+    vacioMsg.classList.toggle('hidden', visibles.length > 0);
+  }
+
+  function bindRow(row){
+    const sel = row.querySelector('select[name$="-insumo"]');
+    if(sel) sel.addEventListener('change', () => actualizarUnidad(row));
+    actualizarUnidad(row);
+    bindQuitarBtn(row);
+  }
+
+  function bindQuitarBtn(row){
+    row.querySelector('.btn-quitar-insumo').addEventListener('click', function(){
+      const deleteCheck = row.querySelector('input[type=checkbox][name$="-DELETE"]');
+      if(deleteCheck){
+        // Fila guardada: marcar para borrar y ocultar
+        deleteCheck.checked = true;
+        row.classList.add('row-deleted');
+        row.classList.add('hidden');
+      } else {
+        // Fila nueva (no tiene PK): eliminar del DOM y decrementar
+        row.remove();
+        setTotal(getTotal() - 1);
+        // Re-numerar índices en los names/ids de las filas restantes
+        body.querySelectorAll('tr.insumo-row').forEach((r, idx) => {
+          r.querySelectorAll('input, select').forEach(el => {
+            el.name = el.name.replace(/insumos-\d+-/, `insumos-${idx}-`);
+            el.id   = el.id.replace(/id_insumos-\d+-/, `id_insumos-${idx}-`);
+          });
+        });
+      }
+      updateVacio();
+    });
+  }
+
+  // Bind en filas ya existentes (errores de validación)
+  body.querySelectorAll('tr.insumo-row').forEach(bindRow);
+
+  document.getElementById('btn-agregar-insumo').addEventListener('click', function(){
+    const idx = getTotal();
+    const templateRow = emptyContainer.querySelector('tr').cloneNode(true);
+    templateRow.querySelectorAll('input, select').forEach(el => {
+      el.name = el.name.replace(/__prefix__/g, idx);
+      el.id   = el.id.replace(/__prefix__/g, idx);
+    });
+    body.appendChild(templateRow);
+    setTotal(idx + 1);
+    bindRow(templateRow);
+    updateVacio();
+  });
+
+  updateVacio();
+})();
+
+// ---- Modal de catálogos ----
+(function(){
+  const modal = document.getElementById('catalogModal');
+  const backdrop = document.getElementById('catalogModalBackdrop');
+  const frame = document.getElementById('catalogModalFrame');
+  const btnClose = document.getElementById('catalogModalClose');
+  const btnRefresh = document.getElementById('catalogModalRefresh');
+  let activeSelectId = null;
+  let activeAjaxUrl = null;
+
+  function withPopupParam(url){
+    try {
+      const u = new URL(url, window.location.origin);
+      if(!u.searchParams.has('popup')) u.searchParams.set('popup','1');
+      return u.toString();
+    } catch(e) {
+      return url + (url.includes('?') ? '&' : '?') + 'popup=1';
+    }
+  }
+
+  function openModal(url, selectId, ajaxUrl){
+    activeSelectId = selectId || null;
+    activeAjaxUrl = ajaxUrl || null;
+    frame.src = withPopupParam(url);
+    modal.classList.remove('hidden');
+  }
+
+  async function refreshSelect(){
+    if(!activeSelectId || !activeAjaxUrl) return;
+    try {
+      const resp = await fetch(activeAjaxUrl);
+      if(!resp.ok) return;
+      const data = await resp.json();
+      const sel = document.getElementById(activeSelectId);
+      if(!sel) return;
+      const currentVal = sel.value;
+      // Conservar opción vacía si existe
+      const emptyOpt = sel.options[0] && sel.options[0].value === '' ? sel.options[0].cloneNode(true) : null;
+      sel.innerHTML = '';
+      if(emptyOpt) sel.appendChild(emptyOpt);
+      (data.opciones || []).forEach(opt => {
+        const o = document.createElement('option');
+        o.value = opt.value;
+        o.textContent = opt.label;
+        if(String(opt.value) === String(currentVal)) o.selected = true;
+        sel.appendChild(o);
+      });
+    } catch(_) {}
+  }
+
+  function closeModal(){
+    modal.classList.add('hidden');
+    frame.src = 'about:blank';
+    refreshSelect();
+  }
+
+  function refreshContent(){
+    if(frame && frame.contentWindow){ frame.contentWindow.location.reload(); }
+  }
+
+  document.querySelectorAll('.gestionar-link').forEach(a => {
+    a.addEventListener('click', function(ev){
+      ev.preventDefault();
+      openModal(this.href, this.dataset.select, this.dataset.ajax);
+    });
+  });
+
+  backdrop.addEventListener('click', closeModal);
+  btnClose.addEventListener('click', closeModal);
+  btnRefresh.addEventListener('click', refreshContent);
+
+  document.addEventListener('keydown', (e)=>{
+    if(!modal.classList.contains('hidden') && e.key === 'Escape') closeModal();
+  });
+})();
+</script>
 {% endblock %}
