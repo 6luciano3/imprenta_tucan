@@ -108,7 +108,7 @@ class ProductoInsumoAltaForm(forms.ModelForm):
 class ProductoInsumoForm(forms.ModelForm):
     class Meta:
         model = ProductoInsumo
-        fields = ['insumo', 'cantidad_por_unidad']
+        fields = ['insumo', 'cantidad_por_unidad', 'es_costo_fijo']
         widgets = {
             'insumo': forms.Select(attrs={
                 'class': 'form-select',
@@ -121,16 +121,19 @@ class ProductoInsumoForm(forms.ModelForm):
                 'min': '0',
                 'required': True
             }),
+            'es_costo_fijo': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
         labels = {
             'insumo': 'Insumo requerido',
             'cantidad_por_unidad': 'Cantidad por unidad',
+            'es_costo_fijo': 'Costo fijo',
         }
 
     def __init__(self, *args, **kwargs):
         producto = kwargs.pop('producto', None)
         super().__init__(*args, **kwargs)
-        
+        self._producto = producto
+
         # Si ya hay un insumo asignado, excluirlo de las opciones
         from insumos.models import Insumo
         if producto:
@@ -139,6 +142,15 @@ class ProductoInsumoForm(forms.ModelForm):
         else:
             self.fields['insumo'].queryset = Insumo.objects.filter(tipo='directo').order_by('nombre')
     
+    def clean_insumo(self):
+        insumo = self.cleaned_data.get('insumo')
+        if insumo and self.instance.pk is None:
+            # Solo al agregar: verificar que el insumo no esté ya en la receta del producto
+            producto = getattr(self, '_producto', None)
+            if producto and ProductoInsumo.objects.filter(producto=producto, insumo=insumo).exists():
+                raise forms.ValidationError(f'"{insumo.nombre}" ya está en la receta de este producto.')
+        return insumo
+
     def clean_cantidad_por_unidad(self):
         cantidad = self.cleaned_data.get('cantidad_por_unidad')
         if cantidad is None or cantidad <= 0:

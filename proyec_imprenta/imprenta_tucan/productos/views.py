@@ -433,10 +433,32 @@ def calcular_consumo(request, producto_id: int, cantidad: int):
         producto = get_object_or_404(Producto, pk=producto_id)
         consumo_dict = calcular_consumo_producto(producto, int(cantidad))
 
+        # Info de fórmula dinámica usada (si aplica)
+        from pedidos.services import calcular_con_formula, _build_formula_variables
+        formula_info = None
+        try:
+            formula = producto.formula
+            if formula and formula.activo:
+                params = producto.parametros_tecnicos
+                variables = _build_formula_variables(params, int(cantidad))
+                formula_resultado = calcular_con_formula(producto, int(cantidad))
+                formula_info = {
+                    'codigo': formula.codigo,
+                    'nombre': formula.nombre or formula.codigo,
+                    'expresion': formula.expresion,
+                    'variables': {k: v for k, v in variables.items()
+                                  if k in (formula.variables_json if isinstance(formula.variables_json, list)
+                                           else list(formula.variables_json.keys()))},
+                    'resultado': {str(k): float(v) for k, v in formula_resultado.items()},
+                }
+        except Exception:
+            pass
+
         # Enriquecer con datos de insumo
         from insumos.models import Insumo
         insumos = {i.idInsumo: i for i in Insumo.objects.filter(idInsumo__in=consumo_dict.keys())}
         detalle = []
+        formula_insumo_ids = set(formula_info['resultado'].keys()) if formula_info else set()
         for iid, req in consumo_dict.items():
             ins = insumos.get(iid)
             if not ins:
@@ -451,6 +473,7 @@ def calcular_consumo(request, producto_id: int, cantidad: int):
                 'requerido': float(req),
                 'stock': stock,
                 'faltan': faltan,
+                'via_formula': str(ins.idInsumo) in formula_insumo_ids,
             })
 
         ok, faltantes = verificar_stock_consumo(consumo_dict)
@@ -460,6 +483,7 @@ def calcular_consumo(request, producto_id: int, cantidad: int):
             'cantidad': int(cantidad),
             'ok': ok,
             'consumo': detalle,
+            'formula': formula_info,
         })
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=400)

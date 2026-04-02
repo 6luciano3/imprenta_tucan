@@ -3,15 +3,66 @@ from collections import defaultdict
 import math
 
 
+def _build_formula_variables(params, cantidad: int) -> dict:
+    """
+    Construye el diccionario de variables para safe_eval a partir de
+    ParametroProducto y la cantidad del trabajo (tirada).
+    Cubre los nombres de variable usados en las fórmulas registradas.
+    """
+    return {
+        'tirada':            float(cantidad),
+        'cantidad':          float(cantidad),
+        'ancho_cm':          float(params.ancho_pliego_cm),
+        'alto_cm':           float(params.alto_pliego_cm),
+        'cobertura':         float(params.Ct),          # g/m2 por color
+        'desperdicio':       float(params.M),            # ej: 0.05
+        'paginas_totales':   int(params.C * params.F * params.Formas),
+        'paginas_por_plancha': int(params.C),            # 1 plancha por color
+        # Consumibles por horas: sin datos de producción, se usa 1 como default
+        'horas':             1,
+        'consumo_por_hora':  1,
+    }
+
+
+def calcular_con_formula(producto, cantidad: int) -> dict:
+    """
+    Evalúa producto.formula usando los ParametroProducto del producto.
+    Retorna {insumo_id: Decimal(resultado)} o {} si no aplica.
+    """
+    try:
+        formula = producto.formula
+        if not formula or not formula.activo:
+            return {}
+        params = producto.parametros_tecnicos
+    except Exception:
+        return {}
+
+    variables = _build_formula_variables(params, cantidad)
+    try:
+        from configuracion.utils.safe_eval import safe_eval
+        resultado = Decimal(str(safe_eval(formula.expresion, variables)))
+        if resultado > 0:
+            return {formula.insumo_id: resultado}
+    except Exception:
+        return {}
+    return {}
+
+
 def calcular_consumo_producto(producto, cantidad: int) -> dict:
-    """Calcula consumo usando RecetaDinamica si existe, sino fallback a BOM estatico."""
-    from decimal import Decimal
-    from collections import defaultdict
+    """
+    Calcula consumo de insumos para un producto y una cantidad de trabajo.
+
+    Prioridad:
+      1. RecetaDinamica (si existe y está activa)
+      2. BOM estático (ProductoInsumo)
+      3. Fórmula dinámica (producto.formula + ParametroProducto)
+         — complementa el BOM: solo agrega insumos que el BOM no incluye.
+    """
     req = defaultdict(Decimal)
     if not producto or not cantidad:
         return dict(req)
 
-    # Intentar RecetaDinamica primero
+    # 1. RecetaDinamica
     try:
         receta = producto.receta_dinamica
         if receta and receta.activo:
@@ -19,13 +70,19 @@ def calcular_consumo_producto(producto, cantidad: int) -> dict:
     except Exception:
         pass
 
-    # Fallback: BOM estatico (ProductoInsumo)
+    # 2. BOM estático
     from productos.models import ProductoInsumo
     for r in ProductoInsumo.objects.filter(producto=producto):
         if r.es_costo_fijo:
             req[r.insumo_id] += Decimal(r.cantidad_por_unidad)
         else:
             req[r.insumo_id] += Decimal(r.cantidad_por_unidad) * Decimal(cantidad)
+
+    # 3. Fórmula dinámica — complementa insumos no cubiertos por el BOM
+    for insumo_id, qty in calcular_con_formula(producto, cantidad).items():
+        if insumo_id not in req:
+            req[insumo_id] = qty
+
     return dict(req)
 
 

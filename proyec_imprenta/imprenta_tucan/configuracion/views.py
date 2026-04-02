@@ -221,6 +221,7 @@ def lista_configuracion(request):
     })
 
 
+@login_required
 def lista_formulas(request):
     from django.core.paginator import Paginator
     from django.db.models import Q
@@ -290,17 +291,16 @@ def editar_formula(request, pk):
     if request.method == 'POST':
         form = FormulaForm(request.POST, instance=formula)
         if form.is_valid():
-            old_version = formula.version
-            old_expr = formula.expresion
+            # Guardar el estado anterior en historial ANTES de modificar
+            FormulaHistorial.objects.create(
+                formula=formula,
+                version=formula.version,
+                expresion=formula.expresion,
+                usuario=request.user
+            )
             formula = form.save(commit=False)
             formula.version += 1
             formula.save()
-            FormulaHistorial.objects.create(
-                formula=formula,
-                version=old_version,
-                expresion=old_expr,
-                usuario=request.user
-            )
             return redirect('lista_formulas')
     else:
         form = FormulaForm(instance=formula)
@@ -385,8 +385,6 @@ def receta_producto_list(request):
 
     # Fórmulas activas para el modal
     formulas = Formula.objects.filter(activo=True).order_by('nombre')
-    import json
-    formulas_json = [{'id': f.id, 'nombre': f.nombre} for f in formulas]
 
     return render(request, 'configuracion/receta_producto_list.html', {
         'recetas': recetas,
@@ -395,7 +393,6 @@ def receta_producto_list(request):
         'order_by': order_by,
         'direction': direction,
         'formulas': formulas,
-        'formulas_json': json.dumps(formulas_json, ensure_ascii=False)
     })
 
 

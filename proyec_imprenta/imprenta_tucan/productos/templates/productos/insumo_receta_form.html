@@ -63,6 +63,23 @@
       </label>
     </div>
 
+    <!-- Campo Costo Fijo -->
+    <div class="space-y-2">
+      <label class="flex items-center gap-3">
+        {{ form.es_costo_fijo }}
+        <span class="font-semibold flex items-center gap-2">
+          <span class="material-symbols-outlined text-lg">attach_money</span>
+          {{ form.es_costo_fijo.label }}
+        </span>
+      </label>
+      {% if form.es_costo_fijo.errors %}
+      <span class="text-red-600 text-sm">{{ form.es_costo_fijo.errors.0 }}</span>
+      {% endif %}
+      <p class="text-xs text-gray-500">
+        Si está activo, la cantidad se aplica una sola vez por pedido (independiente de la tirada).
+      </p>
+    </div>
+
     <!-- Ejemplo informativo -->
     <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
       <div class="flex items-start gap-3">

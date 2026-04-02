@@ -29,8 +29,55 @@ class FormulaForm(forms.ModelForm):
         model = Formula
         fields = ['codigo', 'nombre', 'descripcion', 'expresion', 'variables_json', 'activo']
         widgets = {
-            'variables_json': forms.TextInput(attrs={'placeholder': '["tiraje","area","rendimiento"]'}),
+            'codigo': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ej: TINTA_CYAN_OFFSET'}),
+            'nombre': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Nombre descriptivo'}),
+            'descripcion': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
+            'expresion': forms.Textarea(attrs={'class': 'form-control font-mono', 'rows': 3, 'placeholder': 'Ej: (ancho_cm * alto_cm * tirada * cobertura) / 10000'}),
+            'variables_json': forms.HiddenInput(),
+            'activo': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
+
+    def _parse_variables(self, raw):
+        """Normaliza variables_json a lista de strings (nombres de variables)."""
+        import json
+        if not raw:
+            return []
+        if isinstance(raw, list):
+            return [v if isinstance(v, str) else str(v) for v in raw]
+        if isinstance(raw, dict):
+            return list(raw.keys())
+        try:
+            parsed = json.loads(raw)
+        except (json.JSONDecodeError, TypeError):
+            return []
+        if isinstance(parsed, dict):
+            return list(parsed.keys())
+        if isinstance(parsed, list):
+            return [v if isinstance(v, str) else str(v) for v in parsed]
+        return []
+
+    def clean_variables_json(self):
+        raw = self.data.get('variables_json', '')
+        return self._parse_variables(raw)
+
+    def clean_expresion(self):
+        from configuracion.utils.safe_eval import safe_eval
+        expresion = self.cleaned_data.get('expresion', '').strip()
+        if not expresion:
+            raise forms.ValidationError('La expresión es obligatoria.')
+        # Construir variables dummy a partir del campo crudo (aún no limpiado)
+        nombres = self._parse_variables(self.data.get('variables_json', ''))
+        dummy_vars = {n: 1 for n in nombres if n}
+        try:
+            safe_eval(expresion, dummy_vars)
+        except ValueError as e:
+            raise forms.ValidationError(f'Expresión inválida: {e}')
+        except NameError:
+            # Variables referenciadas no están en dummy → no es error de sintaxis
+            pass
+        except Exception:
+            pass
+        return expresion
 
 
 class OfertasReglasForm(forms.Form):
