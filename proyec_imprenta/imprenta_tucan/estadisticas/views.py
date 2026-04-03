@@ -354,18 +354,18 @@ def api_estadistica_proveedores(request):
 
 def api_estadistica_compras(request):
     desde, hasta = _get_date_range(request)
-    from pedidos.models import OrdenCompra
+    from compras.models import OrdenCompra
     qs = OrdenCompra.objects.all()
-    if desde: qs = qs.filter(fecha_creacion__date__gte=desde)
-    if hasta: qs = qs.filter(fecha_creacion__date__lte=hasta)
-    cantidades = [float(v) for v in qs.values_list("cantidad", flat=True) if v is not None]
-    por_estado = list(qs.values("estado").annotate(n=Count("id")).order_by("-n"))
+    if desde: qs = qs.filter(fecha_creacion__gte=desde)
+    if hasta: qs = qs.filter(fecha_creacion__lte=hasta)
+    montos = [float(v) for v in qs.values_list("monto_total", flat=True) if v is not None]
+    por_estado = list(qs.values("estado__nombre").annotate(n=Count("id")).order_by("-n"))
     por_prov = list(qs.values("proveedor__nombre").annotate(n=Count("id")).order_by("-n")[:10])
     por_mes = list(qs.annotate(mes=TruncMonth("fecha_creacion")).values("mes").annotate(n=Count("id")).order_by("mes"))
     return JsonResponse({
-        "variables": {"cantidad": {"label": "Cantidad por Orden", "stats": _calc_stats(cantidades)}},
+        "variables": {"monto_total": {"label": "Monto Total por Orden ($)", "stats": _calc_stats(montos)}},
         "categoricas": {
-            "por_estado": {"labels": [d["estado"] for d in por_estado], "values": [d["n"] for d in por_estado]},
+            "por_estado": {"labels": [d["estado__nombre"] or "Sin estado" for d in por_estado], "values": [d["n"] for d in por_estado]},
             "por_proveedor": {"labels": [d["proveedor__nombre"] or "Sin proveedor" for d in por_prov], "values": [d["n"] for d in por_prov]},
             "ordenes_por_mes": {"labels": [d["mes"].strftime("%Y-%m") if d["mes"] else "N/A" for d in por_mes], "values": [d["n"] for d in por_mes]},
         }
@@ -499,6 +499,10 @@ def _agregar_graficos_api(story, data, st, ancho=10, alto_hist=2.8, alto_cat=2.8
             if k.startswith("tipo_"):
                 tipos_request[k[5:]] = v
 
+    # Normalizar tipo recibido del frontend al tipo matplotlib
+    def _normalizar_tipo(t):
+        return {"horizontalBar": "barh", "doughnut": "pie", "line": "line", "scatter": "bar"}.get(t, t)
+
     # Histogramas de variables numericas
     for idx_h, (key, vdata) in enumerate(variables.items()):
         if not vdata or not vdata.get("stats"): continue
@@ -506,16 +510,25 @@ def _agregar_graficos_api(story, data, st, ancho=10, alto_hist=2.8, alto_cat=2.8
         bins = stats.get("histograma", [])
         if not bins: continue
         label = vdata.get("label", key)
-        tipo_hist = tipos_request.get(f"hist_{idx_h}", tipos_request.get("tipo_global", tipo_global))
+        tipo_hist = _normalizar_tipo(
+            tipos_request.get(f"hist_{idx_h}", tipos_request.get("tipo_global", tipo_global))
+        )
         story.append(Paragraph(f"Histograma: {label}", st["seccion"]))
-        if tipo_hist in ("pie", "doughnut"):
-            hist_labels = [b["label"] for b in bins]
-            hist_vals = [b["count"] for b in bins]
-            buf = _grafico_categorico(hist_labels, hist_vals, f"Distribucion de {label}", tipo="pie")
-            story.append(_img_flowable(buf, ancho, alto_hist + 2))
-        else:
-            buf = _grafico_histograma(bins, f"Distribucion de {label}")
-            story.append(_img_flowable(buf, ancho, alto_hist))
+        hist_labels = [b["label"] for b in bins]
+        hist_vals   = [b["count"] for b in bins]
+        if tipo_hist == "pie":
+            h = alto_hist + 2
+            buf = _grafico_categorico(hist_labels, hist_vals, f"Distribucion de {label}",
+                                      tipo="pie", ancho=ancho / 2.54, alto=h / 2.54)
+        elif tipo_hist in ("barh", "line"):
+            h = alto_hist
+            buf = _grafico_categorico(hist_labels, hist_vals, f"Distribucion de {label}",
+                                      tipo=tipo_hist, ancho=ancho / 2.54, alto=h / 2.54)
+        else:  # bar (default)
+            h = alto_hist
+            buf = _grafico_histograma(bins, f"Distribucion de {label}",
+                                      ancho=ancho / 2.54, alto=h / 2.54)
+        story.append(_img_flowable(buf, ancho, h))
         story.append(Spacer(1, 0.3*cm))
 
     # Graficos categoricos
@@ -525,14 +538,13 @@ def _agregar_graficos_api(story, data, st, ancho=10, alto_hist=2.8, alto_cat=2.8
         values = cdata.get("values", [])
         if not labels or not values: continue
         titulo = key.replace("_", " ").title()
-        # Usar tipo del request si existe, sino tipo por defecto
-        tipo = tipos_request.get(f"cat_{idx_c}", tipos_request.get("tipo_global", tipo_global))
-        # Normalizar tipos de Chart.js a matplotlib
-        tipo_map = {"horizontalBar": "barh", "doughnut": "pie", "line": "line", "scatter": "bar"}
-        tipo = tipo_map.get(tipo, tipo)
+        tipo = _normalizar_tipo(
+            tipos_request.get(f"cat_{idx_c}", tipos_request.get("tipo_global", tipo_global))
+        )
+        h = alto_cat + 2 if tipo == "pie" else alto_cat
         story.append(Paragraph(f"Grafico: {titulo}", st["seccion"]))
-        buf = _grafico_categorico(labels, values, titulo, tipo=tipo)
-        h = alto_cat + 1 if tipo == "pie" else alto_cat
+        buf = _grafico_categorico(labels, values, titulo, tipo=tipo,
+                                  ancho=ancho / 2.54, alto=h / 2.54)
         story.append(_img_flowable(buf, ancho, h))
         story.append(Spacer(1, 0.3*cm))
 
@@ -858,7 +870,7 @@ def informe_pdf_pedidos(request):
         )]
     )
     try:
-        _doc_count.build(_copy.copy(story))
+        _doc_count.build(_copy.deepcopy(story))
         _buf_count.seek(0)
         from pypdf import PdfReader as _PRI
         _total_pages[0] = len(_PRI(_buf_count).pages)
@@ -930,7 +942,7 @@ def informe_pdf_clientes(request):
         )]
     )
     try:
-        _doc_count.build(_copy.copy(story))
+        _doc_count.build(_copy.deepcopy(story))
         _buf_count.seek(0)
         from pypdf import PdfReader as _PRI
         _total_pages[0] = len(_PRI(_buf_count).pages)
@@ -991,7 +1003,7 @@ def informe_pdf_productos(request):
         )]
     )
     try:
-        _doc_count.build(_copy.copy(story))
+        _doc_count.build(_copy.deepcopy(story))
         _buf_count.seek(0)
         from pypdf import PdfReader as _PRI
         _total_pages[0] = len(_PRI(_buf_count).pages)
@@ -1051,7 +1063,7 @@ def informe_pdf_proveedores(request):
         )]
     )
     try:
-        _doc_count.build(_copy.copy(story))
+        _doc_count.build(_copy.deepcopy(story))
         _buf_count.seek(0)
         from pypdf import PdfReader as _PRI
         _total_pages[0] = len(_PRI(_buf_count).pages)
@@ -1112,7 +1124,7 @@ def informe_pdf_insumos(request):
         )]
     )
     try:
-        _doc_count.build(_copy.copy(story))
+        _doc_count.build(_copy.deepcopy(story))
         _buf_count.seek(0)
         from pypdf import PdfReader as _PRI
         _total_pages[0] = len(_PRI(_buf_count).pages)
@@ -1186,7 +1198,7 @@ def informe_pdf_compras(request):
         )]
     )
     try:
-        _doc_count.build(_copy.copy(story))
+        _doc_count.build(_copy.deepcopy(story))
         _buf_count.seek(0)
         from pypdf import PdfReader as _PRI
         _total_pages[0] = len(_PRI(_buf_count).pages)
@@ -1195,3 +1207,104 @@ def informe_pdf_compras(request):
     # Segunda pasada: PDF final con total conocido
     doc.build(story)
     return _pdf_response(buffer, "informe_compras", request)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# INFORME 7: PRESUPUESTOS
+# ═══════════════════════════════════════════════════════════════════════════════
+@login_required
+def informe_pdf_presupuestos(request):
+    from estadisticas.views import api_estadistica_presupuestos
+    from reportlab.platypus import Paragraph, Table
+    from django.utils.dateparse import parse_date
+    desde = parse_date(request.GET.get("desde", "") or "")
+    hasta = parse_date(request.GET.get("hasta", "") or "")
+    usuario = str(request.user) if request.user.is_authenticated else "Sistema"
+    buffer, doc, st, cw, _total_pages = _pdf_setup("Informe de Presupuestos", request)
+    story = []
+    hdr, hr = _pdf_header(st, "Informe de Presupuestos", _periodo_str(desde, hasta), usuario)
+    story += [hdr, hr]
+
+    # KPIs de presupuestos
+    story.append(Paragraph("Resumen de Presupuestos", st["seccion"]))
+    pqs = Presupuesto.objects.all()
+    if desde: pqs = pqs.filter(fecha__gte=desde)
+    if hasta: pqs = pqs.filter(fecha__lte=hasta)
+    total_pres = pqs.count()
+    aceptados = pqs.filter(respuesta_cliente="aceptado").count()
+    rechazados = pqs.filter(respuesta_cliente="rechazado").count()
+    pendientes = total_pres - aceptados - rechazados
+    from django.db.models import Avg
+    monto_prom = pqs.aggregate(p=Avg("total"))["p"] or 0
+    rows = [
+        [Paragraph("<b>Indicador</b>", st["bold"]), Paragraph("<b>Valor</b>", st["bold"])],
+        [Paragraph("Total presupuestos", st["normal"]), Paragraph(f"<b>{total_pres}</b>", st["bold"])],
+        [Paragraph("Aceptados", st["normal"]), Paragraph(f"<b>{aceptados}</b>", st["bold"])],
+        [Paragraph("Rechazados", st["normal"]), Paragraph(f"<b>{rechazados}</b>", st["bold"])],
+        [Paragraph("Pendientes", st["normal"]), Paragraph(f"<b>{pendientes}</b>", st["bold"])],
+        [Paragraph("Monto promedio", st["normal"]), Paragraph(f"<b>${monto_prom:,.2f}</b>", st["bold"])],
+    ]
+    t = Table(rows, colWidths=[cw * 0.6, cw * 0.4])
+    t.setStyle(_tbl_style(st))
+    story.append(t)
+
+    # Listado de presupuestos
+    story.append(Paragraph("Listado de Presupuestos", st["seccion"]))
+    presupuestos = pqs.select_related("cliente").order_by("-fecha")[:50]
+    rows2 = [[
+        Paragraph("<b>N°</b>", st["bold"]),
+        Paragraph("<b>Cliente</b>", st["bold"]),
+        Paragraph("<b>Fecha</b>", st["bold"]),
+        Paragraph("<b>Total ($)</b>", st["bold"]),
+        Paragraph("<b>Estado</b>", st["bold"]),
+        Paragraph("<b>Respuesta</b>", st["bold"]),
+    ]]
+    for p in presupuestos:
+        cliente_str = str(p.cliente) if p.cliente else "-"
+        rows2.append([
+            Paragraph(str(p.pk), st["normal"]),
+            Paragraph(cliente_str[:30], st["normal"]),
+            Paragraph(str(p.fecha) if p.fecha else "-", st["normal"]),
+            Paragraph(f"${float(p.total or 0):,.2f}", st["normal"]),
+            Paragraph(str(p.estado or "-"), st["normal"]),
+            Paragraph(str(p.respuesta_cliente or "-"), st["normal"]),
+        ])
+    t2 = Table(rows2, colWidths=[cw * 0.07, cw * 0.28, cw * 0.15, cw * 0.17, cw * 0.17, cw * 0.16])
+    t2.setStyle(_tbl_style(st))
+    story.append(t2)
+
+    # Gráficos
+    _data_api = _get_api_data(api_estadistica_presupuestos, desde, hasta)
+    _agregar_graficos_api(story, _data_api, st, request=request)
+
+    hr2, firma_items = _pdf_firma(st, usuario)
+    story.append(hr2)
+    story.extend(firma_items)
+
+    # Primera pasada: contar páginas
+    import copy as _copy
+    from io import BytesIO as _BytesIO7
+    _buf_count = _BytesIO7()
+    _doc_count = __import__('reportlab.platypus', fromlist=['BaseDocTemplate']).BaseDocTemplate(
+        _buf_count, pagesize=__import__('reportlab.lib.pagesizes', fromlist=['A4']).A4,
+        pageTemplates=[__import__('reportlab.platypus', fromlist=['PageTemplate']).PageTemplate(
+            id='cnt',
+            frames=[__import__('reportlab.platypus', fromlist=['Frame']).Frame(
+                2 * st['cm'], 1.5 * st['cm'],
+                st['cw'], 25 * st['cm'],
+                leftPadding=0, rightPadding=0, topPadding=0, bottomPadding=0
+            )],
+            onPage=lambda c, d: None
+        )]
+    )
+    try:
+        _doc_count.build(_copy.deepcopy(story))
+        _buf_count.seek(0)
+        from pypdf import PdfReader as _PRI
+        _total_pages[0] = len(_PRI(_buf_count).pages)
+    except Exception:
+        _total_pages[0] = 1
+
+    # Segunda pasada: PDF final con total conocido
+    doc.build(story)
+    return _pdf_response(buffer, "informe_presupuestos", request)

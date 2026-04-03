@@ -1,4 +1,4 @@
-# Detectar entorno de test
+# Detectar entorno de test  # reload: 2026-04-03
 import sys
 TESTING = 'test' in sys.argv
 

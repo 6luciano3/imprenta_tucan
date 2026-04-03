@@ -9,6 +9,7 @@ from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
+from django.db import transaction
 from django.db.models import OuterRef, Subquery, F, Count, Case, When, Value, IntegerField
 from django.template.loader import render_to_string
 from django.utils import timezone
@@ -73,38 +74,52 @@ def _crear_pedido_desde_oferta(oferta):
         except Exception as e:
             logger.warning(f"_crear_pedido_desde_oferta: no se pudo obtener combo para cliente {cliente.pk}: {e}")
 
-        # Marcar oferta como 'aplicada' ANTES de crear el Pedido
-        # para que Pedido.save() no intente aplicar el descuento de nuevo
-        oferta.estado = 'aplicada'
-        params_actualizados = dict(parametros)
-        params_actualizados['generado_pedido_auto'] = True
-        oferta.parametros = params_actualizados
-        oferta.save(update_fields=['estado', 'parametros'])
+        # Validar stock antes de comprometer el pedido
+        if lineas_data:
+            from pedidos.utils import verificar_insumos_para_lineas
+            lineas_para_verificar = [(cop.producto, cop.cantidad) for cop in lineas_data]
+            stock_ok, faltantes = verificar_insumos_para_lineas(lineas_para_verificar)
+            if not stock_ok:
+                nombres_faltantes = ', '.join(str(k) for k in faltantes.keys()) if faltantes else 'insumos desconocidos'
+                logger.warning(
+                    f"_crear_pedido_desde_oferta: stock insuficiente para oferta {oferta.id} "
+                    f"(cliente {cliente.pk}). Faltantes: {nombres_faltantes}"
+                )
+                return None
 
-        estado_pedido, _ = EstadoPedido.objects.get_or_create(nombre='pendiente')
-        fecha_entrega = timezone.now().date() + timedelta(days=7)
+        # Marcar oferta como 'aplicada' y crear el Pedido en una sola transacción.
+        # Si cualquier paso falla, ambos cambios se revierten automáticamente.
+        with transaction.atomic():
+            oferta.estado = 'aplicada'
+            params_actualizados = dict(parametros)
+            params_actualizados['generado_pedido_auto'] = True
+            oferta.parametros = params_actualizados
+            oferta.save(update_fields=['estado', 'parametros'])
 
-        pedido = Pedido.objects.create(
-            cliente=cliente,
-            fecha_entrega=fecha_entrega,
-            monto_total=monto_final,
-            estado=estado_pedido,
-            descuento=descuento_pct,
-        )
+            estado_pedido, _ = EstadoPedido.objects.get_or_create(nombre='pendiente')
+            fecha_entrega = timezone.now().date() + timedelta(days=7)
 
-        for cop in lineas_data:
-            LineaPedido.objects.create(
-                pedido=pedido,
-                producto=cop.producto,
-                cantidad=cop.cantidad,
-                precio_unitario=Decimal(str(cop.producto.precioUnitario or 0)),
-                especificaciones=cop.producto.nombreProducto,
+            pedido = Pedido.objects.create(
+                cliente=cliente,
+                fecha_entrega=fecha_entrega,
+                monto_total=monto_final,
+                estado=estado_pedido,
+                descuento=descuento_pct,
             )
 
-        # Guardar id del pedido creado en los parámetros de la oferta
-        params_actualizados['aplicada_pedido_id'] = pedido.pk
-        oferta.parametros = params_actualizados
-        oferta.save(update_fields=['parametros'])
+            for cop in lineas_data:
+                LineaPedido.objects.create(
+                    pedido=pedido,
+                    producto=cop.producto,
+                    cantidad=cop.cantidad,
+                    precio_unitario=Decimal(str(cop.producto.precioUnitario or 0)),
+                    especificaciones=cop.producto.nombreProducto,
+                )
+
+            # Guardar id del pedido creado en los parámetros de la oferta
+            params_actualizados['aplicada_pedido_id'] = pedido.pk
+            oferta.parametros = params_actualizados
+            oferta.save(update_fields=['parametros'])
         # Log de pedido creado automaticamente
         try:
             from .models import AutomationLog
@@ -124,17 +139,27 @@ def _crear_pedido_desde_oferta(oferta):
 def aceptar_oferta_token(request, token):
     oferta = get_object_or_404(OfertaPropuesta, token_email=token)
 
-    # Bloquear si la oferta ya venció
+    # Mostrar página informativa si ya venció (sin bloquear fila aún)
     if oferta.esta_vencida or oferta.estado == 'vencida':
         return render(request, 'automatizacion/oferta_individual.html', {
             'oferta': oferta,
             'error': 'Esta oferta ha vencido y ya no puede ser aceptada.',
         })
 
-    if request.method in ('GET', 'POST') and oferta.estado not in ('aceptada', 'aplicada', 'aceptada_sin_stock'):
-        oferta.estado = 'aceptada'
-        oferta.fecha_validacion = timezone.now()
-        oferta.save()
+    if request.method == 'POST' and oferta.estado not in ('aceptada', 'aplicada', 'aceptada_sin_stock'):
+        with transaction.atomic():
+            # Re-verificar estado y expiración con bloqueo de fila
+            oferta = OfertaPropuesta.objects.select_for_update().get(token_email=token)
+            if oferta.esta_vencida or oferta.estado == 'vencida':
+                return render(request, 'automatizacion/oferta_individual.html', {
+                    'oferta': oferta,
+                    'error': 'Esta oferta ha vencido y ya no puede ser aceptada.',
+                })
+            if oferta.estado in ('aceptada', 'aplicada', 'aceptada_sin_stock'):
+                return render(request, 'automatizacion/oferta_individual.html', {'oferta': oferta})
+            oferta.estado = 'aceptada'
+            oferta.fecha_validacion = timezone.now()
+            oferta.save()
         AccionCliente.objects.create(
             cliente=oferta.cliente,
             oferta=oferta,
@@ -211,10 +236,20 @@ def rechazar_oferta_token(request, token):
     oferta = get_object_or_404(OfertaPropuesta, token_email=token)
     if oferta.esta_vencida or oferta.estado == 'vencida':
         return render(request, 'automatizacion/oferta_individual.html', {'oferta': oferta, 'error': 'Esta oferta ha vencido y ya no puede ser rechazada.'})
-    if request.method in ('GET', 'POST') and oferta.estado != 'rechazada':
-        oferta.estado = 'rechazada'
-        oferta.fecha_validacion = timezone.now()
-        oferta.save()
+    if request.method == 'POST' and oferta.estado != 'rechazada':
+        with transaction.atomic():
+            # Re-verificar estado y expiración con bloqueo de fila
+            oferta = OfertaPropuesta.objects.select_for_update().get(token_email=token)
+            if oferta.esta_vencida or oferta.estado == 'vencida':
+                return render(request, 'automatizacion/oferta_individual.html', {
+                    'oferta': oferta,
+                    'error': 'Esta oferta ha vencido y ya no puede ser rechazada.',
+                })
+            if oferta.estado == 'rechazada':
+                return render(request, 'automatizacion/oferta_individual.html', {'oferta': oferta})
+            oferta.estado = 'rechazada'
+            oferta.fecha_validacion = timezone.now()
+            oferta.save()
         AccionCliente.objects.create(
             cliente=oferta.cliente,
             oferta=oferta,
@@ -795,13 +830,17 @@ def mis_ofertas_cliente(request):
 
 @login_required
 def confirmar_oferta_cliente(request, oferta_id):
-    oferta = get_object_or_404(OfertaPropuesta, pk=oferta_id)
-    # Solo permitir si corresponde al cliente del usuario
-    if oferta.cliente.email != request.user.email:
-        return redirect('mis_ofertas_cliente')
-    oferta.estado = 'aceptada'
-    oferta.fecha_validacion = timezone.now()
-    oferta.save()
+    with transaction.atomic():
+        oferta = OfertaPropuesta.objects.select_for_update().get(pk=oferta_id)
+        # Solo permitir si corresponde al cliente del usuario
+        if oferta.cliente.email != request.user.email:
+            return redirect('mis_ofertas_cliente')
+        if oferta.esta_vencida or oferta.estado in ('aceptada', 'aplicada', 'aceptada_sin_stock', 'vencida'):
+            messages.error(request, 'Esta oferta ya no puede ser aceptada.')
+            return redirect('mis_ofertas_cliente')
+        oferta.estado = 'aceptada'
+        oferta.fecha_validacion = timezone.now()
+        oferta.save()
     # Registrar acción del cliente
     try:
         from .models import AccionCliente
@@ -855,12 +894,15 @@ def confirmar_oferta_cliente(request, oferta_id):
 
 @login_required
 def rechazar_oferta_cliente(request, oferta_id):
-    oferta = get_object_or_404(OfertaPropuesta, pk=oferta_id)
-    if oferta.cliente.email != request.user.email:
-        return redirect('mis_ofertas_cliente')
-    oferta.estado = 'rechazada'
-    oferta.fecha_validacion = timezone.now()
-    oferta.save()
+    with transaction.atomic():
+        oferta = OfertaPropuesta.objects.select_for_update().get(pk=oferta_id)
+        if oferta.cliente.email != request.user.email:
+            return redirect('mis_ofertas_cliente')
+        if oferta.estado == 'rechazada':
+            return redirect('mis_ofertas_cliente')
+        oferta.estado = 'rechazada'
+        oferta.fecha_validacion = timezone.now()
+        oferta.save()
     # Registrar acción del cliente
     try:
         from .models import AccionCliente
