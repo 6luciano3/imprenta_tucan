@@ -36,7 +36,7 @@ def lista_productos(request):
 
     valid_order_fields = [
         'idProducto', 'nombreProducto', 'precioUnitario',
-        'categoriaProducto__nombreCategoria', 'tipoProducto__nombreTipoProducto', 'unidadMedida__nombreUnidad',
+        'categoriaProducto__nombreCategoria', 'tipoProducto__nombreTipoProducto', 'unidadMedida__nombre',
     ]
     if order_by not in valid_order_fields:
         order_by = 'idProducto'
@@ -53,7 +53,7 @@ def lista_productos(request):
                 Q(descripcion__icontains=query) |
                 Q(categoriaProducto__nombreCategoria__icontains=query) |
                 Q(tipoProducto__nombreTipoProducto__icontains=query) |
-                Q(unidadMedida__nombreUnidad__icontains=query)
+                Q(unidadMedida__nombre__icontains=query)
             )
         else:
             qs = qs.filter(
@@ -61,7 +61,7 @@ def lista_productos(request):
                 Q(descripcion__icontains=query) |
                 Q(categoriaProducto__nombreCategoria__icontains=query) |
                 Q(tipoProducto__nombreTipoProducto__icontains=query) |
-                Q(unidadMedida__nombreUnidad__icontains=query)
+                Q(unidadMedida__nombre__icontains=query)
             )
 
     order_field = f'-{order_by}' if direction == 'desc' else order_by

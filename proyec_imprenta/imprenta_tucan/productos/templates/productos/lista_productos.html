@@ -20,7 +20,7 @@
   <option value="precioUnitario" {% if order_by == 'precioUnitario' %}selected{% endif %}>Precio</option>
   <option value="categoriaProducto__nombreCategoria" {% if order_by == 'categoriaProducto__nombreCategoria' %}selected{% endif %}>Categoría</option>
   <option value="tipoProducto__nombreTipoProducto" {% if order_by == 'tipoProducto__nombreTipoProducto' %}selected{% endif %}>Tipo</option>
-  <option value="unidadMedida__nombreUnidad" {% if order_by == 'unidadMedida__nombreUnidad' %}selected{% endif %}>Unidad</option>
+  <option value="unidadMedida__nombre" {% if order_by == 'unidadMedida__nombre' %}selected{% endif %}>Unidad</option>
 {% endblock %}
 
 {% block list_content %}

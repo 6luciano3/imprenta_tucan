@@ -1,7 +1,28 @@
 import logging
-logger = logging.getLogger(__name__)
+import json
+from collections import defaultdict
+from urllib.parse import urlencode
 
+from django.shortcuts import render, redirect, get_object_or_404
+from django.http import JsonResponse, HttpResponse
+from django.contrib import messages
+from django.contrib.auth import get_user_model
+from django.contrib.auth.decorators import login_required
+from django.core.paginator import Paginator
+from django.db.models import OuterRef, Subquery, F, Count, Case, When, Value, IntegerField
+from django.template.loader import render_to_string
+from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_POST
+from django import forms
+from django.conf import settings
+
+from clientes.models import Cliente
+from .models import OrdenSugerida, OfertaAutomatica, RankingCliente, RankingHistorico, OfertaPropuesta, AccionCliente
+from .services import enviar_oferta_email
+from configuracion.models import Parametro
+
+logger = logging.getLogger(__name__)
 
 # --- Helper: retroalimentación del ranking — delega a ClienteInteligenteEngine.retroalimentar() ---
 def _ajustar_score_por_feedback(cliente, accion):
@@ -223,11 +244,6 @@ def ver_oferta_token(request, token):
     if oferta.esta_vencida or oferta.estado == 'vencida':
         return render(request, 'automatizacion/oferta_individual.html', {'oferta': oferta, 'error': 'Esta oferta ha vencido.'})
     return render(request, 'automatizacion/oferta_individual.html', {'oferta': oferta})
-from django.views.decorators.http import require_POST
-from django.contrib.auth.decorators import login_required
-
-# ...existing code...
-
 @login_required
 @require_POST
 def crear_propuesta_para_insumo(request):
@@ -252,6 +268,7 @@ def crear_propuesta_para_insumo(request):
     messages.success(request, f'Propuesta creada para {insumo.nombre}. Completa los datos desde la edición.')
     return redirect('compras_propuestas')
 
+@login_required
 @require_POST
 def actualizar_titulo_oferta(request):
     """Endpoint AJAX para actualizar el título de una oferta."""
@@ -267,11 +284,6 @@ def actualizar_titulo_oferta(request):
     except Exception as e:
         return JsonResponse({'ok': False, 'error': str(e)})
 
-from django.template.loader import render_to_string
-from django.conf import settings
-# --- Importaciones necesarias ---
-from django.views.decorators.csrf import csrf_exempt
-from django.http import HttpResponse
 # --- Tracking pixel para registrar "leído" ---
 @csrf_exempt
 def pixel_leido(request):
@@ -305,21 +317,7 @@ def pixel_leido(request):
     # 1x1 GIF transparente
     gif = b'GIF89a\x01\x00\x01\x00\x80\x00\x00\x00\x00\x00\xff\xff\xff!\xf9\x04\x01\x00\x00\x00\x00,\x00\x00\x00\x00\x01\x00\x01\x00\x00\x02\x02D\x01\x00;'
     return HttpResponse(gif, content_type='image/gif')
-from django.views.decorators.csrf import csrf_exempt
-from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib import messages
-from django.core.paginator import Paginator
-from django.db.models import OuterRef, Subquery, F, Count, Case, When, Value, IntegerField
-from clientes.models import Cliente
-from django.http import JsonResponse
-from .models import OrdenSugerida, OfertaAutomatica, RankingCliente, RankingHistorico, OfertaPropuesta, AccionCliente
-from django.utils import timezone
-from django.contrib.auth.decorators import login_required
-from django.contrib.auth import get_user_model
-from django import forms
-from .services import enviar_oferta_email
-
-
+@login_required
 def panel(request):
     from pedidos.models import OrdenCompra
     ordenes_sugeridas = OrdenSugerida.objects.select_related('pedido', 'insumo').order_by('-generada')[:10]
@@ -397,6 +395,7 @@ def ejecutar_cotizacion(request):
         return JsonResponse({'ok': False, 'error': str(e)})
 
 
+@login_required
 def lista_ordenes(request):
     # Si no hay órdenes sugeridas, generar algunas entradas de demostración automáticamente
     if not OrdenSugerida.objects.exists():
@@ -418,6 +417,7 @@ def lista_ordenes(request):
     return render(request, 'automatizacion/ordenes.html', {'ordenes': ordenes})
 
 
+@login_required
 def lista_ofertas(request):
     qs = OfertaAutomatica.objects.select_related('cliente').order_by('-generada')
     try:
@@ -431,6 +431,7 @@ def lista_ofertas(request):
     return render(request, 'automatizacion/ofertas.html', {'ofertas': ofertas})
 
 
+@login_required
 def lista_ranking_clientes(request):
     """Listado de Ranking de Clientes con métricas del período actual."""
     # Determinar período actual (mensual por defecto)
@@ -950,9 +951,10 @@ def accion_callback(request):
 
 
 @login_required
+@require_POST
 def generar_demo(request):
     """Genera datos de demo para órdenes sugeridas y ofertas automáticas."""
-    if request.method not in ('POST', 'GET'):
+    if request.method != 'POST':
         return JsonResponse({'error': 'Método no permitido'}, status=405)
 
     created = {'ordenes': 0, 'ofertas': 0}
@@ -1100,12 +1102,7 @@ def _ensure_demo_ordenes():
         )
 
 
-# Logs de Automatización removidos del panel y rutas
-
-
 # --- Automatización de presupuestos con criterios ponderados (Admin) ---
-from django.views.decorators.http import require_POST
-
 
 @login_required
 def compras_propuestas_admin(request):
@@ -1198,11 +1195,8 @@ def consultar_stock_propuesta(request, propuesta_id):
     return redirect('compras_propuestas')
 
 
-from django.template.loader import render_to_string
-from django.conf import settings
 @login_required
 @require_POST
-
 def aceptar_compra_propuesta(request, propuesta_id):
     from automatizacion.models import CompraPropuesta
     propuesta = get_object_or_404(CompraPropuesta, pk=propuesta_id)
@@ -1453,6 +1447,7 @@ def generar_ofertas_ahora(request):
 
 
 @login_required
+@require_POST
 def reenviar_ofertas_todas(request):
     """
     Proceso Inteligente Automático: Aprueba y envía TODAS las ofertas existentes a sus clientes.

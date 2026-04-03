@@ -1,6 +1,5 @@
-from django.shortcuts import redirect, get_object_or_404
+from django.shortcuts import render, redirect, get_object_or_404
 from .models import AuditEntry
-from django.shortcuts import render
 from django.contrib import messages
 from django.core.paginator import Paginator
 from django.http import HttpResponse
@@ -40,11 +39,7 @@ def _filtrar_auditorias(request):
         qs = qs.filter(app_label__icontains=app)
     if modelo:
         qs = qs.filter(model__icontains=modelo)
-    # Filtro adicional por evento desde GET directo
-    accion_directa = request.GET.get('action', '').strip()
-    if accion_directa:
-        qs = qs.filter(action=accion_directa)
-    # Filtro adicional por evento desde GET directo
+    # Filtro adicional por acción desde GET directo (tiene precedencia sobre 'evento')
     accion_directa = request.GET.get('action', '').strip()
     if accion_directa:
         qs = qs.filter(action=accion_directa)

@@ -1,6 +1,7 @@
 from django.test import TestCase, Client
 from django.urls import reverse
-from .models import Producto, CategoriaProducto, TipoProducto, UnidadMedida
+from .models import Producto, CategoriaProducto, TipoProducto, UnidadMedida, ProductoInsumo
+from .forms import ProductoForm, ProductoInsumoForm
 from usuarios.models import Usuario
 
 class ProductoListaViewTest(TestCase):
@@ -48,3 +49,122 @@ class ProductoListaViewTest(TestCase):
         productos = response.context['productos'].object_list
         self.assertEqual(productos[0].nombreProducto, "Resma Oficio")
         self.assertEqual(productos[1].nombreProducto, "Resma A4")
+
+
+class ProductoFormCleanNombreTest(TestCase):
+    """Tests para ProductoForm.clean_nombreProducto()."""
+
+    def setUp(self):
+        from insumos.models import Insumo
+        from configuracion.models import Formula
+        self.insumo = Insumo.objects.create(
+            nombre="Papel test", codigo="PT-001", stock=50
+        )
+        self.formula = Formula.objects.create(
+            insumo=self.insumo, codigo="F-TEST", nombre="Fórmula test",
+            expresion="tirada * 1", variables_json=[], version=1, activo=True,
+        )
+        self.producto = Producto.objects.create(
+            nombreProducto="Folleto Existente",
+            precioUnitario=100,
+            formula=self.formula,
+        )
+
+    def _form_data(self, nombre, pk=None):
+        """Construye datos mínimos para ProductoForm."""
+        data = {
+            'nombreProducto': nombre,
+            'precioUnitario': '100.00',
+            'formula': self.formula.pk,
+            'activo': True,
+        }
+        instance = Producto.objects.get(pk=pk) if pk else None
+        return ProductoForm(data=data, instance=instance)
+
+    def test_nombre_unico_ok(self):
+        form = self._form_data("Folleto Nuevo")
+        self.assertTrue(form.is_valid(), form.errors)
+
+    def test_nombre_duplicado_rechazado(self):
+        form = self._form_data("Folleto Existente")
+        self.assertFalse(form.is_valid())
+        self.assertIn('nombreProducto', form.errors)
+
+    def test_nombre_duplicado_case_insensitive(self):
+        form = self._form_data("folleto existente")
+        self.assertFalse(form.is_valid())
+        self.assertIn('nombreProducto', form.errors)
+
+    def test_editar_propio_nombre_permitido(self):
+        """Al editar, el mismo nombre no debe considerarse duplicado."""
+        form = self._form_data("Folleto Existente", pk=self.producto.pk)
+        self.assertTrue(form.is_valid(), form.errors)
+
+    def test_editar_con_nombre_de_otro_rechazado(self):
+        otro = Producto.objects.create(
+            nombreProducto="Afiche",
+            precioUnitario=200,
+            formula=self.formula,
+        )
+        form = self._form_data("Folleto Existente", pk=otro.pk)
+        self.assertFalse(form.is_valid())
+        self.assertIn('nombreProducto', form.errors)
+
+
+class ProductoInsumoFormCleanInsumoTest(TestCase):
+    """Tests para ProductoInsumoForm.clean_insumo() — validación de duplicados en receta."""
+
+    def setUp(self):
+        from insumos.models import Insumo
+        from configuracion.models import Formula
+        self.insumo_a = Insumo.objects.create(
+            nombre="Tinta Cyan", codigo="TK-C", stock=100, tipo='directo'
+        )
+        self.insumo_b = Insumo.objects.create(
+            nombre="Papel Bond", codigo="PB-B", stock=200, tipo='directo'
+        )
+        formula = Formula.objects.create(
+            insumo=self.insumo_a, codigo="F-R", nombre="Formula receta",
+            expresion="tirada * 1", variables_json=[], version=1, activo=True,
+        )
+        self.producto = Producto.objects.create(
+            nombreProducto="Folleto Receta",
+            precioUnitario=150,
+            formula=formula,
+        )
+        # Insumo A ya está en la receta
+        ProductoInsumo.objects.create(
+            producto=self.producto,
+            insumo=self.insumo_a,
+            cantidad_por_unidad=2,
+        )
+
+    def _form(self, insumo, cantidad=1):
+        form = ProductoInsumoForm(
+            data={'insumo': insumo.pk, 'cantidad_por_unidad': str(cantidad), 'es_costo_fijo': False},
+            producto=self.producto,
+        )
+        return form
+
+    def test_insumo_nuevo_permitido(self):
+        form = self._form(self.insumo_b)
+        self.assertTrue(form.is_valid(), form.errors)
+
+    def test_insumo_duplicado_rechazado(self):
+        form = self._form(self.insumo_a)
+        self.assertFalse(form.is_valid())
+        self.assertIn('insumo', form.errors)
+
+    def test_cantidad_cero_rechazada(self):
+        form = self._form(self.insumo_b, cantidad=0)
+        self.assertFalse(form.is_valid())
+        self.assertIn('cantidad_por_unidad', form.errors)
+
+    def test_cantidad_negativa_rechazada(self):
+        form = self._form(self.insumo_b, cantidad=-5)
+        self.assertFalse(form.is_valid())
+        self.assertIn('cantidad_por_unidad', form.errors)
+
+    def test_cantidad_positiva_ok(self):
+        form = self._form(self.insumo_b, cantidad=3)
+        self.assertTrue(form.is_valid(), form.errors)

@@ -2,6 +2,7 @@
 from django.shortcuts import render
 from django.http import HttpResponseBadRequest
 from django.utils import timezone
+from django.contrib.auth.decorators import login_required
 from datetime import timedelta
 from automatizacion.propuestas.models import ComboOferta, ComboOfertaProducto
 from productos.models import Producto
@@ -17,7 +18,6 @@ def _productos_mas_pedidos(cliente, top_n=5, ventana_dias=180):
     )
     frecuencia = {}
     for linea in lineas:
-        pid = linea.producto_id
         pid = linea.producto.idProducto
         if pid not in frecuencia:
             frecuencia[pid] = {'producto': linea.producto, 'veces': 0, 'cantidad_total': 0}
@@ -313,6 +313,7 @@ def _serializar_combo(combo):
         'enviada': combo.enviada, 'fecha_fin': combo.fecha_fin,
     }
 
+@login_required
 def lista_combos_oferta(request):
     is_popup = request.GET.get('popup') == '1'
     cliente_id = request.GET.get('cliente_id')

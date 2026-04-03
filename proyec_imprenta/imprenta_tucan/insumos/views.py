@@ -52,6 +52,7 @@ def enviar_reporte_proyecciones(mensaje):
 
 
 @require_perm('Insumos', 'Listar')
+@login_required
 def lista_insumos(request):
     """Lista de Insumos unificada: búsqueda (q), orden (order_by/direction) y paginación."""
     query = request.GET.get('q', '') or request.GET.get('criterio', '')
@@ -89,6 +90,7 @@ def lista_insumos(request):
 
 
 @require_perm('Insumos', 'Crear', redirect_to='lista_insumos')
+@login_required
 def crear_insumo(request):
     if request.method == 'POST':
         form = InsumoForm(request.POST)
@@ -106,6 +108,7 @@ def crear_insumo(request):
 
 
 @require_perm('Insumos', 'Crear', redirect_to='lista_insumos')
+@login_required
 def alta_insumo(request):
     if request.method == "POST":
         form = AltaInsumoForm(request.POST)
@@ -127,6 +130,7 @@ def alta_insumo(request):
 
 
 @require_perm('Insumos', 'Editar', redirect_to='lista_insumos')
+@login_required
 def editar_insumo(request, pk: int):
     insumo = get_object_or_404(Insumo, idInsumo=pk)
     if request.method == 'POST':
@@ -145,6 +149,7 @@ def editar_insumo(request, pk: int):
 
 
 @require_perm('Insumos', 'Ver', redirect_to='lista_insumos')
+@login_required
 def detalle_insumo(request, pk: int):
     insumo = get_object_or_404(Insumo, idInsumo=pk)
     return render(request, 'insumos/detalle_insumo.html', {
@@ -206,6 +211,7 @@ def confirmarBaja(insumo: Insumo) -> None:
     cambiarEstado(insumo, "Inactivo")
 
 
+@login_required
 def buscar_insumo(request):
     """Vista legacy: redirige a la lista unificada preservando el querystring."""
     params = request.GET.urlencode()
@@ -215,6 +221,7 @@ def buscar_insumo(request):
     return redirect(url)
 
 
+@login_required
 def seleccionar_insumo(request, pk: int):
     criterio = request.GET.get('criterio', '').strip()
     if not criterio:
@@ -246,6 +253,7 @@ def _es_personal_administrativo(user) -> bool:
 
 
 @require_perm('Insumos', 'Editar', redirect_to='lista_insumos')
+@login_required
 def modificar_insumo(request, idInsumo: int):
     """Pantalla para modificar un insumo (Personal Administrativo).
 
@@ -284,6 +292,7 @@ def modificar_insumo(request, idInsumo: int):
 
 
 @require_perm('Insumos', 'Desactivar', redirect_to='lista_insumos')
+@login_required
 def baja_insumo(request, idInsumo: int):
     """Pantalla de confirmación de baja para un insumo (Personal Administrativo).
 
@@ -310,6 +319,7 @@ def baja_insumo(request, idInsumo: int):
 
 
 @require_perm('Insumos', 'Activar', redirect_to='lista_insumos')
+@login_required
 def activar_insumo(request, idInsumo: int):
     """Activar/desactivar insumo (toggle) como en proveedores y clientes."""
     insumo = get_object_or_404(Insumo, pk=idInsumo)
@@ -325,6 +335,7 @@ def activar_insumo(request, idInsumo: int):
 
 
 @require_perm('Insumos', 'Eliminar', redirect_to='lista_insumos')
+@login_required
 def eliminar_insumo(request, idInsumo: int):
     """Eliminar Insumo con confirmación (POST)."""
     insumo = get_object_or_404(Insumo, pk=idInsumo)

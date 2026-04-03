@@ -19,12 +19,10 @@ from .forms import (
     SeleccionarClienteForm,
     ModificarPedidoForm,
 )
-from .models import Pedido, EstadoPedido
-from .models import LineaPedido
+from .models import Pedido, EstadoPedido, LineaPedido
 from .utils import (
     verificar_insumos_disponibles,
     verificar_insumos_para_lineas,
-    descontar_insumos_para_lineas,
     verificar_insumos_para_ajuste,
     ajustar_insumos_por_diferencia,
 )
@@ -152,7 +150,7 @@ def alta_pedido(request):
                     "productos_calculadora": list(
                         Producto.objects.filter(activo=True)
                         .order_by('nombreProducto')
-                        .values('idProducto', 'nombreProducto', 'unidadMedida__abreviatura', 'unidadMedida__nombreUnidad')
+                        .values('idProducto', 'nombreProducto', 'unidadMedida__simbolo', 'unidadMedida__nombre')
                     ),
                     "proximo_numero_pedido": (Pedido.objects.order_by('-id').first().id + 1) if Pedido.objects.exists() else 1,
                     "clientes_data_json": "[]",
@@ -188,9 +186,9 @@ def alta_pedido(request):
             subtotal_con_descuento = subtotal * (1 - descuento / 100)
             total_con_iva = subtotal_con_descuento * iva_multiplier
 
-            # Descontar stock y crear pedidos en una transacción
+            # Crear pedido en una transacción. El stock se descuenta cuando
+            # el estado cambia a "proceso" (vía Pedido.save → reservar_insumos_para_pedido).
             with transaction.atomic():
-                descontar_insumos_para_lineas([(p, c) for (p, c, _e) in lineas])
                 # Crear el pedido cabecera
                 pedido = Pedido.objects.create(
                     cliente=cliente,
@@ -250,7 +248,7 @@ def alta_pedido(request):
     productos_calculadora = list(
         Producto.objects.filter(activo=True)
         .order_by('nombreProducto')
-        .values('idProducto', 'nombreProducto', 'unidadMedida__abreviatura', 'unidadMedida__nombreUnidad')
+        .values('idProducto', 'nombreProducto', 'unidadMedida__simbolo', 'unidadMedida__nombre')
     )
     precios = {p.pk: float(p.precio) for p in Producto.objects.all()}
 
@@ -368,8 +366,6 @@ def verificar_stock_modificar(request, idPedido: int):
     Espera JSON: { "producto": <id>, "cantidad": <int> }
     Responde: { ok: bool, faltantes: [{id, codigo, nombre, faltan}] }
     """
-    from django.shortcuts import get_object_or_404
-
     try:
         body = json.loads(request.body.decode("utf-8"))
     except Exception:
@@ -437,11 +433,8 @@ def buscar_pedido(request):
 @login_required
 @requiere_permiso("Pedidos")
 def detalle_pedido(request, pk: int):
-    from django.shortcuts import get_object_or_404
-
     pedido = get_object_or_404(Pedido.objects.select_related("cliente", "estado"), pk=pk)
     lineas_qs = pedido.lineas.select_related("producto").all()
-    from decimal import Decimal
     lineas = []
     subtotal = Decimal("0")
     for l in lineas_qs:
@@ -487,9 +480,6 @@ def modificar_pedido(request, idPedido: int):
     - Recalcula monto_total (precio x cantidad) y guarda.
     - Muestra mensajes de éxito o error.
     """
-    from django.shortcuts import get_object_or_404
-    from .models import LineaPedido
-
     pedido = get_object_or_404(Pedido.objects.select_related("cliente", "estado"), pk=idPedido)
     lineas_actuales = list(pedido.lineas.select_related('producto').all())
 
@@ -539,7 +529,6 @@ def modificar_pedido(request, idPedido: int):
                 return redirect(request.path)
 
             # Calcular monto_total aplicando descuento e IVA igual que en alta_pedido
-            from decimal import Decimal
             subtotal = Decimal("0")
             for f in formset.cleaned_data:
                 if f and not f.get('DELETE', False):
@@ -607,10 +596,8 @@ def modificar_pedido(request, idPedido: int):
             "fecha_entrega": fecha_entrega_default,
         })
 
-    import json as _json
-    from decimal import Decimal as _D
     precios = {p.pk: float(p.precio) for p in Producto.objects.all()}
-    precios_lineas_json = _json.dumps([float(l.precio_unitario) for l in lineas_actuales])
+    precios_lineas_json = json.dumps([float(l.precio_unitario) for l in lineas_actuales])
 
     # Calcular desglose inicial para mostrarlo desde el servidor (sin JS en la carga)
     subtotal_inicial = sum(
@@ -653,8 +640,6 @@ def modificar_pedido(request, idPedido: int):
 @requiere_permiso("Pedidos", "Eliminar")
 def eliminar_pedido(request, idPedido: int):
     """Eliminar Pedido con confirmación (POST). Visible para todos; el servidor valida permisos."""
-    from django.shortcuts import get_object_or_404
-
     pedido = get_object_or_404(Pedido.objects.select_related("cliente", "estado"), pk=idPedido)
     if request.method == "POST":
         if not request.user.is_staff:

@@ -13,8 +13,9 @@ from automatizacion.models import ScoreProveedor
 from .forms import ProveedorForm, RubroForm
 
 
+@login_required
 def index(request):
-    return HttpResponse("Página de ejemplo de la app")
+    return redirect('lista_proveedores')
 
 
 @login_required
@@ -252,7 +253,6 @@ def lista_rubros(request):
     direction = request.GET.get('direction', 'asc')
     qs = Rubro.objects.all()
     if query:
-        from django.db.models import Q
         qs = qs.filter(Q(nombre__icontains=query) | Q(descripcion__icontains=query))
     order_field = f'-{order_by}' if direction == 'desc' else order_by
     qs = qs.order_by(order_field)
@@ -265,7 +265,6 @@ def lista_rubros(request):
     if request.headers.get('x-requested-with') == 'XMLHttpRequest' or request.GET.get('popup') == '1':
         # Solo devolver la tabla para el modal, nunca el dashboard
         html = render_to_string('proveedores/tabla_rubros_modal.html', {'rubros': rubros, 'request': request})
-        from django.http import HttpResponse
         return HttpResponse(html, content_type='text/html')
     # Renderizar solo la tabla si se solicita desde el modal
     if request.GET.get('popup') == '1':
@@ -321,6 +320,7 @@ def eliminar_rubro(request, pk):
     return render(request, 'proveedores/rubro_eliminar_confirm.html', {'rubro': rubro})
 
 
+@login_required
 def buscar_proveedor(request):
     """Vista legacy: redirige a la lista unificada preservando querystring."""
     params = request.GET.urlencode()
