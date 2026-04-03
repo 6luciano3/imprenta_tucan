@@ -1,18 +1,25 @@
-from permisos.decorators import requiere_permiso
-from django.contrib.auth.decorators import login_required
-from django.shortcuts import render, redirect, get_object_or_404
-from django.db.models import Q
-from django.core.paginator import Paginator
+from datetime import timedelta
+
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.core.paginator import Paginator
+from django.db import models
+from django.db.models import Q
+from django.shortcuts import render, redirect, get_object_or_404
+from django.utils import timezone
+
+from automatizacion.models import RespuestaCliente, EmailTracking
+from configuracion.models import Parametro
+from configuracion.services import get_page_size
+from pedidos.models import Pedido
+from permisos.decorators import requiere_permiso
 from .models import Cliente
 from .forms import ClienteForm
-from configuracion.permissions import require_perm
 
 ESTADOS_BLOQUEANTES = ["Pendiente", "En Proceso", "Completado"]
 
 
 # Alta de cliente
-@require_perm("Clientes", "Crear")
 @login_required
 @requiere_permiso("Clientes", "Crear")
 def alta_cliente(request):
@@ -30,7 +37,6 @@ def alta_cliente(request):
 
 
 # Lista de clientes unificada con busqueda y ordenamiento
-@require_perm("Clientes", "Listar")
 @login_required
 @requiere_permiso("Clientes")
 def lista_clientes(request):
@@ -59,7 +65,6 @@ def lista_clientes(request):
     order_field = f"-{order_by}" if direction == "desc" else order_by
     clientes_qs = clientes_qs.order_by(order_field)
 
-    from configuracion.services import get_page_size
     paginator = Paginator(clientes_qs, get_page_size())
     page = request.GET.get("page")
     clientes = paginator.get_page(page)
@@ -73,7 +78,6 @@ def lista_clientes(request):
 
 
 # Detalle de cliente
-@require_perm("Clientes", "Ver")
 @login_required
 @requiere_permiso("Clientes")
 def detalle_cliente(request, id):
@@ -82,7 +86,6 @@ def detalle_cliente(request, id):
 
 
 # Editar cliente
-@require_perm("Clientes", "Editar")
 @login_required
 @requiere_permiso("Clientes", "Editar")
 def editar_cliente(request, id):
@@ -102,7 +105,6 @@ def editar_cliente(request, id):
 
 
 # Eliminar cliente
-@require_perm("Clientes", "Eliminar")
 @login_required
 @requiere_permiso("Clientes", "Eliminar")
 def eliminar_cliente(request, id):
@@ -122,7 +124,6 @@ def eliminar_cliente(request, id):
 
 
 # Activar/desactivar cliente (toggle)
-@require_perm("Clientes", "Activar")
 @login_required
 @requiere_permiso("Clientes")
 def activar_cliente(request, id):
@@ -136,7 +137,6 @@ def activar_cliente(request, id):
 
 
 # Buscar cliente
-@require_perm("Clientes", "Listar")
 @login_required
 @requiere_permiso("Clientes")
 def buscar_cliente(request):
@@ -148,7 +148,6 @@ def buscar_cliente(request):
 
 
 # Confirmar eliminacion de cliente
-@require_perm("Clientes", "Eliminar")
 @login_required
 @requiere_permiso("Clientes")
 def confirmar_eliminacion_cliente(request, id):
@@ -170,15 +169,10 @@ def confirmar_eliminacion_cliente(request, id):
     return render(request, "clientes/confirmar_eliminacion.html", {"cliente": cliente})
 
 
-@require_perm('Clientes', 'Ver')
 @login_required
+@requiere_permiso('Clientes', 'Ver')
 def clientes_inactivos(request):
     """Vista para mostrar clientes inactivos y enviar notificaciones de reactivación."""
-    from django.utils import timezone
-    from datetime import timedelta
-    from pedidos.models import Pedido
-    from configuracion.models import Parametro
-
     dias_inactividad = 90
     try:
         dias_param = Parametro.get('CLIENTE_DIAS_INACTIVIDAD')
@@ -190,12 +184,11 @@ def clientes_inactivos(request):
     fecha_limite = timezone.now().date() - timedelta(days=dias_inactividad)
 
     clientes_activos = Cliente.objects.filter(estado='Activo').values_list('id', flat=True)
-    
+
     clientes_con_pedidos_recientes = Pedido.objects.filter(
         cliente__in=clientes_activos,
         fecha_pedido__gt=fecha_limite
     ).values_list('cliente_id', flat=True).distinct()
-
 
     # Paginación igual que en lista_clientes
     clientes_inactivos_qs = Cliente.objects.filter(
@@ -211,8 +204,6 @@ def clientes_inactivos(request):
         if ultimo_pedido:
             cliente.dias_sin_pedido = (timezone.now().date() - ultimo_pedido.fecha_pedido).days
 
-    # Paginación
-    from configuracion.services import get_page_size
     paginator = Paginator(list(clientes_inactivos_qs), get_page_size())
     page = request.GET.get("page")
     clientes_inactivos = paginator.get_page(page)
@@ -226,11 +217,8 @@ def clientes_inactivos(request):
         except Exception as e:
             mensaje_resultado = f"Error: {str(e)}"
 
-    from automatizacion.models import RespuestaCliente, EmailTracking
-    from django.db import models
-    
     respuestas_recientes = RespuestaCliente.objects.select_related('cliente').order_by('-recibido_en')[:20]
-    
+
     tracking_stats = EmailTracking.objects.filter(tipo='cliente_inactivo').values(
         'estado'
     ).annotate(total=models.Count('id'))

@@ -222,6 +222,7 @@
     </td>
     <td>
       {{ formset.empty_form.cantidad.as_widget }}
+      <div class="invalid-feedback cantidad-error" style="display:none;">La cantidad debe ser entre 0 y 1.000.000.</div>
     </td>
     <td>
       {{ formset.empty_form.especificaciones.as_widget }}
@@ -262,6 +263,13 @@
     // Interceptar el submit para mostrar el modal
     btnSubmit?.addEventListener('click', function(e) {
       e.preventDefault();
+      // Validar cantidades antes de abrir el modal
+      const cantidadesInvalidas = [...tbody.querySelectorAll('tr.linea:not(.tr-hidden)')].some(tr => {
+        const inp = tr.querySelector('.cantidad-input, input[name$="-cantidad"]');
+        const v = parseInt(inp?.value, 10);
+        return !isNaN(v) && (v < 0 || v > 1000000);
+      });
+      if (cantidadesInvalidas) return;
       // Mostrar resumen del cliente
       const clienteSelect = document.getElementById('id_cliente');
       const clienteId = clienteSelect?.value;
@@ -411,7 +419,18 @@
         recalcSubtotal();
         scheduleCheckStock();
       });
-      cantidadInput?.addEventListener('input', () => { recalcRow(tr); recalcSubtotal(); scheduleCheckStock(); });
+      cantidadInput?.addEventListener('input', () => {
+        const v = parseInt(cantidadInput.value, 10);
+        const errorDiv = tr.querySelector('.cantidad-error');
+        if (!isNaN(v) && (v < 0 || v > 1000000)) {
+          cantidadInput.classList.add('is-invalid');
+          if (errorDiv) errorDiv.style.display = 'block';
+        } else {
+          cantidadInput.classList.remove('is-invalid');
+          if (errorDiv) errorDiv.style.display = 'none';
+        }
+        recalcRow(tr); recalcSubtotal(); scheduleCheckStock();
+      });
       btnRemove?.addEventListener('click', () => {
         if (delInput) {
           delInput.checked = true;

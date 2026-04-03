@@ -54,9 +54,9 @@ class LineaPedidoForm(forms.Form):
     )
     cantidad = forms.IntegerField(
         label="Cantidad",
-        min_value=1,
+        min_value=0,
         max_value=1_000_000,
-        widget=forms.NumberInput(attrs={"class": "form-control cantidad-input", "min": "1", "max": "1000000", "required": True}),
+        widget=forms.NumberInput(attrs={"class": "form-control cantidad-input", "min": "0", "max": "1000000", "required": True}),
     )
     especificaciones = forms.CharField(
         label="Especificaciones",
