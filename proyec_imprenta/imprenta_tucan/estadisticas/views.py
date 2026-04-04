@@ -165,7 +165,7 @@ def api_insumos_urgentes(request):
 def api_proyeccion_demanda(request):
     try:
         from insumos.models import ProyeccionInsumo, predecir_demanda_media_movil
-        from pedidos.models import OrdenCompra
+        from compras.models import DetalleOrdenCompra
         from django.db.models.functions import TruncMonth
         from core.motor.config import MotorConfig
         from core.motor.demanda_engine import DemandaInteligenteEngine
@@ -179,9 +179,22 @@ def api_proyeccion_demanda(request):
         engine = DemandaInteligenteEngine()
         proyecciones_bd = {p.insumo_id: p.cantidad_proyectada for p in ProyeccionInsumo.objects.filter(periodo=periodo_actual)}
         hace_6m = hoy - timedelta(days=180)
-        ordenes_por_insumo = {r["insumo_id"]: r["total"] for r in OrdenCompra.objects.filter(fecha_creacion__gte=hace_6m).values("insumo_id").annotate(total=Sum("cantidad"))}
+        # Fuente "ordenes": usa DetalleOrdenCompra para obtener cantidades por insumo
+        detalles_qs = (
+            DetalleOrdenCompra.objects
+            .filter(orden__fecha_creacion__gte=hace_6m)
+            .values("insumo_id")
+            .annotate(total=Sum("cantidad"))
+        )
+        ordenes_por_insumo = {r["insumo_id"]: r["total"] for r in detalles_qs}
         meses_activos = {}
-        for r in OrdenCompra.objects.filter(fecha_creacion__gte=hace_6m).annotate(mes=TruncMonth("fecha_creacion")).values("insumo_id", "mes").distinct():
+        for r in (
+            DetalleOrdenCompra.objects
+            .filter(orden__fecha_creacion__gte=hace_6m)
+            .annotate(mes=TruncMonth("orden__fecha_creacion"))
+            .values("insumo_id", "mes")
+            .distinct()
+        ):
             meses_activos[r["insumo_id"]] = meses_activos.get(r["insumo_id"], 0) + 1
         ord_prom = {iid: total / meses_activos.get(iid, 1) for iid, total in ordenes_por_insumo.items()}
         insumos = (list(Insumo.objects.filter(activo=True, tipo=Insumo.TIPO_DIRECTO, idInsumo__in=proyecciones_bd.keys())) + list(Insumo.objects.filter(activo=True, tipo=Insumo.TIPO_DIRECTO).exclude(idInsumo__in=proyecciones_bd.keys()).order_by("stock")[:n*2]))[:n*3]

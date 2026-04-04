@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(python manage.py check estadisticas)",
-      "Bash(xargs ls:*)"
+      "Bash(xargs ls:*)",
+      "Bash(xargs grep:*)",
+      "Bash(grep -l \"MotorConfig\\\\|DEFAULTS\" \"c:\\\\Users\\\\Public\\\\Documents\\\\facultad\\\\3er Año\\\\Trabajo Final\\\\proyecto_imprenta\\\\proyec_imprenta\\\\imprenta_tucan\"/**/*.py)"
     ]
   }
 }

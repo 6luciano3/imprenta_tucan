@@ -46,8 +46,10 @@ DEFAULTS = {
     'DEMANDA_CAP_FACTOR_STOCK_MIN': 1.5,
 
     # --- Tabla de Proyección Demanda (dashboard) ---
-    'PROYECCION_N_INSUMOS': 8,   # cantidad de insumos a mostrar en la tabla
-    'PROYECCION_MESES': 3,        # ventana de meses para media móvil (fuente 2)
+    'PROYECCION_N_INSUMOS': 8,             # cantidad de insumos a mostrar en la tabla
+    'PROYECCION_MESES': 3,                  # ventana de meses para media móvil (fuente 2)
+    'PROYECCION_MESES_ETS': 12,             # períodos históricos para modelo ETS
+    'TOP_N_PROVEEDORES_COTIZACION': 3,      # proveedores rankeados para SC automática
 
     # --- Temporización / Latencia de Proveedores ---
     # lambda para decaimiento exponencial en cumplimiento/incidencias (por día)

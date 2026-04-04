@@ -13,7 +13,6 @@ class InsumoForm(forms.ModelForm):
             'categoria',
             'tipo',
             'stock',
-            'precio',
             'activo',
         ]
         widgets = {
@@ -21,16 +20,13 @@ class InsumoForm(forms.ModelForm):
             'nombre': forms.TextInput(attrs={'class': 'form-control'}),
             'categoria': forms.TextInput(attrs={'class': 'form-control'}),
             'tipo': forms.Select(attrs={'class': 'form-select'}),
-            # stock widget eliminado - campo excluido del formulario
-            'precio': forms.NumberInput(attrs={'class': 'form-control', 'min': '0', 'max': '1000000', 'step': '0.01'}),
         }
 
 
 class AltaInsumoForm(forms.ModelForm):
     class Meta:
         model = Insumo
-        fields = ["nombre", "codigo", "tipo", "proveedor", "cantidad"]
-        # precio_unitario excluido: solo se modifica desde App Compras
+        fields = ["nombre", "codigo", "tipo", "proveedor", "cantidad", "precio_unitario"]
         widgets = {
             "nombre": forms.TextInput(attrs={"class": "form-control", "required": True, "maxlength": 100}),
             "codigo": forms.TextInput(attrs={"class": "form-control", "required": True, "maxlength": 20}),
@@ -156,18 +152,6 @@ class ModificarInsumoForm(forms.ModelForm):
                 self.initial["proveedor"] = offset.pk
             except Proveedor.DoesNotExist:
                 pass
-
-    def clean_cantidad(self):
-        cantidad = self.cleaned_data.get("cantidad")
-        if cantidad is None or cantidad <= 0:
-            raise forms.ValidationError("La cantidad debe ser un número positivo.")
-        return cantidad
-
-    def clean_precio_unitario(self):
-        precio = self.cleaned_data.get("precio_unitario")
-        if precio is None or precio <= 0:
-            raise forms.ValidationError("El precio unitario debe ser un número positivo.")
-        return precio
 
     def clean_codigo(self):
         """Validar código único permitiendo mantener el del propio insumo."""

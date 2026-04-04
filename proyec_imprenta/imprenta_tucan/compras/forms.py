@@ -102,6 +102,14 @@ class DetalleRemitoForm(forms.Form):
         widget=forms.NumberInput(attrs={"class": "form-control", "min": "1"}),
         label="Cantidad"
     )
+    precio_unitario = forms.DecimalField(
+        min_value=0,
+        decimal_places=2,
+        required=False,
+        initial=0,
+        widget=forms.NumberInput(attrs={"class": "form-control", "min": "0", "step": "0.01", "placeholder": "0.00"}),
+        label="Precio Unitario"
+    )
 
 
 DetalleRemitoFormSet = formset_factory(DetalleRemitoForm, extra=1, min_num=1, validate_min=True)

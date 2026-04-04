@@ -101,7 +101,7 @@ def motor_demanda_config(request):
 @login_required
 @requiere_permiso("Parametrizar el Sistema")
 def proyeccion_demanda_config(request):
-    """Permite editar los parámetros de visualización de la tabla Proyección Demanda."""
+    """Permite editar los parámetros de visualización y ejecución de la Proyección de Demanda."""
     from configuracion.models import Parametro, GrupoParametro
     from core.motor.config import MotorConfig, DEFAULTS
 
@@ -112,12 +112,13 @@ def proyeccion_demanda_config(request):
             'descripcion': 'Número de filas que se muestran en la tabla "Proyección Demanda Insumos" del dashboard.',
             'tipo': Parametro.TIPO_INT,
             'step': '1',
-            'min': '1',
+            'min': '0',
+            'max': '50',
         },
         {
             'clave': 'PROYECCION_MESES',
             'nombre': 'Ventana de meses (media móvil)',
-            'descripcion': 'Cantidad de meses hacia atrás usados para calcular el promedio de consumo real cuando no hay proyección oficial.',
+            'descripcion': 'Cantidad de meses hacia atrás usados para calcular el promedio de consumo real cuando no hay proyección oficial. Aplica tanto al dashboard como a la tarea automática.',
             'tipo': Parametro.TIPO_INT,
             'step': '1',
             'min': '1',
@@ -132,34 +133,58 @@ def proyeccion_demanda_config(request):
             'max': '10',
         },
         {
-            'clave': 'PREDICCION_DIA_SEMANA',
-            'nombre': 'Día de ejecución semanal',
-            'descripcion': 'Día de la semana en que se ejecuta automáticamente la predicción (0=Lunes, 6=Domingo).',
+            'clave': 'PROYECCION_MESES_ETS',
+            'nombre': 'Períodos históricos para método ETS',
+            'descripcion': 'Cantidad de meses de historial usados por el modelo de suavizamiento exponencial (ETS). Más meses = proyección más estable pero más lenta de reaccionar.',
             'tipo': Parametro.TIPO_INT,
             'step': '1',
-            'min': '0',
-            'max': '6',
-        },
-        {
-            'clave': 'PREDICCION_HORA',
-            'nombre': 'Hora de ejecución automática',
-            'descripcion': 'Hora del día (0-23) en que se ejecuta automáticamente la predicción semanal.',
-            'tipo': Parametro.TIPO_INT,
-            'step': '1',
-            'min': '0',
-            'max': '23',
+            'min': '3',
+            'max': '24',
         },
     ]
 
+    # Parámetros informativos (no se pueden cambiar desde aquí — el crontab es fijo en settings)
+    INFO_SCHEDULE = {
+        'crontab_fijo': 'Domingo 06:00 AM (configurado en settings.py)',
+        'tarea': 'automatizacion.tasks.tarea_prediccion_demanda_semanal',
+    }
+
     if request.method == 'POST':
+        # Botón "Ejecutar ahora"
+        if 'ejecutar_ahora' in request.POST:
+            try:
+                from insumos.tasks import generar_proyecciones_insumos
+                generar_proyecciones_insumos.delay()
+                messages.success(request, 'Tarea de proyección enviada a la cola. Los resultados estarán disponibles en unos segundos.')
+            except Exception as e:
+                messages.error(request, f'Error al encolar la tarea: {e}')
+            return redirect(request.path)
+
         grupo, _ = GrupoParametro.objects.get_or_create(
             codigo='PROYECCION_DEMANDA',
             defaults={'nombre': 'Proyección Demanda'},
         )
+        errores = []
         for p in PARAMS:
             raw = request.POST.get(p['clave'], '').strip()
-            if raw:
-                Parametro.set(p['clave'], raw, tipo=p['tipo'], grupo=grupo, nombre=p['nombre'])
+            if not raw:
+                continue
+            # Validar que sea entero válido dentro de rango
+            try:
+                val = int(raw)
+                min_val = int(p.get('min', 0))
+                max_val = int(p.get('max', 9999))
+                if not (min_val <= val <= max_val):
+                    errores.append(f"{p['nombre']}: debe estar entre {min_val} y {max_val}.")
+                    continue
+            except ValueError:
+                errores.append(f"{p['nombre']}: debe ser un número entero.")
+                continue
+            Parametro.set(p['clave'], str(val), tipo=p['tipo'], grupo=grupo, nombre=p['nombre'])
+        if errores:
+            for e in errores:
+                messages.error(request, e)
+            return redirect(request.path)
         return redirect(request.path + '?saved=1')
 
     saved = request.GET.get('saved') == '1'
@@ -167,7 +192,26 @@ def proyeccion_demanda_config(request):
         {**p, 'valor': MotorConfig.get(p['clave']) if MotorConfig.get(p['clave']) is not None else DEFAULTS.get(p['clave'], '')}
         for p in PARAMS
     ]
-    return render(request, 'configuracion/proyeccion_demanda.html', {'params': params, 'saved': saved})
+
+    # Resumen del estado actual de proyecciones
+    from insumos.models import ProyeccionInsumo
+    from django.utils import timezone
+    periodo_actual = timezone.now().strftime('%Y-%m')
+    total_proyecciones = ProyeccionInsumo.objects.filter(periodo=periodo_actual).count()
+    pendientes = ProyeccionInsumo.objects.filter(periodo=periodo_actual, estado='pendiente').count()
+    ultima = ProyeccionInsumo.objects.filter(periodo=periodo_actual).order_by('-fecha_generacion').first()
+
+    return render(request, 'configuracion/proyeccion_demanda.html', {
+        'params': params,
+        'saved': saved,
+        'info_schedule': INFO_SCHEDULE,
+        'estado_proyecciones': {
+            'periodo': periodo_actual,
+            'total': total_proyecciones,
+            'pendientes': pendientes,
+            'ultima_generacion': ultima.fecha_generacion if ultima else None,
+        },
+    })
 
 
 def redirect_configuracion(request):

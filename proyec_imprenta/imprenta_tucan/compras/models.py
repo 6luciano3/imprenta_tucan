@@ -22,7 +22,7 @@ class OrdenCompra(models.Model):
     ]
     
     proveedor = models.ForeignKey(
-        "proveedores.Proveedor", on_delete=models.CASCADE, related_name="ordenes_compra_app"
+        "proveedores.Proveedor", on_delete=models.PROTECT, related_name="ordenes_compra_app"
     )
     estado = models.ForeignKey(
         EstadoCompra, on_delete=models.PROTECT, related_name="ordenes"
@@ -65,7 +65,7 @@ class OrdenCompra(models.Model):
 class DetalleOrdenCompra(models.Model):
     orden = models.ForeignKey(OrdenCompra, on_delete=models.CASCADE, related_name="detalles")
     insumo = models.ForeignKey(
-        "insumos.Insumo", on_delete=models.CASCADE, related_name="detalles_orden_compra"
+        "insumos.Insumo", on_delete=models.PROTECT, related_name="detalles_orden_compra"
     )
     cantidad = models.PositiveIntegerField()
     precio_unitario = models.DecimalField(max_digits=10, decimal_places=2)
@@ -82,9 +82,9 @@ class Remito(models.Model):
         OrdenCompra, on_delete=models.SET_NULL, null=True, blank=True, related_name="remitos"
     )
     proveedor = models.ForeignKey(
-        "proveedores.Proveedor", on_delete=models.CASCADE, related_name="remitos_compras"
+        "proveedores.Proveedor", on_delete=models.PROTECT, related_name="remitos_compras"
     )
-    numero = models.CharField(max_length=50)
+    numero = models.CharField(max_length=50, unique=True)
     fecha = models.DateField()
     usuario = models.ForeignKey(
         "usuarios.Usuario", on_delete=models.SET_NULL, null=True, blank=True, related_name="remitos_compras"
@@ -104,12 +104,19 @@ class Remito(models.Model):
 class DetalleRemito(models.Model):
     remito = models.ForeignKey(Remito, on_delete=models.CASCADE, related_name="detalles")
     insumo = models.ForeignKey(
-        "insumos.Insumo", on_delete=models.CASCADE, related_name="detalles_remito_compras"
+        "insumos.Insumo", on_delete=models.PROTECT, related_name="detalles_remito_compras"
     )
     cantidad = models.PositiveIntegerField()
+    precio_unitario = models.DecimalField(
+        max_digits=10, decimal_places=2, default=0,
+        help_text="Precio al que se recibió el insumo en este remito"
+    )
+
+    def subtotal(self):
+        return self.cantidad * self.precio_unitario
 
     def __str__(self):
-        return f"{self.insumo.nombre} x {self.cantidad}"
+        return f"{self.insumo.nombre} x {self.cantidad} @ ${self.precio_unitario}"
 
 
 class MovimientoStock(models.Model):

@@ -12,17 +12,13 @@ from django.dispatch import receiver
 
 logger = logging.getLogger(__name__)
 
-# Cache temporal: guarda el stock anterior antes de guardar
-_stock_previo: dict[int, int] = {}
-
-
 @receiver(pre_save, sender='insumos.Insumo')
 def _capturar_stock_previo(sender, instance, **kwargs):
     """Guarda el stock actual antes de la actualización para detectar el cambio."""
     if instance.pk:
         try:
             old = sender.objects.filter(pk=instance.pk).values_list('stock', flat=True).first()
-            _stock_previo[instance.pk] = int(old or 0)
+            instance._stock_previo = int(old or 0)
         except Exception:
             pass
 
@@ -37,7 +33,7 @@ def _alerta_stock_bajo(sender, instance, created, **kwargs):
     """
     try:
         stock_actual = int(instance.stock or 0)
-        stock_previo = _stock_previo.pop(instance.pk, stock_actual)
+        stock_previo = getattr(instance, '_stock_previo', stock_actual)
         stock_minimo = int(instance.stock_minimo_sugerido or 0)
 
         # Solo actuar si el stock bajó en este guardado

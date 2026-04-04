@@ -92,19 +92,7 @@ def lista_insumos(request):
 @require_perm('Insumos', 'Crear', redirect_to='lista_insumos')
 @login_required
 def crear_insumo(request):
-    if request.method == 'POST':
-        form = InsumoForm(request.POST)
-        if form.is_valid():
-            form.save()
-            messages.success(request, 'Insumo creado correctamente.')
-            return redirect('lista_insumos')
-    else:
-        form = InsumoForm()
-
-    return render(request, 'insumos/crear_insumo.html', {
-        'form': form,
-        'return_url': 'lista_insumos',
-    })
+    return redirect('alta_insumo')
 
 
 @require_perm('Insumos', 'Crear', redirect_to='lista_insumos')
@@ -115,9 +103,6 @@ def alta_insumo(request):
         if form.is_valid():
             try:
                 insumo = form.save(commit=False)
-                # Sincronizar con campos legacy para mantener listas actuales
-                # stock NO se modifica al crear - solo desde App Compras via Remito
-                insumo.precio = insumo.precio_unitario
                 insumo.save()
                 messages.success(request, "El insumo ha sido registrado correctamente.")
                 return redirect('lista_insumos')
@@ -181,8 +166,6 @@ def modificarDatos(insumo: Insumo, form: ModificarInsumoForm) -> Insumo:
     - Sincroniza precio con precio_unitario.
     """
     insumo_mod = form.save(commit=False)
-    # stock NO se modifica al editar - solo desde App Compras via Remito
-    insumo_mod.precio = insumo_mod.precio_unitario
     insumo_mod.save()
     return insumo_mod
 
@@ -400,24 +383,24 @@ def validar_proyeccion(request, pk):
         if estado in ['aceptada', 'modificada'] and cantidad:
             insumo = proyeccion.insumo
             # Generar Remito automatico en App Compras en vez de modificar stock directo
+            from django.db import transaction
             try:
-                from compras.models import Remito, DetalleRemito, EstadoCompra
-                from django.utils import timezone
-                estado_rec, _ = EstadoCompra.objects.get_or_create(nombre='Recibida')
-                remito = Remito.objects.create(
-                    proveedor=proyeccion.proveedor_validado or insumo.proveedor,
-                    numero=f'PROY-{proyeccion.pk:06d}',
-                    fecha=timezone.now().date(),
-                    observaciones=f'Remito automatico por validacion de ProyeccionInsumo #{proyeccion.pk}',
-                )
-                DetalleRemito.objects.create(remito=remito, insumo=insumo, cantidad=int(cantidad))
-                insumo.stock += int(cantidad)
-                insumo.save(update_fields=["stock"])
+                with transaction.atomic():
+                    from compras.models import Remito, DetalleRemito, EstadoCompra
+                    from django.utils import timezone
+                    estado_rec, _ = EstadoCompra.objects.get_or_create(nombre='Recibida')
+                    remito = Remito.objects.create(
+                        proveedor=proyeccion.proveedor_validado or insumo.proveedor,
+                        numero=f'PROY-{proyeccion.pk:06d}',
+                        fecha=timezone.now().date(),
+                        observaciones=f'Remito automatico por validacion de ProyeccionInsumo #{proyeccion.pk}',
+                    )
+                    DetalleRemito.objects.create(remito=remito, insumo=insumo, cantidad=int(cantidad))
+                    insumo.stock += int(cantidad)
+                    insumo.save(update_fields=["stock"])
             except Exception as e_r:
                 import logging
                 logging.getLogger(__name__).warning(f'Error creando Remito para proyeccion #{proyeccion.pk}: {e_r}')
-                insumo.stock += int(cantidad)
-                insumo.save(update_fields=["stock"])
             # Generar orden sugerida de compra
             OrdenCompra.objects.create(
                 insumo=insumo,

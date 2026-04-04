@@ -7,6 +7,26 @@ from .models import OrdenCompra, DetalleOrdenCompra, Remito, DetalleRemito, Esta
 from .forms import OrdenCompraForm, DetalleOrdenCompraFormSet, RemitoForm, DetalleRemitoFormSet
 
 
+def _datos_empresa() -> dict:
+    """Lee los datos de la empresa desde configuracion.Parametro (con fallback)."""
+    try:
+        from configuracion.models import Parametro
+        return {
+            'nombre':   Parametro.get('EMPRESA_NOMBRE',    'Imprenta Tucán S.A.'),
+            'cuit':     Parametro.get('EMPRESA_CUIT',      ''),
+            'domicilio':Parametro.get('EMPRESA_DOMICILIO', ''),
+            'telefono': Parametro.get('EMPRESA_TELEFONO',  ''),
+            'email':    Parametro.get('EMPRESA_EMAIL',     ''),
+            'iva':      Parametro.get('EMPRESA_CONDICION_IVA', 'Responsable Inscripto'),
+        }
+    except Exception:
+        return {
+            'nombre': 'Imprenta Tucán S.A.',
+            'cuit': '', 'domicilio': '', 'telefono': '', 'email': '',
+            'iva': 'Responsable Inscripto',
+        }
+
+
 def _registrar_auditoria(request, instance, action="create"):
     try:
         from auditoria.models import AuditEntry
@@ -166,14 +186,7 @@ def detalle_orden_json(request, pk):
         'fecha_envio': orden.fecha_envio.strftime('%d/%m/%Y %H:%M') if orden.fecha_envio else '',
         
         # Empresa
-        'empresa': {
-            'nombre': 'Imprenta Tucán S.A.',
-            'cuit': '30-12345678-9',
-            'domicilio': 'Av. Principal 123, Tucumán',
-            'telefono': '381-4000000',
-            'email': 'info@imprentatucan.com',
-            'iva': 'Responsable Inscripto',
-        },
+        'empresa': _datos_empresa(),
         
         # Proveedor
         'proveedor': {
@@ -220,7 +233,9 @@ def enviar_orden_email(request, pk):
     subtotal = float(orden.monto_total)
     iva = subtotal * 0.21
     total = subtotal + iva
-    
+    condicion_pago_text = dict(OrdenCompra.CONDICIONES_PAGO).get(orden.condicion_pago, 'Contado')
+    empresa = _datos_empresa()
+
     detalles_html = ""
     num = 1
     for d in orden.detalles.all():
@@ -276,7 +291,7 @@ def enviar_orden_email(request, pk):
     <body>
         <div class="container">
             <div class="header">
-                <h1>IMPRENTA TUCÁN S.A.</h1>
+                <h1>{empresa['nombre'].upper()}</h1>
                 <div class="orden-num">ORDEN DE COMPRA Nº {orden.pk:04d}</div>
             </div>
             
@@ -288,7 +303,7 @@ def enviar_orden_email(request, pk):
                     </div>
                     <div class="info-box">
                         <h4>Condición de Pago</h4>
-                        <p>Contado</p>
+                        <p>{condicion_pago_text}</p>
                     </div>
                     <div class="info-box">
                         <h4>Moneda</h4>
@@ -333,7 +348,7 @@ def enviar_orden_email(request, pk):
                 
                 <div class="observaciones">
                     <h4 style="margin: 0 0 8px 0; color: #666; font-size: 11px; text-transform: uppercase;">Condiciones de Entrega</h4>
-                    <p><strong>Lugar:</strong> Depósito Gráfica Tucán</p>
+                    <p><strong>Lugar:</strong> {empresa['domicilio'] or 'A convenir'}</p>
                     <p><strong>Observaciones:</strong> {orden.observaciones or 'Sin observaciones'}</p>
                 </div>
             </div>
@@ -346,7 +361,7 @@ def enviar_orden_email(request, pk):
             </div>
             
             <div class="footer">
-                <p>Imprenta Tucán S.A. | info@imprentatucan.com | 381-4000000</p>
+                <p>{empresa['nombre']} | {empresa['email']} | {empresa['telefono']}</p>
                 <p>Este es un mensaje automático. Por favor no responder a este email.</p>
             </div>
         </div>
@@ -356,7 +371,7 @@ def enviar_orden_email(request, pk):
     
     try:
         send_mail(
-            subject=f'Orden de Compra OC-{orden.pk:04d} - Imprenta Tucán',
+            subject=f'Orden de Compra OC-{orden.pk:04d} - {empresa["nombre"]}',
             message='Orden de Compra',
             from_email=settings.DEFAULT_FROM_EMAIL,
             recipient_list=[proveedor.email],
@@ -610,7 +625,11 @@ def nuevo_remito(request):
                 if df.cleaned_data and not df.cleaned_data.get("DELETE", False):
                     insumo = df.cleaned_data["insumo"]
                     cantidad = df.cleaned_data["cantidad"]
-                    DetalleRemito.objects.create(remito=remito, insumo=insumo, cantidad=cantidad)
+                    precio_unitario = df.cleaned_data.get("precio_unitario") or 0
+                    DetalleRemito.objects.create(
+                        remito=remito, insumo=insumo,
+                        cantidad=cantidad, precio_unitario=precio_unitario,
+                    )
                     stock_anterior = insumo.stock or 0
                     insumo.stock = stock_anterior + cantidad
                     insumo.save(update_fields=["stock", "updated_at"])
@@ -762,11 +781,11 @@ def ajuste_masivo_precios(request):
     from proveedores.models import Proveedor
     proveedores = Proveedor.objects.filter(activo=True)
     
-    ultimos_insumos = Insumo.objects.filter(activo=True).exclude(precio=0).exclude(precio__isnull=True).order_by('-idInsumo')[:10]
-    
+    ultimos_insumos = Insumo.objects.filter(activo=True).exclude(precio_unitario=0).order_by('-idInsumo')[:10]
+
     for insumo in ultimos_insumos:
-        if insumo.precio:
-            insumo.precio_mas_10 = insumo.precio * Decimal('1.10')
+        if insumo.precio_unitario:
+            insumo.precio_mas_10 = insumo.precio_unitario * Decimal('1.10')
         else:
             insumo.precio_mas_10 = 0
     
@@ -809,26 +828,26 @@ def ajuste_masivo_precios(request):
             queryset = queryset.filter(proveedor_predeterminado_id=filtro_proveedor)
         
         if filtro_tipo == 'con_precio':
-            queryset = queryset.filter(precio__isnull=False, precio__gt=0)
-        
+            queryset = queryset.filter(precio_unitario__gt=0)
+
         from decimal import Decimal
         from django.db import transaction
-        
+
         factor = Decimal('1') + Decimal(str(porcentaje)) / Decimal('100')
-        
+
         insumos_actualizados = 0
         errores = []
-        
+
         with transaction.atomic():
             for insumo in queryset:
                 try:
-                    if insumo.precio:
-                        nuevo_precio = (insumo.precio * factor).quantize(Decimal('0.01'))
+                    if insumo.precio_unitario:
+                        nuevo_precio = (insumo.precio_unitario * factor).quantize(Decimal('0.01'))
                         if nuevo_precio < 0:
                             errores.append(f"{insumo.nombre}: precio no puede ser negativo")
                             continue
-                        insumo.precio = nuevo_precio
-                        insumo.save(update_fields=['precio'])
+                        insumo.precio_unitario = nuevo_precio
+                        insumo.save(update_fields=['precio_unitario'])
                         insumos_actualizados += 1
                 except Exception as e:
                     errores.append(f"{insumo.nombre}: {str(e)}")
@@ -848,6 +867,18 @@ def ajuste_masivo_precios(request):
         'insumos_count': insumos_count,
     }
     return render(request, "compras/ajuste_masivo_precios.html", context)
+
+
+@login_required
+def api_insumo_sugerencia(request, insumo_pk):
+    """Devuelve cantidad_compra_sugerida y precio_unitario de un insumo para pre-llenar OC."""
+    from django.http import JsonResponse
+    from insumos.models import Insumo
+    insumo = get_object_or_404(Insumo, pk=insumo_pk, activo=True)
+    return JsonResponse({
+        'cantidad_sugerida': insumo.cantidad_compra_sugerida or '',
+        'precio_unitario': float(insumo.precio_unitario) if insumo.precio_unitario else '',
+    })
 
 
 # ── Comparacion de precios por proveedor ──────────────────────────────────────

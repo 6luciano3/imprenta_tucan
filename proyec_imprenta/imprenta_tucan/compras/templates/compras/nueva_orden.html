@@ -146,5 +146,27 @@ function eliminarLinea(btn) {
   const rows = document.querySelectorAll('.detalle-row');
   if (rows.length > 1) btn.closest('.detalle-row').remove();
 }
+
+// Autocompletar cantidad sugerida y precio al elegir insumo
+document.addEventListener("change", function(e) {
+  if (!e.target.matches("select[name$='-insumo']")) return;
+  const insumoId = e.target.value;
+  if (!insumoId) return;
+  const row = e.target.closest(".detalle-row");
+  if (!row) return;
+  fetch(`/compras/api/insumo/${insumoId}/sugerencia/`)
+    .then(r => r.json())
+    .then(data => {
+      const cantInput = row.querySelector("input[name$='-cantidad']");
+      const precioInput = row.querySelector("input[name$='-precio_unitario']");
+      if (cantInput && !cantInput.value && data.cantidad_sugerida) {
+        cantInput.value = data.cantidad_sugerida;
+      }
+      if (precioInput && !precioInput.value && data.precio_unitario) {
+        precioInput.value = parseFloat(data.precio_unitario).toFixed(2);
+      }
+    })
+    .catch(() => {});
+});
 </script>
 {% endblock %}

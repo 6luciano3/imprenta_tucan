@@ -1,4 +1,5 @@
 ﻿import datetime
+from django.core.validators import MinValueValidator
 
 def predecir_demanda_media_movil(insumo, periodo_actual, meses=3):
     """
@@ -50,12 +51,13 @@ class Insumo(models.Model):
     nombre = models.CharField(max_length=100)
     descripcion = models.TextField(blank=True)
     codigo = models.CharField(max_length=20, unique=True)
-    proveedor = models.ForeignKey('proveedores.Proveedor', on_delete=models.CASCADE,
+    proveedor = models.ForeignKey('proveedores.Proveedor', on_delete=models.SET_NULL,
                                   related_name='insumos', null=True, blank=True)
     cantidad = models.PositiveIntegerField(default=0)
-    precio_unitario = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    precio_unitario = models.DecimalField(max_digits=10, decimal_places=2, default=0,
+                                          validators=[MinValueValidator(0)])
     categoria = models.CharField(max_length=100, blank=True)
-    stock = models.IntegerField(default=0)
+    stock = models.IntegerField(default=0, validators=[MinValueValidator(0)])
     stock_minimo_manual = models.PositiveIntegerField(
         null=True, blank=True,
         help_text='Stock mínimo sugerido (cargado manualmente). Se usa cuando no hay historial de consumo.',
@@ -64,7 +66,6 @@ class Insumo(models.Model):
         null=True, blank=True,
         help_text='Cantidad estándar a reponer cuando se detecta necesidad de compra. Reemplaza el dict hardcodeado en tasks.',
     )
-    precio = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     activo = models.BooleanField(default=True)
     unidad_medida = models.CharField(max_length=20, default='unidad', blank=True)
     tipo = models.CharField(

@@ -208,10 +208,9 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'automatizacion.tasks.tarea_automatizacion_presupuestos_ponderada',
         'schedule': 30 * 60,
     },
-    'proyecciones-insumos-diario': {
-        'task': 'insumos.tasks.generar_proyecciones_insumos',
-        'schedule': 24 * 60 * 60,  # cada 24 horas
-    },
+    # 'proyecciones-insumos-diario' desactivado: sustituido por prediccion-demanda-cada-hora
+    # que cubre todos los insumos directos y también notifica al admin.
+    # generar_proyecciones_insumos queda disponible para ejecución manual desde /configuracion/proyeccion-demanda/
     'recordatorio-presupuestos-diario': {
         'task': 'automatizacion.tasks.tarea_recordatorio_presupuestos',
         'schedule': 24 * 60 * 60,  # cada día a las 8 AM (configurable con crontab)
@@ -219,6 +218,10 @@ CELERY_BEAT_SCHEDULE = {
     'clientes-inactivos-semanal': {
         'task': 'automatizacion.tasks.tarea_clientes_inactivos',
         'schedule': 24 * 60 * 60 * 7,  # cada semana
+    },
+    'alertar-ordenes-compra-vencidas-diario': {
+        'task': 'compras.tasks.alertar_ordenes_vencidas',
+        'schedule': 24 * 60 * 60,  # cada día
     },
 }
 

@@ -42,13 +42,16 @@ def tarea_prediccion_demanda():
         else:
             periodo_siguiente = f'{now.year}-{now.month + 1:02d}'
 
+        from core.motor.config import MotorConfig
+        meses = MotorConfig.get('PROYECCION_MESES', cast=int) or 3
+
         insumos = Insumo.objects.filter(activo=True, tipo='directo')
         procesados = 0
         urgentes = 0
 
         for insumo in insumos:
             try:
-                cantidad_proyectada = predecir_demanda_media_movil(insumo, periodo_siguiente, meses=3) or 0
+                cantidad_proyectada = predecir_demanda_media_movil(insumo, periodo_siguiente, meses=meses) or 0
                 if cantidad_proyectada <= 0:
                     # Si no hay historial usar stock_minimo * 2 como base
                     cantidad_proyectada = int(insumo.stock_minimo_sugerido or 0) * 2 or 10

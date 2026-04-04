@@ -15,13 +15,15 @@ def generar_proyecciones_insumos():
         - Si tampoco hay mínimo sugerido, omite el insumo.
     """
     from insumos.models import predecir_demanda_media_movil
+    from core.motor.config import MotorConfig
 
     periodo = timezone.now().strftime('%Y-%m')
+    meses = MotorConfig.get('PROYECCION_MESES', cast=int) or 3
     generadas = 0
     omitidas = 0
 
     for insumo in Insumo.objects.filter(activo=True):
-        cantidad_proyectada = predecir_demanda_media_movil(insumo, periodo, meses=3)
+        cantidad_proyectada = predecir_demanda_media_movil(insumo, periodo, meses=meses)
 
         if cantidad_proyectada is None:
             # Fallback: usar stock mínimo sugerido
