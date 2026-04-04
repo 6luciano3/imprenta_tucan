@@ -117,8 +117,9 @@ def eliminar_cliente(request, id):
         return redirect("lista_clientes")
     if request.method == "POST":
         nombre_cliente = f"{cliente.nombre} {cliente.apellido}"
-        cliente.delete()
-        messages.success(request, f"El cliente {nombre_cliente} ha sido eliminado exitosamente.")
+        cliente.estado = 'Inactivo'
+        cliente.save()
+        messages.success(request, f"El cliente {nombre_cliente} ha sido desactivado.")
         return redirect("lista_clientes")
     return redirect("lista_clientes")
 
@@ -160,11 +161,9 @@ def confirmar_eliminacion_cliente(request, id):
         )
         return redirect("lista_clientes")
     if request.method == "POST":
-        if not cliente.puede_eliminarse():
-            messages.error(request, "El cliente tiene pedidos activos y no puede eliminarse.")
-            return redirect("lista_clientes")
-        cliente.delete()
-        messages.success(request, "El cliente ha sido eliminado exitosamente.")
+        cliente.estado = 'Inactivo'
+        cliente.save()
+        messages.success(request, "El cliente ha sido desactivado exitosamente.")
         return redirect("lista_clientes")
     return render(request, "clientes/confirmar_eliminacion.html", {"cliente": cliente})
 

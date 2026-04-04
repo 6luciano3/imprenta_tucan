@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(python manage.py check estadisticas)"
+      "Bash(python manage.py check estadisticas)",
+      "Bash(xargs ls:*)"
     ]
   }
 }

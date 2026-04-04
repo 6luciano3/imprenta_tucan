@@ -136,12 +136,6 @@
               </span>
             </button>
           </form>
-       <a href="#"
-         onclick="return confirmarEliminacion({{ cliente.id }}, '{{ cliente.nombre }} {{ cliente.apellido }}')"
-             class="text-red-600 hover:text-red-800 flex items-center gap-1"
-             title="Eliminar">
-            <span class="material-symbols-outlined text-sm">delete</span>
-          </a>
         </td>
       </tr>
       {% empty %}
@@ -181,45 +175,7 @@
 
 </div>
 
-<!-- Modal de confirmación de eliminación -->
-<div id="modalConfirmacion" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full">
-  <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
-    <div class="mt-3 text-center">
-      <h3 class="text-lg leading-6 font-medium text-gray-900">Confirmar eliminación</h3>
-      <div class="mt-2 px-7 py-3">
-        <p class="text-sm text-gray-500">
-          ¿Estás seguro que deseas eliminar al cliente <span id="clienteNombre" class="font-medium"></span>?
-        </p>
-      </div>
-      <div class="flex justify-center gap-4 mt-4">
-        <form id="formEliminar" method="POST">
-          {% csrf_token %}
-          <button type="submit" 
-                  class="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700">
-            Eliminar
-          </button>
-        </form>
-        <button onclick="cerrarModal()"
-                class="bg-gray-200 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-300">
-          Cancelar
-        </button>
-      </div>
-    </div>
-  </div>
-</div>
-
 <script>
-function confirmarEliminacion(id, nombre) {
-  document.getElementById('modalConfirmacion').classList.remove('hidden');
-  document.getElementById('clienteNombre').textContent = nombre;
-  document.getElementById('formEliminar').action = "{% url 'eliminar_cliente' 0 %}".replace('0', id);
-  // Prevenir navegación del enlace
-  return false;
-}
-
-function cerrarModal() {
-  document.getElementById('modalConfirmacion').classList.add('hidden');
-}
 // Botón para cargar y resaltar el ranking inteligente
 document.addEventListener('DOMContentLoaded', function() {
   const btnRanking = document.getElementById('btnRanking');

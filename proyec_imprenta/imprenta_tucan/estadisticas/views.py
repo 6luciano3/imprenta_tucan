@@ -461,6 +461,26 @@ def _grafico_categorico(labels, values, titulo, tipo="bar", ancho=13, alto=4):
             at.set_fontsize(7)
             at.set_color("white")
             at.set_fontweight("bold")
+    elif tipo == "doughnut":
+        wedges, texts, autotexts = ax.pie(
+            values, labels=labels, autopct="%1.1f%%",
+            colors=COLORS[:len(labels)], startangle=90,
+            wedgeprops={"edgecolor": "white", "linewidth": 1.5, "width": 0.5}
+        )
+        for t in texts: t.set_fontsize(8)
+        for at in autotexts:
+            at.set_fontsize(7)
+            at.set_fontweight("bold")
+    elif tipo == "scatter":
+        xs = list(range(len(labels)))
+        ax.scatter(xs, values, color=COLORS[:len(labels)], s=80, zorder=3)
+        ax.set_xticks(xs)
+        ax.set_xticklabels(labels, rotation=30, fontsize=7)
+        ax.tick_params(axis="y", labelsize=7)
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+        ax.yaxis.grid(True, alpha=0.3)
+        ax.set_axisbelow(True)
     else:
         bars = ax.bar(labels, values, color=COLORS[:len(labels)],
                       edgecolor="white", linewidth=0.5)
@@ -501,7 +521,7 @@ def _agregar_graficos_api(story, data, st, ancho=10, alto_hist=2.8, alto_cat=2.8
 
     # Normalizar tipo recibido del frontend al tipo matplotlib
     def _normalizar_tipo(t):
-        return {"horizontalBar": "barh", "doughnut": "pie", "line": "line", "scatter": "bar"}.get(t, t)
+        return {"horizontalBar": "barh"}.get(t, t)
 
     # Histogramas de variables numericas
     for idx_h, (key, vdata) in enumerate(variables.items()):
@@ -516,11 +536,11 @@ def _agregar_graficos_api(story, data, st, ancho=10, alto_hist=2.8, alto_cat=2.8
         story.append(Paragraph(f"Histograma: {label}", st["seccion"]))
         hist_labels = [b["label"] for b in bins]
         hist_vals   = [b["count"] for b in bins]
-        if tipo_hist == "pie":
+        if tipo_hist in ("pie", "doughnut"):
             h = alto_hist + 2
             buf = _grafico_categorico(hist_labels, hist_vals, f"Distribucion de {label}",
-                                      tipo="pie", ancho=ancho / 2.54, alto=h / 2.54)
-        elif tipo_hist in ("barh", "line"):
+                                      tipo=tipo_hist, ancho=ancho / 2.54, alto=h / 2.54)
+        elif tipo_hist in ("barh", "line", "scatter"):
             h = alto_hist
             buf = _grafico_categorico(hist_labels, hist_vals, f"Distribucion de {label}",
                                       tipo=tipo_hist, ancho=ancho / 2.54, alto=h / 2.54)
@@ -541,7 +561,7 @@ def _agregar_graficos_api(story, data, st, ancho=10, alto_hist=2.8, alto_cat=2.8
         tipo = _normalizar_tipo(
             tipos_request.get(f"cat_{idx_c}", tipos_request.get("tipo_global", tipo_global))
         )
-        h = alto_cat + 2 if tipo == "pie" else alto_cat
+        h = alto_cat + 2 if tipo in ("pie", "doughnut") else alto_cat
         story.append(Paragraph(f"Grafico: {titulo}", st["seccion"]))
         buf = _grafico_categorico(labels, values, titulo, tipo=tipo,
                                   ancho=ancho / 2.54, alto=h / 2.54)

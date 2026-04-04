@@ -12,7 +12,8 @@ class Command(BaseCommand):
         email = options['email']
         try:
             cliente = Cliente.objects.get(email=email)
-            cliente.delete()
-            self.stdout.write(self.style.SUCCESS(f'Cliente con email {email} eliminado correctamente.'))
+            cliente.estado = 'Inactivo'
+            cliente.save()
+            self.stdout.write(self.style.SUCCESS(f'Cliente con email {email} desactivado correctamente.'))
         except Cliente.DoesNotExist:
             self.stdout.write(self.style.ERROR(f'No existe un cliente con email {email}.'))

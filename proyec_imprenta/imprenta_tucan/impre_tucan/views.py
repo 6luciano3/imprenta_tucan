@@ -85,11 +85,9 @@ def confirmar_eliminacion_cliente(request, id):
 
     if request.method == 'POST':
         nombre = f"{cliente.nombre} {cliente.apellido}"
-        try:
-            cliente.delete()
-            messages.success(request, f"El cliente {nombre} fue eliminado correctamente.")
-        except Exception:
-            messages.error(request, f"No se pudo eliminar el cliente {nombre}.")
+        cliente.estado = 'Inactivo'
+        cliente.save()
+        messages.success(request, f"El cliente {nombre} fue desactivado correctamente.")
         return redirect('buscar_cliente')
 
     return render(request, 'clientes/confirmar_eliminacion.html', {'cliente': cliente})
