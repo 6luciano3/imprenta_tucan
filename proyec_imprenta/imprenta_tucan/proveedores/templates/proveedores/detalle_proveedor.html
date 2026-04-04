@@ -22,7 +22,15 @@
         </div>
         <div>
           <p class="font-semibold">Estado:</p>
-          <p class="mb-4">{% if proveedor.activo %}Activo{% else %}Inactivo{% endif %}</p>
+          <p class="mb-4">{% if proveedor.activo %}<span class="text-green-700 font-medium">Activo</span>{% else %}<span class="text-red-600 font-medium">Inactivo</span>{% endif %}</p>
+        </div>
+        <div>
+          <p class="font-semibold">Alta:</p>
+          <p class="mb-4">{{ proveedor.fecha_creacion|date:"d/m/Y H:i" }}</p>
+        </div>
+        <div>
+          <p class="font-semibold">Rubro:</p>
+          <p class="mb-4">{{ proveedor.rubro_nombre|default:"-" }}</p>
         </div>
         <div>
           <p class="font-semibold">Nombre:</p>
@@ -38,16 +46,26 @@
         </div>
         <div>
           <p class="font-semibold">Teléfono:</p>
-          <p class="mb-4">{{ proveedor.telefono }}</p>
+          <p class="mb-4">{{ proveedor.telefono|default:"-" }}</p>
+        </div>
+        <div>
+          <p class="font-semibold">Celular (E.164):</p>
+          <p class="mb-4">{{ proveedor.telefono_e164|default:"-" }}</p>
+        </div>
+        <div>
+          <p class="font-semibold">WhatsApp:</p>
+          <p class="mb-4">{{ proveedor.whatsapp|default:"-" }}</p>
         </div>
         <div class="md:col-span-2">
           <p class="font-semibold">Dirección:</p>
           <p class="mb-4">{{ proveedor.direccion|default:"-" }}</p>
         </div>
+        {% if proveedor.api_stock_url %}
         <div class="md:col-span-2">
-          <p class="font-semibold">Rubro:</p>
-          <p class="mb-4">{{ proveedor.rubro_nombre|default:"-" }}</p>
+          <p class="font-semibold">API de stock:</p>
+          <p class="mb-4 text-blue-700 break-all">{{ proveedor.api_stock_url }}</p>
         </div>
+        {% endif %}
       </div>
 
       <div class="mt-6 flex justify-end gap-2">

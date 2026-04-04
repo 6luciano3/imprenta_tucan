@@ -89,48 +89,15 @@ def lista_proveedores(request):
 def crear_proveedor(request):
     """Crear nuevo proveedor"""
     if request.method == 'POST':
-        # Procesar formulario
-        nombre = request.POST.get('nombre')
-        cuit = request.POST.get('cuit')
-        email = request.POST.get('email')
-        telefono = request.POST.get('telefono')
-        direccion = request.POST.get('direccion')
-        # Preferir selección del catálogo si viene informada
-        rubro_lookup_id = request.POST.get('rubro_lookup')
-        rubro_text = request.POST.get('rubro')
-        rubro = rubro_text
-        rubro_fk = None
-        if rubro_lookup_id:
-            try:
-                rubro_obj = Rubro.objects.get(pk=rubro_lookup_id)
-                rubro = rubro_obj.nombre
-                rubro_fk = rubro_obj
-            except Rubro.DoesNotExist:
-                pass
-        elif rubro_text:
-            # Intentar mapear texto a FK
-            try:
-                rubro_fk = Rubro.objects.get(nombre__iexact=rubro_text.strip())
-            except Rubro.DoesNotExist:
-                rubro_fk = None
-
-        if nombre and email and telefono:
-            Proveedor.objects.create(
-                nombre=nombre,
-                cuit=cuit,
-                email=email,
-                telefono=telefono,
-                direccion=direccion,
-                rubro=rubro,
-                rubro_fk=rubro_fk
-            )
-            messages.success(request, f'El proveedor {nombre} ha sido creado exitosamente.')
+        form = ProveedorForm(request.POST)
+        if form.is_valid():
+            proveedor = form.save()
+            messages.success(request, f'El proveedor {proveedor.nombre} ha sido creado exitosamente.')
             return redirect('lista_proveedores')
-        else:
-            messages.error(request, 'Por favor complete todos los campos obligatorios.')
-
+    else:
+        form = ProveedorForm()
     rubros = Rubro.objects.filter(activo=True).order_by('nombre')
-    return render(request, 'proveedores/crear_proveedor.html', {'rubros': rubros})
+    return render(request, 'proveedores/crear_proveedor.html', {'form': form, 'rubros': rubros})
 
 
 @login_required
@@ -140,33 +107,16 @@ def editar_proveedor(request, id):
     proveedor = get_object_or_404(Proveedor, id=id)
 
     if request.method == 'POST':
-        # Procesar formulario de edición
-        proveedor.nombre = request.POST.get('nombre', proveedor.nombre)
-        proveedor.cuit = request.POST.get('cuit', proveedor.cuit)
-        proveedor.email = request.POST.get('email', proveedor.email)
-        proveedor.telefono = request.POST.get('telefono', proveedor.telefono)
-        proveedor.direccion = request.POST.get('direccion', proveedor.direccion)
-        proveedor.rubro = request.POST.get('rubro', proveedor.rubro)
-        rubro_lookup_id = request.POST.get('rubro_lookup')
-        if rubro_lookup_id:
-            try:
-                proveedor.rubro_fk = Rubro.objects.get(pk=rubro_lookup_id)
-                proveedor.rubro = proveedor.rubro_fk.nombre
-            except Rubro.DoesNotExist:
-                pass
-        elif proveedor.rubro:
-            # Mapear texto a FK si existe catálogo
-            try:
-                proveedor.rubro_fk = Rubro.objects.get(nombre__iexact=proveedor.rubro.strip())
-            except Rubro.DoesNotExist:
-                proveedor.rubro_fk = None
-
-        proveedor.save()
-        messages.success(request, f'El proveedor {proveedor.nombre} ha sido actualizado exitosamente.')
-        return redirect('lista_proveedores')
+        form = ProveedorForm(request.POST, instance=proveedor)
+        if form.is_valid():
+            form.save()
+            messages.success(request, f'El proveedor {proveedor.nombre} ha sido actualizado exitosamente.')
+            return redirect('lista_proveedores')
+    else:
+        form = ProveedorForm(instance=proveedor)
 
     rubros = Rubro.objects.filter(activo=True).order_by('nombre')
-    return render(request, 'proveedores/editar_proveedor.html', {'proveedor': proveedor, 'rubros': rubros})
+    return render(request, 'proveedores/editar_proveedor.html', {'form': form, 'proveedor': proveedor, 'rubros': rubros})
 
 
 @login_required
@@ -176,14 +126,12 @@ def eliminar_proveedor(request, id):
     proveedor = get_object_or_404(Proveedor, id=id)
 
     if request.method == 'POST':
-        nombre_proveedor = proveedor.nombre
-        rubro_proveedor = proveedor.rubro or "Sin rubro"
-        proveedor.delete()
-        messages.success(
-            request, f'El proveedor {nombre_proveedor} ({rubro_proveedor}) ha sido eliminado exitosamente.')
+        proveedor.activo = False
+        proveedor.save()
+        messages.success(request, f'El proveedor {proveedor.nombre} ha sido desactivado.')
         return redirect('lista_proveedores')
 
-    return render(request, 'proveedores/confirmar_eliminacion.html', {'proveedor': proveedor})
+    return redirect('lista_proveedores')
 
 
 @login_required
@@ -313,6 +261,14 @@ def editar_rubro(request, pk):
 @requiere_permiso("Proveedores")
 def eliminar_rubro(request, pk):
     rubro = get_object_or_404(Rubro, pk=pk)
+    proveedores_asociados = rubro.proveedores.filter(activo=True).count()
+    if proveedores_asociados:
+        messages.error(
+            request,
+            f'No se puede eliminar el rubro "{rubro.nombre}" porque tiene '
+            f'{proveedores_asociados} proveedor(es) activo(s) asociado(s).'
+        )
+        return redirect('lista_rubros')
     if request.method == 'POST':
         rubro.delete()
         messages.success(request, 'Rubro eliminado correctamente.')

@@ -1,6 +1,26 @@
+import re
 import phonenumbers
 from django.core.exceptions import ValidationError
 from django.db import models
+
+
+def validar_cuit(valor):
+    """Valida formato y dígito verificador del CUIT argentino (XX-XXXXXXXX-X)."""
+    if not valor:
+        return
+    cleaned = valor.replace('-', '')
+    if not re.match(r'^\d{11}$', cleaned):
+        raise ValidationError(
+            'El CUIT debe tener 11 dígitos en formato XX-XXXXXXXX-X. Ejemplo: 20-12345678-9'
+        )
+    weights = [5, 4, 3, 2, 7, 6, 5, 4, 3, 2]
+    total = sum(int(d) * w for d, w in zip(cleaned[:10], weights))
+    remainder = total % 11
+    if remainder == 1:
+        raise ValidationError('El CUIT ingresado no es válido (dígito verificador incorrecto).')
+    expected = 0 if remainder == 0 else 11 - remainder
+    if int(cleaned[10]) != expected:
+        raise ValidationError('El CUIT ingresado no es válido (dígito verificador incorrecto).')
 
 
 def validar_telefono_e164(valor):
@@ -41,8 +61,8 @@ class Rubro(models.Model):
 class Proveedor(models.Model):
     nombre = models.CharField(max_length=100, db_column='nombreProveedor')
     apellido = models.CharField(max_length=100, default='Ejemplo')
-    cuit = models.CharField(max_length=13, unique=True)  # Formato: XX-XXXXXXXX-X
-    email = models.EmailField()
+    cuit = models.CharField(max_length=13, unique=True, validators=[validar_cuit])
+    email = models.EmailField(unique=True)
     telefono = models.CharField(max_length=20, blank=True)
     telefono_e164 = models.CharField(
         max_length=20,
@@ -65,8 +85,8 @@ class Proveedor(models.Model):
     direccion = models.TextField()
     # Campo nuevo para normalizar rubro como catálogo
     rubro_fk = models.ForeignKey('proveedores.Rubro', on_delete=models.PROTECT, null=True, blank=True, related_name='proveedores')
-    # Campo textual legado para compatibilidad; puede eliminarse luego de migrar formularios/vistas
-    rubro = models.CharField(max_length=50)
+    # Campo textual legado; se sincroniza automáticamente desde rubro_fk en el formulario
+    rubro = models.CharField(max_length=50, blank=True)
 
     # URL de API para consulta de stock en proveedor real
     api_stock_url = models.URLField(blank=True, null=True, help_text="Endpoint para consulta de stock en proveedor real")
