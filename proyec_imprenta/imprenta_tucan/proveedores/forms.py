@@ -34,14 +34,22 @@ class ProveedorForm(forms.ModelForm):
             'telefono': forms.TextInput(attrs={
                 'placeholder': 'Ej: 0381-4123456',
                 'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500',
+                'inputmode': 'tel',
+                'pattern': r'[0-9\s\+\-\(\)\.]+',
+                'title': 'Solo dígitos y los caracteres: + - ( ) espacio',
+                'oninput': "this.value = this.value.replace(/[^0-9\\s\\+\\-\\(\\)\\.]/g, '')",
             }),
             'telefono_e164': forms.TextInput(attrs={
                 'placeholder': '+5493816123456',
                 'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500',
+                'inputmode': 'tel',
+                'oninput': "this.value = this.value.replace(/[^0-9\\+]/g, '').replace(/(?!^)\\+/g, '')",
             }),
             'whatsapp': forms.TextInput(attrs={
                 'placeholder': '+5493816123456 (opcional, si difiere del teléfono)',
                 'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500',
+                'inputmode': 'tel',
+                'oninput': "this.value = this.value.replace(/[^0-9\\+]/g, '').replace(/(?!^)\\+/g, '')",
             }),
             'api_stock_url': forms.URLInput(attrs={
                 'placeholder': 'https://api.proveedor.com/stock',
@@ -75,6 +83,38 @@ class ProveedorForm(forms.ModelForm):
                     )
                 except Rubro.DoesNotExist:
                     pass
+
+    def clean_nombre(self):
+        valor = self.cleaned_data.get('nombre', '').strip()
+        if len(valor) < 2:
+            raise forms.ValidationError('El nombre debe tener al menos 2 caracteres.')
+        return valor
+
+    def clean_telefono(self):
+        import re
+        valor = self.cleaned_data.get('telefono', '').strip()
+        if not valor:
+            return valor
+        if not re.match(r'^[0-9\s\+\-\(\)\.]+$', valor):
+            raise forms.ValidationError(
+                'El teléfono solo puede contener dígitos y los caracteres: + - ( ) espacio'
+            )
+        digitos = re.sub(r'\D', '', valor)
+        if len(digitos) < 6:
+            raise forms.ValidationError('El teléfono debe tener al menos 6 dígitos.')
+        return valor
+
+    def clean_cuit(self):
+        valor = self.cleaned_data.get('cuit', '').strip()
+        if not valor:
+            return None  # NULL en DB para evitar conflicto de unique con vacío
+        from .models import validar_cuit
+        from django.core.exceptions import ValidationError as DjangoValidationError
+        try:
+            validar_cuit(valor)
+        except DjangoValidationError as e:
+            raise forms.ValidationError(e.message)
+        return valor
 
     def clean(self):
         cleaned = super().clean()

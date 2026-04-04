@@ -61,7 +61,7 @@ class Rubro(models.Model):
 class Proveedor(models.Model):
     nombre = models.CharField(max_length=100, db_column='nombreProveedor')
     apellido = models.CharField(max_length=100, default='Ejemplo')
-    cuit = models.CharField(max_length=13, unique=True, validators=[validar_cuit])
+    cuit = models.CharField(max_length=13, unique=True, null=True, blank=True, validators=[validar_cuit])
     email = models.EmailField(unique=True)
     telefono = models.CharField(max_length=20, blank=True)
     telefono_e164 = models.CharField(
@@ -82,7 +82,7 @@ class Proveedor(models.Model):
         help_text='Número de WhatsApp en formato E.164. '
                   'Dejar en blanco si coincide con Teléfono (E.164).',
     )
-    direccion = models.TextField()
+    direccion = models.TextField(blank=True)
     # Campo nuevo para normalizar rubro como catálogo
     rubro_fk = models.ForeignKey('proveedores.Rubro', on_delete=models.PROTECT, null=True, blank=True, related_name='proveedores')
     # Campo textual legado; se sincroniza automáticamente desde rubro_fk en el formulario
