@@ -244,6 +244,9 @@ AUTOMATION_WEBHOOK_SECRET = os.environ.get('AUTOMATION_WEBHOOK_SECRET', '')
 # OpenAI - Chatbot Intelligence
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '')
 
+# Anthropic (Claude) - Chatbot Intelligence (prioridad sobre OpenAI)
+ANTHROPIC_API_KEY = os.environ.get('ANTHROPIC_API_KEY', '')
+
 if EMAIL_HOST_PASSWORD:
     EMAIL_BACKEND  = 'django.core.mail.backends.smtp.EmailBackend'
     EMAIL_HOST     = 'smtp.gmail.com'

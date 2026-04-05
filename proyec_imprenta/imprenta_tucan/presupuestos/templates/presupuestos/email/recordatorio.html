@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Recordatorio de Presupuesto</title>
+  <style>
+    body { margin: 0; padding: 0; background-color: #f4f4f4; font-family: Arial, sans-serif; }
+    .wrapper { max-width: 600px; margin: 30px auto; background: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+    .header { background-color: #1e3a5f; padding: 28px 32px; text-align: center; }
+    .header h1 { margin: 0; color: #ffffff; font-size: 22px; letter-spacing: 0.5px; }
+    .header p { margin: 6px 0 0; color: #a8c4e0; font-size: 13px; }
+    .body { padding: 32px; color: #333333; }
+    .body p { margin: 0 0 16px; line-height: 1.6; font-size: 15px; }
+    .card { background: #f8f9fb; border: 1px solid #e2e8f0; border-radius: 6px; padding: 20px 24px; margin: 24px 0; }
+    .card table { width: 100%; border-collapse: collapse; }
+    .card td { padding: 6px 0; font-size: 14px; color: #444; }
+    .card td:first-child { font-weight: 600; color: #1e3a5f; width: 40%; }
+    .dias-badge { display: inline-block; background: #fff3cd; border: 1px solid #ffc107; color: #856404; padding: 4px 12px; border-radius: 20px; font-size: 13px; font-weight: 600; }
+    .cta { text-align: center; margin: 28px 0; }
+    .cta a { background-color: #f97316; color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 6px; font-size: 15px; font-weight: 700; display: inline-block; }
+    .cta a:hover { background-color: #ea6500; }
+    .footer { background: #f1f5f9; padding: 18px 32px; text-align: center; }
+    .footer p { margin: 0; font-size: 12px; color: #94a3b8; line-height: 1.6; }
+    .footer a { color: #64748b; }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="header">
+      <h1>Imprenta Tucán</h1>
+      <p>Recordatorio de presupuesto</p>
+    </div>
+
+    <div class="body">
+      <p>Hola <strong>{{ cliente.nombre }}</strong>,</p>
+
+      <p>
+        Te recordamos que tu presupuesto está próximo a vencer.
+        {% if dias_restantes == 0 %}
+          <span class="dias-badge">¡Vence hoy!</span>
+        {% elif dias_restantes == 1 %}
+          <span class="dias-badge">Vence mañana</span>
+        {% else %}
+          <span class="dias-badge">Vence en {{ dias_restantes }} días</span>
+        {% endif %}
+      </p>
+
+      <div class="card">
+        <table>
+          <tr>
+            <td>Número</td>
+            <td># {{ presupuesto.numero }}</td>
+          </tr>
+          <tr>
+            <td>Total</td>
+            <td><strong>${{ presupuesto.total }}</strong></td>
+          </tr>
+          <tr>
+            <td>Válido hasta</td>
+            <td>{{ presupuesto.validez|date:"d/m/Y" }}</td>
+          </tr>
+          {% if presupuesto.observaciones %}
+          <tr>
+            <td>Observaciones</td>
+            <td>{{ presupuesto.observaciones }}</td>
+          </tr>
+          {% endif %}
+        </table>
+      </div>
+
+      <p>Si querés aceptarlo o rechazarlo, hacé clic en el botón:</p>
+
+      <div class="cta">
+        <a href="{{ link }}">Ver mi presupuesto</a>
+      </div>
+
+      <p style="font-size:13px; color:#666;">
+        Si tenés alguna consulta, respondé este email o llamanos en nuestro horario de atención:<br>
+        Lunes a viernes de 8:00 a 18:00 hs · Sábados de 9:00 a 13:00 hs
+      </p>
+    </div>
+
+    <div class="footer">
+      <p>
+        Este mensaje fue enviado automáticamente por <strong>Imprenta Tucán</strong>.<br>
+        Si no solicitaste este presupuesto, podés ignorar este email.<br>
+        <a href="{{ link }}">Ver presupuesto online</a>
+      </p>
+    </div>
+  </div>
+</body>
+</html>

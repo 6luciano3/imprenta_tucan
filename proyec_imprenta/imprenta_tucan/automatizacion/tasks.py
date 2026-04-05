@@ -892,7 +892,8 @@ def tarea_recordatorio_presupuestos():
 
     try:
         dias_antes = int(Parametro.get('PRESUPUESTO_DIAS_RECORDATORIO', 3))
-    except Exception:
+    except Exception as e:
+        logger.warning('Error leyendo PRESUPUESTO_DIAS_RECORDATORIO: %s. Usando default 3 días.', e)
         dias_antes = 3
 
     fecha_limite = timezone.now().date() + timedelta(days=dias_antes)
@@ -915,24 +916,45 @@ def tarea_recordatorio_presupuestos():
     for presupuesto in presupuestos:
         try:
             cliente = presupuesto.cliente
+
+            # Validar email: debe existir y estar verificado
             if not cliente.email:
+                logger.warning('Recordatorio omitido para presupuesto %s: cliente sin email', presupuesto.numero)
+                errores += 1
+                continue
+            if not getattr(cliente, 'email_verificado', True):
+                logger.warning('Recordatorio omitido para presupuesto %s: email no verificado', presupuesto.numero)
                 errores += 1
                 continue
 
-            link_presupuesto = f"{getattr(settings, 'BASE_URL', 'http://localhost:8000')}/presupuestos/ver/{presupuesto.token}/"
+            # Deduplicación: no enviar más de una vez por día
+            if presupuesto.recordatorio_enviado_fecha == fecha_hoy:
+                logger.info('Recordatorio ya enviado hoy para presupuesto %s, omitiendo', presupuesto.numero)
+                continue
 
-            mensaje = (
+            link_presupuesto = f"{getattr(settings, 'BASE_URL', 'http://localhost:8000')}/presupuestos/respuesta/{presupuesto.token}/"
+
+            dias_restantes = (presupuesto.validez - fecha_hoy).days
+            mensaje_texto = (
                 f"Hola {cliente.nombre},\n\n"
-                f"Te recordamos que tu presupuesto #{presupuesto.numero} está próximo a vencer "
-                f"el {presupuesto.validez.strftime('%d/%m/%Y')}.\n\n"
-                f"Detalles:\n"
-                f"- Total: ${presupuesto.total}\n"
-                f"- Válido hasta: {presupuesto.validez.strftime('%d/%m/%Y')}\n\n"
-                f"Si te interesa, podés aceptarlo o rechazarlo desde este enlace:\n"
-                f"{link_presupuesto}\n\n"
-                f"¿Tenés alguna consulta? Respondé este email o llamanos.\n\n"
+                f"Te recordamos que tu presupuesto #{presupuesto.numero} vence "
+                f"el {presupuesto.validez.strftime('%d/%m/%Y')} "
+                f"({'hoy' if dias_restantes == 0 else f'en {dias_restantes} día/s'}).\n\n"
+                f"Total: ${presupuesto.total}\n\n"
+                f"Podés verlo, aceptarlo o rechazarlo aquí:\n{link_presupuesto}\n\n"
                 f"Saludos,\nEquipo Imprenta Tucán"
             )
+
+            try:
+                from django.template.loader import render_to_string
+                html_body = render_to_string('presupuestos/email/recordatorio.html', {
+                    'cliente': cliente,
+                    'presupuesto': presupuesto,
+                    'link': link_presupuesto,
+                    'dias_restantes': dias_restantes,
+                })
+            except Exception:
+                html_body = None
 
             try:
                 from core.notifications.engine import enviar_notificacion
@@ -940,15 +962,18 @@ def tarea_recordatorio_presupuestos():
                     destinatario=cliente.email,
                     canal='email',
                     asunto=f'Recordatorio: Tu presupuesto #{presupuesto.numero} vence pronto',
-                    mensaje=mensaje,
+                    mensaje=mensaje_texto,
+                    html=html_body,
                 )
+                presupuesto.recordatorio_enviado_fecha = fecha_hoy
+                presupuesto.save(update_fields=['recordatorio_enviado_fecha'])
                 enviados += 1
             except Exception as e:
-                logger.warning(f'Error enviando recordatorio presupuesto {presupuesto.id}: {e}')
+                logger.warning('Error enviando recordatorio presupuesto %s: %s', presupuesto.numero, e)
                 errores += 1
 
         except Exception as e:
-            logger.warning(f'Error procesando presupuesto {presupuesto.id}: {e}')
+            logger.warning('Error procesando presupuesto %s: %s', presupuesto.numero, e)
             errores += 1
 
     AutomationLog.objects.create(

@@ -542,11 +542,14 @@ def recordatorio_presupuestos(request):
     mensaje_resultado = None
     if request.method == 'POST' and 'enviar_recordatorios' in request.POST:
         from automatizacion.tasks import tarea_recordatorio_presupuestos
+        import logging
+        _logger = logging.getLogger(__name__)
         try:
-            resultado = tarea_recordatorio_presupuestos()
-            mensaje_resultado = resultado
+            tarea_recordatorio_presupuestos.delay()
+            mensaje_resultado = "Recordatorios enviados a la cola. Se procesarán en segundos."
         except Exception as e:
-            mensaje_resultado = f"Error: {str(e)}"
+            _logger.exception('Error al encolar tarea de recordatorio de presupuestos')
+            mensaje_resultado = f"Error al enviar recordatorios: {str(e)}"
 
     context = {
         'presupuestos_proximos': presupuestos_proximos,

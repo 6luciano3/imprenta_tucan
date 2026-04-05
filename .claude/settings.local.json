@@ -8,7 +8,8 @@
       "Bash(python manage.py showmigrations compras)",
       "Bash(python manage.py migrate compras)",
       "Bash(python manage.py check --deploy)",
-      "Bash(python manage.py check)"
+      "Bash(python manage.py check)",
+      "Bash(python -c \"import openai; print\\('openai version:', openai.__version__\\)\")"
     ]
   }
 }

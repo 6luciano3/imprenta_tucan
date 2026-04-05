@@ -104,7 +104,9 @@ def _enviar_email(destinatario, mensaje, *, asunto=None, html=None, metadata=Non
     else:
         send_mail(asunto, mensaje, remitente, [destinatario], fail_silently=False, reply_to=[reply_to] if reply_to else None)
 
-    logger.info('email enviado a %s: %s', destinatario, asunto)
+    # Mascara el email para no exponer datos personales en logs
+    _masked = destinatario[:2] + '***@***' + destinatario.split('@')[-1][-4:] if '@' in destinatario else '***'
+    logger.info('email enviado a %s: %s', _masked, asunto)
     return {'ok': True}
 
 

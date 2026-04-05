@@ -34,6 +34,11 @@ class Presupuesto(models.Model):
         related_name='presupuestos_origen',
         verbose_name='Pedido generado',
     )
+    recordatorio_enviado_fecha = models.DateField(
+        null=True, blank=True,
+        verbose_name='Fecha último recordatorio enviado',
+        help_text='Se actualiza cada vez que se envía un recordatorio automático. Evita duplicados en el mismo día.',
+    )
 
 
 class PresupuestoDetalle(models.Model):

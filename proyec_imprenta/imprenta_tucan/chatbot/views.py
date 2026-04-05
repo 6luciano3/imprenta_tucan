@@ -17,6 +17,12 @@ except ImportError:
     OPENAI_AVAILABLE = False
 
 try:
+    import anthropic as anthropic_sdk
+    ANTHROPIC_AVAILABLE = True
+except ImportError:
+    ANTHROPIC_AVAILABLE = False
+
+try:
     from pedidos.models import Pedido, EstadoPedido
 except ImportError:
     Pedido = None
@@ -53,67 +59,167 @@ except ImportError:
     ConversacionChatbot = None
 
 
-def obtener_respuesta_openai(mensaje, historial=None):
-    api_key = getattr(settings, 'OPENAI_API_KEY', '')
-    
-    if not api_key or api_key == 'tu-openai-api-key-aqui':
+def obtener_respuesta_claude(mensaje, historial=None):
+    """Llama a la API de Claude (Anthropic) con contexto real del negocio."""
+    api_key = getattr(settings, 'ANTHROPIC_API_KEY', '')
+    if not api_key or not ANTHROPIC_AVAILABLE:
         return None
-    
-    if not OPENAI_AVAILABLE:
-        return None
-    
+
     try:
-        client = openai.OpenAI(api_key=api_key)
-        
-        messages = [
-            {
-                "role": "system",
-                "content": """Eres el asistente virtual de Imprenta Tucan, una imprenta ubicada en Argentina.
+        client = anthropic_sdk.Anthropic(api_key=api_key)
+
+        contexto_negocio = _construir_contexto_negocio()
+
+        system_prompt = f"""Eres el asistente virtual de Imprenta Tucán, una imprenta comercial ubicada en Argentina.
 
 CARACTERÍSTICAS DEL NEGOCIO:
-- Imprenta comercial: tarjetas, volantes, folletos, facturas, talonarios, sobres, stickers, etc.
-- Ubicación: Argentina
+- Servicios: tarjetas, volantes, folletos, facturas, talonarios, sobres, stickers, etc.
 - Moneda: Pesos argentinos ($)
-- Horario: Lunes a viernes de 8:00 a 18:00, sábados de 9:00 a 13:00
+- Horario: Lunes a viernes 8:00-18:00, sábados 9:00-13:00
 
-INFORMACIÓN DEL SISTEMA:
-El sistema puede manejar:
-- PEDIDOS: seguimiento, estados, historial de pedidos
-- CLIENTES: búsqueda, información de contacto
-- PRODUCTOS/SERVICIOS: precios, características
-- PRESUPUESTOS: cotizaciones, estados (pendiente, aceptado, rechazado)
-- COTIZACIONES (Solicitudes de Cotización): solicitudes de materiales/insumos de clientes, estados, proveedor asignado
-- INSUMOS: stock de materiales (papel, tinta, etc.)
-- ESTADÍSTICAS: ventas, clientes frecuentes
+DATOS ACTUALES DEL SISTEMA:
+{contexto_negocio}
 
-REGLAS DE RESPUESTA:
-1. Responde siempre en español de forma clara y concisa
-2. Usa un tono amigable y profesional
-3. Si no puedes realizar una acción, explica qué necesitas
-4. Para consultas específicas de datos, indica que el usuario puede verlo en el sistema
-5. No inventes información sobre pedidos o clientes específicos
-6. Usa emojis sparingly para hacer las respuestas más amigables
-7. Si el usuario pregunta algo que no tiene que ver con la imprenta, redirígelo amablemente a nuestros servicios"""
-            }
-        ]
-        
+REGLAS:
+1. Respondé siempre en español, de forma clara y concisa.
+2. Usá los datos del sistema cuando el usuario pregunte por precios, stock, pedidos o presupuestos.
+3. Si no encontrás el dato exacto, decilo claramente en vez de inventarlo.
+4. Sé amigable y profesional. Usá emojis con moderación.
+5. Si la pregunta no tiene que ver con la imprenta, redirigí amablemente al usuario."""
+
+        messages = []
         if historial:
             for msg in reversed(historial):
                 messages.append({"role": "user", "content": msg.mensaje})
                 if msg.respuesta:
                     messages.append({"role": "assistant", "content": msg.respuesta})
-        
         messages.append({"role": "user", "content": mensaje})
-        
+
+        response = client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=600,
+            system=system_prompt,
+            messages=messages,
+        )
+
+        return response.content[0].text
+
+    except Exception as e:
+        print(f"Error Anthropic: {e}")
+        return None
+
+
+def _limpiar(texto):
+    """Normaliza texto eliminando caracteres problemáticos."""
+    if not texto:
+        return ''
+    return unicodedata.normalize('NFC', str(texto))
+
+
+def _construir_contexto_negocio():
+    """Reúne datos reales del sistema para incluirlos en el prompt de IA."""
+    lineas = []
+
+    # Insumos: precios y stock
+    try:
+        from insumos.models import Insumo
+        insumos = Insumo.objects.filter(activo=True).order_by('nombre')
+        if insumos:
+            lineas.append("INSUMOS ACTUALES (nombre | precio unitario | stock | unidad):")
+            for i in insumos:
+                lineas.append(
+                    f"  - {_limpiar(i.nombre)}: ${i.precio_unitario or 0} | stock: {i.stock or 0} {_limpiar(i.unidad_medida or '')}"
+                )
+    except Exception:
+        pass
+
+    # Pedidos recientes
+    try:
+        from pedidos.models import Pedido
+        from django.utils import timezone
+        pedidos = Pedido.objects.select_related('cliente', 'estado').order_by('-fecha_pedido')[:10]
+        if pedidos:
+            lineas.append("\nPEDIDOS RECIENTES (id | cliente | estado | monto):")
+            for p in pedidos:
+                cliente = f"{_limpiar(p.cliente.nombre)} {_limpiar(p.cliente.apellido)}" if p.cliente else "—"
+                estado = _limpiar(p.estado.nombre) if p.estado else "—"
+                lineas.append(f"  - #{p.id}: {cliente} | {estado} | ${p.monto_total}")
+    except Exception:
+        pass
+
+    # Presupuestos recientes
+    try:
+        from presupuestos.models import Presupuesto
+        presupuestos = Presupuesto.objects.select_related('cliente').order_by('-fecha')[:10]
+        if presupuestos:
+            lineas.append("\nPRESUPUESTOS RECIENTES (número | cliente | estado | total):")
+            for p in presupuestos:
+                cliente = p.cliente.nombre if p.cliente else "—"
+                lineas.append(f"  - #{p.numero}: {cliente} | {p.estado} | ${p.total}")
+    except Exception:
+        pass
+
+    # Clientes
+    try:
+        from clientes.models import Cliente
+        total_clientes = Cliente.objects.count()
+        lineas.append(f"\nTOTAL CLIENTES REGISTRADOS: {total_clientes}")
+    except Exception:
+        pass
+
+    return "\n".join(lineas)
+
+
+def obtener_respuesta_openai(mensaje, historial=None):
+    api_key = getattr(settings, 'OPENAI_API_KEY', '')
+
+    if not api_key or api_key == 'tu-openai-api-key-aqui':
+        return None
+
+    if not OPENAI_AVAILABLE:
+        return None
+
+    try:
+        client = openai.OpenAI(api_key=api_key)
+
+        contexto_negocio = _construir_contexto_negocio()
+
+        system_prompt = f"""Eres el asistente virtual de Imprenta Tucán, una imprenta comercial ubicada en Argentina.
+
+CARACTERÍSTICAS DEL NEGOCIO:
+- Servicios: tarjetas, volantes, folletos, facturas, talonarios, sobres, stickers, etc.
+- Moneda: Pesos argentinos ($)
+- Horario: Lunes a viernes 8:00-18:00, sábados 9:00-13:00
+
+DATOS ACTUALES DEL SISTEMA:
+{contexto_negocio}
+
+REGLAS:
+1. Respondé siempre en español, de forma clara y concisa.
+2. Usá los datos del sistema cuando el usuario pregunte por precios, stock, pedidos o presupuestos.
+3. Si no encontrás el dato exacto, decilo claramente en vez de inventarlo.
+4. Sé amigable y profesional. Usá emojis con moderación.
+5. Si la pregunta no tiene que ver con la imprenta, redirigí amablemente al usuario."""
+
+        messages = [{"role": "system", "content": system_prompt}]
+
+        if historial:
+            for msg in reversed(historial):
+                messages.append({"role": "user", "content": msg.mensaje})
+                if msg.respuesta:
+                    messages.append({"role": "assistant", "content": msg.respuesta})
+
+        messages.append({"role": "user", "content": mensaje})
+
         response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=messages,
-            max_tokens=500,
-            temperature=0.7
+            max_tokens=600,
+            temperature=0.5,
         )
-        
+
         return response.choices[0].message.content
-        
+
     except Exception as e:
         print(f"Error OpenAI: {e}")
         return None
@@ -416,8 +522,13 @@ def buscar_presupuesto(texto):
 def buscar_cotizacion(texto):
     if not SolicitudCotizacion:
         return None
-    
+
     texto_lower = texto.lower()
+
+    # Solo responder si la consulta es claramente sobre cotizaciones/SC
+    palabras_clave = ('cotizacion', 'cotización', 'solicitud', ' sc-', 'sc ')
+    if not any(p in texto_lower for p in palabras_clave):
+        return None
     
     if 'hoy' in texto_lower:
         hoy = timezone.now().date()
@@ -460,12 +571,6 @@ def buscar_cotizacion(texto):
                 lista = "\n".join([f"• SC-{c.id:04d} - {c.get_estado_display()}" for c in cotizaciones])
                 return f"📋 COTIZACIONES DE PROVEEDOR:\n\n{lista}\n\nTotal: {cotizaciones.count()}"
     
-    # Listar todas las cotizaciones recientes
-    cotizaciones = SolicitudCotizacion.objects.all()[:5]
-    if cotizaciones:
-        lista = "\n".join([f"• SC-{c.id:04d} - {c.proveedor.nombre} ({c.get_estado_display()})" for c in cotizaciones])
-        return f"📋 COTIZACIONES RECIENTES:\n\n{lista}\n\nTotal: {cotizaciones.count()}"
-    
     return None
 
 
@@ -501,18 +606,58 @@ def buscar_estadisticas(texto):
     return None
 
 
+def _extraer_nombre_insumo(texto_lower, patrones):
+    """Extrae el nombre del insumo del texto usando los patrones dados."""
+    for patron in patrones:
+        match = re.search(patron, texto_lower)
+        if match:
+            return match.group(1).strip().rstrip('?').strip()
+    return ''
+
+
 def buscar_insumos(texto):
     try:
         from insumos.models import Insumo
     except ImportError:
         return None
-    
+
     texto_lower = texto.lower()
-    
+
+    # Consulta de precio de insumo
+    if 'precio' in texto_lower:
+        patrones_precio = [
+            r'precio del\s+(.+?)\s*$',
+            r'precio de la\s+(.+?)\s*$',
+            r'precio de\s+(.+?)\s*$',
+            r'precio\s+(.+?)\s*$',
+            r'cuanto cuesta\s+(.+?)\s*$',
+            r'cuánto cuesta\s+(.+?)\s*$',
+            r'costo de\s+(.+?)\s*$',
+        ]
+        palabra = _extraer_nombre_insumo(texto_lower, patrones_precio)
+
+        if palabra and len(palabra) > 1:
+            insumos = Insumo.objects.filter(nombre__icontains=palabra)[:5]
+            if not insumos:
+                for p in palabra.split():
+                    if len(p) > 2:
+                        insumos = Insumo.objects.filter(nombre__icontains=p)[:5]
+                        if insumos:
+                            break
+        else:
+            insumos = Insumo.objects.exclude(precio_unitario=0).order_by('nombre')[:10]
+
+        if insumos:
+            lista = "\n".join([
+                f"• {i.nombre} — ${i.precio_unitario or 0:,.2f} (stock: {i.stock or 0} {i.unidad_medida or ''})"
+                for i in insumos
+            ])
+            return f"💲 PRECIOS DE INSUMOS:\n\n{lista}"
+        return f"No encontré insumos con el nombre '{palabra}'"
+
+    # Consulta de stock
     if 'stock' in texto_lower or 'hay' in texto_lower or 'tiene' in texto_lower or 'cuanto' in texto_lower:
-        palabra = ''
-        
-        patrones = [
+        patrones_stock = [
             r'stock del\s+(.+?)\s*$',
             r'stock de la\s+(.+?)\s*$',
             r'stock de\s+(.+?)\s*$',
@@ -521,45 +666,31 @@ def buscar_insumos(texto):
             r'tiene\s+(.+?)\s*$',
             r'cuanto\s+(.+?)\s*$',
         ]
-        
-        for patron in patrones:
-            match = re.search(patron, texto_lower)
-            if match:
-                palabra = match.group(1).strip()
-                break
-        
-        palabra = palabra.rstrip('?').strip()
-        
+        palabra = _extraer_nombre_insumo(texto_lower, patrones_stock)
+
         if palabra and len(palabra) > 1:
             insumos = Insumo.objects.filter(nombre__icontains=palabra)[:5]
             if not insumos:
-                palabras = palabra.split()
-                for p in palabras:
+                for p in palabra.split():
                     if len(p) > 2:
                         insumos = Insumo.objects.filter(nombre__icontains=p)[:5]
                         if insumos:
                             break
         else:
             insumos = Insumo.objects.all()[:5]
-        
+
         if insumos:
             lista = "\n".join([f"• {i.nombre} - Stock: {i.stock} {i.unidad_medida or ''}" for i in insumos])
             return f"🛒 INSUMOS:\n\n{lista}"
-        
-        insumos = Insumo.objects.all()[:5]
-        if insumos:
-            lista = "\n".join([f"• {i.nombre} - Stock: {i.stock} {i.unidad_medida or ''}" for i in insumos])
-            return f"🛒 INSUMOS:\n\n{lista}"
-        
         return "No hay insumos registrados"
-    
+
     if 'bajo' in texto_lower or 'falta' in texto_lower:
         insumos = Insumo.objects.filter(stock__lte=10)[:5]
         if insumos:
             lista = "\n".join([f"• {i.nombre} - Stock: {i.stock} {i.unidad_medida or ''}" for i in insumos])
             return f"⚠️ INSUMOS BAJOS:\n\n{lista}\n\n¡Considerar reponer!"
         return "No hay insumos con stock bajo ✓"
-    
+
     return None
 
 
@@ -610,8 +741,13 @@ def chatbot_api(request):
                 session_id=session_id
             ).order_by('-fecha')[:6])
         
-        respuesta = obtener_respuesta_openai(mensaje, historial)
-        modo = 'ia'
+        # Prioridad: Claude → OpenAI → modo local
+        respuesta = obtener_respuesta_claude(mensaje, historial)
+        modo = 'claude'
+
+        if not respuesta:
+            respuesta = obtener_respuesta_openai(mensaje, historial)
+            modo = 'openai'
 
         if not respuesta:
             respuesta = obtener_respuesta(mensaje)
