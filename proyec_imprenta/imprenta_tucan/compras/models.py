@@ -158,3 +158,49 @@ class MovimientoStock(models.Model):
 
     def __str__(self):
         return f"{self.get_tipo_display()} | {self.insumo.nombre} | {self.cantidad} | {self.fecha}"
+
+
+class HistorialPrecioInsumo(models.Model):
+    """Registro inmutable de cada cambio de precio de un insumo."""
+    ORIGENES = [
+        ('manual', 'Actualización manual'),
+        ('ajuste_masivo', 'Ajuste masivo'),
+        ('remito', 'Recepción de remito'),
+        ('sc', 'Solicitud de cotización'),
+    ]
+
+    insumo = models.ForeignKey(
+        'insumos.Insumo', on_delete=models.CASCADE, related_name='historial_precios'
+    )
+    precio_anterior = models.DecimalField(max_digits=10, decimal_places=2)
+    precio_nuevo = models.DecimalField(max_digits=10, decimal_places=2)
+    variacion_pct = models.DecimalField(
+        max_digits=6, decimal_places=2, null=True, blank=True,
+        help_text='Variación porcentual respecto al precio anterior'
+    )
+    origen = models.CharField(max_length=20, choices=ORIGENES, default='manual')
+    motivo = models.CharField(max_length=300, blank=True)
+    usuario = models.ForeignKey(
+        'usuarios.Usuario', on_delete=models.SET_NULL, null=True, blank=True
+    )
+    remito = models.ForeignKey(
+        'compras.Remito', on_delete=models.SET_NULL, null=True, blank=True,
+        help_text='Remito origen del cambio (si aplica)'
+    )
+    fecha = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-fecha']
+        verbose_name = 'Historial de Precio'
+        verbose_name_plural = 'Historial de Precios'
+
+    def __str__(self):
+        return f"{self.insumo.nombre} | ${self.precio_anterior} → ${self.precio_nuevo} | {self.fecha:%d/%m/%Y}"
+
+    def save(self, *args, **kwargs):
+        if self.precio_anterior and self.precio_anterior != 0:
+            from decimal import Decimal
+            self.variacion_pct = (
+                (self.precio_nuevo - self.precio_anterior) / self.precio_anterior * 100
+            ).quantize(Decimal('0.01'))
+        super().save(*args, **kwargs)

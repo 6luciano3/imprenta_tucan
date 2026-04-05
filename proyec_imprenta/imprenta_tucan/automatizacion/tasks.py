@@ -64,17 +64,35 @@ def tarea_prediccion_demanda():
                 ).order_by('-score').first()
                 proveedor_sugerido = score.proveedor if score else None
 
-                # Crear o actualizar proyeccion
-                proj, created = ProyeccionInsumo.objects.update_or_create(
-                    insumo=insumo,
-                    periodo=periodo_siguiente,
-                    defaults={
-                        'cantidad_proyectada': int(cantidad_proyectada),
-                        'proveedor_sugerido': proveedor_sugerido,
-                        'fecha_generacion': now,
-                        'estado': 'pendiente',
-                    }
-                )
+                # Crear o actualizar proyeccion.
+                # Si ya existe y está en estado terminal (aceptada/validada/rechazada),
+                # actualizar solo la cantidad y proveedor sin resetear el estado.
+                ESTADOS_TERMINALES = {'aceptada', 'validada', 'rechazada'}
+                existente = ProyeccionInsumo.objects.filter(
+                    insumo=insumo, periodo=periodo_siguiente
+                ).first()
+
+                if existente and existente.estado in ESTADOS_TERMINALES:
+                    # Solo actualizar datos de cantidad; no tocar el estado
+                    existente.cantidad_proyectada = int(cantidad_proyectada)
+                    existente.proveedor_sugerido = proveedor_sugerido
+                    existente.fecha_generacion = now
+                    existente.save(update_fields=[
+                        'cantidad_proyectada', 'proveedor_sugerido', 'fecha_generacion'
+                    ])
+                    proj = existente
+                    created = False
+                else:
+                    proj, created = ProyeccionInsumo.objects.update_or_create(
+                        insumo=insumo,
+                        periodo=periodo_siguiente,
+                        defaults={
+                            'cantidad_proyectada': int(cantidad_proyectada),
+                            'proveedor_sugerido': proveedor_sugerido,
+                            'fecha_generacion': now,
+                            'estado': 'pendiente',
+                        }
+                    )
                 procesados += 1
 
                 # Detectar urgencia: stock actual menor que proyeccion

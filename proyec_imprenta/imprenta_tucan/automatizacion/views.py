@@ -1914,10 +1914,22 @@ def prediccion_generar(request):
         from automatizacion.services import enviar_solicitud_cotizacion
         from configuracion.models import Parametro
 
+        forzar = request.POST.get('forzar') == '1'
+
+        # Si forzar=1: resetear todas las proyecciones del periodo a 'pendiente'
+        if forzar:
+            now = timezone.now()
+            if now.month == 12:
+                periodo = f'{now.year + 1}-01'
+            else:
+                periodo = f'{now.year}-{now.month + 1:02d}'
+            reseteadas = ProyeccionInsumo.objects.filter(periodo=periodo).update(estado='pendiente')
+            messages.info(request, f'{reseteadas} proyecciones de {periodo} reseteadas a pendiente.')
+
         # 1. Generar proyecciones
         resultado = tarea_prediccion_demanda()
 
-        # 2. Obtener top 5 proveedores con email real
+        # 2. Obtener top N proveedores con email real
         top_n = int(Parametro.get('TOP_N_PROVEEDORES_COTIZACION', 5))
         scores = (
             ScoreProveedor.objects
@@ -1930,7 +1942,7 @@ def prediccion_generar(request):
         )
         proveedores = [s.proveedor for s in scores]
 
-        # 3. Agrupar todas las proyecciones pendientes en una sola SC por proveedor
+        # 3. Agrupar proyecciones PENDIENTES (ignorar aceptadas/validadas/rechazadas)
         proyecciones = ProyeccionInsumo.objects.filter(
             estado='pendiente'
         ).select_related('insumo')
@@ -1940,7 +1952,7 @@ def prediccion_generar(request):
             for p in proyecciones
         ]
 
-        # 4. Enviar SC a cada proveedor - sin cambiar estado de proyecciones
+        # 4. Enviar SC a cada proveedor
         enviados = []
         if insumos_cantidades and proveedores:
             for proveedor in proveedores:
@@ -1952,10 +1964,12 @@ def prediccion_generar(request):
                 if ok:
                     enviados.append(proveedor.nombre)
 
-        if enviados:
+        if not insumos_cantidades:
+            messages.info(request, f'{resultado} — Todas las proyecciones ya están confirmadas. Usá "Forzar regeneración" para resetearlas.')
+        elif enviados:
             messages.success(request, f'{resultado} — SC enviada a: {", ".join(enviados)}.')
         else:
-            messages.warning(request, f'{resultado} — No se pudieron enviar SC.')
+            messages.warning(request, f'{resultado} — No se pudieron enviar SC (sin proveedores disponibles).')
     except Exception as e:
         messages.warning(request, f'Error: {e}')
     return redirect('prediccion_demanda_panel')

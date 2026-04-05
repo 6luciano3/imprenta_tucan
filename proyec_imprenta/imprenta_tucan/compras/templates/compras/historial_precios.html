@@ -1,0 +1,105 @@
+{% extends 'base.html' %}
+{% block title %}Historial de Precios — {{ insumo.nombre }}{% endblock %}
+
+{% block content %}
+<div class="mb-6 flex items-center justify-between">
+  <div>
+    <h1 class="text-2xl font-bold flex items-center gap-2">
+      <span class="material-symbols-outlined text-orange-500">history</span>
+      Historial de Precios
+    </h1>
+    <p class="text-gray-500 text-sm mt-1">
+      <strong>{{ insumo.nombre }}</strong>
+      {% if insumo.codigo %}<span class="text-gray-400"> · {{ insumo.codigo }}</span>{% endif %}
+      — Precio actual: <strong class="text-gray-800">${{ insumo.precio_unitario|floatformat:2 }}</strong>
+    </p>
+  </div>
+  <div class="flex gap-2">
+    <a href="{% url 'compras:actualizar_precio_insumo' insumo.pk %}"
+       class="flex items-center gap-1 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-sm font-medium">
+      <span class="material-symbols-outlined text-sm">price_change</span>
+      Actualizar precio
+    </a>
+    <a href="{% url 'compras:lista_precios_insumos' %}"
+       class="flex items-center gap-1 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium">
+      <span class="material-symbols-outlined text-sm">arrow_back</span>
+      Volver
+    </a>
+  </div>
+</div>
+
+{% if page_obj.object_list %}
+<div class="bg-white rounded-xl shadow border border-gray-200 overflow-hidden">
+  <table class="min-w-full text-sm">
+    <thead class="bg-gray-50 border-b border-gray-200">
+      <tr>
+        <th class="px-4 py-3 text-left font-semibold text-gray-600">Fecha</th>
+        <th class="px-4 py-3 text-right font-semibold text-gray-600">Precio anterior</th>
+        <th class="px-4 py-3 text-right font-semibold text-gray-600">Precio nuevo</th>
+        <th class="px-4 py-3 text-center font-semibold text-gray-600">Variación</th>
+        <th class="px-4 py-3 text-left font-semibold text-gray-600">Origen</th>
+        <th class="px-4 py-3 text-left font-semibold text-gray-600">Motivo</th>
+        <th class="px-4 py-3 text-left font-semibold text-gray-600">Usuario</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-100">
+      {% for h in page_obj %}
+      <tr class="hover:bg-gray-50">
+        <td class="px-4 py-3 text-gray-500 whitespace-nowrap">{{ h.fecha|date:"d/m/Y H:i" }}</td>
+        <td class="px-4 py-3 text-right font-mono text-gray-500">${{ h.precio_anterior|floatformat:2 }}</td>
+        <td class="px-4 py-3 text-right font-mono font-semibold">${{ h.precio_nuevo|floatformat:2 }}</td>
+        <td class="px-4 py-3 text-center">
+          {% if h.variacion_pct %}
+            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold
+              {% if h.variacion_pct > 0 %}bg-red-100 text-red-700{% elif h.variacion_pct < 0 %}bg-green-100 text-green-700{% else %}bg-gray-100 text-gray-600{% endif %}">
+              {% if h.variacion_pct > 0 %}+{% endif %}{{ h.variacion_pct|floatformat:1 }}%
+            </span>
+          {% else %}
+            <span class="text-gray-400">—</span>
+          {% endif %}
+        </td>
+        <td class="px-4 py-3">
+          <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium
+            {% if h.origen == 'manual' %}bg-blue-100 text-blue-700
+            {% elif h.origen == 'ajuste_masivo' %}bg-purple-100 text-purple-700
+            {% elif h.origen == 'remito' %}bg-emerald-100 text-emerald-700
+            {% else %}bg-amber-100 text-amber-700{% endif %}">
+            {% if h.origen == 'manual' %}Manual
+            {% elif h.origen == 'ajuste_masivo' %}Ajuste masivo
+            {% elif h.origen == 'remito' %}Remito
+            {% else %}SC{% endif %}
+          </span>
+          {% if h.remito %}
+            <a href="#" class="text-xs text-blue-500 ml-1">{{ h.remito.numero }}</a>
+          {% endif %}
+        </td>
+        <td class="px-4 py-3 text-gray-600 max-w-xs truncate">{{ h.motivo|default:"—" }}</td>
+        <td class="px-4 py-3 text-gray-500">{{ h.usuario|default:"Sistema" }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if page_obj.has_other_pages %}
+<div class="mt-4 flex items-center justify-between text-sm text-gray-600">
+  <span>Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span>
+  <div class="flex gap-2">
+    {% if page_obj.has_previous %}
+      <a href="?page={{ page_obj.previous_page_number }}" class="px-3 py-1 border rounded hover:bg-gray-50">Anterior</a>
+    {% endif %}
+    {% if page_obj.has_next %}
+      <a href="?page={{ page_obj.next_page_number }}" class="px-3 py-1 border rounded hover:bg-gray-50">Siguiente</a>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+{% else %}
+<div class="bg-white rounded-xl border border-gray-200 p-12 text-center text-gray-500">
+  <span class="material-symbols-outlined text-5xl text-gray-300 block mb-3">history</span>
+  <p class="text-lg font-medium mb-1">Sin historial de precios</p>
+  <p class="text-sm">Los cambios de precio se registrarán aquí a partir de ahora.</p>
+</div>
+{% endif %}
+{% endblock %}

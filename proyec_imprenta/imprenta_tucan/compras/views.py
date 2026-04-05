@@ -630,9 +630,25 @@ def nuevo_remito(request):
                         remito=remito, insumo=insumo,
                         cantidad=cantidad, precio_unitario=precio_unitario,
                     )
+                    # Si el remito trae precio real, actualizar insumo y registrar historial
+                    from .models import HistorialPrecioInsumo
+                    from decimal import Decimal
+                    precio_decimal = Decimal(str(precio_unitario))
+                    if precio_decimal > 0 and precio_decimal != (insumo.precio_unitario or 0):
+                        precio_anterior = insumo.precio_unitario or Decimal('0')
+                        insumo.precio_unitario = precio_decimal
+                        HistorialPrecioInsumo.objects.create(
+                            insumo=insumo,
+                            precio_anterior=precio_anterior,
+                            precio_nuevo=precio_decimal,
+                            origen='remito',
+                            motivo=f'Precio actualizado al recibir Remito {remito.numero}',
+                            usuario=request.user,
+                            remito=remito,
+                        )
                     stock_anterior = insumo.stock or 0
                     insumo.stock = stock_anterior + cantidad
-                    insumo.save(update_fields=["stock", "updated_at"])
+                    insumo.save(update_fields=["stock", "precio_unitario", "updated_at"])
                     # Registrar MovimientoStock
                     from .models import MovimientoStock
                     MovimientoStock.objects.create(
@@ -726,15 +742,26 @@ def actualizar_precio_insumo(request, insumo_pk):
     if request.method == "POST":
         form = PrecioForm(request.POST)
         if form.is_valid():
+            from .models import HistorialPrecioInsumo
             precio_anterior = insumo.precio_unitario
-            insumo.precio_unitario = form.cleaned_data["precio_unitario"]
+            precio_nuevo = form.cleaned_data["precio_unitario"]
+            motivo = form.cleaned_data.get("motivo", "")
+            insumo.precio_unitario = precio_nuevo
             insumo.save(update_fields=["precio_unitario", "updated_at"])
+            HistorialPrecioInsumo.objects.create(
+                insumo=insumo,
+                precio_anterior=precio_anterior,
+                precio_nuevo=precio_nuevo,
+                origen='manual',
+                motivo=motivo,
+                usuario=request.user,
+            )
             _registrar_auditoria(request, insumo, "update")
             messages.success(
                 request,
-                f"Precio de {insumo.nombre} actualizado: ${precio_anterior} → ${insumo.precio_unitario}."
+                f"Precio de {insumo.nombre} actualizado: ${precio_anterior} → ${precio_nuevo}."
             )
-            return redirect("compras:lista_ordenes_compra")
+            return redirect("compras:lista_precios_insumos")
     else:
         form = PrecioForm(initial={"precio_unitario": insumo.precio_unitario})
 
@@ -748,8 +775,58 @@ def actualizar_precio_insumo(request, insumo_pk):
 @login_required
 def lista_precios_insumos(request):
     from insumos.models import Insumo
-    insumos = Insumo.objects.filter(activo=True).select_related("proveedor").order_by("nombre")
-    return render(request, "compras/lista_precios.html", {"insumos": insumos})
+    from proveedores.models import Proveedor
+    from django.core.paginator import Paginator
+
+    q = request.GET.get("q", "").strip()
+    proveedor_id = request.GET.get("proveedor", "")
+    sin_precio = request.GET.get("sin_precio", "")
+
+    qs = Insumo.objects.filter(activo=True).select_related("proveedor").order_by("nombre")
+
+    if q:
+        from django.db.models import Q as _Q
+        qs = qs.filter(_Q(nombre__icontains=q) | _Q(codigo__icontains=q))
+    if proveedor_id:
+        qs = qs.filter(proveedor_id=proveedor_id)
+    if sin_precio:
+        qs = qs.filter(precio_unitario=0)
+
+    proveedores = Proveedor.objects.filter(activo=True).order_by("nombre")
+    paginator = Paginator(qs, 30)
+    page = paginator.get_page(request.GET.get("page"))
+
+    return render(request, "compras/lista_precios.html", {
+        "page_obj": page,
+        "insumos": page.object_list,
+        "proveedores": proveedores,
+        "q": q,
+        "proveedor_sel": proveedor_id,
+        "sin_precio": sin_precio,
+        "total": qs.count(),
+    })
+
+
+# ── Historial de precios de un insumo ────────────────────────────────────────
+@login_required
+def historial_precios_insumo(request, insumo_pk):
+    from insumos.models import Insumo
+    from .models import HistorialPrecioInsumo
+    from django.core.paginator import Paginator
+
+    insumo = get_object_or_404(Insumo, pk=insumo_pk)
+    historial_qs = (
+        HistorialPrecioInsumo.objects
+        .filter(insumo=insumo)
+        .select_related('usuario', 'remito')
+        .order_by('-fecha')
+    )
+    paginator = Paginator(historial_qs, 20)
+    page = paginator.get_page(request.GET.get('page'))
+    return render(request, "compras/historial_precios.html", {
+        "insumo": insumo,
+        "page_obj": page,
+    })
 
 
 # ── Home de Compras ───────────────────────────────────────────────────────────
@@ -825,7 +902,7 @@ def ajuste_masivo_precios(request):
             queryset = queryset.filter(categoria__icontains=filtro_categoria)
         
         if filtro_proveedor:
-            queryset = queryset.filter(proveedor_predeterminado_id=filtro_proveedor)
+            queryset = queryset.filter(proveedor_id=filtro_proveedor)
         
         if filtro_tipo == 'con_precio':
             queryset = queryset.filter(precio_unitario__gt=0)
@@ -837,20 +914,34 @@ def ajuste_masivo_precios(request):
 
         insumos_actualizados = 0
         errores = []
+        motivo_masivo = request.POST.get('motivo', '').strip() or f'Ajuste masivo {porcentaje:+.2f}%'
 
         with transaction.atomic():
+            from .models import HistorialPrecioInsumo
+            registros_historial = []
             for insumo in queryset:
                 try:
                     if insumo.precio_unitario:
-                        nuevo_precio = (insumo.precio_unitario * factor).quantize(Decimal('0.01'))
+                        precio_anterior = insumo.precio_unitario
+                        nuevo_precio = (precio_anterior * factor).quantize(Decimal('0.01'))
                         if nuevo_precio < 0:
                             errores.append(f"{insumo.nombre}: precio no puede ser negativo")
                             continue
                         insumo.precio_unitario = nuevo_precio
                         insumo.save(update_fields=['precio_unitario'])
+                        registros_historial.append(HistorialPrecioInsumo(
+                            insumo=insumo,
+                            precio_anterior=precio_anterior,
+                            precio_nuevo=nuevo_precio,
+                            origen='ajuste_masivo',
+                            motivo=motivo_masivo,
+                            usuario=request.user,
+                        ))
                         insumos_actualizados += 1
                 except Exception as e:
                     errores.append(f"{insumo.nombre}: {str(e)}")
+            if registros_historial:
+                HistorialPrecioInsumo.objects.bulk_create(registros_historial)
         
         if errores:
             messages.warning(request, f"Actualizados {insumos_actualizados} insumos. Errores: {', '.join(errores[:5])}")

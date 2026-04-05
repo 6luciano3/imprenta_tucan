@@ -26,12 +26,22 @@
         <span class="material-symbols-outlined text-sm">warning</span> Pendientes de revision
       </span>
     </div>
-    <form method="post" action="{% url 'prediccion_generar' %}">
-      {% csrf_token %}
-      <button type="submit" class="px-3 py-2 rounded bg-violet-600 text-white text-sm hover:bg-violet-700">
-        <span class="material-symbols-outlined text-sm align-middle">refresh</span> Generar proyecciones
-      </button>
-    </form>
+    <div class="flex gap-2">
+      <form method="post" action="{% url 'prediccion_generar' %}">
+        {% csrf_token %}
+        <button type="submit" class="px-3 py-2 rounded bg-violet-600 text-white text-sm hover:bg-violet-700">
+          <span class="material-symbols-outlined text-sm align-middle">refresh</span> Generar proyecciones
+        </button>
+      </form>
+      <form method="post" action="{% url 'prediccion_generar' %}"
+            onsubmit="return confirm('¿Resetear todas las proyecciones a Pendiente y regenerar? Esto descarta los estados Aceptada/Validada del período actual.')">
+        {% csrf_token %}
+        <input type="hidden" name="forzar" value="1">
+        <button type="submit" class="px-3 py-2 rounded bg-rose-600 text-white text-sm hover:bg-rose-700">
+          <span class="material-symbols-outlined text-sm align-middle">restart_alt</span> Forzar regeneración
+        </button>
+      </form>
+    </div>
   </div>
 
   {% if proyecciones %}
