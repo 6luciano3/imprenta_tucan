@@ -1702,10 +1702,16 @@ def solicitud_cotizacion_confirmar(request, token):
     # Actualizar proyecciones relacionadas
     try:
         from insumos.models import ProyeccionInsumo
-        insumo_ids = list(sc.items.values_list('insumo_id', flat=True))
-        ProyeccionInsumo.objects.filter(
-            insumo_id__in=insumo_ids, estado='pendiente'
-        ).update(estado='aceptada', proveedor_validado=sc.proveedor)
+        # Solo aceptar los insumos que el proveedor marcó como disponibles
+        insumo_ids_disponibles = list(
+            sc.items.filter(disponible=True).values_list('insumo_id', flat=True)
+        )
+        if insumo_ids_disponibles:
+            ProyeccionInsumo.objects.filter(
+                insumo_id__in=insumo_ids_disponibles, estado='pendiente'
+            ).update(estado='aceptada', proveedor_validado=sc.proveedor)
+        # Los insumos marcados como no disponibles quedan en 'pendiente'
+        # para que el mecanismo de fallback los envíe a otro proveedor
     except Exception:
         pass
 
