@@ -87,21 +87,41 @@ def crear_presupuesto(request):
     today = date.today()
     validez_default = (today + timedelta(days=30)).strftime('%Y-%m-%d')
 
+    # Descuentos por tipo de cliente (desde Parametro o defaults)
+    from configuracion.models import Parametro
+    try:
+        descuentos_tipos = {
+            'nuevo':       int(Parametro.get('DESCUENTO_CLIENTE_NUEVO',       0)),
+            'estandar':    int(Parametro.get('DESCUENTO_CLIENTE_ESTANDAR',    5)),
+            'estrategico': int(Parametro.get('DESCUENTO_CLIENTE_ESTRATEGICO', 15)),
+            'premium':     int(Parametro.get('DESCUENTO_CLIENTE_PREMIUM',     25)),
+        }
+    except Exception:
+        descuentos_tipos = {'nuevo': 0, 'estandar': 5, 'estrategico': 15, 'premium': 25}
+
+    # IVA configurable
+    try:
+        iva_default = int(Parametro.get('IVA_PRESUPUESTO', 21))
+    except Exception:
+        iva_default = 21
+
     if request.method == 'POST':
         form = PresupuestoForm(request.POST)
         if form.is_valid():
+            from django.db import transaction
             presupuesto = form.save(commit=False)
-            # Generar número automático
-            ultimo = Presupuesto.objects.order_by('-id').first()
-            if ultimo and ultimo.numero and ultimo.numero.startswith('P-'):
-                try:
-                    last_num = int(ultimo.numero.split('-')[1])
-                except Exception:
-                    last_num = ultimo.id
-            else:
-                last_num = ultimo.id if ultimo else 0
-            presupuesto.numero = f"P-{last_num + 1:05d}"
-            presupuesto.save()
+            # Generar número automático de forma thread-safe
+            with transaction.atomic():
+                ultimo = Presupuesto.objects.select_for_update().order_by('-id').first()
+                if ultimo and ultimo.numero and ultimo.numero.startswith('P-'):
+                    try:
+                        last_num = int(ultimo.numero.split('-')[1])
+                    except Exception:
+                        last_num = ultimo.id
+                else:
+                    last_num = ultimo.id if ultimo else 0
+                presupuesto.numero = f"P-{last_num + 1:05d}"
+                presupuesto.save()
 
             # Leer descuento/IVA global
             descuento_global = request.POST.get('descuento_global', '0').strip()
@@ -142,7 +162,12 @@ def crear_presupuesto(request):
                     continue
             presupuesto.total = total
             presupuesto.save()
-            return redirect(f"/presupuestos/lista/?nuevo={presupuesto.pk}")
+            from django.contrib import messages
+            messages.success(
+                request,
+                f'Presupuesto {presupuesto.numero} creado. Podés enviárselo al cliente desde aquí.'
+            )
+            return redirect('presupuestos:lista')
     else:
         form = PresupuestoForm()
 
@@ -151,6 +176,8 @@ def crear_presupuesto(request):
         'productos_lista': productos_lista,
         'clientes_data': clientes_data,
         'validez_default': validez_default,
+        'descuentos_tipos_json': descuentos_tipos,
+        'iva_default': iva_default,
     })
 
 

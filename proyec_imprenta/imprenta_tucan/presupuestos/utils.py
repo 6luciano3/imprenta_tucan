@@ -113,7 +113,7 @@ def generar_pdf_presupuesto(presupuesto, link_respuesta=''):
     validez_str = presupuesto.validez.strftime('%d/%m/%Y') if presupuesto.validez else 'Sin fecha límite'
 
     info_rows = [
-        [Paragraph(f'Presupuesto <font color="#1d4ed8"><b>{presupuesto.numero}</b></font>', normal12_blue(styles))],
+        [Paragraph(f'Presupuesto <font color="#1d4ed8"><b>{presupuesto.numero}</b></font>', ps('pres_num', fontSize=12, fontName='Helvetica-Bold', textColor=colors.HexColor('#1d4ed8')))],
         [Paragraph(f'Fecha: {fecha_str}  ·  Válido hasta: <b>{validez_str}</b>', normal9)],
         [Paragraph(f'Estado: <b>{presupuesto.estado}</b>', normal9)],
     ]
@@ -293,14 +293,30 @@ def _pil_fonts():
         return None, None, None, None
 
     _REGULAR = [
+        # Windows
         'C:/Windows/Fonts/segoeui.ttf',
         'C:/Windows/Fonts/arial.ttf',
         'C:/Windows/Fonts/calibri.ttf',
+        # Linux
+        '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
+        '/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf',
+        '/usr/share/fonts/truetype/freefont/FreeSans.ttf',
+        # macOS
+        '/System/Library/Fonts/Helvetica.ttc',
+        '/Library/Fonts/Arial.ttf',
     ]
     _BOLD = [
+        # Windows
         'C:/Windows/Fonts/segoeuib.ttf',
         'C:/Windows/Fonts/arialbd.ttf',
         'C:/Windows/Fonts/calibrib.ttf',
+        # Linux
+        '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',
+        '/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf',
+        '/usr/share/fonts/truetype/freefont/FreeSansBold.ttf',
+        # macOS
+        '/System/Library/Fonts/Helvetica.ttc',
+        '/Library/Fonts/Arial Bold.ttf',
     ]
 
     def _try(paths, size):

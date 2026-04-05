@@ -282,7 +282,8 @@
     return html + '</select>';
   }
 
-  const DESCUENTOS_POR_TIPO = { 'nuevo': 0, 'estandar': 5, 'estrategico': 15, 'premium': 25 };
+  const DESCUENTOS_POR_TIPO = {{ descuentos_tipos_json|safe }};
+  const IVA_DEFAULT = {{ iva_default }};
 
   function recalcAll() {
     let subtotal = 0;
@@ -304,7 +305,7 @@
     const montoDesc = subtotal * (descPct / 100);
     const subtotalConDesc = subtotal - montoDesc;
     const aplicaIVA = ivaCheckbox.checked;
-    const montoIVA = aplicaIVA ? subtotalConDesc * 0.21 : 0;
+    const montoIVA = aplicaIVA ? subtotalConDesc * (IVA_DEFAULT / 100) : 0;
     const total = subtotalConDesc + montoIVA;
 
     if (descPct > 0) {
@@ -368,10 +369,48 @@
   descuentoSelect.addEventListener('change', recalcGrandTotal);
   ivaCheckbox.addEventListener('change', recalcGrandTotal);
 
-  document.querySelector('form').addEventListener('submit', function () {
+  document.querySelector('form').addEventListener('submit', function (e) {
+    // --- Validaciones frontend ---
+    const filas = tbody.querySelectorAll('tr');
+    let errores = [];
+
+    if (filas.length === 0) {
+      errores.push('Agregá al menos un producto al presupuesto.');
+    } else {
+      let filaValida = false;
+      filas.forEach((tr, i) => {
+        const prod   = tr.querySelector('.producto-select').value;
+        const cant   = parseFloat(tr.querySelector('.cantidad-input').value);
+        const precio = parseFloat(tr.querySelector('.precio-input').value);
+        if (!prod) return;
+        filaValida = true;
+        if (!(cant > 0))   errores.push(`Fila ${i+1}: la cantidad debe ser mayor a 0.`);
+        if (!(precio > 0)) errores.push(`Fila ${i+1}: el precio debe ser mayor a 0.`);
+      });
+      if (!filaValida) errores.push('Seleccioná un producto en al menos una fila.');
+    }
+
+    const clienteVal = document.getElementById('{{ form.cliente.id_for_label }}').value;
+    if (!clienteVal) errores.push('Seleccioná un cliente.');
+
+    if (errores.length > 0) {
+      e.preventDefault();
+      let msgBox = document.getElementById('validacion-errores');
+      if (!msgBox) {
+        msgBox = document.createElement('div');
+        msgBox.id = 'validacion-errores';
+        msgBox.className = 'alert alert-danger mt-3';
+        document.querySelector('form').prepend(msgBox);
+      }
+      msgBox.innerHTML = '<strong>Corregí los siguientes errores:</strong><ul class="mb-0 mt-1">' +
+        errores.map(e => `<li>${e}</li>`).join('') + '</ul>';
+      msgBox.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
+
     document.querySelectorAll('input[name^="det-"]').forEach(el => el.remove());
     const descGlobal = descuentoSelect.value;
-    const ivaVal = ivaCheckbox.checked ? '21' : '0';
+    const ivaVal = ivaCheckbox.checked ? String(IVA_DEFAULT) : '0';
     [['descuento_global', descGlobal], ['iva_aplicada', ivaVal]].forEach(([n, v]) => {
       const inp = document.createElement('input');
       inp.type = 'hidden'; inp.name = n; inp.value = v;
