@@ -152,12 +152,17 @@ def proyeccion_demanda_config(request):
     if request.method == 'POST':
         # Botón "Ejecutar ahora"
         if 'ejecutar_ahora' in request.POST:
+            from insumos.tasks import generar_proyecciones_insumos
             try:
-                from insumos.tasks import generar_proyecciones_insumos
                 generar_proyecciones_insumos.delay()
-                messages.success(request, 'Tarea de proyección enviada a la cola. Los resultados estarán disponibles en unos segundos.')
-            except Exception as e:
-                messages.error(request, f'Error al encolar la tarea: {e}')
+                messages.success(request, 'Tarea enviada a la cola Celery. Los resultados estarán disponibles en unos segundos.')
+            except Exception:
+                # Celery/Redis no disponible — ejecutar sincrónicamente
+                try:
+                    generar_proyecciones_insumos()
+                    messages.success(request, 'Proyecciones generadas correctamente (ejecución directa, Celery no disponible).')
+                except Exception as e:
+                    messages.error(request, f'Error al ejecutar la tarea: {e}')
             return redirect(request.path)
 
         grupo, _ = GrupoParametro.objects.get_or_create(
@@ -169,7 +174,28 @@ def proyeccion_demanda_config(request):
             raw = request.POST.get(p['clave'], '').strip()
             if not raw:
                 continue
-            # Validar que sea entero válido dentro de rango
+            
+            # Para PROYECCION_N_INSUMOS: solo permitir 0-50
+            if p['clave'] == 'PROYECCION_N_INSUMOS':
+                # Validar que sea número positivo
+                if not raw.isdigit():
+                    errores.append(f"{p['nombre']}: debe ser un número entre 0 y 50.")
+                    continue
+                val = int(raw)
+                if not (0 <= val <= 50):
+                    errores.append(f"{p['nombre']}: debe estar entre 0 y 50.")
+                    continue
+                Parametro.set(p['clave'], str(val), tipo=p['tipo'], grupo=grupo, nombre=p['nombre'])
+                continue
+            
+            # Para los otros parámetros: validación original
+            import re
+            if not re.match(r'^-?\d+$', raw):
+                errores.append(f"{p['nombre']}: debe ser un número entero.")
+                continue
+            if len(raw) > 10:
+                errores.append(f"{p['nombre']}: valor demasiado largo.")
+                continue
             try:
                 val = int(raw)
                 min_val = int(p.get('min', 0))

@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rechazar Solicitud SC-{{ sc.id|stringformat:"04d" }}</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #f0f4f8; font-family: Segoe UI, Arial, sans-serif; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
+.card { background: #fff; border-radius: 16px; box-shadow: 0 4px 24px rgba(0,0,0,.1); max-width: 520px; width: 100%; overflow: hidden; }
+.header { background: linear-gradient(135deg, #7f1d1d, #ef4444); padding: 28px 32px; }
+.header-title { font-size: 22px; font-weight: 700; color: #fff; }
+.header-sub { font-size: 13px; color: rgba(255,255,255,.7); margin-top: 4px; }
+.body { padding: 28px 32px; }
+.sc-info { font-size: 13px; color: #64748b; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 16px; margin-bottom: 20px; }
+.sc-info strong { color: #1e293b; }
+label { display: block; font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 6px; }
+textarea {
+  width: 100%; border: 1px solid #cbd5e1; border-radius: 8px;
+  padding: 10px 12px; font-size: 13px; resize: vertical; min-height: 100px;
+  font-family: inherit; outline: none; transition: border-color .15s;
+}
+textarea:focus { border-color: #ef4444; }
+.items-list { margin-top: 12px; margin-bottom: 20px; }
+.items-list table { width: 100%; font-size: 12px; border-collapse: collapse; }
+.items-list th { background: #f1f5f9; color: #475569; padding: 7px 10px; text-align: left; border-bottom: 1px solid #e2e8f0; }
+.items-list td { padding: 7px 10px; border-bottom: 1px solid #f1f5f9; color: #374151; }
+.actions { display: flex; gap: 12px; margin-top: 20px; }
+.btn-rechazar {
+  flex: 1; background: #ef4444; color: #fff; border: none; border-radius: 10px;
+  padding: 13px; font-size: 14px; font-weight: 700; cursor: pointer; transition: background .15s;
+}
+.btn-rechazar:hover { background: #dc2626; }
+.btn-volver {
+  padding: 13px 20px; background: #f1f5f9; color: #374151; border: none;
+  border-radius: 10px; font-size: 14px; cursor: pointer; text-decoration: none;
+  display: inline-flex; align-items: center;
+}
+.btn-volver:hover { background: #e2e8f0; }
+.footer { background: #f8fafc; border-top: 1px solid #e2e8f0; padding: 14px 32px; text-align: center; font-size: 11px; color: #94a3b8; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="header">
+    <div class="header-title">Rechazar SC-{{ sc.id|stringformat:"04d" }}</div>
+    <div class="header-sub">Indique el motivo para que podamos mejorar futuras solicitudes.</div>
+  </div>
+
+  <div class="body">
+    <div class="sc-info">
+      <strong>Proveedor:</strong> {{ sc.proveedor.nombre }}<br>
+      <strong>Fecha:</strong> {{ sc.creada|date:"d/m/Y" }}
+    </div>
+
+    <div class="items-list">
+      <table>
+        <thead><tr><th>Insumo</th><th style="text-align:center;">Cantidad</th></tr></thead>
+        <tbody>
+          {% for item in items %}
+          <tr>
+            <td>{{ item.insumo.nombre }}</td>
+            <td style="text-align:center;">{{ item.cantidad }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <form method="POST">
+      {% csrf_token %}
+      <label for="motivo">Motivo del rechazo (opcional)</label>
+      <textarea id="motivo" name="motivo" placeholder="Ej: No tenemos stock, precio fuera de rango, no trabajamos con este producto..."></textarea>
+
+      <div class="actions">
+        <a href="/automatizacion/solicitud-cotizacion/{{ token }}/confirmar/" class="btn-volver">← Volver</a>
+        <button type="submit" class="btn-rechazar">✗ Confirmar Rechazo</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="footer">Imprenta Tucán &mdash; Gracias por su respuesta.</div>
+</div>
+</body>
+</html>

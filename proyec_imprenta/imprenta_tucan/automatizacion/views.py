@@ -1540,77 +1540,221 @@ def reenviar_ofertas_todas(request):
     return redirect(f"/automatizacion/propuestas/?{params}")
 
 
+# ── Helpers internos para SC ────────────────────────────────────────────────
+
+def _crear_oc_desde_sc(sc):
+    """Crea una OrdenCompra borrador desde una SolicitudCotizacion confirmada.
+    Sólo incluye items marcados como disponibles (o sin marcar).
+    Retorna la OC creada, o None si falla.
+    """
+    try:
+        from compras.models import OrdenCompra, DetalleOrdenCompra, EstadoCompra
+        from django.db import transaction as _tx
+
+        estado, _ = EstadoCompra.objects.get_or_create(nombre='Pendiente')
+        with _tx.atomic():
+            oc = OrdenCompra.objects.create(
+                proveedor=sc.proveedor,
+                estado=estado,
+                solicitud_cotizacion=sc,
+                observaciones=f'Generada automáticamente desde SC-{sc.id:04d}.',
+            )
+            total = 0
+            for item in sc.items.select_related('insumo').all():
+                if item.disponible is False:
+                    continue  # item explícitamente no disponible
+                precio = item.precio_unitario_respuesta or 0
+                DetalleOrdenCompra.objects.create(
+                    orden=oc,
+                    insumo=item.insumo,
+                    cantidad=item.cantidad,
+                    precio_unitario=precio,
+                )
+                total += item.cantidad * precio
+            oc.monto_total = total
+            oc.save(update_fields=['monto_total'])
+        return oc
+    except Exception as e:
+        logger.error(f'_crear_oc_desde_sc: error creando OC desde SC-{sc.id}: {e}')
+        return None
+
+
+def _enviar_sc_siguiente_proveedor(sc):
+    """Busca el siguiente proveedor rankeado que no haya recibido una SC
+    para los mismos insumos en los últimos 7 días y le envía una nueva SC.
+    Retorna la nueva SolicitudCotizacion o None.
+    """
+    try:
+        from automatizacion.models import SolicitudCotizacion as _SC, ScoreProveedor
+        from automatizacion.services import enviar_solicitud_cotizacion
+        from datetime import timedelta
+
+        insumos_cantidades = [
+            (item.insumo, item.cantidad)
+            for item in sc.items.select_related('insumo').all()
+        ]
+        if not insumos_cantidades:
+            return None
+
+        insumo_ids = [i.pk for i, _ in insumos_cantidades]
+        hace_7dias = timezone.now() - timedelta(days=7)
+
+        # Proveedores ya notificados recientemente para estos insumos
+        ya_notificados = set(
+            _SC.objects.filter(
+                creada__gte=hace_7dias,
+                items__insumo_id__in=insumo_ids,
+            ).values_list('proveedor_id', flat=True)
+        )
+
+        siguiente = (
+            ScoreProveedor.objects
+            .select_related('proveedor')
+            .filter(proveedor__activo=True)
+            .exclude(proveedor__email__isnull=True)
+            .exclude(proveedor__email='')
+            .exclude(proveedor__email__endswith='.local')
+            .exclude(proveedor_id__in=ya_notificados)
+            .order_by('-score')
+            .first()
+        )
+        if not siguiente:
+            logger.info(f'_enviar_sc_siguiente_proveedor: sin candidatos para SC-{sc.id}')
+            return None
+
+        sc_nueva, ok, err = enviar_solicitud_cotizacion(
+            proveedor=siguiente.proveedor,
+            insumos_cantidades=insumos_cantidades,
+            comentario=f'Reasignada automáticamente (SC-{sc.id:04d} rechazada por {sc.proveedor.nombre}).',
+        )
+        if ok:
+            logger.info(f'_enviar_sc_siguiente_proveedor: SC-{sc_nueva.id} enviada a {siguiente.proveedor}')
+            return sc_nueva
+        logger.warning(f'_enviar_sc_siguiente_proveedor: fallo enviando a {siguiente.proveedor}: {err}')
+        return None
+    except Exception as e:
+        logger.error(f'_enviar_sc_siguiente_proveedor: error inesperado: {e}')
+        return None
+
+
+def _notificar_staff_sc(sc, accion, extra=''):
+    """Notifica a todo el staff y al email admin sobre una respuesta de SC."""
+    try:
+        from django.conf import settings as _s
+        from core.notifications.engine import enviar_notificacion
+        from usuarios.models import Notificacion
+
+        verbo = 'CONFIRMÓ' if accion == 'confirmada' else 'RECHAZÓ'
+        resumen = f'Proveedor {sc.proveedor.nombre} {verbo} SC-{sc.id:04d} ({sc.items.count()} insumo(s)).{(" " + extra) if extra else ""}'
+        for u in get_user_model().objects.filter(is_staff=True):
+            Notificacion.objects.create(usuario=u, mensaje=resumen)
+        admin_email = getattr(_s, 'EMAIL_HOST_USER', '')
+        if admin_email:
+            enviar_notificacion(
+                destinatario=admin_email,
+                canal='email',
+                asunto=f'SC-{sc.id:04d} {accion.capitalize()} por {sc.proveedor.nombre}',
+                mensaje=resumen,
+            )
+    except Exception as e:
+        logger.error(f'_notificar_staff_sc: {e}')
+
+
+# ── Vistas públicas de SC (sin login — autenticadas por token) ───────────────
+
 @csrf_exempt
 def solicitud_cotizacion_confirmar(request, token):
+    """
+    GET  → muestra formulario para que el proveedor informe precios y disponibilidad.
+    POST → guarda precios, confirma la SC, crea OC borrador y notifica al staff.
+    """
     from automatizacion.models import SolicitudCotizacion
     sc = get_object_or_404(SolicitudCotizacion, token=token)
     ya_respondida = sc.estado in ('confirmada', 'rechazada')
-    if not ya_respondida:
-        sc.estado = 'confirmada'
-        sc.fecha_respuesta = timezone.now()
-        sc.save()
-        # Actualizar proyecciones relacionadas: estado aceptada + proveedor validado
+
+    if ya_respondida:
+        return render(request, 'automatizacion/solicitud_cotizacion_respuesta.html', {
+            'sc': sc, 'accion': sc.estado, 'ya_respondida': True,
+        })
+
+    items = sc.items.select_related('insumo').all()
+
+    if request.method == 'GET':
+        return render(request, 'automatizacion/solicitud_cotizacion_form.html', {
+            'sc': sc, 'items': items, 'token': token,
+        })
+
+    # POST: guardar precios y disponibilidad por item
+    for item in items:
+        precio_raw = request.POST.get(f'precio_{item.pk}', '').strip()
+        disponible_raw = request.POST.get(f'disponible_{item.pk}', '')
         try:
-            from insumos.models import ProyeccionInsumo
-            insumo_ids = list(sc.items.values_list('insumo_id', flat=True))
-            ProyeccionInsumo.objects.filter(
-                insumo_id__in=insumo_ids,
-                estado='pendiente'
-            ).update(estado='aceptada', proveedor_validado=sc.proveedor)
-        except Exception:
-            pass
-        try:
-            from django.conf import settings as _s
-            from core.notifications.engine import enviar_notificacion
-            from usuarios.models import Notificacion
-            resumen = f'Proveedor {sc.proveedor.nombre} CONFIRMO SC-{sc.id:04d} con {sc.items.count()} insumo(s).'
-            for u in get_user_model().objects.filter(is_staff=True):
-                Notificacion.objects.create(usuario=u, mensaje=resumen)
-            admin_email = getattr(_s, 'EMAIL_HOST_USER', '')
-            if admin_email:
-                enviar_notificacion(
-                    destinatario=admin_email,
-                    canal='email',
-                    asunto=f'SC-{sc.id:04d} Confirmada por {sc.proveedor.nombre}',
-                    mensaje=resumen,
-                )
-        except Exception:
-            pass
+            item.precio_unitario_respuesta = float(precio_raw.replace(',', '.')) if precio_raw else None
+        except ValueError:
+            item.precio_unitario_respuesta = None
+        item.disponible = (disponible_raw == '1')
+        item.save(update_fields=['precio_unitario_respuesta', 'disponible'])
+
+    sc.estado = 'confirmada'
+    sc.fecha_respuesta = timezone.now()
+    sc.save()
+
+    # Actualizar proyecciones relacionadas
+    try:
+        from insumos.models import ProyeccionInsumo
+        insumo_ids = list(sc.items.values_list('insumo_id', flat=True))
+        ProyeccionInsumo.objects.filter(
+            insumo_id__in=insumo_ids, estado='pendiente'
+        ).update(estado='aceptada', proveedor_validado=sc.proveedor)
+    except Exception:
+        pass
+
+    # Crear OC borrador automáticamente
+    oc = _crear_oc_desde_sc(sc)
+    oc_info = f'OC-{oc.pk:04d} generada automáticamente.' if oc else ''
+
+    _notificar_staff_sc(sc, 'confirmada', extra=oc_info)
+
     return render(request, 'automatizacion/solicitud_cotizacion_respuesta.html', {
-        'sc': sc, 'accion': 'confirmada', 'ya_respondida': ya_respondida,
+        'sc': sc, 'accion': 'confirmada', 'ya_respondida': False, 'oc': oc,
     })
 
 
 @csrf_exempt
 def solicitud_cotizacion_rechazar(request, token):
+    """
+    GET  → muestra formulario para ingresar motivo de rechazo.
+    POST → registra el rechazo, notifica al staff y busca el siguiente proveedor.
+    """
     from automatizacion.models import SolicitudCotizacion
     sc = get_object_or_404(SolicitudCotizacion, token=token)
     ya_respondida = sc.estado in ('confirmada', 'rechazada')
-    if not ya_respondida:
-        motivo = request.POST.get('motivo', '')
-        sc.estado = 'rechazada'
-        sc.fecha_respuesta = timezone.now()
-        sc.comentario = (sc.comentario + ' | ' if sc.comentario else '') + f'Rechazada: {motivo or "Sin motivo"}'
-        sc.save()
-        try:
-            from django.conf import settings as _s
-            from core.notifications.engine import enviar_notificacion
-            from usuarios.models import Notificacion
-            resumen = f'Proveedor {sc.proveedor.nombre} RECHAZO SC-{sc.id:04d}. Motivo: {motivo or "Sin motivo"}'
-            for u in get_user_model().objects.filter(is_staff=True):
-                Notificacion.objects.create(usuario=u, mensaje=resumen)
-            admin_email = getattr(_s, 'EMAIL_HOST_USER', '')
-            if admin_email:
-                enviar_notificacion(
-                    destinatario=admin_email,
-                    canal='email',
-                    asunto=f'SC-{sc.id:04d} Rechazada por {sc.proveedor.nombre}',
-                    mensaje=resumen,
-                )
-        except Exception:
-            pass
+
+    if ya_respondida:
+        return render(request, 'automatizacion/solicitud_cotizacion_respuesta.html', {
+            'sc': sc, 'accion': sc.estado, 'ya_respondida': True,
+        })
+
+    if request.method == 'GET':
+        return render(request, 'automatizacion/solicitud_cotizacion_rechazar_form.html', {
+            'sc': sc, 'items': sc.items.select_related('insumo').all(), 'token': token,
+        })
+
+    motivo = request.POST.get('motivo', '').strip()
+    sc.estado = 'rechazada'
+    sc.fecha_respuesta = timezone.now()
+    sc.comentario = (sc.comentario + ' | ' if sc.comentario else '') + f'Rechazada: {motivo or "Sin motivo"}'
+    sc.save()
+
+    # Buscar siguiente proveedor (fallback)
+    sc_nueva = _enviar_sc_siguiente_proveedor(sc)
+    fallback_info = f'SC-{sc_nueva.id:04d} enviada a {sc_nueva.proveedor.nombre}.' if sc_nueva else 'Sin proveedores alternativos disponibles.'
+
+    _notificar_staff_sc(sc, 'rechazada', extra=fallback_info)
+
     return render(request, 'automatizacion/solicitud_cotizacion_respuesta.html', {
-        'sc': sc, 'accion': 'rechazada', 'ya_respondida': ya_respondida,
+        'sc': sc, 'accion': 'rechazada', 'ya_respondida': False,
+        'motivo': motivo, 'sc_nueva': sc_nueva,
     })
 
 

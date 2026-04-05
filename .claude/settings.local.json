@@ -4,7 +4,10 @@
       "Bash(python manage.py check estadisticas)",
       "Bash(xargs ls:*)",
       "Bash(xargs grep:*)",
-      "Bash(grep -l \"MotorConfig\\\\|DEFAULTS\" \"c:\\\\Users\\\\Public\\\\Documents\\\\facultad\\\\3er Año\\\\Trabajo Final\\\\proyecto_imprenta\\\\proyec_imprenta\\\\imprenta_tucan\"/**/*.py)"
+      "Bash(grep -l \"MotorConfig\\\\|DEFAULTS\" \"c:\\\\Users\\\\Public\\\\Documents\\\\facultad\\\\3er Año\\\\Trabajo Final\\\\proyecto_imprenta\\\\proyec_imprenta\\\\imprenta_tucan\"/**/*.py)",
+      "Bash(python manage.py showmigrations compras)",
+      "Bash(python manage.py migrate compras)",
+      "Bash(python manage.py check --deploy)"
     ]
   }
 }
