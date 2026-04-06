@@ -24,6 +24,8 @@ class ProductoForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         from configuracion.models import Formula, UnidadDeMedida
         self.fields['formula'].queryset = Formula.objects.filter(activo=True).order_by('codigo')
+        self.fields['formula'].required = False
+        self.fields['formula'].empty_label = '— Sin fórmula (opcional) —'
         self.fields['unidadMedida'].queryset = UnidadDeMedida.objects.filter(activo=True).order_by('nombre')
 
     def clean_nombreProducto(self):
@@ -95,7 +97,7 @@ class ProductoInsumoAltaForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         from insumos.models import Insumo
-        self.fields['insumo'].queryset = Insumo.objects.order_by('nombre')
+        self.fields['insumo'].queryset = Insumo.objects.filter(tipo='directo').order_by('nombre')
         self.fields['insumo'].empty_label = '— Seleccionar insumo —'
 
     def clean_cantidad_por_unidad(self):

@@ -66,9 +66,10 @@ class Producto(models.Model):
     unidadMedida = models.ForeignKey('configuracion.UnidadDeMedida', on_delete=models.SET_NULL, null=True, blank=True)
     activo = models.BooleanField(default=True)
 
-    # Relación directa: cada producto tiene exactamente una fórmula asociada
-    formula = models.ForeignKey('configuracion.Formula', on_delete=models.PROTECT,
-                                related_name='productos', help_text="Fórmula para calcular los insumos de este producto")
+    # Relación directa: cada producto puede tener una fórmula asociada (opcional)
+    formula = models.ForeignKey('configuracion.Formula', on_delete=models.SET_NULL,
+                                null=True, blank=True,
+                                related_name='productos', help_text="Fórmula para calcular los insumos de este producto (opcional)")
     tinta_insumo = models.ForeignKey(
         'insumos.Insumo', on_delete=models.SET_NULL, null=True, blank=True, related_name='productos_tinta',
         help_text="Insumo de tinta a descontar (gramos)"

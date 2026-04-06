@@ -101,11 +101,31 @@ def crear_producto(request):
         form = ProductoForm(request.POST)
         formset = InsumoFormSet(request.POST, prefix='insumos')
         if form.is_valid() and formset.is_valid():
-            producto = form.save()
-            formset.instance = producto
-            formset.save()
-            messages.success(request, f'Producto "{producto.nombreProducto}" registrado exitosamente.')
-            return redirect('lista_productos')
+            # Validar coherencia: debe haber al menos un insumo o una fórmula
+            insumos_activos = [
+                f for f in formset
+                if f.cleaned_data and not f.cleaned_data.get('DELETE') and f.cleaned_data.get('insumo')
+            ]
+            tiene_formula = bool(form.cleaned_data.get('formula'))
+            if not insumos_activos and not tiene_formula:
+                messages.warning(
+                    request,
+                    'Agregá al menos un insumo a la receta o seleccioná una fórmula de cálculo. '
+                    'Sin esto el sistema no podrá calcular el consumo al generar pedidos.'
+                )
+            else:
+                # Validar insumos duplicados en el formset
+                insumo_ids = [f.cleaned_data['insumo'].pk for f in insumos_activos]
+                if len(insumo_ids) != len(set(insumo_ids)):
+                    messages.error(request, 'Hay insumos duplicados en la receta. Cada insumo debe aparecer una sola vez.')
+                else:
+                    producto = form.save()
+                    formset.instance = producto
+                    formset.save()
+                    cant = len(insumos_activos)
+                    detalle = f' con {cant} insumo{"s" if cant != 1 else ""}' if cant > 0 else ''
+                    messages.success(request, f'Producto "{producto.nombreProducto}" registrado exitosamente{detalle}.')
+                    return redirect('lista_productos')
     else:
         form = ProductoForm()
         formset = InsumoFormSet(prefix='insumos')
@@ -140,7 +160,6 @@ def crear_producto(request):
 
 @require_perm('Productos', 'Editar', redirect_to='lista_productos')
 @login_required
-@requiere_permiso("Productos")
 def editar_producto(request, idProducto):
     producto = get_object_or_404(Producto, idProducto=idProducto)
     if request.method == 'POST':
@@ -158,7 +177,6 @@ def editar_producto(request, idProducto):
 
 @require_perm('Productos', 'Eliminar', redirect_to='lista_productos')
 @login_required
-@requiere_permiso("Productos")
 def eliminar_producto(request, idProducto):
     producto = get_object_or_404(Producto, idProducto=idProducto)
     if request.method == 'POST':
@@ -176,7 +194,6 @@ def eliminar_producto(request, idProducto):
 
 @require_perm('Productos', 'Ver', redirect_to='lista_productos')
 @login_required
-@requiere_permiso("Productos")
 def detalle_producto(request, idProducto):
     producto = get_object_or_404(Producto, idProducto=idProducto)
     return render(request, 'productos/detalle_producto.html', {'producto': producto})
@@ -184,7 +201,6 @@ def detalle_producto(request, idProducto):
 
 @require_perm('Productos', 'Activar', redirect_to='lista_productos')
 @login_required
-@requiere_permiso("Productos")
 def activar_producto(request, idProducto):
     """Activar/Desactivar producto (toggle de estado lógico)."""
     producto = get_object_or_404(Producto, idProducto=idProducto)
