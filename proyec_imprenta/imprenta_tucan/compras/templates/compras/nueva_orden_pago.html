@@ -1,0 +1,643 @@
+{% extends 'base.html' %}
+{% block title %}Nueva Orden de Pago{% endblock %}
+{% block content %}
+
+<div class="mb-6 flex items-center justify-between">
+  <div>
+    <h1 class="text-2xl font-bold text-gray-800 flex items-center gap-2">
+      <span class="material-symbols-outlined text-emerald-600">payments</span>
+      Nueva Orden de Pago
+    </h1>
+    <p class="text-gray-500 text-sm mt-1">Completá los datos y luego guardá o previsualizá antes de confirmar.</p>
+  </div>
+  <a href="{% url 'compras:lista_ordenes_pago' %}" class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium">
+    <span class="material-symbols-outlined text-base">arrow_back</span> Volver
+  </a>
+</div>
+
+<form method="post" id="formOP">
+{% csrf_token %}
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+  <!-- ── Columna principal ─────────────────────────────── -->
+  <div class="lg:col-span-2 space-y-6">
+
+    <!-- Encabezado -->
+    <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+      <h2 class="text-base font-semibold text-gray-700 mb-4 flex items-center gap-2">
+        <span class="material-symbols-outlined text-gray-400">info</span> Datos generales
+      </h2>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-xs font-semibold text-gray-600 mb-1">Proveedor <span class="text-red-500">*</span></label>
+          <select name="proveedor" id="sel-proveedor" required
+            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400">
+            <option value="">— Seleccioná un proveedor —</option>
+            {% for p in proveedores %}
+              <option value="{{ p.pk }}">{{ p.nombre }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-gray-600 mb-1">Orden de Compra asociada <span class="text-gray-400 font-normal">(opcional)</span></label>
+          <select name="orden_compra"
+            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400">
+            <option value="">— Ninguna —</option>
+            {% for oc in ordenes_compra %}
+              <option value="{{ oc.pk }}">OC-{{ oc.pk|stringformat:"04d" }} | {{ oc.proveedor }} | {{ oc.fecha_creacion }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-gray-600 mb-1">Moneda</label>
+          <select name="moneda"
+            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400">
+            {% for val, label in monedas %}
+              <option value="{{ val }}" {% if val == 'ARS' %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-gray-600 mb-1">Fecha de vencimiento <span class="text-gray-400 font-normal">(opcional)</span></label>
+          <input type="date" name="fecha_vencimiento"
+            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400">
+        </div>
+      </div>
+    </div>
+
+    <!-- Comprobantes -->
+    <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-base font-semibold text-gray-700 flex items-center gap-2">
+          <span class="material-symbols-outlined text-gray-400">receipt</span> Comprobantes
+        </h2>
+        <button type="button" onclick="agregarComprobante()"
+          class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold">
+          <span class="material-symbols-outlined text-sm">add</span> Agregar
+        </button>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm" id="tabla-comprobantes">
+          <thead>
+            <tr class="text-xs text-gray-500 uppercase border-b">
+              <th class="text-left pb-2 font-semibold pr-2">Tipo</th>
+              <th class="text-left pb-2 font-semibold pr-2">Número</th>
+              <th class="text-left pb-2 font-semibold pr-2">Fecha</th>
+              <th class="text-right pb-2 font-semibold pr-2">Importe</th>
+              <th class="text-right pb-2 font-semibold pr-2">Saldo pend.</th>
+              <th class="w-8"></th>
+            </tr>
+          </thead>
+          <tbody id="body-comprobantes">
+            <!-- filas dinámicas -->
+          </tbody>
+        </table>
+      </div>
+      <p id="comp-empty-msg" class="text-xs text-gray-400 mt-3 hidden">No hay comprobantes. Hacé clic en "Agregar".</p>
+    </div>
+
+    <!-- Formas de pago -->
+    <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-base font-semibold text-gray-700 flex items-center gap-2">
+          <span class="material-symbols-outlined text-gray-400">account_balance</span> Formas de Pago
+        </h2>
+        <button type="button" onclick="agregarFormaPago()"
+          class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold">
+          <span class="material-symbols-outlined text-sm">add</span> Agregar
+        </button>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm" id="tabla-formas-pago">
+          <thead>
+            <tr class="text-xs text-gray-500 uppercase border-b">
+              <th class="text-left pb-2 font-semibold pr-2">Método</th>
+              <th class="text-left pb-2 font-semibold pr-2">Banco</th>
+              <th class="text-left pb-2 font-semibold pr-2">CBU / Cheque</th>
+              <th class="text-left pb-2 font-semibold pr-2">Referencia</th>
+              <th class="text-right pb-2 font-semibold pr-2">Importe</th>
+              <th class="w-8"></th>
+            </tr>
+          </thead>
+          <tbody id="body-formas-pago">
+            <!-- filas dinámicas -->
+          </tbody>
+        </table>
+      </div>
+      <p id="fp-empty-msg" class="text-xs text-gray-400 mt-3 hidden">No hay formas de pago. Hacé clic en "Agregar".</p>
+    </div>
+
+    <!-- Retenciones -->
+    <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-base font-semibold text-gray-700 flex items-center gap-2">
+          <span class="material-symbols-outlined text-gray-400">percent</span> Retenciones
+          <span class="text-xs text-gray-400 font-normal">(opcional)</span>
+        </h2>
+        <button type="button" onclick="agregarRetencion()"
+          class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-semibold">
+          <span class="material-symbols-outlined text-sm">add</span> Agregar
+        </button>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm" id="tabla-retenciones">
+          <thead>
+            <tr class="text-xs text-gray-500 uppercase border-b">
+              <th class="text-left pb-2 font-semibold pr-2">Tipo</th>
+              <th class="text-left pb-2 font-semibold pr-2">Descripción</th>
+              <th class="text-right pb-2 font-semibold pr-2">Importe</th>
+              <th class="w-8"></th>
+            </tr>
+          </thead>
+          <tbody id="body-retenciones">
+            <!-- filas dinámicas -->
+          </tbody>
+        </table>
+      </div>
+      <p id="ret-empty-msg" class="text-xs text-gray-400 mt-3 hidden">Sin retenciones.</p>
+    </div>
+
+  </div><!-- /col principal -->
+
+  <!-- ── Columna lateral ─────────────────────────────── -->
+  <div class="space-y-6">
+
+    <!-- Resumen totales -->
+    <div class="bg-gray-900 rounded-xl p-6 text-white sticky top-4">
+      <h2 class="text-sm font-semibold uppercase tracking-wider text-gray-400 mb-4">Resumen</h2>
+      <div class="space-y-3 text-sm">
+        <div class="flex justify-between">
+          <span class="text-gray-300">Total comprobantes</span>
+          <span id="res-total" class="font-semibold">$0,00</span>
+        </div>
+        <div class="flex justify-between text-red-400">
+          <span>Retenciones</span>
+          <span id="res-retenciones">−$0,00</span>
+        </div>
+        <div class="border-t border-gray-700 pt-3 flex justify-between">
+          <span class="text-emerald-400 font-bold">Neto a pagar</span>
+          <span id="res-neto" class="text-emerald-400 font-bold text-lg">$0,00</span>
+        </div>
+        <div class="flex justify-between text-xs text-gray-500 pt-1">
+          <span>Total formas de pago</span>
+          <span id="res-fp">$0,00</span>
+        </div>
+        <div id="res-diff-row" class="flex justify-between text-xs hidden">
+          <span class="text-yellow-400">Diferencia</span>
+          <span id="res-diff" class="text-yellow-400 font-semibold"></span>
+        </div>
+      </div>
+
+      <!-- Botones -->
+      <div class="mt-6 space-y-2">
+        <button type="button" onclick="abrirPrevisualizacion()"
+          class="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-gray-700 hover:bg-gray-600 text-white text-sm font-semibold">
+          <span class="material-symbols-outlined text-base">preview</span> Previsualizar
+        </button>
+        <button type="submit"
+          class="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold">
+          <span class="material-symbols-outlined text-base">save</span> Guardar Orden de Pago
+        </button>
+      </div>
+    </div>
+
+    <!-- Observaciones -->
+    <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+      <label class="block text-xs font-semibold text-gray-600 mb-2">Observaciones</label>
+      <textarea name="observaciones" rows="4" placeholder="Notas internas, aclaraciones..."
+        class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 resize-none"></textarea>
+    </div>
+
+  </div><!-- /col lateral -->
+</div><!-- /grid -->
+</form>
+
+
+<!-- ════════════════════════════════════════════════════════════════════════════
+     MODAL PREVISUALIZACIÓN
+════════════════════════════════════════════════════════════════════════════ -->
+<div id="modalPreview" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4" style="background:rgba(0,0,0,0.55);">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+
+    <!-- Header modal -->
+    <div class="bg-gradient-to-r from-emerald-700 to-emerald-500 rounded-t-2xl px-8 py-6 text-white">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-4">
+          <div class="h-12 w-12 rounded-full bg-white/20 grid place-items-center">
+            <span class="material-symbols-outlined text-2xl">payments</span>
+          </div>
+          <div>
+            <p class="text-xs uppercase tracking-widest text-emerald-200">Orden de Pago</p>
+            <p class="text-xl font-bold">Vista previa</p>
+          </div>
+        </div>
+        <div class="text-right text-sm text-emerald-100">
+          <p id="prev-fecha"></p>
+          <p id="prev-proveedor" class="font-semibold text-white mt-0.5"></p>
+        </div>
+      </div>
+    </div>
+
+    <div class="px-8 py-6 space-y-6">
+
+      <!-- Comprobantes -->
+      <div>
+        <h3 class="text-sm font-bold text-gray-700 uppercase tracking-wider mb-3 flex items-center gap-2">
+          <span class="material-symbols-outlined text-gray-400 text-base">receipt</span> Comprobantes
+        </h3>
+        <table class="w-full text-sm border border-gray-100 rounded-lg overflow-hidden">
+          <thead class="bg-gray-50 text-xs text-gray-500 uppercase">
+            <tr>
+              <th class="px-3 py-2 text-left font-semibold">Tipo</th>
+              <th class="px-3 py-2 text-left font-semibold">Número</th>
+              <th class="px-3 py-2 text-left font-semibold">Fecha</th>
+              <th class="px-3 py-2 text-right font-semibold">Importe</th>
+              <th class="px-3 py-2 text-right font-semibold">Saldo</th>
+            </tr>
+          </thead>
+          <tbody id="prev-comprobantes" class="divide-y divide-gray-100"></tbody>
+          <tfoot>
+            <tr class="bg-gray-50 font-semibold text-sm">
+              <td colspan="3" class="px-3 py-2 text-right text-gray-600">Total</td>
+              <td id="prev-total-comp" class="px-3 py-2 text-right text-gray-800"></td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      <!-- Formas de pago -->
+      <div>
+        <h3 class="text-sm font-bold text-gray-700 uppercase tracking-wider mb-3 flex items-center gap-2">
+          <span class="material-symbols-outlined text-gray-400 text-base">account_balance</span> Formas de Pago
+        </h3>
+        <table class="w-full text-sm border border-gray-100 rounded-lg overflow-hidden">
+          <thead class="bg-gray-50 text-xs text-gray-500 uppercase">
+            <tr>
+              <th class="px-3 py-2 text-left font-semibold">Método</th>
+              <th class="px-3 py-2 text-left font-semibold">Detalle</th>
+              <th class="px-3 py-2 text-right font-semibold">Importe</th>
+            </tr>
+          </thead>
+          <tbody id="prev-formas-pago" class="divide-y divide-gray-100"></tbody>
+        </table>
+      </div>
+
+      <!-- Retenciones (si hay) -->
+      <div id="prev-ret-bloque" class="hidden">
+        <h3 class="text-sm font-bold text-gray-700 uppercase tracking-wider mb-3 flex items-center gap-2">
+          <span class="material-symbols-outlined text-gray-400 text-base">percent</span> Retenciones
+        </h3>
+        <table class="w-full text-sm border border-gray-100 rounded-lg overflow-hidden">
+          <thead class="bg-gray-50 text-xs text-gray-500 uppercase">
+            <tr>
+              <th class="px-3 py-2 text-left font-semibold">Tipo</th>
+              <th class="px-3 py-2 text-left font-semibold">Descripción</th>
+              <th class="px-3 py-2 text-right font-semibold">Importe</th>
+            </tr>
+          </thead>
+          <tbody id="prev-retenciones" class="divide-y divide-gray-100"></tbody>
+        </table>
+      </div>
+
+      <!-- Resumen final -->
+      <div class="bg-gray-900 rounded-xl p-5 text-white">
+        <div class="grid grid-cols-3 gap-4 text-center">
+          <div>
+            <p class="text-xs text-gray-400 uppercase mb-1">Total</p>
+            <p id="prev-res-total" class="text-lg font-bold"></p>
+          </div>
+          <div>
+            <p class="text-xs text-red-400 uppercase mb-1">Retenciones</p>
+            <p id="prev-res-ret" class="text-lg font-bold text-red-400"></p>
+          </div>
+          <div>
+            <p class="text-xs text-emerald-400 uppercase mb-1">Neto a Pagar</p>
+            <p id="prev-res-neto" class="text-lg font-bold text-emerald-400"></p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Observaciones preview -->
+      <div id="prev-obs-bloque" class="hidden">
+        <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Observaciones</h3>
+        <p id="prev-obs" class="text-sm text-gray-700 bg-gray-50 rounded-lg px-4 py-3 border border-gray-100"></p>
+      </div>
+
+      <!-- Firmas -->
+      <div class="grid grid-cols-3 gap-6 pt-4 border-t border-gray-100">
+        <div class="text-center">
+          <div class="border-t-2 border-gray-300 pt-2 mt-8"></div>
+          <p class="text-xs text-gray-500">Elaborado por</p>
+        </div>
+        <div class="text-center">
+          <div class="border-t-2 border-gray-300 pt-2 mt-8"></div>
+          <p class="text-xs text-gray-500">Autorizado por</p>
+        </div>
+        <div class="text-center">
+          <div class="border-t-2 border-gray-300 pt-2 mt-8"></div>
+          <p class="text-xs text-gray-500">Recibido por</p>
+        </div>
+      </div>
+
+    </div><!-- /body modal -->
+
+    <!-- Footer modal -->
+    <div class="border-t border-gray-100 px-8 py-4 flex justify-between items-center">
+      <button onclick="cerrarPreview()" class="px-4 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium">
+        Cerrar
+      </button>
+      <button onclick="document.getElementById('formOP').submit()"
+        class="inline-flex items-center gap-2 px-5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold">
+        <span class="material-symbols-outlined text-base">save</span> Confirmar y Guardar
+      </button>
+    </div>
+
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════════════════════
+     TEMPLATES DE FILAS (HTML5 <template> — inerte, sin render)
+════════════════════════════════════════════════════════════════════════════ -->
+
+<template id="tpl-comprobante">
+  <tr class="border-t comp-row">
+    <td class="py-2 pr-2">
+      <select name="comp_tipo" class="border border-gray-300 rounded px-2 py-1 text-sm w-full focus:ring-1 focus:ring-emerald-400 focus:outline-none">
+        {% for val, label in tipos_comprobante %}
+          <option value="{{ val }}">{{ label }}</option>
+        {% endfor %}
+      </select>
+    </td>
+    <td class="py-2 pr-2">
+      <input type="text" name="comp_numero" placeholder="0001-00000001"
+        class="border border-gray-300 rounded px-2 py-1 text-sm w-full focus:ring-1 focus:ring-emerald-400 focus:outline-none">
+    </td>
+    <td class="py-2 pr-2">
+      <input type="date" name="comp_fecha"
+        class="border border-gray-300 rounded px-2 py-1 text-sm w-full focus:ring-1 focus:ring-emerald-400 focus:outline-none comp-fecha">
+    </td>
+    <td class="py-2 pr-2">
+      <input type="number" name="comp_importe" min="0" step="0.01" placeholder="0.00"
+        class="border border-gray-300 rounded px-2 py-1 text-sm w-24 text-right focus:ring-1 focus:ring-emerald-400 focus:outline-none comp-importe">
+    </td>
+    <td class="py-2 pr-2">
+      <input type="number" name="comp_saldo" min="0" step="0.01" placeholder="0.00"
+        class="border border-gray-300 rounded px-2 py-1 text-sm w-24 text-right focus:ring-1 focus:ring-emerald-400 focus:outline-none">
+    </td>
+    <td class="py-2 text-center">
+      <button type="button" onclick="eliminarFila(this, 'comp')" class="text-red-400 hover:text-red-600">
+        <span class="material-symbols-outlined text-base">delete</span>
+      </button>
+    </td>
+  </tr>
+</template>
+
+<template id="tpl-forma-pago">
+  <tr class="border-t fp-row">
+    <td class="py-2 pr-2">
+      <select name="fp_metodo" class="border border-gray-300 rounded px-2 py-1 text-sm w-full focus:ring-1 focus:ring-blue-400 focus:outline-none fp-metodo">
+        {% for val, label in metodos_pago %}
+          <option value="{{ val }}">{{ label }}</option>
+        {% endfor %}
+      </select>
+    </td>
+    <td class="py-2 pr-2">
+      <input type="text" name="fp_banco" placeholder="Banco"
+        class="border border-gray-300 rounded px-2 py-1 text-sm w-full focus:ring-1 focus:ring-blue-400 focus:outline-none">
+    </td>
+    <td class="py-2 pr-2">
+      <input type="text" name="fp_cbu" placeholder="CBU / N° cheque"
+        class="border border-gray-300 rounded px-2 py-1 text-sm w-full focus:ring-1 focus:ring-blue-400 focus:outline-none fp-cbu-cheque">
+      <input type="hidden" name="fp_cheque" value="">
+    </td>
+    <td class="py-2 pr-2">
+      <input type="text" name="fp_referencia" placeholder="Referencia"
+        class="border border-gray-300 rounded px-2 py-1 text-sm w-full focus:ring-1 focus:ring-blue-400 focus:outline-none">
+    </td>
+    <td class="py-2 pr-2">
+      <input type="number" name="fp_importe" min="0" step="0.01" placeholder="0.00"
+        class="border border-gray-300 rounded px-2 py-1 text-sm w-24 text-right focus:ring-1 focus:ring-blue-400 focus:outline-none fp-importe">
+    </td>
+    <td class="py-2 text-center">
+      <button type="button" onclick="eliminarFila(this, 'fp')" class="text-red-400 hover:text-red-600">
+        <span class="material-symbols-outlined text-base">delete</span>
+      </button>
+    </td>
+  </tr>
+</template>
+
+<template id="tpl-retencion">
+  <tr class="border-t ret-row">
+    <td class="py-2 pr-2">
+      <select name="ret_tipo" class="border border-gray-300 rounded px-2 py-1 text-sm w-full focus:ring-1 focus:ring-red-400 focus:outline-none">
+        {% for val, label in tipos_retencion %}
+          <option value="{{ val }}">{{ label }}</option>
+        {% endfor %}
+      </select>
+    </td>
+    <td class="py-2 pr-2">
+      <input type="text" name="ret_descripcion" placeholder="Descripción adicional"
+        class="border border-gray-300 rounded px-2 py-1 text-sm w-full focus:ring-1 focus:ring-red-400 focus:outline-none">
+    </td>
+    <td class="py-2 pr-2">
+      <input type="number" name="ret_importe" min="0" step="0.01" placeholder="0.00"
+        class="border border-gray-300 rounded px-2 py-1 text-sm w-24 text-right focus:ring-1 focus:ring-red-400 focus:outline-none ret-importe">
+    </td>
+    <td class="py-2 text-center">
+      <button type="button" onclick="eliminarFila(this, 'ret')" class="text-red-400 hover:text-red-600">
+        <span class="material-symbols-outlined text-base">delete</span>
+      </button>
+    </td>
+  </tr>
+</template>
+
+
+<script>
+const HOY = '{{ hoy }}';
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+function fmt(n) {
+  return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 2 }).format(n || 0);
+}
+function parseNum(v) {
+  return parseFloat(String(v).replace(',', '.')) || 0;
+}
+
+function actualizarMsgs() {
+  const compRows = document.querySelectorAll('#body-comprobantes .comp-row').length;
+  const fpRows   = document.querySelectorAll('#body-formas-pago .fp-row').length;
+  const retRows  = document.querySelectorAll('#body-retenciones .ret-row').length;
+  document.getElementById('comp-empty-msg').classList.toggle('hidden', compRows > 0);
+  document.getElementById('fp-empty-msg').classList.toggle('hidden', fpRows > 0);
+  document.getElementById('ret-empty-msg').classList.toggle('hidden', retRows > 0);
+}
+
+// ── Agregar filas ─────────────────────────────────────────────────────────────
+function agregarComprobante() {
+  const tpl   = document.getElementById('tpl-comprobante');
+  const clone = document.importNode(tpl.content, true);
+  clone.querySelector('.comp-fecha').value = HOY;
+  document.getElementById('body-comprobantes').appendChild(clone);
+  recalcular();
+  actualizarMsgs();
+}
+
+function agregarFormaPago() {
+  const tpl   = document.getElementById('tpl-forma-pago');
+  const clone = document.importNode(tpl.content, true);
+  document.getElementById('body-formas-pago').appendChild(clone);
+  recalcular();
+  actualizarMsgs();
+}
+
+function agregarRetencion() {
+  const tpl   = document.getElementById('tpl-retencion');
+  const clone = document.importNode(tpl.content, true);
+  document.getElementById('body-retenciones').appendChild(clone);
+  recalcular();
+  actualizarMsgs();
+}
+
+// ── Eliminar fila ─────────────────────────────────────────────────────────────
+function eliminarFila(btn, tipo) {
+  const clsMap = { comp: 'comp-row', fp: 'fp-row', ret: 'ret-row' };
+  btn.closest('.' + clsMap[tipo]).remove();
+  recalcular();
+  actualizarMsgs();
+}
+
+// ── Recalcular resumen lateral ────────────────────────────────────────────────
+function recalcular() {
+  let total = 0, ret = 0, fp = 0;
+  document.querySelectorAll('.comp-importe').forEach(i => total += parseNum(i.value));
+  document.querySelectorAll('.ret-importe').forEach(i => ret   += parseNum(i.value));
+  document.querySelectorAll('.fp-importe').forEach(i  => fp    += parseNum(i.value));
+
+  const neto = total - ret;
+  document.getElementById('res-total').textContent       = fmt(total);
+  document.getElementById('res-retenciones').textContent = '−' + fmt(ret);
+  document.getElementById('res-neto').textContent        = fmt(neto);
+  document.getElementById('res-fp').textContent          = fmt(fp);
+
+  const diff = fp - neto;
+  const diffRow = document.getElementById('res-diff-row');
+  if (Math.abs(diff) > 0.01) {
+    diffRow.classList.remove('hidden');
+    document.getElementById('res-diff').textContent = fmt(diff);
+  } else {
+    diffRow.classList.add('hidden');
+  }
+}
+
+// Escuchar cambios en importes
+document.addEventListener('input', e => {
+  if (e.target.matches('.comp-importe, .ret-importe, .fp-importe')) recalcular();
+});
+
+// ── Previsualización ──────────────────────────────────────────────────────────
+function abrirPrevisualizacion() {
+  // Proveedor
+  const selProv = document.getElementById('sel-proveedor');
+  const provNombre = selProv.options[selProv.selectedIndex]?.text || '—';
+  document.getElementById('prev-proveedor').textContent = provNombre;
+  document.getElementById('prev-fecha').textContent = new Date().toLocaleDateString('es-AR');
+
+  // Comprobantes
+  let totalComp = 0;
+  const bodyComp = document.getElementById('prev-comprobantes');
+  bodyComp.innerHTML = '';
+  document.querySelectorAll('#body-comprobantes .comp-row').forEach(row => {
+    const tipo   = row.querySelector('[name=comp_tipo]');
+    const num    = row.querySelector('[name=comp_numero]').value || '—';
+    const fecha  = row.querySelector('[name=comp_fecha]').value  || '';
+    const imp    = parseNum(row.querySelector('[name=comp_importe]').value);
+    const saldo  = parseNum(row.querySelector('[name=comp_saldo]').value);
+    totalComp += imp;
+    const tr = document.createElement('tr');
+    tr.className = 'border-t border-gray-100';
+    tr.innerHTML = `
+      <td class="px-3 py-2">${tipo.options[tipo.selectedIndex]?.text || ''}</td>
+      <td class="px-3 py-2 font-mono text-xs">${num}</td>
+      <td class="px-3 py-2 text-gray-500">${fecha}</td>
+      <td class="px-3 py-2 text-right">${fmt(imp)}</td>
+      <td class="px-3 py-2 text-right text-emerald-600">${fmt(saldo)}</td>`;
+    bodyComp.appendChild(tr);
+  });
+  document.getElementById('prev-total-comp').textContent = fmt(totalComp);
+
+  // Formas de pago
+  const bodyFP = document.getElementById('prev-formas-pago');
+  bodyFP.innerHTML = '';
+  document.querySelectorAll('#body-formas-pago .fp-row').forEach(row => {
+    const met    = row.querySelector('[name=fp_metodo]');
+    const banco  = row.querySelector('[name=fp_banco]').value || '';
+    const cbu    = row.querySelector('.fp-cbu-cheque').value  || '';
+    const ref    = row.querySelector('[name=fp_referencia]').value || '';
+    const imp    = parseNum(row.querySelector('[name=fp_importe]').value);
+    const detalle = [banco, cbu, ref].filter(Boolean).join(' · ');
+    const tr = document.createElement('tr');
+    tr.className = 'border-t border-gray-100';
+    tr.innerHTML = `
+      <td class="px-3 py-2 font-medium">${met.options[met.selectedIndex]?.text || ''}</td>
+      <td class="px-3 py-2 text-gray-500 text-xs">${detalle || '—'}</td>
+      <td class="px-3 py-2 text-right font-semibold">${fmt(imp)}</td>`;
+    bodyFP.appendChild(tr);
+  });
+
+  // Retenciones
+  let totalRet = 0;
+  const bodyRet = document.getElementById('prev-retenciones');
+  bodyRet.innerHTML = '';
+  document.querySelectorAll('#body-retenciones .ret-row').forEach(row => {
+    const tipo = row.querySelector('[name=ret_tipo]');
+    const desc = row.querySelector('[name=ret_descripcion]').value || '';
+    const imp  = parseNum(row.querySelector('[name=ret_importe]').value);
+    totalRet += imp;
+    const tr = document.createElement('tr');
+    tr.className = 'border-t border-gray-100';
+    tr.innerHTML = `
+      <td class="px-3 py-2">${tipo.options[tipo.selectedIndex]?.text || ''}</td>
+      <td class="px-3 py-2 text-gray-500">${desc}</td>
+      <td class="px-3 py-2 text-right text-red-600">${fmt(imp)}</td>`;
+    bodyRet.appendChild(tr);
+  });
+  const retBloque = document.getElementById('prev-ret-bloque');
+  retBloque.classList.toggle('hidden', document.querySelectorAll('#body-retenciones .ret-row').length === 0);
+
+  // Resumen
+  const neto = totalComp - totalRet;
+  document.getElementById('prev-res-total').textContent = fmt(totalComp);
+  document.getElementById('prev-res-ret').textContent   = fmt(totalRet);
+  document.getElementById('prev-res-neto').textContent  = fmt(neto);
+
+  // Observaciones
+  const obs = document.querySelector('[name=observaciones]').value.trim();
+  const obsBloque = document.getElementById('prev-obs-bloque');
+  if (obs) {
+    document.getElementById('prev-obs').textContent = obs;
+    obsBloque.classList.remove('hidden');
+  } else {
+    obsBloque.classList.add('hidden');
+  }
+
+  document.getElementById('modalPreview').classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+}
+
+function cerrarPreview() {
+  document.getElementById('modalPreview').classList.add('hidden');
+  document.body.style.overflow = '';
+}
+
+document.getElementById('modalPreview').addEventListener('click', function(e) {
+  if (e.target === this) cerrarPreview();
+});
+
+// Init
+actualizarMsgs();
+</script>
+
+{% endblock %}

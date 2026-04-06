@@ -139,7 +139,12 @@ def eliminar_proveedor(request, id):
 def detalle_proveedor(request, id):
     """Ver detalles completos del proveedor"""
     proveedor = get_object_or_404(Proveedor, id=id)
-    return render(request, 'proveedores/detalle_proveedor.html', {'proveedor': proveedor})
+    from compras.models import OrdenPago
+    ordenes_pago = OrdenPago.objects.filter(proveedor=proveedor).order_by('-creado_en')[:10]
+    return render(request, 'proveedores/detalle_proveedor.html', {
+        'proveedor': proveedor,
+        'ordenes_pago': ordenes_pago,
+    })
 
 
 @login_required

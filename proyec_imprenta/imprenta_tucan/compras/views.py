@@ -3,7 +3,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
 from django.utils import timezone
-from .models import OrdenCompra, DetalleOrdenCompra, Remito, DetalleRemito, EstadoCompra
+from .models import OrdenCompra, DetalleOrdenCompra, Remito, DetalleRemito, EstadoCompra, OrdenPago, ComprobanteOrdenPago, FormaPagoOrdenPago, RetencionOrdenPago
 from .forms import OrdenCompraForm, DetalleOrdenCompraFormSet, RemitoForm, DetalleRemitoFormSet
 
 
@@ -142,7 +142,8 @@ def nueva_orden(request):
 @login_required
 def detalle_orden(request, pk):
     orden = get_object_or_404(OrdenCompra.objects.select_related("proveedor", "estado", "usuario").prefetch_related("detalles__insumo", "remitos"), pk=pk)
-    return render(request, "compras/detalle_orden.html", {"orden": orden})
+    pagos_oc = OrdenPago.objects.filter(orden_compra=orden).order_by('-creado_en')
+    return render(request, "compras/detalle_orden.html", {"orden": orden, "pagos_oc": pagos_oc})
 
 
 @login_required
@@ -866,15 +867,17 @@ def historial_precios_insumo(request, insumo_pk):
 
 # ── Home de Compras ───────────────────────────────────────────────────────────
 def home_compras(request):
-    from .models import OrdenCompra, Remito
+    from .models import OrdenCompra, Remito, OrdenPago
     from insumos.models import Insumo
     ordenes_count = OrdenCompra.objects.count()
     remitos_count = Remito.objects.count()
     insumos_count = Insumo.objects.filter(activo=True).count()
+    pagos_count   = OrdenPago.objects.filter(estado__in=['pendiente', 'aprobada']).count()
     return render(request, "compras/home.html", {
         "ordenes_count": ordenes_count,
         "remitos_count": remitos_count,
         "insumos_count": insumos_count,
+        "pagos_count":   pagos_count,
     })
 
 

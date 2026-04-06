@@ -1,6 +1,7 @@
 from django.urls import path, include
 from django.views.generic import RedirectView
 from . import views
+from . import views_ordenpago as vop
 from insumos import views as insumos_views
 
 app_name = "compras"
@@ -41,7 +42,16 @@ urlpatterns = [
     
     # Ajuste masivo de precios
     path("ajuste-masivo/", views.ajuste_masivo_precios, name="ajuste_masivo_precios"),
-    
+
     # Exportar órdenes
     path("ordenes/exportar/", views.exportar_ordenes_excel, name="exportar_ordenes"),
+
+    # Órdenes de Pago
+    path("pagos/",                              vop.lista_ordenes_pago,       name="lista_ordenes_pago"),
+    path("pagos/nueva/",                        vop.nueva_orden_pago,         name="nueva_orden_pago"),
+    path("pagos/<int:pk>/json/",                vop.detalle_orden_pago_json,  name="detalle_orden_pago_json"),
+    path("pagos/<int:pk>/aprobar/",             vop.aprobar_orden_pago,       name="aprobar_orden_pago"),
+    path("pagos/<int:pk>/registrar-pago/",      vop.registrar_pago,           name="registrar_pago"),
+    path("pagos/<int:pk>/anular/",              vop.anular_orden_pago,           name="anular_orden_pago"),
+    path("pagos/exportar/",                     vop.exportar_ordenes_pago_excel, name="exportar_ordenes_pago"),
 ]

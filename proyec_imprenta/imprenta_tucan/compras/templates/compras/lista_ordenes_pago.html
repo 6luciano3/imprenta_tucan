@@ -1,0 +1,460 @@
+{% extends 'base.html' %}
+{% block title %}Órdenes de Pago{% endblock %}
+
+{% block content %}
+<div class="mb-6 flex items-center justify-between">
+  <div>
+    <h1 class="text-2xl font-bold flex items-center gap-2">
+      <span class="material-symbols-outlined text-2xl text-emerald-600">payments</span>
+      Órdenes de Pago
+    </h1>
+    <p class="text-gray-500 text-sm mt-1">Gestión de pagos a proveedores.</p>
+  </div>
+  <div class="flex items-center gap-2">
+    <a href="{% url 'compras:home_compras' %}"
+       class="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium">
+      <span class="material-symbols-outlined text-base">arrow_back</span> Compras
+    </a>
+    <a href="{% url 'compras:exportar_ordenes_pago' %}?estado={{ estado_sel }}&proveedor={{ proveedor_sel }}&q={{ q }}"
+       class="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm font-medium">
+      <span class="material-symbols-outlined text-base">download</span> Exportar CSV
+    </a>
+    <a href="{% url 'compras:nueva_orden_pago' %}"
+       class="flex items-center gap-1.5 px-4 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm">
+      <span class="material-symbols-outlined text-base">add</span> Nueva Orden de Pago
+    </a>
+  </div>
+</div>
+
+<!-- Resumen de estados -->
+<div class="grid grid-cols-3 gap-4 mb-6">
+  <div class="bg-yellow-50 border border-yellow-200 rounded-xl p-4 text-center">
+    <p class="text-2xl font-black text-yellow-700">{{ total_pendientes }}</p>
+    <p class="text-xs font-semibold text-yellow-600 uppercase mt-1">Pendientes</p>
+  </div>
+  <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 text-center">
+    <p class="text-2xl font-black text-blue-700">{{ total_aprobadas }}</p>
+    <p class="text-xs font-semibold text-blue-600 uppercase mt-1">Aprobadas</p>
+  </div>
+  <div class="bg-green-50 border border-green-200 rounded-xl p-4 text-center">
+    <p class="text-2xl font-black text-green-700">{{ total_pagadas }}</p>
+    <p class="text-xs font-semibold text-green-600 uppercase mt-1">Pagadas</p>
+  </div>
+</div>
+
+<!-- Filtros -->
+<div class="bg-white rounded-xl shadow border border-gray-100 p-4 mb-6">
+  <form method="GET" class="flex flex-wrap gap-3 items-end">
+    <div class="flex-1 min-w-48">
+      <label class="text-xs text-gray-500 font-semibold uppercase mb-1 block">Buscar</label>
+      <input type="text" name="q" value="{{ q }}" placeholder="N° orden, proveedor..."
+             class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400">
+    </div>
+    <div class="min-w-36">
+      <label class="text-xs text-gray-500 font-semibold uppercase mb-1 block">Estado</label>
+      <select name="estado" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm">
+        <option value="">Todos</option>
+        {% for key, label in estados %}
+          <option value="{{ key }}" {% if estado_sel == key %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="min-w-44">
+      <label class="text-xs text-gray-500 font-semibold uppercase mb-1 block">Proveedor</label>
+      <select name="proveedor" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm">
+        <option value="">Todos</option>
+        {% for p in proveedores %}
+          <option value="{{ p.pk }}" {% if proveedor_sel == p.pk|stringformat:"s" %}selected{% endif %}>{{ p.nombre }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <button type="submit" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-semibold">
+      Filtrar
+    </button>
+    <a href="{% url 'compras:lista_ordenes_pago' %}" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm">
+      Limpiar
+    </a>
+  </form>
+</div>
+
+<!-- Tabla -->
+<div class="bg-white rounded-xl shadow border border-gray-200 overflow-hidden">
+  {% if ordenes %}
+  <table class="w-full text-sm">
+    <thead class="bg-gray-50 border-b border-gray-200">
+      <tr>
+        <th class="px-4 py-3 text-left font-semibold text-gray-600">N° Orden</th>
+        <th class="px-4 py-3 text-left font-semibold text-gray-600">Proveedor</th>
+        <th class="px-4 py-3 text-left font-semibold text-gray-600">OC Asociada</th>
+        <th class="px-4 py-3 text-right font-semibold text-gray-600">Total</th>
+        <th class="px-4 py-3 text-right font-semibold text-gray-600">Retenciones</th>
+        <th class="px-4 py-3 text-right font-semibold text-gray-600">Neto a Pagar</th>
+        <th class="px-4 py-3 text-center font-semibold text-gray-600">Estado</th>
+        <th class="px-4 py-3 text-left font-semibold text-gray-600">Vencimiento</th>
+        <th class="px-4 py-3 text-center font-semibold text-gray-600">Acciones</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-100">
+      {% for op in ordenes %}
+      <tr class="hover:bg-gray-50">
+        <td class="px-4 py-3 font-mono font-semibold text-gray-800">OP-{{ op.numero }}</td>
+        <td class="px-4 py-3 text-gray-700">{{ op.proveedor.nombre }}</td>
+        <td class="px-4 py-3 text-gray-500">
+          {% if op.orden_compra %}
+            <span class="text-blue-600 font-mono text-xs">OC-{{ op.orden_compra.pk|stringformat:"04d" }}</span>
+          {% else %}—{% endif %}
+        </td>
+        <td class="px-4 py-3 text-right font-mono">${{ op.monto_total|floatformat:2 }}</td>
+        <td class="px-4 py-3 text-right font-mono text-red-600">
+          {% if op.monto_retenciones %}-${{ op.monto_retenciones|floatformat:2 }}{% else %}—{% endif %}
+        </td>
+        <td class="px-4 py-3 text-right font-mono font-bold text-gray-800">${{ op.monto_neto|floatformat:2 }}</td>
+        <td class="px-4 py-3 text-center">
+          <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold
+            {% if op.estado == 'pendiente' %}bg-yellow-100 text-yellow-800
+            {% elif op.estado == 'aprobada' %}bg-blue-100 text-blue-800
+            {% elif op.estado == 'pagada' %}bg-green-100 text-green-800
+            {% else %}bg-red-100 text-red-800{% endif %}">
+            {{ op.get_estado_display }}
+          </span>
+        </td>
+        <td class="px-4 py-3 text-gray-500 whitespace-nowrap">
+          {% if op.fecha_vencimiento %}
+            {{ op.fecha_vencimiento|date:"d/m/Y" }}
+          {% else %}—{% endif %}
+        </td>
+        <td class="px-4 py-3 text-center">
+          <div class="flex items-center justify-center gap-2">
+            <!-- Ver modal -->
+            <button onclick="abrirModalOP({{ op.pk }})"
+                    class="text-gray-500 hover:text-gray-700" title="Ver detalle">
+              <span class="material-symbols-outlined text-base">visibility</span>
+            </button>
+            {% if op.estado == 'pendiente' %}
+            <!-- Aprobar -->
+            <form method="POST" action="{% url 'compras:aprobar_orden_pago' op.pk %}" class="inline">
+              {% csrf_token %}
+              <button type="submit" class="text-blue-600 hover:text-blue-800" title="Aprobar">
+                <span class="material-symbols-outlined text-base">thumb_up</span>
+              </button>
+            </form>
+            {% endif %}
+            {% if op.estado in 'pendiente,aprobada' %}
+            <!-- Registrar pago -->
+            <button onclick="abrirModalPago({{ op.pk }}, '{{ op.numero }}')"
+                    class="text-emerald-600 hover:text-emerald-800" title="Registrar pago">
+              <span class="material-symbols-outlined text-base">paid</span>
+            </button>
+            {% endif %}
+            {% if op.estado != 'pagada' %}
+            <!-- Anular -->
+            <form method="POST" action="{% url 'compras:anular_orden_pago' op.pk %}" class="inline"
+                  onsubmit="return confirm('¿Anular la Orden de Pago N° {{ op.numero }}?')">
+              {% csrf_token %}
+              <button type="submit" class="text-red-500 hover:text-red-700" title="Anular">
+                <span class="material-symbols-outlined text-base">cancel</span>
+              </button>
+            </form>
+            {% endif %}
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  {% if page_obj.has_other_pages %}
+  <div class="px-4 py-3 border-t flex items-center justify-between text-sm text-gray-500">
+    <span>Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span>
+    <div class="flex gap-2">
+      {% if page_obj.has_previous %}
+        <a href="?page={{ page_obj.previous_page_number }}&q={{ q }}&estado={{ estado_sel }}&proveedor={{ proveedor_sel }}"
+           class="px-3 py-1 border rounded hover:bg-gray-50">Anterior</a>
+      {% endif %}
+      {% if page_obj.has_next %}
+        <a href="?page={{ page_obj.next_page_number }}&q={{ q }}&estado={{ estado_sel }}&proveedor={{ proveedor_sel }}"
+           class="px-3 py-1 border rounded hover:bg-gray-50">Siguiente</a>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+  {% else %}
+  <div class="py-16 text-center text-gray-400">
+    <span class="material-symbols-outlined text-5xl text-gray-300 block mb-3">payments</span>
+    <p class="text-lg font-medium mb-1">Sin órdenes de pago</p>
+    <p class="text-sm mb-4">Creá la primera orden de pago.</p>
+    <a href="{% url 'compras:nueva_orden_pago' %}"
+       class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm">
+      <span class="material-symbols-outlined text-base">add</span> Nueva Orden de Pago
+    </a>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Modal: Detalle de Orden de Pago -->
+<div id="modalOP" class="hidden fixed inset-0 z-50 overflow-y-auto">
+  <div class="absolute inset-0 bg-black/60" onclick="cerrarModalOP()"></div>
+  <div class="relative min-h-screen flex items-start justify-center p-4 pt-10">
+    <div class="bg-white w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden" id="modalOP-content">
+      <!-- El contenido se inyecta via JS -->
+      <div class="flex items-center justify-center py-16 text-gray-400" id="modalOP-loading">
+        <span class="material-symbols-outlined text-4xl animate-pulse">hourglass_empty</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Registrar Pago -->
+<div id="modalPago" class="hidden fixed inset-0 z-50 flex items-center justify-center">
+  <div class="absolute inset-0 bg-black/50" onclick="cerrarModalPago()"></div>
+  <div class="relative bg-white rounded-xl shadow-2xl w-full max-w-sm p-6">
+    <h3 class="font-bold text-gray-800 mb-4 flex items-center gap-2">
+      <span class="material-symbols-outlined text-emerald-600">paid</span>
+      Registrar Pago — OP-<span id="modalPago-numero"></span>
+    </h3>
+    <form id="formRegistrarPago" method="POST" action="">
+      {% csrf_token %}
+      <label class="block text-sm font-semibold text-gray-700 mb-1">Fecha de pago</label>
+      <input type="date" name="fecha_pago" id="modalPago-fecha"
+             class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm mb-4 focus:ring-2 focus:ring-emerald-400">
+      <div class="flex gap-3 justify-end">
+        <button type="button" onclick="cerrarModalPago()"
+                class="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm">Cancelar</button>
+        <button type="submit"
+                class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-semibold">
+          Confirmar pago
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+const URLS = {
+  json: (pk) => `/compras/pagos/${pk}/json/`,
+  pago: (pk) => `/compras/pagos/${pk}/registrar-pago/`,
+};
+
+function fmt(n) {
+  return n.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function badgeEstado(key, label) {
+  const cls = {
+    pendiente: 'bg-yellow-100 text-yellow-800',
+    aprobada:  'bg-blue-100 text-blue-800',
+    pagada:    'bg-green-100 text-green-800',
+    anulada:   'bg-red-100 text-red-800',
+  }[key] || 'bg-gray-100 text-gray-700';
+  return `<span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${cls}">${label}</span>`;
+}
+
+async function abrirModalOP(pk) {
+  const modal   = document.getElementById('modalOP');
+  const content = document.getElementById('modalOP-content');
+  const loading = document.getElementById('modalOP-loading');
+  modal.classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+  content.innerHTML = `<div class="flex items-center justify-center py-16 text-gray-400">
+    <span class="material-symbols-outlined text-4xl animate-pulse">hourglass_empty</span></div>`;
+
+  const resp = await fetch(URLS.json(pk));
+  const d    = await resp.json();
+
+  const comprobantesHtml = d.comprobantes.length ? `
+    <table class="w-full text-sm mt-2 border border-gray-200 rounded-lg overflow-hidden">
+      <thead class="bg-gray-50 text-gray-500 text-xs uppercase">
+        <tr>
+          <th class="px-3 py-2 text-left">Tipo</th>
+          <th class="px-3 py-2 text-left">Número</th>
+          <th class="px-3 py-2 text-left">Fecha</th>
+          <th class="px-3 py-2 text-right">Importe</th>
+          <th class="px-3 py-2 text-right">Saldo Pendiente</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-100">
+        ${d.comprobantes.map(c => `
+          <tr>
+            <td class="px-3 py-2">${c.tipo}</td>
+            <td class="px-3 py-2 font-mono">${c.numero}</td>
+            <td class="px-3 py-2 text-gray-500">${c.fecha}</td>
+            <td class="px-3 py-2 text-right font-mono ${c.importe < 0 ? 'text-red-600' : ''}">${c.importe < 0 ? '-' : ''}$${fmt(Math.abs(c.importe))}</td>
+            <td class="px-3 py-2 text-right font-mono font-semibold text-green-700">$${fmt(c.saldo_pendiente)}</td>
+          </tr>`).join('')}
+      </tbody>
+    </table>` : '<p class="text-gray-400 text-sm mt-2">Sin comprobantes.</p>';
+
+  const formasPagoHtml = d.formas_pago.length ? d.formas_pago.map(fp => `
+    <div class="flex items-start gap-3 py-2 border-b last:border-0">
+      <span class="material-symbols-outlined text-emerald-500 text-base mt-0.5">check_circle</span>
+      <div class="flex-1">
+        <p class="font-semibold text-sm">${fp.metodo}
+          ${fp.importe ? `<span class="ml-2 text-gray-500 font-mono">$${fmt(fp.importe)}</span>` : ''}
+        </p>
+        ${fp.banco ? `<p class="text-xs text-gray-500">Banco: ${fp.banco}</p>` : ''}
+        ${fp.cbu   ? `<p class="text-xs text-gray-500 font-mono">CBU: ${fp.cbu}</p>` : ''}
+        ${fp.numero_cheque ? `<p class="text-xs text-gray-500">Cheque N°: ${fp.numero_cheque}</p>` : ''}
+        ${fp.referencia ? `<p class="text-xs text-gray-500">Ref: ${fp.referencia}</p>` : ''}
+      </div>
+    </div>`).join('') : '<p class="text-gray-400 text-sm">Sin formas de pago definidas.</p>';
+
+  const retencionesHtml = d.retenciones.length ? `
+    <table class="w-full text-sm mt-2">
+      <thead><tr>
+        <th class="text-left text-xs text-gray-500 uppercase pb-1">Tipo</th>
+        <th class="text-left text-xs text-gray-500 uppercase pb-1">Descripción</th>
+        <th class="text-right text-xs text-gray-500 uppercase pb-1">Importe</th>
+      </tr></thead>
+      <tbody>${d.retenciones.map(r => `
+        <tr class="border-t">
+          <td class="py-1.5">${r.tipo}</td>
+          <td class="py-1.5 text-gray-500">${r.descripcion || '—'}</td>
+          <td class="py-1.5 text-right font-mono text-red-600">-$${fmt(r.importe)}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>` : '<p class="text-gray-400 text-sm mt-1">Sin retenciones.</p>';
+
+  content.innerHTML = `
+  <!-- ENCABEZADO -->
+  <div class="bg-gradient-to-r from-emerald-700 to-emerald-500 text-white px-6 py-5">
+    <div class="flex items-start justify-between">
+      <div class="flex items-center gap-3">
+        <div class="bg-white/20 rounded-full p-2">
+          <span class="material-symbols-outlined text-3xl">payments</span>
+        </div>
+        <div>
+          <p class="text-xs font-semibold uppercase tracking-wider text-emerald-100">Imprenta Tucán</p>
+          <h2 class="text-xl font-black">Orden de Pago</h2>
+        </div>
+      </div>
+      <div class="text-right space-y-1">
+        <p class="text-sm font-mono font-bold text-white">N° ${d.numero.padStart(5,'0')}</p>
+        <p class="text-xs text-emerald-100">${d.fecha}</p>
+        <div>${badgeEstado(d.estado_key, d.estado)}</div>
+        <p class="text-xs text-emerald-100">Por: ${d.usuario || '—'}</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="p-6 space-y-6 overflow-y-auto max-h-[70vh]">
+
+    <!-- DATOS DEL PROVEEDOR -->
+    <div class="bg-gray-50 border border-gray-200 rounded-xl p-4">
+      <h3 class="font-bold text-gray-700 flex items-center gap-2 mb-3">
+        <span class="material-symbols-outlined text-base text-blue-500">business</span> Datos del Proveedor
+      </h3>
+      <div class="grid grid-cols-2 gap-x-8 gap-y-1 text-sm">
+        <div><p class="text-gray-400 text-xs">Nombre</p><p class="font-semibold">${d.proveedor.nombre}</p></div>
+        <div><p class="text-gray-400 text-xs">CUIT</p><p>${d.proveedor.cuit || '—'}</p></div>
+        <div><p class="text-gray-400 text-xs">Condición IVA</p><p>${d.proveedor.condicion_iva || '—'}</p></div>
+        <div><p class="text-gray-400 text-xs">Dirección</p><p>${d.proveedor.direccion || '—'}</p></div>
+        <div class="col-span-2"><p class="text-gray-400 text-xs">Email</p><p>${d.proveedor.email || '—'}</p></div>
+      </div>
+    </div>
+
+    <!-- COMPROBANTES -->
+    <div>
+      <h3 class="font-bold text-gray-700 flex items-center gap-2 mb-2">
+        <span class="material-symbols-outlined text-base text-indigo-500">description</span> Comprobantes Asociados
+      </h3>
+      ${comprobantesHtml}
+    </div>
+
+    <!-- DETALLE DEL PAGO -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <!-- Forma de pago -->
+      <div>
+        <h3 class="font-bold text-gray-700 flex items-center gap-2 mb-2">
+          <span class="material-symbols-outlined text-base text-emerald-500">account_balance</span> Forma de Pago
+        </h3>
+        <div class="bg-white border border-gray-200 rounded-xl px-4 py-2">
+          ${formasPagoHtml}
+        </div>
+      </div>
+
+      <!-- Retenciones -->
+      <div>
+        <h3 class="font-bold text-gray-700 flex items-center gap-2 mb-2">
+          <span class="material-symbols-outlined text-base text-red-500">percent</span> Retenciones / Descuentos
+        </h3>
+        <div class="bg-white border border-gray-200 rounded-xl px-4 py-2">
+          ${retencionesHtml}
+        </div>
+      </div>
+    </div>
+
+    <!-- RESUMEN FINAL -->
+    <div class="bg-gray-900 text-white rounded-xl p-5">
+      <h3 class="font-bold text-gray-300 text-xs uppercase tracking-wider mb-3 flex items-center gap-2">
+        <span class="material-symbols-outlined text-base">calculate</span> Resumen Final
+      </h3>
+      <div class="space-y-2">
+        <div class="flex justify-between text-sm">
+          <span class="text-gray-400">Total facturas</span>
+          <span class="font-mono">${d.moneda} $${fmt(d.monto_total)}</span>
+        </div>
+        <div class="flex justify-between text-sm">
+          <span class="text-red-400">Total retenciones</span>
+          <span class="font-mono text-red-400">− $${fmt(d.monto_retenciones)}</span>
+        </div>
+        <div class="border-t border-gray-700 pt-2 flex justify-between text-lg font-black">
+          <span>Total neto a pagar</span>
+          <span class="text-emerald-400">${d.moneda} $${fmt(d.monto_neto)}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- OBSERVACIONES -->
+    ${d.observaciones ? `<div>
+      <h3 class="font-bold text-gray-700 flex items-center gap-2 mb-1">
+        <span class="material-symbols-outlined text-base text-gray-400">notes</span> Observaciones
+      </h3>
+      <p class="text-sm text-gray-600 bg-gray-50 border border-gray-200 rounded-lg px-4 py-3">${d.observaciones}</p>
+    </div>` : ''}
+
+    <!-- FIRMAS -->
+    <div class="grid grid-cols-3 gap-6 pt-4 border-t border-gray-200">
+      ${['Elaborado por','Autorizado por','Recibido por'].map(f => `
+        <div class="text-center">
+          <div class="border-b border-gray-400 h-10 mb-2"></div>
+          <p class="text-xs text-gray-500">${f}</p>
+        </div>`).join('')}
+    </div>
+
+  </div>
+
+  <!-- PIE -->
+  <div class="border-t border-gray-100 px-6 py-4 flex justify-between items-center bg-gray-50">
+    <button onclick="cerrarModalOP()"
+            class="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg text-sm font-medium text-gray-700">
+      Cerrar
+    </button>
+    <button onclick="window.print()"
+            class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-semibold flex items-center gap-1">
+      <span class="material-symbols-outlined text-base">print</span> Imprimir
+    </button>
+  </div>`;
+}
+
+function cerrarModalOP() {
+  document.getElementById('modalOP').classList.add('hidden');
+  document.body.style.overflow = '';
+}
+
+function abrirModalPago(pk, numero) {
+  document.getElementById('modalPago').classList.remove('hidden');
+  document.getElementById('modalPago-numero').textContent = numero;
+  document.getElementById('modalPago-fecha').value = new Date().toISOString().split('T')[0];
+  document.getElementById('formRegistrarPago').action = `/compras/pagos/${pk}/registrar-pago/`;
+}
+
+function cerrarModalPago() {
+  document.getElementById('modalPago').classList.add('hidden');
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { cerrarModalOP(); cerrarModalPago(); }
+});
+</script>
+{% endblock %}

@@ -78,6 +78,67 @@
         </form>
       </div>
     </div>
+
+    <!-- Órdenes de Pago del proveedor -->
+    <div class="bg-white p-6 rounded-xl shadow mt-6">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-lg font-semibold text-gray-800 flex items-center gap-2">
+          <span class="material-symbols-outlined text-emerald-600">payments</span>
+          Órdenes de Pago
+        </h2>
+        <a href="{% url 'compras:lista_ordenes_pago' %}?proveedor={{ proveedor.pk }}"
+           class="text-xs text-emerald-600 hover:text-emerald-800 font-medium flex items-center gap-1">
+          Ver todas <span class="material-symbols-outlined text-sm">open_in_new</span>
+        </a>
+      </div>
+
+      {% if ordenes_pago %}
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="text-xs text-gray-500 uppercase border-b border-gray-200">
+              <th class="text-left pb-2 font-semibold">N° Orden</th>
+              <th class="text-left pb-2 font-semibold">Fecha</th>
+              <th class="text-right pb-2 font-semibold">Total</th>
+              <th class="text-right pb-2 font-semibold">Neto</th>
+              <th class="text-left pb-2 font-semibold">Estado</th>
+              <th class="text-left pb-2 font-semibold">Vencimiento</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-100">
+            {% for op in ordenes_pago %}
+            <tr class="hover:bg-gray-50">
+              <td class="py-2 font-mono font-semibold text-gray-800">OP-{{ op.numero }}</td>
+              <td class="py-2 text-gray-500">{{ op.creado_en|date:"d/m/Y" }}</td>
+              <td class="py-2 text-right font-mono">${{ op.monto_total|floatformat:2 }}</td>
+              <td class="py-2 text-right font-mono font-semibold text-emerald-700">${{ op.monto_neto|floatformat:2 }}</td>
+              <td class="py-2">
+                <span class="px-2 py-0.5 rounded-full text-xs font-semibold
+                  {% if op.estado == 'pagada' %}bg-green-100 text-green-700
+                  {% elif op.estado == 'aprobada' %}bg-blue-100 text-blue-700
+                  {% elif op.estado == 'anulada' %}bg-red-100 text-red-700
+                  {% else %}bg-yellow-100 text-yellow-700{% endif %}">
+                  {{ op.get_estado_display }}
+                </span>
+              </td>
+              <td class="py-2 text-gray-500">{{ op.fecha_vencimiento|date:"d/m/Y"|default:"—" }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p class="text-sm text-gray-400">Este proveedor no tiene órdenes de pago registradas.</p>
+      {% endif %}
+
+      <div class="mt-4">
+        <a href="{% url 'compras:nueva_orden_pago' %}"
+           class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold">
+          <span class="material-symbols-outlined text-sm">add</span> Nueva Orden de Pago
+        </a>
+      </div>
+    </div>
+
   </div>
 </div>
 {% endblock %}

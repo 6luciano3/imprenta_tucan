@@ -126,7 +126,45 @@
                     </div>
                 </div>
             </a>
+            <!-- Órdenes de Pago -->
+            <a href="{% url 'compras:lista_ordenes_pago' %}" class="group bg-white border border-emerald-200 rounded-xl p-5 shadow-sm hover:shadow-md transition">
+                <div class="flex items-center gap-4">
+                    <div class="h-12 w-12 rounded-full bg-emerald-50 text-emerald-700 grid place-items-center">
+                        <span class="material-symbols-outlined">payments</span>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-500">Órdenes de Pago</p>
+                        <p class="text-lg font-bold group-hover:text-emerald-700">
+                            {{ pagos_pendientes_count }} pendiente{{ pagos_pendientes_count|pluralize:",s" }}
+                        </p>
+                        {% if pagos_pendientes_monto %}
+                        <p class="text-xs text-emerald-600 font-semibold">${{ pagos_pendientes_monto|floatformat:0 }} por pagar</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </a>
         </section>
+
+        <!-- Panel financiero de pagos del mes -->
+        {% if pagos_pendientes_count or pagos_pagados_mes %}
+        <div class="mt-6 bg-gradient-to-r from-emerald-700 to-emerald-500 rounded-xl p-5 text-white flex flex-wrap gap-8 items-center">
+            <div>
+                <p class="text-xs uppercase tracking-wider text-emerald-200">Pendiente de pago</p>
+                <p class="text-2xl font-black">${{ pagos_pendientes_monto|floatformat:0 }}</p>
+                <p class="text-xs text-emerald-200">{{ pagos_pendientes_count }} orden{{ pagos_pendientes_count|pluralize:",es" }}</p>
+            </div>
+            <div class="border-l border-emerald-400 pl-8">
+                <p class="text-xs uppercase tracking-wider text-emerald-200">Pagado este mes</p>
+                <p class="text-2xl font-black">${{ pagos_pagados_mes|floatformat:0 }}</p>
+            </div>
+            <div class="ml-auto">
+                <a href="{% url 'compras:lista_ordenes_pago' %}"
+                   class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white text-emerald-700 text-sm font-bold hover:bg-emerald-50">
+                    <span class="material-symbols-outlined text-base">open_in_new</span> Ver pagos
+                </a>
+            </div>
+        </div>
+        {% endif %}
 
         <h3 class="mt-8 mb-2 text-sm font-semibold text-gray-600">Analítica</h3>
         <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">

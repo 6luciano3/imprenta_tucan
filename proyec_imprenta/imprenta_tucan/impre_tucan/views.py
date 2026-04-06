@@ -11,6 +11,7 @@ from pedidos.models import Pedido
 from presupuestos.models import Presupuesto
 from auditoria.models import AuditEntry
 from configuracion.models import Parametro
+from compras.models import OrdenPago
 
 # Vista principal protegida
 
@@ -35,6 +36,21 @@ def dashboard(request):
     total_presupuestos = Presupuesto.objects.count()
     total_auditoria = AuditEntry.objects.count()
     total_configuracion = Parametro.objects.count()
+
+    # Métricas de Órdenes de Pago
+    from django.db.models import Sum
+    from django.utils import timezone as tz
+    from datetime import timedelta
+    hoy = tz.localdate()
+    inicio_mes = hoy.replace(day=1)
+    pagos_pendientes = OrdenPago.objects.filter(estado__in=['pendiente', 'aprobada'])
+    pagos_pendientes_monto = pagos_oc_mes = pagos_neto_mes = None
+    try:
+        pagos_pendientes_monto = pagos_pendientes.aggregate(t=Sum('monto_neto'))['t'] or 0
+        pagos_oc_mes = OrdenPago.objects.filter(estado='pagada', fecha_pago__gte=inicio_mes).aggregate(t=Sum('monto_neto'))['t'] or 0
+    except Exception:
+        pagos_pendientes_monto = 0
+        pagos_oc_mes = 0
 
     # Últimas fechas conocidas (cuando existan los campos)
     ultima_fecha_usuarios = (
@@ -72,6 +88,9 @@ def dashboard(request):
         'ultima_fecha_proveedores': ultima_fecha_proveedores,
         'ultima_fecha_insumos': ultima_fecha_insumos,
         'ultima_fecha_pedidos': ultima_fecha_pedidos,
+        'pagos_pendientes_count': pagos_pendientes.count(),
+        'pagos_pendientes_monto': pagos_pendientes_monto,
+        'pagos_pagados_mes':      pagos_oc_mes,
     }
     # Usar el dashboard con paneles inteligentes y logs
     return render(request, 'usuarios/dashboard_paneles.html', context)

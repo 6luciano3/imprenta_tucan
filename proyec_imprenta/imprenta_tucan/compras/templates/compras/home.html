@@ -87,6 +87,25 @@
     </div>
   </a>
 
+  <!-- Órdenes de Pago -->
+  <a href="{% url 'compras:lista_ordenes_pago' %}" class="group bg-white border border-gray-200 rounded-xl p-6 shadow-sm hover:shadow-md transition">
+    <div class="flex items-center gap-4 mb-4">
+      <div class="h-12 w-12 rounded-full bg-emerald-50 text-emerald-600 grid place-items-center">
+        <span class="material-symbols-outlined text-2xl">payments</span>
+      </div>
+      <div>
+        <p class="text-xs text-gray-500 uppercase font-semibold">Órdenes de Pago</p>
+        <p class="text-2xl font-bold text-gray-800 group-hover:text-emerald-700">{{ pagos_count }}</p>
+      </div>
+    </div>
+    <p class="text-sm text-gray-500">Gestionar órdenes de pago a proveedores: aprobar, registrar pago y emitir comprobante.</p>
+    <div class="mt-4 flex gap-2">
+      <span class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-semibold group-hover:bg-emerald-700">
+        <span class="material-symbols-outlined text-sm">open_in_new</span> Ver pagos
+      </span>
+    </div>
+  </a>
+
   <!-- Precios -->
   <a href="{% url 'compras:lista_precios_insumos' %}" class="group bg-white border border-gray-200 rounded-xl p-6 shadow-sm hover:shadow-md transition">
     <div class="flex items-center gap-4 mb-4">
@@ -127,6 +146,9 @@
   </a>
   <a href="{% url 'compras:nuevo_remito_compra' %}" class="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-lg bg-green-600 hover:bg-green-700 text-white font-semibold text-sm">
     <span class="material-symbols-outlined text-base">add</span> Nuevo Remito
+  </a>
+  <a href="{% url 'compras:nueva_orden_pago' %}" class="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm">
+    <span class="material-symbols-outlined text-base">add</span> Nueva Orden de Pago
   </a>
 </div>
 {% endblock %}
