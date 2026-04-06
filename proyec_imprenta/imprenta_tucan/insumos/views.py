@@ -136,9 +136,17 @@ def editar_insumo(request, pk: int):
 @require_perm('Insumos', 'Ver', redirect_to='lista_insumos')
 @login_required
 def detalle_insumo(request, pk: int):
+    from compras.models import HistorialPrecioInsumo
     insumo = get_object_or_404(Insumo, idInsumo=pk)
+    historial_reciente = (
+        HistorialPrecioInsumo.objects
+        .filter(insumo=insumo)
+        .select_related('usuario', 'remito')
+        .order_by('-fecha')[:5]
+    )
     return render(request, 'insumos/detalle_insumo.html', {
         'insumo': insumo,
+        'historial_reciente': historial_reciente,
     })
 
 

@@ -62,7 +62,13 @@
 							<span class="px-2 py-1 rounded-full text-xs font-semibold bg-orange-100 text-orange-800">Indirecto</span>
 						{% endif %}
 					</td>						<td class="py-3 px-5 hidden md:table-cell">{{ insumo.stock|default:"-" }}</td>
-						<td class="py-3 px-5 hidden md:table-cell">{{ insumo.precio|default:"-" }}</td>
+						<td class="py-3 px-5 hidden md:table-cell">
+							{% if insumo.precio_unitario %}
+								${{ insumo.precio_unitario|floatformat:2 }}
+							{% else %}
+								<span class="text-red-400 text-xs">Sin precio</span>
+							{% endif %}
+						</td>
 												<td class="py-3 px-5 text-center">
 													<div class="flex items-center justify-center gap-3">
 														<a href="{% url 'detalle_insumo' insumo.idInsumo %}" class="text-blue-600 hover:text-blue-800 flex items-center gap-1" title="Ver detalles">
@@ -75,6 +81,9 @@
 														{% endif %}
                                                         <a href="{% url 'compras:actualizar_precio_insumo' insumo.idInsumo %}" class="text-orange-600 hover:text-orange-800 flex items-center gap-1" title="Actualizar precio">
                                                             <span class="material-symbols-outlined text-sm">price_change</span>
+                                                        </a>
+                                                        <a href="{% url 'compras:historial_precios_insumo' insumo.idInsumo %}" class="text-indigo-600 hover:text-indigo-800 flex items-center gap-1" title="Historial de precios">
+                                                            <span class="material-symbols-outlined text-sm">history</span>
                                                         </a>
 														{% if can_insumos_activar %}
 														  {% if insumo.activo %}

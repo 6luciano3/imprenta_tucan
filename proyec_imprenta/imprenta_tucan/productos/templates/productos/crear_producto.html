@@ -100,20 +100,20 @@
 
   <!-- Insumos requeridos (receta) -->
   <div class="border border-gray-200 rounded-xl overflow-hidden">
-    <div class="flex items-center justify-between bg-gray-50 px-4 py-3 border-b">
-      <div>
+    <div class="bg-gray-50 px-4 py-3 border-b">
+      <div class="flex items-center justify-between">
         <h2 class="font-bold flex items-center gap-2">
           <span class="material-symbols-outlined text-base">list_alt</span>
           Insumos Requeridos
-          <span class="text-sm font-normal text-gray-500">(opcional — podés agregarlos ahora o después)</span>
+          <span class="text-sm font-normal text-gray-500">(opcional)</span>
         </h2>
-        <p class="text-xs text-gray-400 mt-0.5 ml-6">Solo insumos directos. Para insumos calculados dinámicamente, usá la Fórmula de cálculo.</p>
+        <button type="button" id="btn-agregar-insumo"
+                class="flex items-center gap-1 bg-green-600 text-white text-sm px-3 py-1.5 rounded-lg hover:bg-green-700">
+          <span class="material-symbols-outlined text-base">add</span>
+          Agregar insumo
+        </button>
       </div>
-      <button type="button" id="btn-agregar-insumo"
-              class="flex items-center gap-1 bg-green-600 text-white text-sm px-3 py-1.5 rounded-lg hover:bg-green-700">
-        <span class="material-symbols-outlined text-base">add</span>
-        Agregar insumo
-      </button>
+      <p class="text-xs text-gray-400 mt-1 ml-6">Solo insumos directos. Para consumo dinámico usá la Fórmula de cálculo.</p>
     </div>
 
     {{ formset.management_form }}
@@ -162,9 +162,8 @@
     </div>
   </div>
 
-  <!-- Template vacío para JS (oculto) -->
-  <div id="insumo-empty-form" class="hidden">
-    <table><tbody>
+  <!-- Template vacío para JS — usa <template> para evitar que el navegador renderice contenido de tabla fuera de contexto -->
+  <template id="insumo-empty-form">
     <tr class="border-t insumo-row">
       <td class="py-2 px-3">{{ formset.empty_form.insumo }}</td>
       <td class="py-2 px-3"><span class="unidad-display text-gray-500 text-xs bg-gray-100 rounded px-2 py-1 whitespace-nowrap">—</span></td>
@@ -180,8 +179,7 @@
         </button>
       </td>
     </tr>
-    </tbody></table>
-  </div>
+  </template>
 
   <div class="flex justify-end gap-4 pt-4">
     <a href="{% url 'lista_productos' %}"
@@ -258,7 +256,7 @@
 (function(){
   const UNIDADES = {{ unidades_insumos_json|safe }};
   const body = document.getElementById('insumos-body');
-  const emptyContainer = document.getElementById('insumo-empty-form');
+  const emptyTemplate = document.getElementById('insumo-empty-form');
   const totalFormsInput = document.getElementById('id_insumos-TOTAL_FORMS');
   const vacioMsg = document.getElementById('insumos-vacio');
 
@@ -314,7 +312,8 @@
 
   document.getElementById('btn-agregar-insumo').addEventListener('click', function(){
     const idx = getTotal();
-    const templateRow = emptyContainer.querySelector('tr').cloneNode(true);
+    const clone = document.importNode(emptyTemplate.content, true);
+    const templateRow = clone.querySelector('tr');
     templateRow.querySelectorAll('input, select').forEach(el => {
       el.name = el.name.replace(/__prefix__/g, idx);
       el.id   = el.id.replace(/__prefix__/g, idx);

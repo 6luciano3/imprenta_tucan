@@ -1,78 +1,206 @@
 {% extends 'base.html' %}
-{% block title %}Detalle de Insumo{% endblock %}
+{% block title %}Detalle de Insumo — {{ insumo.nombre }}{% endblock %}
 
 {% block content %}
 <div class="px-4 md:px-10 lg:px-20 xl:px-40 py-5">
-  <div class="max-w-3xl mx-auto">
-    <div class="flex justify-between items-center mb-6">
-      <h1 class="text-3xl font-black text-[#111418] dark:text-white">🧰 Detalle de Insumo</h1>
-      <a href="{% url 'lista_insumos' %}" class="flex items-center gap-2 bg-gray-500 text-white px-4 py-2 rounded-lg shadow hover:bg-gray-600">
-        <span class="material-symbols-outlined">arrow_back</span>
-        Volver
-      </a>
-    </div>
+  <div class="max-w-4xl mx-auto space-y-6">
 
-  <div class="bg-white p-6 rounded-xl shadow">
-      <h2 class="text-xl font-semibold mb-4 text-gray-800">Información</h2>
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-gray-700">
-        <div>
-          <p class="font-semibold">Código:</p>
-          <p class="mb-4">{{ insumo.codigo }}</p>
-        </div>
-        <div>
-          <p class="font-semibold">Nombre:</p>
-          <p class="mb-4">{{ insumo.nombre }}</p>
-        </div>
-        <div>
-          <p class="font-semibold">Categoría:</p>
-          <p class="mb-4">{{ insumo.categoria|default:"-" }}</p>
-        </div>
-        <div>
-          <p class="font-semibold">Stock:</p>
-          <p class="mb-4">{{ insumo.stock }}</p>
-        </div>
-        <div>
-          <p class="font-semibold">Precio:</p>
-          <p class="mb-4">{{ insumo.precio }}</p>
-        </div>
-        <div>
-          <p class="font-semibold">Estado:</p>
-          <p class="mb-4">{% if insumo.activo %}Activo{% else %}Inactivo{% endif %}</p>
-        </div>
-      </div>
-
-      <div class="mt-6 flex justify-between items-center">
-        <a href="{% url 'lista_insumos' %}" class="inline-flex items-center gap-2 bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700">
-          <span class="material-symbols-outlined">arrow_back</span>
+    <!-- Encabezado -->
+    <div class="flex justify-between items-center">
+      <h1 class="text-2xl font-bold flex items-center gap-2">
+        <span class="material-symbols-outlined text-2xl text-blue-600">inventory_2</span>
+        {{ insumo.nombre }}
+      </h1>
+      <div class="flex gap-2">
+        <a href="{% url 'compras:actualizar_precio_insumo' insumo.pk %}"
+           class="flex items-center gap-1 px-3 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-sm font-medium">
+          <span class="material-symbols-outlined text-sm">price_change</span>
+          Actualizar precio
+        </a>
+        <a href="{% url 'compras:historial_precios_insumo' insumo.pk %}"
+           class="flex items-center gap-1 px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium">
+          <span class="material-symbols-outlined text-sm">history</span>
+          Historial de precios
+        </a>
+        <a href="{% url 'lista_insumos' %}"
+           class="flex items-center gap-1 px-3 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg text-sm font-medium">
+          <span class="material-symbols-outlined text-sm">arrow_back</span>
           Volver
         </a>
-        {% if can_insumos_eliminar %}
-          <button onclick="return confirmarEliminarInsumoDetalle({{ insumo.pk }}, '{{ insumo.nombre|escapejs }}')"
-                  class="inline-flex items-center gap-2 bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700">
-            <span class="material-symbols-outlined">delete</span>
-            Eliminar
-          </button>
-        {% endif %}
       </div>
     </div>
+
+    <!-- Información del insumo -->
+    <div class="bg-white rounded-xl shadow border border-gray-200 p-6">
+      <h2 class="text-base font-semibold text-gray-700 mb-4">Información general</h2>
+      <div class="grid grid-cols-2 md:grid-cols-3 gap-5 text-sm">
+        <div>
+          <p class="text-gray-400 font-medium uppercase text-xs mb-1">Código</p>
+          <p class="font-mono font-semibold text-gray-800">{{ insumo.codigo|default:"—" }}</p>
+        </div>
+        <div>
+          <p class="text-gray-400 font-medium uppercase text-xs mb-1">Nombre</p>
+          <p class="text-gray-800">{{ insumo.nombre }}</p>
+        </div>
+        <div>
+          <p class="text-gray-400 font-medium uppercase text-xs mb-1">Categoría</p>
+          <p class="text-gray-800">{{ insumo.categoria|default:"—" }}</p>
+        </div>
+        <div>
+          <p class="text-gray-400 font-medium uppercase text-xs mb-1">Tipo</p>
+          <p class="text-gray-800 capitalize">{{ insumo.tipo|default:"—" }}</p>
+        </div>
+        <div>
+          <p class="text-gray-400 font-medium uppercase text-xs mb-1">Unidad de medida</p>
+          <p class="text-gray-800">{{ insumo.unidad_medida|default:"—" }}</p>
+        </div>
+        <div>
+          <p class="text-gray-400 font-medium uppercase text-xs mb-1">Estado</p>
+          {% if insumo.activo %}
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-100 text-green-700 text-xs font-semibold">
+              <span class="material-symbols-outlined text-xs">check_circle</span> Activo
+            </span>
+          {% else %}
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-100 text-red-700 text-xs font-semibold">
+              <span class="material-symbols-outlined text-xs">cancel</span> Inactivo
+            </span>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Stock y Precio -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <!-- Stock -->
+      <div class="bg-white rounded-xl shadow border border-gray-200 p-5">
+        <p class="text-xs font-semibold uppercase text-gray-400 mb-1">Stock actual</p>
+        <p class="text-3xl font-black {% if insumo.stock <= 0 %}text-red-600{% elif insumo.stock_minimo_sugerido and insumo.stock < insumo.stock_minimo_sugerido %}text-yellow-600{% else %}text-gray-800{% endif %}">
+          {{ insumo.stock }} <span class="text-base font-normal text-gray-400">{{ insumo.unidad_medida }}</span>
+        </p>
+        {% if insumo.stock_minimo_sugerido %}
+        <p class="text-xs text-gray-400 mt-1">Mínimo sugerido: {{ insumo.stock_minimo_sugerido }} {{ insumo.unidad_medida }}</p>
+        {% endif %}
+      </div>
+
+      <!-- Precio -->
+      <div class="bg-white rounded-xl shadow border border-gray-200 p-5">
+        <p class="text-xs font-semibold uppercase text-gray-400 mb-1">Precio unitario actual</p>
+        <p class="text-3xl font-black text-gray-800">
+          {% if insumo.precio_unitario %}
+            ${{ insumo.precio_unitario|floatformat:2 }}
+          {% else %}
+            <span class="text-red-500">Sin precio</span>
+          {% endif %}
+        </p>
+        <a href="{% url 'compras:actualizar_precio_insumo' insumo.pk %}"
+           class="text-xs text-orange-600 hover:text-orange-700 mt-2 inline-flex items-center gap-1">
+          <span class="material-symbols-outlined text-xs">edit</span>
+          Actualizar precio
+        </a>
+      </div>
+    </div>
+
+    <!-- Historial de precios reciente -->
+    <div class="bg-white rounded-xl shadow border border-gray-200 overflow-hidden">
+      <div class="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+        <h2 class="font-semibold text-gray-700 flex items-center gap-2">
+          <span class="material-symbols-outlined text-base text-indigo-500">history</span>
+          Últimos cambios de precio
+        </h2>
+        <a href="{% url 'compras:historial_precios_insumo' insumo.pk %}"
+           class="text-sm text-indigo-600 hover:text-indigo-800 flex items-center gap-1">
+          Ver historial completo
+          <span class="material-symbols-outlined text-sm">chevron_right</span>
+        </a>
+      </div>
+
+      {% if historial_reciente %}
+      <table class="w-full text-sm">
+        <thead class="bg-gray-50 text-gray-500 text-xs uppercase">
+          <tr>
+            <th class="px-4 py-2 text-left">Fecha</th>
+            <th class="px-4 py-2 text-right">Precio ant.</th>
+            <th class="px-4 py-2 text-right">Precio nuevo</th>
+            <th class="px-4 py-2 text-center">Variación</th>
+            <th class="px-4 py-2 text-left">Origen</th>
+            <th class="px-4 py-2 text-left">Motivo</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+          {% for h in historial_reciente %}
+          <tr class="hover:bg-gray-50">
+            <td class="px-4 py-2 text-gray-500 whitespace-nowrap">{{ h.fecha|date:"d/m/Y H:i" }}</td>
+            <td class="px-4 py-2 text-right font-mono text-gray-400">${{ h.precio_anterior|floatformat:2 }}</td>
+            <td class="px-4 py-2 text-right font-mono font-semibold text-gray-800">${{ h.precio_nuevo|floatformat:2 }}</td>
+            <td class="px-4 py-2 text-center">
+              {% if h.variacion_pct %}
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold
+                  {% if h.variacion_pct > 0 %}bg-red-100 text-red-700{% elif h.variacion_pct < 0 %}bg-green-100 text-green-700{% else %}bg-gray-100 text-gray-600{% endif %}">
+                  {% if h.variacion_pct > 0 %}+{% endif %}{{ h.variacion_pct|floatformat:1 }}%
+                </span>
+              {% else %}
+                <span class="text-gray-400">—</span>
+              {% endif %}
+            </td>
+            <td class="px-4 py-2">
+              <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium
+                {% if h.origen == 'manual' %}bg-blue-100 text-blue-700
+                {% elif h.origen == 'ajuste_masivo' %}bg-purple-100 text-purple-700
+                {% elif h.origen == 'remito' %}bg-emerald-100 text-emerald-700
+                {% else %}bg-amber-100 text-amber-700{% endif %}">
+                {% if h.origen == 'manual' %}Manual
+                {% elif h.origen == 'ajuste_masivo' %}Ajuste masivo
+                {% elif h.origen == 'remito' %}Remito
+                {% else %}SC{% endif %}
+              </span>
+            </td>
+            <td class="px-4 py-2 text-gray-500 max-w-xs truncate">{{ h.motivo|default:"—" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <div class="py-8 text-center text-gray-400 text-sm">
+        <span class="material-symbols-outlined text-3xl text-gray-300 block mb-2">history</span>
+        Sin historial de precios registrado.
+        <a href="{% url 'compras:actualizar_precio_insumo' insumo.pk %}" class="text-orange-600 hover:underline ml-1">Registrar primer precio</a>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Acciones -->
+    <div class="flex justify-between items-center pb-4">
+      <a href="{% url 'lista_insumos' %}"
+         class="inline-flex items-center gap-2 bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 text-sm">
+        <span class="material-symbols-outlined text-sm">arrow_back</span>
+        Volver a la lista
+      </a>
+      {% if can_insumos_eliminar %}
+        <button onclick="return confirmarEliminarInsumoDetalle({{ insumo.pk }}, '{{ insumo.nombre|escapejs }}')"
+                class="inline-flex items-center gap-2 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 text-sm">
+          <span class="material-symbols-outlined text-sm">delete</span>
+          Eliminar insumo
+        </button>
+      {% endif %}
+    </div>
+
   </div>
 </div>
-<!-- Modal de confirmación de eliminación (Detalle) -->
-<div id="modalEliminarInsumoDetalle" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full">
+
+<!-- Modal eliminación -->
+<div id="modalEliminarInsumoDetalle" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
   <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
     <div class="mt-3 text-center">
-      <h3 class="text-lg leading-6 font-medium text-gray-900">Confirmar eliminación</h3>
-      <div class="mt-2 px-7 py-3">
-        <p class="text-sm text-gray-500">
-          ¿Estás seguro que deseas eliminar el insumo <span id="insumoNombreDetalle" class="font-medium"></span>?
-        </p>
-      </div>
+      <h3 class="text-lg font-medium text-gray-900">Confirmar eliminación</h3>
+      <p class="text-sm text-gray-500 mt-2">
+        ¿Eliminar el insumo <span id="insumoNombreDetalle" class="font-medium text-gray-800"></span>?
+      </p>
       <div class="flex justify-center gap-4 mt-4">
         <form id="formEliminarInsumoDetalle" method="POST">
           {% csrf_token %}
-          <button type="submit" class="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700">Eliminar</button>
+          <button type="submit" class="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700">Eliminar</button>
         </form>
-        <button onclick="cerrarModalEliminarInsumoDetalle()" class="bg-gray-200 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-300">Cancelar</button>
+        <button onclick="cerrarModalEliminarInsumoDetalle()" class="bg-gray-200 text-gray-700 px-4 py-2 rounded hover:bg-gray-300">Cancelar</button>
       </div>
     </div>
   </div>
