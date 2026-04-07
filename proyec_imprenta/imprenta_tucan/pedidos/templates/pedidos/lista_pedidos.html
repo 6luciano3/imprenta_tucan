@@ -18,8 +18,41 @@
 {% endblock %}
 
 
-{% block list_actions_right %}{% endblock %}
+{% block list_actions_right %}
+<a href="{% url 'exportar_pedidos' %}?q={{ query }}&estado={{ estado_fil }}&fecha_desde={{ fecha_desde }}&fecha_hasta={{ fecha_hasta }}"
+   class="flex items-center gap-2 bg-gray-600 text-white px-4 py-2 rounded-lg shadow hover:bg-gray-700 text-sm">
+  <span class="material-symbols-outlined text-base">download</span>
+  Exportar CSV
+</a>
+{% endblock %}
+
+{% block extra_filters %}
+<div class="flex items-center gap-2">
+  <select name="estado" aria-label="Filtrar por estado"
+    class="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-blue-400 focus:outline-none">
+    <option value="">Todos los estados</option>
+    {% for est in estados %}
+    <option value="{{ est.nombre }}" {% if estado_fil == est.nombre %}selected{% endif %}>{{ est.nombre }}</option>
+    {% endfor %}
+  </select>
+</div>
+<div class="flex items-center gap-1 date-modern">
+  <input type="date" name="fecha_desde" value="{{ fecha_desde }}" title="Fecha desde"
+    class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white focus:ring-2 focus:ring-blue-400 focus:outline-none">
+  <span class="text-gray-400 text-xs">—</span>
+  <input type="date" name="fecha_hasta" value="{{ fecha_hasta }}" title="Fecha hasta"
+    class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white focus:ring-2 focus:ring-blue-400 focus:outline-none">
+</div>
+{% endblock %}
+
 {% block list_content %}
+  {% if total_resultados is not None %}
+  <p class="text-sm text-gray-500 mb-3">
+    Mostrando <strong>{{ pedidos|length }}</strong> de <strong>{{ total_resultados }}</strong> resultado(s)
+    {% if estado_fil %} · Estado: <span class="font-medium text-blue-600">{{ estado_fil }}</span>{% endif %}
+    {% if fecha_desde or fecha_hasta %} · Período: {{ fecha_desde|default:"…" }} → {{ fecha_hasta|default:"hoy" }}{% endif %}
+  </p>
+  {% endif %}
   <!-- Tabla -->
     <div class="bg-white shadow rounded-xl overflow-hidden table-responsive">
       {% if pedidos %}
@@ -62,6 +95,9 @@
               </a>
               <a href="{% url 'modificar_pedido' pedido.id %}" class="inline-flex items-center text-amber-600 hover:text-amber-800" title="Modificar">
                 <span class="material-symbols-outlined text-base">edit</span>
+              </a>
+              <a href="{% url 'clonar_pedido' pedido.id %}" class="inline-flex items-center text-purple-600 hover:text-purple-800" title="Clonar pedido">
+                <span class="material-symbols-outlined text-base">content_copy</span>
               </a>
               <!-- Cambiar Estado dropdown -->
               <div class="relative">

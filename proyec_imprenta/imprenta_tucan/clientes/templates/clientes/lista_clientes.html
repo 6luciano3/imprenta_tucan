@@ -1,7 +1,13 @@
 {% extends 'layouts/list_base.html' %}
 {% block title %}Lista de Clientes{% endblock %}
 
-{% block list_actions_right %}{% endblock %}
+{% block list_actions_right %}
+<a href="{% url 'clientes_inactivos' %}"
+   class="flex items-center gap-2 bg-amber-500 text-white px-4 py-2 rounded-lg shadow hover:bg-amber-600 text-sm">
+  <span class="material-symbols-outlined text-base">inventory_2</span>
+  Inactivos
+</a>
+{% endblock %}
 
 {% block extra_head %}
 {{ block.super }}
@@ -76,10 +82,32 @@
 {% endblock %}
 
 
+{% block extra_filters %}
+<div class="flex items-center gap-2">
+  <select name="estado" aria-label="Filtrar por estado"
+    class="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-blue-400 focus:outline-none">
+    <option value="">Todos</option>
+    <option value="Activo" {% if estado_fil == 'Activo' %}selected{% endif %}>Activos</option>
+    <option value="Inactivo" {% if estado_fil == 'Inactivo' %}selected{% endif %}>Inactivos</option>
+  </select>
+</div>
+<div class="flex items-center gap-1 date-modern">
+  <input type="date" name="fecha_desde" value="{{ fecha_desde }}" title="Última actualización desde"
+    class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white focus:ring-2 focus:ring-blue-400 focus:outline-none">
+  <span class="text-gray-400 text-xs">—</span>
+  <input type="date" name="fecha_hasta" value="{{ fecha_hasta }}" title="Última actualización hasta"
+    class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white focus:ring-2 focus:ring-blue-400 focus:outline-none">
+</div>
+{% endblock %}
+
 {% block list_content %}
-
-
-
+{% if total_resultados is not None %}
+<p class="text-sm text-gray-500 mb-3">
+  Mostrando <strong>{{ clientes|length }}</strong> de <strong>{{ total_resultados }}</strong> cliente(s)
+  {% if estado_fil %} · <span class="font-medium {% if estado_fil == 'Activo' %}text-green-600{% else %}text-gray-500{% endif %}">{{ estado_fil }}s</span>{% endif %}
+  {% if fecha_desde or fecha_hasta %} · Actualizado: {{ fecha_desde|default:"…" }} → {{ fecha_hasta|default:"hoy" }}{% endif %}
+</p>
+{% endif %}
 
 <!-- Tabla de clientes -->
 <div class="bg-white shadow rounded-xl overflow-hidden table-responsive">

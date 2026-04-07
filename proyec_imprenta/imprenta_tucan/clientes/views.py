@@ -40,15 +40,20 @@ def alta_cliente(request):
 @login_required
 @requiere_permiso("Clientes")
 def lista_clientes(request):
-    query = request.GET.get("q", "") or request.GET.get("criterio", "")
-    order_by = request.GET.get("order_by", "apellido")
-    direction = request.GET.get("direction", "asc")
+    query       = request.GET.get("q", "") or request.GET.get("criterio", "")
+    order_by    = request.GET.get("order_by", "apellido")
+    direction   = request.GET.get("direction", "asc")
+    estado_fil  = request.GET.get("estado", "Activo")
+    fecha_desde = request.GET.get("fecha_desde", "")
+    fecha_hasta = request.GET.get("fecha_hasta", "")
 
     valid_order_fields = ["id", "nombre", "apellido", "email", "telefono", "direccion"]
     if order_by not in valid_order_fields:
         order_by = "apellido"
 
     clientes_qs = Cliente.objects.all()
+    if estado_fil:
+        clientes_qs = clientes_qs.filter(estado=estado_fil)
     if query:
         if order_by == "id" and query.isdigit():
             clientes_qs = clientes_qs.filter(id=int(query))
@@ -61,19 +66,27 @@ def lista_clientes(request):
                 Q(telefono__icontains=query) |
                 Q(direccion__icontains=query)
             )
+    if fecha_desde:
+        clientes_qs = clientes_qs.filter(fecha_ultima_actualizacion__date__gte=fecha_desde)
+    if fecha_hasta:
+        clientes_qs = clientes_qs.filter(fecha_ultima_actualizacion__date__lte=fecha_hasta)
 
     order_field = f"-{order_by}" if direction == "desc" else order_by
     clientes_qs = clientes_qs.order_by(order_field)
 
     paginator = Paginator(clientes_qs, get_page_size())
-    page = request.GET.get("page")
-    clientes = paginator.get_page(page)
+    clientes = paginator.get_page(request.GET.get("page"))
+    total_resultados = paginator.count
 
     return render(request, "clientes/lista_clientes.html", {
         "clientes": clientes,
         "query": query,
         "order_by": order_by,
         "direction": direction,
+        "estado_fil": estado_fil,
+        "fecha_desde": fecha_desde,
+        "fecha_hasta": fecha_hasta,
+        "total_resultados": total_resultados,
     })
 
 

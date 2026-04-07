@@ -33,14 +33,38 @@ from .models import OrdenCompra
 from configuracion.permissions import require_perm
 
 
+def _audit_pedido(request, pedido, accion, extra=None):
+    """Registra un AuditEntry para un Pedido. Silencia errores."""
+    try:
+        from auditoria.models import AuditEntry
+        import json
+        AuditEntry.objects.create(
+            user=request.user,
+            ip_address=request.META.get('REMOTE_ADDR'),
+            path=request.path,
+            method=request.method,
+            app_label='pedidos',
+            model='Pedido',
+            object_id=str(pedido.pk),
+            object_repr=str(pedido),
+            action=accion,
+            changes=json.dumps(extra or {}),
+        )
+    except Exception:
+        pass
+
+
 @require_perm('Pedidos', 'Listar')
 @login_required
 @requiere_permiso("Pedidos")
 def lista_pedidos(request):
-    """Lista unificada con búsqueda, orden y paginación para Pedidos."""
-    query = (request.GET.get("q", "") or request.GET.get("criterio", "")).strip()
-    order_by = request.GET.get("order_by", "id")
-    direction = request.GET.get("direction", "desc")
+    """Lista unificada con búsqueda, orden, paginación y filtro de fechas para Pedidos."""
+    query       = (request.GET.get("q", "") or request.GET.get("criterio", "")).strip()
+    order_by    = request.GET.get("order_by", "id")
+    direction   = request.GET.get("direction", "desc")
+    estado_fil  = request.GET.get("estado", "")
+    fecha_desde = request.GET.get("fecha_desde", "")
+    fecha_hasta = request.GET.get("fecha_hasta", "")
 
     valid_order_fields = [
         "id", "cliente__nombre", "cliente__apellido",
@@ -68,25 +92,32 @@ def lista_pedidos(request):
                 Q(lineas__producto__nombreProducto__icontains=query)
             ).distinct()
 
+    if estado_fil:
+        qs = qs.filter(estado__nombre__iexact=estado_fil)
+    if fecha_desde:
+        qs = qs.filter(fecha_pedido__gte=fecha_desde)
+    if fecha_hasta:
+        qs = qs.filter(fecha_pedido__lte=fecha_hasta)
+
     order_field = f"-{order_by}" if direction == "desc" else order_by
     qs = qs.order_by(order_field)
 
     from configuracion.services import get_page_size
     paginator = Paginator(qs, get_page_size())
-    page_number = request.GET.get("page")
-    page_obj = paginator.get_page(page_number)
+    page_obj = paginator.get_page(request.GET.get("page"))
+    total_resultados = paginator.count
 
-    return render(
-        request,
-        "pedidos/lista_pedidos.html",
-        {
-            "pedidos": page_obj,
-            "query": query,
-            "order_by": order_by,
-            "direction": direction,
-            "estados": EstadoPedido.objects.all(),
-        },
-    )
+    return render(request, "pedidos/lista_pedidos.html", {
+        "pedidos": page_obj,
+        "query": query,
+        "order_by": order_by,
+        "direction": direction,
+        "estado_fil": estado_fil,
+        "fecha_desde": fecha_desde,
+        "fecha_hasta": fecha_hasta,
+        "estados": EstadoPedido.objects.all(),
+        "total_resultados": total_resultados,
+    })
 
 
 @require_perm('Pedidos', 'Crear')
@@ -208,6 +239,7 @@ def alta_pedido(request):
                         precio_unitario=producto.precio or Decimal("0")
                     )
 
+            _audit_pedido(request, pedido, 'create', {'lineas': len(lineas), 'total': str(total_con_iva)})
             cant_lineas = len([f for f in formset if not f.cleaned_data.get('DELETE')
                               and f.cleaned_data.get('producto') and f.cleaned_data.get('cantidad')])
             if aplicar_iva:
@@ -650,6 +682,7 @@ def eliminar_pedido(request, idPedido: int):
             messages.error(request, f"El pedido #{pedido.id} no puede eliminarse porque su estado es '{pedido.estado}'. Solo se pueden eliminar pedidos con estado Cancelado o Entregado.")
             return redirect("lista_pedidos")
         descripcion = f"Pedido {pedido.id} - {pedido.cliente}"
+        _audit_pedido(request, pedido, 'delete', {'estado': pedido.estado.nombre, 'total': str(pedido.monto_total)})
         from productos.models import ProductoInsumo
         # Obtener todas las líneas del pedido
         lineas = list(pedido.lineas.select_related('producto').all())
@@ -703,6 +736,81 @@ def orden_compra_detalle(request, pk):
     return render(request, 'pedidos/orden_compra_detalle.html', context)
 
 
+@login_required
+@requiere_permiso("Pedidos", "Crear")
+def clonar_pedido(request, pk):
+    """Crea un pedido nuevo con los mismos productos/cantidades, estado Pendiente."""
+    original = get_object_or_404(Pedido.objects.prefetch_related('lineas__producto'), pk=pk)
+    from datetime import date, timedelta
+    estado_pendiente, _ = EstadoPedido.objects.get_or_create(nombre='Pendiente')
+    with transaction.atomic():
+        nuevo = Pedido.objects.create(
+            cliente=original.cliente,
+            fecha_entrega=date.today() + timedelta(days=10),
+            estado=estado_pendiente,
+            monto_total=original.monto_total,
+            descuento=original.descuento,
+            aplicar_iva=original.aplicar_iva,
+        )
+        for linea in original.lineas.all():
+            LineaPedido.objects.create(
+                pedido=nuevo,
+                producto=linea.producto,
+                cantidad=linea.cantidad,
+                especificaciones=linea.especificaciones or '',
+                precio_unitario=linea.precio_unitario,
+            )
+    _audit_pedido(request, nuevo, 'create', {'clonado_de': original.pk})
+    messages.success(request, f'Pedido #{original.pk} clonado como #{nuevo.pk}. Revisá fecha de entrega.')
+    return redirect('modificar_pedido', idPedido=nuevo.pk)
+
+
+@login_required
+@requiere_permiso("Pedidos")
+def exportar_pedidos_csv(request):
+    """Exporta la lista de pedidos a CSV respetando los filtros activos."""
+    import csv
+    from django.http import HttpResponse
+
+    query   = (request.GET.get('q', '') or request.GET.get('criterio', '')).strip()
+    estado  = request.GET.get('estado', '')
+    fecha_desde = request.GET.get('fecha_desde', '')
+    fecha_hasta = request.GET.get('fecha_hasta', '')
+
+    qs = Pedido.objects.select_related('cliente', 'estado').prefetch_related('lineas__producto').order_by('-id')
+    if query:
+        if query.isdigit():
+            qs = qs.filter(Q(id=int(query)) | Q(cliente__nombre__icontains=query) | Q(cliente__apellido__icontains=query)).distinct()
+        else:
+            qs = qs.filter(Q(cliente__nombre__icontains=query) | Q(cliente__apellido__icontains=query) | Q(estado__nombre__icontains=query)).distinct()
+    if estado:
+        qs = qs.filter(estado__nombre__iexact=estado)
+    if fecha_desde:
+        qs = qs.filter(fecha_pedido__gte=fecha_desde)
+    if fecha_hasta:
+        qs = qs.filter(fecha_pedido__lte=fecha_hasta)
+
+    response = HttpResponse(content_type='text/csv; charset=utf-8-sig')
+    response['Content-Disposition'] = 'attachment; filename="pedidos.csv"'
+    writer = csv.writer(response)
+    writer.writerow(['N° Pedido', 'Cliente', 'CUIT', 'Productos', 'Fecha Pedido', 'Fecha Entrega', 'Estado', 'Descuento %', 'IVA', 'Total'])
+    for p in qs:
+        productos = '; '.join(f"{l.producto.nombreProducto} x{l.cantidad}" for l in p.lineas.all())
+        writer.writerow([
+            p.pk,
+            f"{p.cliente.nombre} {p.cliente.apellido}",
+            p.cliente.cuit or '',
+            productos,
+            p.fecha_pedido.strftime('%d/%m/%Y'),
+            p.fecha_entrega.strftime('%d/%m/%Y'),
+            p.estado.nombre,
+            p.descuento,
+            '21%' if p.aplicar_iva else 'No',
+            str(p.monto_total),
+        ])
+    return response
+
+
 @require_POST
 @login_required
 @requiere_permiso("Pedidos")
@@ -721,7 +829,7 @@ def cambiar_estado_pedido(request, idPedido: int):
         estado_anterior = pedido.estado
         pedido.estado = nuevo_estado
         pedido.save()
-        
+        _audit_pedido(request, pedido, 'update', {'estado': [estado_anterior.nombre, nuevo_estado.nombre]})
         messages.success(request, f"Pedido #{pedido.id} cambiado de '{estado_anterior.nombre}' a '{nuevo_estado.nombre}'")
         
     except Pedido.DoesNotExist:

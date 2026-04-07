@@ -20,10 +20,13 @@ def index(request):
 @login_required
 @requiere_permiso("Comercial")
 def lista_presupuestos(request):
-    query = request.GET.get('q', '') or request.GET.get('criterio', '')
-    order_by = request.GET.get('order_by', 'fecha')
-    direction = request.GET.get('direction', 'desc')
-    fecha = request.GET.get('fecha')
+    query       = request.GET.get('q', '') or request.GET.get('criterio', '')
+    order_by    = request.GET.get('order_by', 'fecha')
+    direction   = request.GET.get('direction', 'desc')
+    fecha       = request.GET.get('fecha', '')
+    fecha_desde = request.GET.get('fecha_desde', '')
+    fecha_hasta = request.GET.get('fecha_hasta', '')
+    estado_fil  = request.GET.get('estado', '')
 
     valid_order_fields = ['id', 'numero', 'cliente__apellido', 'cliente__nombre', 'fecha', 'validez', 'total', 'estado']
     if order_by not in valid_order_fields:
@@ -39,17 +42,22 @@ def lista_presupuestos(request):
             Q(estado__icontains=query)
         )
 
-    # Filtro por fecha exacta (día específico)
     if fecha:
         qs = qs.filter(fecha=fecha)
+    if fecha_desde:
+        qs = qs.filter(fecha__gte=fecha_desde)
+    if fecha_hasta:
+        qs = qs.filter(fecha__lte=fecha_hasta)
+    if estado_fil:
+        qs = qs.filter(estado__iexact=estado_fil)
 
     order_field = f'-{order_by}' if direction == 'desc' else order_by
     qs = qs.order_by(order_field)
 
     from configuracion.services import get_page_size
     paginator = Paginator(qs, get_page_size())
-    page = request.GET.get('page')
-    presupuestos = paginator.get_page(page)
+    presupuestos = paginator.get_page(request.GET.get('page'))
+    total_resultados = paginator.count
 
     nuevo_pk = request.GET.get('nuevo')
     nuevo_presupuesto = None
@@ -65,7 +73,12 @@ def lista_presupuestos(request):
         'order_by': order_by,
         'direction': direction,
         'fecha': fecha,
+        'fecha_desde': fecha_desde,
+        'fecha_hasta': fecha_hasta,
+        'estado_fil': estado_fil,
+        'total_resultados': total_resultados,
         'nuevo_presupuesto': nuevo_presupuesto,
+        'estados_choices': ['Activo', 'Inactivo'],
     })
 
 
@@ -263,6 +276,89 @@ def editar_presupuesto(request, pk):
         'global_descuento': global_descuento,
         'global_iva_aplicada': global_iva_aplicada,
     })
+
+
+@login_required
+@requiere_permiso("Comercial")
+def exportar_presupuestos_csv(request):
+    import csv
+    from django.http import HttpResponse
+
+    query       = (request.GET.get('q', '') or '').strip()
+    estado      = request.GET.get('estado', '')
+    fecha_desde = request.GET.get('fecha_desde', '')
+    fecha_hasta = request.GET.get('fecha_hasta', '')
+
+    qs = Presupuesto.objects.select_related('cliente').prefetch_related('detalles__producto').order_by('-fecha')
+    if query:
+        qs = qs.filter(Q(numero__icontains=query) | Q(cliente__nombre__icontains=query) | Q(cliente__apellido__icontains=query))
+    if estado:
+        qs = qs.filter(estado__iexact=estado)
+    if fecha_desde:
+        qs = qs.filter(fecha__gte=fecha_desde)
+    if fecha_hasta:
+        qs = qs.filter(fecha__lte=fecha_hasta)
+
+    response = HttpResponse(content_type='text/csv; charset=utf-8-sig')
+    response['Content-Disposition'] = 'attachment; filename="presupuestos.csv"'
+    writer = csv.writer(response)
+    writer.writerow(['N° Presupuesto', 'Cliente', 'CUIT', 'Fecha', 'Validez', 'Estado', 'Respuesta', 'Productos', 'Total'])
+    for p in qs:
+        productos = '; '.join(
+            f"{d.producto.nombreProducto} x{d.cantidad}" for d in p.detalles.all()
+        )
+        writer.writerow([
+            p.numero,
+            f"{p.cliente.nombre} {p.cliente.apellido}",
+            p.cliente.cuit or '',
+            p.fecha.strftime('%d/%m/%Y'),
+            p.validez.strftime('%d/%m/%Y') if p.validez else '',
+            p.estado,
+            p.respuesta_cliente,
+            productos,
+            str(p.total),
+        ])
+    return response
+
+
+@login_required
+@requiere_permiso("Comercial")
+def detalle_presupuesto(request, pk):
+    presupuesto = get_object_or_404(
+        Presupuesto.objects.select_related('cliente').prefetch_related('detalles__producto'),
+        pk=pk,
+    )
+    return render(request, 'presupuestos/detalle_presupuesto.html', {'presupuesto': presupuesto})
+
+
+@login_required
+@requiere_permiso("Comercial")
+def clonar_presupuesto(request, pk):
+    original = get_object_or_404(Presupuesto.objects.prefetch_related('detalles__producto'), pk=pk)
+    from django.contrib import messages
+    from datetime import date, timedelta
+    from django.db import transaction
+    with transaction.atomic():
+        nuevo = Presupuesto.objects.create(
+            cliente=original.cliente,
+            validez=date.today() + timedelta(days=15),
+            total=original.total,
+            estado='Activo',
+            respuesta_cliente='pendiente',
+            observaciones=original.observaciones if hasattr(original, 'observaciones') else '',
+        )
+        for d in original.detalles.all():
+            PresupuestoDetalle.objects.create(
+                presupuesto=nuevo,
+                producto=d.producto,
+                cantidad=d.cantidad,
+                precio_unitario=d.precio_unitario,
+                descuento=d.descuento,
+                iva=d.iva,
+                subtotal=d.subtotal,
+            )
+    messages.success(request, f'Presupuesto clonado como {nuevo.numero}.')
+    return redirect('presupuestos:editar', pk=nuevo.pk)
 
 
 @require_perm('Presupuestos', 'Eliminar')

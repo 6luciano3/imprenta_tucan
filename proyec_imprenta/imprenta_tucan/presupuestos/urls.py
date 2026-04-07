@@ -17,4 +17,7 @@ urlpatterns = [
     path('ok/<uuid:token>/<str:accion>/', views.accion_directa, name='accion_directa'),
     path('pdf/<uuid:token>/', views.descargar_pdf_presupuesto, name='pdf'),
     path('imagen/<uuid:token>/', views.imagen_presupuesto, name='imagen'),
+    path('exportar/', views.exportar_presupuestos_csv, name='exportar'),
+    path('<int:pk>/', views.detalle_presupuesto, name='detalle'),
+    path('<int:pk>/clonar/', views.clonar_presupuesto, name='clonar'),
 ]

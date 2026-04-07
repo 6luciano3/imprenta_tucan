@@ -730,6 +730,67 @@ def nuevo_remito(request):
     })
 
 
+@login_required
+def editar_remito(request, pk):
+    """Permite corregir observaciones y fecha de un remito. NO reversa stock — es solo edición de cabecera."""
+    remito = get_object_or_404(Remito.objects.select_related('proveedor', 'orden_compra'), pk=pk)
+    if request.method == 'POST':
+        nueva_fecha = request.POST.get('fecha')
+        nuevas_obs  = request.POST.get('observaciones', '')
+        if nueva_fecha:
+            remito.fecha = nueva_fecha
+        remito.observaciones = nuevas_obs
+        remito.save(update_fields=['fecha', 'observaciones'])
+        _registrar_auditoria(request, remito, 'update')
+        messages.success(request, f'Remito {remito.numero} actualizado.')
+        return redirect('compras:lista_remitos_compra')
+    return render(request, 'compras/editar_remito.html', {'remito': remito})
+
+
+@require_POST
+@login_required
+def anular_remito(request, pk):
+    """
+    Anula un remito: revierte el stock de cada insumo y registra MovimientoStock de ajuste.
+    No borra el remito — lo marca con observaciones de anulación para trazabilidad.
+    """
+    from decimal import Decimal
+    remito = get_object_or_404(Remito.objects.prefetch_related('detalles__insumo'), pk=pk)
+
+    if remito.observaciones.startswith('[ANULADO]'):
+        messages.error(request, f'El remito {remito.numero} ya fue anulado.')
+        return redirect('compras:lista_remitos_compra')
+
+    motivo = request.POST.get('motivo', 'Sin motivo especificado')
+
+    with transaction.atomic():
+        for detalle in remito.detalles.all():
+            insumo = detalle.insumo
+            cant   = detalle.cantidad
+            stock_anterior = insumo.stock or 0
+            insumo.stock   = max(0, stock_anterior - cant)
+            insumo.save(update_fields=['stock'])
+            MovimientoStock.objects.create(
+                insumo=insumo,
+                tipo='ajuste_negativo',
+                origen='ajuste',
+                cantidad=cant,
+                stock_anterior=stock_anterior,
+                stock_posterior=insumo.stock,
+                referencia=f'Anulación Remito {remito.numero}',
+                remito=remito,
+                fecha=remito.fecha,
+                usuario=request.user,
+                observaciones=f'Remito anulado. Motivo: {motivo}',
+            )
+        remito.observaciones = f'[ANULADO] {motivo}\n\n' + remito.observaciones
+        remito.save(update_fields=['observaciones'])
+        _registrar_auditoria(request, remito, 'update')
+
+    messages.success(request, f'Remito {remito.numero} anulado y stock revertido.')
+    return redirect('compras:lista_remitos_compra')
+
+
 # ── API: items de solicitud de cotizacion confirmada ─────────────────────────
 from django.http import JsonResponse
 

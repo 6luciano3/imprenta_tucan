@@ -12,4 +12,6 @@ urlpatterns = [
     path('eliminar/<int:idPedido>/', views.eliminar_pedido, name='eliminar_pedido'),
     path('cambiar-estado/<int:idPedido>/', views.cambiar_estado_pedido, name='cambiar_estado_pedido'),
     path('orden-compra/<int:pk>/', views.orden_compra_detalle, name='orden_compra_detalle'),
+    path('exportar/', views.exportar_pedidos_csv, name='exportar_pedidos'),
+    path('<int:pk>/clonar/', views.clonar_pedido, name='clonar_pedido'),
 ]
