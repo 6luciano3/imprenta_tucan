@@ -16,6 +16,7 @@ class Pedido(models.Model):
     estado = models.ForeignKey(EstadoPedido, on_delete=models.CASCADE)
     descuento = models.DecimalField(max_digits=5, decimal_places=2, default=0, help_text="Porcentaje de descuento aplicado al pedido")
     aplicar_iva = models.BooleanField(default=False, help_text="Si se aplica IVA 21% al pedido")
+    eliminado = models.BooleanField(default=False, help_text="Baja lógica — el registro no se borra físicamente")
 
 
     def __str__(self):

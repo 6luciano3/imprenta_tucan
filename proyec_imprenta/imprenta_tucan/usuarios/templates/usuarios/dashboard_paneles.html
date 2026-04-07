@@ -1,5 +1,54 @@
 {% extends 'usuarios/dashboard.html' %}
 {% block extra_panels %}
+
+<!-- L — Panel Compras en Curso -->
+{% if oc_pendientes_entrega or oc_sin_respuesta or pagos_por_vencer_7d or pagos_vencidos %}
+<h3 class="mt-8 mb-2 text-sm font-semibold text-gray-600">Compras en Curso</h3>
+<section class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-2">
+
+  <a href="{% url 'compras:lista_ordenes_compra' %}"
+     class="bg-white border border-gray-200 rounded-xl p-4 shadow-sm hover:shadow-md transition flex flex-col gap-1">
+    <div class="flex items-center gap-2 text-blue-600 mb-1">
+      <span class="material-symbols-outlined text-xl">local_shipping</span>
+      <span class="text-xs font-semibold uppercase text-gray-500">Pendientes de entrega</span>
+    </div>
+    <p class="text-2xl font-black text-gray-800">{{ oc_pendientes_entrega }}</p>
+    <p class="text-xs text-gray-400">Órdenes de compra sin recibir</p>
+  </a>
+
+  <a href="{% url 'compras:lista_ordenes_compra' %}"
+     class="bg-white border border-gray-200 rounded-xl p-4 shadow-sm hover:shadow-md transition flex flex-col gap-1">
+    <div class="flex items-center gap-2 text-amber-500 mb-1">
+      <span class="material-symbols-outlined text-xl">schedule_send</span>
+      <span class="text-xs font-semibold uppercase text-gray-500">Sin respuesta</span>
+    </div>
+    <p class="text-2xl font-black text-gray-800">{{ oc_sin_respuesta }}</p>
+    <p class="text-xs text-gray-400">OC enviadas sin confirmación</p>
+  </a>
+
+  <a href="{% url 'compras:lista_ordenes_pago' %}"
+     class="bg-white border {% if pagos_vencidos %}border-red-200 bg-red-50{% else %}border-gray-200{% endif %} rounded-xl p-4 shadow-sm hover:shadow-md transition flex flex-col gap-1">
+    <div class="flex items-center gap-2 {% if pagos_vencidos %}text-red-600{% else %}text-orange-500{% endif %} mb-1">
+      <span class="material-symbols-outlined text-xl">error_outline</span>
+      <span class="text-xs font-semibold uppercase text-gray-500">Pagos vencidos</span>
+    </div>
+    <p class="text-2xl font-black {% if pagos_vencidos %}text-red-700{% else %}text-gray-800{% endif %}">{{ pagos_vencidos }}</p>
+    <p class="text-xs text-gray-400">OP sin pagar fuera de plazo</p>
+  </a>
+
+  <a href="{% url 'compras:lista_ordenes_pago' %}"
+     class="bg-white border {% if pagos_por_vencer_7d %}border-yellow-200{% else %}border-gray-200{% endif %} rounded-xl p-4 shadow-sm hover:shadow-md transition flex flex-col gap-1">
+    <div class="flex items-center gap-2 text-yellow-600 mb-1">
+      <span class="material-symbols-outlined text-xl">event_busy</span>
+      <span class="text-xs font-semibold uppercase text-gray-500">Vencen en 7 días</span>
+    </div>
+    <p class="text-2xl font-black text-gray-800">{{ pagos_por_vencer_7d }}</p>
+    <p class="text-xs text-gray-400">OP pendientes próximas a vencer</p>
+  </a>
+
+</section>
+{% endif %}
+
 {% if puede_configurar_ofertas %}
 <h3 class="mt-8 mb-2 text-sm font-semibold text-gray-600">Gestión de Ofertas</h3>
 <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">

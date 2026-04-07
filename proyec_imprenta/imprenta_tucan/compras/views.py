@@ -389,116 +389,131 @@ def enviar_orden_email(request, pk):
         return JsonResponse({'ok': False, 'error': str(e)}, status=500)
 
 
-def confirmar_orden_publico(request, pk):
+def _procesar_recepcion_orden(orden, usuario=None):
+    """
+    Lógica central de recepción de una OrdenCompra.
+    Crea el Remito, actualiza stock, historial de precios y kardex.
+    Retorna (ok: bool, mensaje: str, detalles_creados: list).
+    """
     from django.utils import timezone
     from django.db import transaction
     from decimal import Decimal
+    from .models import Remito, DetalleRemito, MovimientoStock, HistorialPrecioInsumo
 
-    orden = get_object_or_404(OrdenCompra.objects.prefetch_related("detalles__insumo"), pk=pk)
+    with transaction.atomic():
+        numero_remito = f"OC-{orden.pk:04d}"
+        remito = Remito.objects.create(
+            orden_compra=orden,
+            proveedor=orden.proveedor,
+            numero=numero_remito,
+            fecha=timezone.now().date(),
+            usuario=usuario,
+            observaciones="Remito generado al confirmar recepción de mercadería.",
+        )
 
-    try:
-        with transaction.atomic():
-            # 1. Cambiar estado a confirmada (robusto ante nombre inexistente)
-            estado_confirmado = EstadoCompra.objects.filter(nombre__icontains='confirmado').first()
-            if not estado_confirmado:
-                estado_confirmado, _ = EstadoCompra.objects.get_or_create(nombre='Confirmada')
-            orden.estado = estado_confirmado
+        detalles_creados = []
+        insumo_ids_recibidos = []
+        for detalle in orden.detalles.select_related('insumo').all():
+            insumo = detalle.insumo
+            precio_oc = detalle.precio_unitario or Decimal('0')
 
-            # 2. Crear remito automáticamente
-            from .models import Remito, DetalleRemito, MovimientoStock, HistorialPrecioInsumo
-
-            numero_remito = f"OC-{orden.pk:04d}"
-            remito = Remito.objects.create(
-                orden_compra=orden,
-                proveedor=orden.proveedor,
-                numero=numero_remito,
-                fecha=timezone.now().date(),
-                observaciones="Remito generado automáticamente al confirmar orden desde email del proveedor."
+            DetalleRemito.objects.create(
+                remito=remito,
+                insumo=insumo,
+                cantidad=detalle.cantidad,
+                precio_unitario=precio_oc,
             )
 
-            # 3. Registrar detalles, actualizar precios y aumentar stock
-            detalles_creados = []
-            insumo_ids_recibidos = []
-            for detalle in orden.detalles.select_related('insumo').all():
-                insumo = detalle.insumo
-                precio_oc = detalle.precio_unitario or Decimal('0')
-
-                # Crear detalle del remito con precio de la OC
-                DetalleRemito.objects.create(
-                    remito=remito,
+            if precio_oc > 0 and precio_oc != (insumo.precio_unitario or Decimal('0')):
+                precio_anterior = insumo.precio_unitario or Decimal('0')
+                insumo.precio_unitario = precio_oc
+                HistorialPrecioInsumo.objects.create(
                     insumo=insumo,
-                    cantidad=detalle.cantidad,
-                    precio_unitario=precio_oc,
-                )
-
-                # Actualizar precio del insumo y registrar historial si cambió
-                if precio_oc > 0 and precio_oc != (insumo.precio_unitario or Decimal('0')):
-                    precio_anterior = insumo.precio_unitario or Decimal('0')
-                    insumo.precio_unitario = precio_oc
-                    HistorialPrecioInsumo.objects.create(
-                        insumo=insumo,
-                        precio_anterior=precio_anterior,
-                        precio_nuevo=precio_oc,
-                        origen='remito',
-                        motivo=f'Precio actualizado al recibir Remito {remito.numero} (OC-{orden.pk:04d})',
-                        remito=remito,
-                    )
-
-                # Aumentar stock
-                stock_anterior = insumo.stock or 0
-                insumo.stock = stock_anterior + detalle.cantidad
-                insumo.save(update_fields=['stock', 'precio_unitario', 'updated_at'])
-
-                # Registrar movimiento de stock (Kardex)
-                MovimientoStock.objects.create(
-                    insumo=insumo,
-                    tipo="entrada",
-                    origen="remito",
-                    cantidad=detalle.cantidad,
-                    stock_anterior=stock_anterior,
-                    stock_posterior=insumo.stock,
-                    referencia=f"Remito {remito.numero} (OC-{orden.pk:04d})",
+                    precio_anterior=precio_anterior,
+                    precio_nuevo=precio_oc,
+                    origen='remito',
+                    motivo=f'Precio actualizado al recibir {remito.numero}',
                     remito=remito,
-                    fecha=timezone.now().date(),
                 )
 
-                detalles_creados.append(f"{insumo.nombre} (+{detalle.cantidad})")
-                insumo_ids_recibidos.append(insumo.pk)
+            stock_anterior = insumo.stock or 0
+            insumo.stock = stock_anterior + detalle.cantidad
+            insumo.save(update_fields=['stock', 'precio_unitario', 'updated_at'])
 
-            # 4. Marcar como recibida y guardar
-            estado_recibida = EstadoCompra.objects.filter(nombre__icontains='recibid').first()
-            if estado_recibida:
-                orden.estado = estado_recibida
-            orden.fecha_recepcion = timezone.now().date()
-            orden.save(update_fields=['estado', 'fecha_recepcion', 'actualizado_en'])
+            MovimientoStock.objects.create(
+                insumo=insumo,
+                tipo="entrada",
+                origen="remito",
+                cantidad=detalle.cantidad,
+                stock_anterior=stock_anterior,
+                stock_posterior=insumo.stock,
+                referencia=f"Remito {remito.numero}",
+                remito=remito,
+                fecha=timezone.now().date(),
+                usuario=usuario,
+            )
 
-            # 5. Actualizar ProyeccionInsumo aceptadas → validadas
-            try:
-                from insumos.models import ProyeccionInsumo
-                ProyeccionInsumo.objects.filter(
-                    insumo_id__in=insumo_ids_recibidos,
-                    estado='aceptada',
-                ).update(estado='validada')
-            except Exception:
-                pass
+            detalles_creados.append(f"{insumo.nombre} (+{detalle.cantidad})")
+            insumo_ids_recibidos.append(insumo.pk)
 
-            # 6. Enviar notificación interna
-            try:
-                from core.notifications.engine import enviar_notificacion
-                enviar_notificacion(
-                    titulo=f"OC-{orden.pk:04d} confirmada por proveedor",
-                    mensaje=f"El proveedor {orden.proveedor.nombre} confirmó la orden. Stock y precios actualizados automáticamente.",
-                    tipo="success",
-                    importancia="alta",
-                    enlace=f"/compras/ordenes/{orden.pk}/"
-                )
-            except Exception:
-                pass
+        estado_recibida, _ = EstadoCompra.objects.get_or_create(nombre='Recibida')
+        orden.estado = estado_recibida
+        orden.fecha_recepcion = timezone.now().date()
+        orden.save(update_fields=['estado', 'fecha_recepcion', 'actualizado_en'])
 
-            mensaje = f"Orden confirmada y mercadería recibida. Stock actualizado: {', '.join(detalles_creados[:3])}"
-            if len(detalles_creados) > 3:
-                mensaje += f" y {len(detalles_creados) - 3} más"
+        try:
+            from insumos.models import ProyeccionInsumo
+            ProyeccionInsumo.objects.filter(
+                insumo_id__in=insumo_ids_recibidos,
+                estado='aceptada',
+            ).update(estado='validada')
+        except Exception:
+            pass
 
+        # D+E — Auto-crear OrdenPago pendiente con vencimiento calculado
+        try:
+            from datetime import timedelta, date as _date
+            _DIAS_PAGO = {
+                'contado': 0, '15_dias': 15, '30_dias': 30,
+                '60_dias': 60, '90_dias': 90,
+            }
+            dias_venc = _DIAS_PAGO.get(getattr(orden, 'condicion_pago', 'contado'), 30)
+            OrdenPago.objects.create(
+                proveedor=orden.proveedor,
+                orden_compra=orden,
+                estado='pendiente',
+                fecha_vencimiento=_date.today() + timedelta(days=dias_venc),
+                observaciones=(
+                    f'Generada automáticamente al recibir mercadería de OC-{orden.pk:04d}. '
+                    f'Completar N° de factura antes del vencimiento.'
+                ),
+                usuario=usuario,
+            )
+        except Exception:
+            pass
+
+        return detalles_creados
+
+
+def confirmar_orden_publico(request, pk):
+    """Endpoint público — el proveedor hace clic en el link del email."""
+    orden = get_object_or_404(OrdenCompra.objects.prefetch_related("detalles__insumo"), pk=pk)
+    try:
+        detalles_creados = _procesar_recepcion_orden(orden, usuario=None)
+        mensaje = f"Orden confirmada. Stock actualizado: {', '.join(detalles_creados[:3])}"
+        if len(detalles_creados) > 3:
+            mensaje += f" y {len(detalles_creados) - 3} más"
+        try:
+            from core.notifications.engine import enviar_notificacion
+            enviar_notificacion(
+                titulo=f"OC-{orden.pk:04d} confirmada por proveedor",
+                mensaje=f"El proveedor {orden.proveedor.nombre} confirmó la orden. Stock actualizado.",
+                tipo="success",
+                importancia="alta",
+                enlace=f"/compras/ordenes/{orden.pk}/",
+            )
+        except Exception:
+            pass
     except Exception as e:
         mensaje = f"Error al confirmar la orden: {str(e)}. Contacte a Imprenta Tucán."
 
@@ -507,6 +522,32 @@ def confirmar_orden_publico(request, pk):
         "accion": "confirmada",
         "mensaje": mensaje,
     })
+
+
+@login_required
+@require_POST
+def marcar_orden_recibida(request, pk):
+    """Vista interna — el staff marca la orden como recibida al llegar la mercadería."""
+    orden = get_object_or_404(OrdenCompra.objects.prefetch_related("detalles__insumo"), pk=pk)
+
+    if orden.estado and 'recibid' in orden.estado.nombre.lower():
+        messages.warning(request, "Esta orden ya fue marcada como recibida.")
+        return redirect('compras:detalle_orden_compra', pk=pk)
+
+    if not orden.detalles.exists():
+        messages.error(request, "La orden no tiene insumos cargados. Agregá detalles antes de marcarla como recibida.")
+        return redirect('compras:detalle_orden_compra', pk=pk)
+
+    try:
+        detalles_creados = _procesar_recepcion_orden(orden, usuario=request.user)
+        resumen = ', '.join(detalles_creados[:3])
+        if len(detalles_creados) > 3:
+            resumen += f" y {len(detalles_creados) - 3} más"
+        messages.success(request, f"Mercadería recibida. Stock actualizado: {resumen}")
+    except Exception as e:
+        messages.error(request, f"Error al registrar recepción: {e}")
+
+    return redirect('compras:detalle_orden_compra', pk=pk)
 
 
 def rechazar_orden_publico(request, pk):

@@ -17,6 +17,8 @@ urlpatterns = [
     # Vistas públicas para proveedores
     path("ordenes/<int:pk>/confirmar/", views.confirmar_orden_publico, name="confirmar_orden_publico"),
     path("ordenes/<int:pk>/rechazar/", views.rechazar_orden_publico, name="rechazar_orden_publico"),
+    # Recepción interna de mercadería (staff)
+    path("ordenes/<int:pk>/recibir/", views.marcar_orden_recibida, name="marcar_orden_recibida"),
     path("ordenes/<int:pk>/pdf/", views.orden_pdf, name="orden_pdf"),
     path("remitos/", views.lista_remitos, name="lista_remitos_compra"),
     path("remitos/nuevo/", views.nuevo_remito, name="nuevo_remito_compra"),

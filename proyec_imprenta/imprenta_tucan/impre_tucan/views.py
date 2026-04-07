@@ -37,20 +37,44 @@ def dashboard(request):
     total_auditoria = AuditEntry.objects.count()
     total_configuracion = Parametro.objects.count()
 
-    # Métricas de Órdenes de Pago
+    # Métricas de Órdenes de Pago y Compras
     from django.db.models import Sum
     from django.utils import timezone as tz
     from datetime import timedelta
+    from compras.models import OrdenCompra as _OC
     hoy = tz.localdate()
     inicio_mes = hoy.replace(day=1)
     pagos_pendientes = OrdenPago.objects.filter(estado__in=['pendiente', 'aprobada'])
-    pagos_pendientes_monto = pagos_oc_mes = pagos_neto_mes = None
+    pagos_pendientes_monto = pagos_oc_mes = 0
     try:
         pagos_pendientes_monto = pagos_pendientes.aggregate(t=Sum('monto_neto'))['t'] or 0
         pagos_oc_mes = OrdenPago.objects.filter(estado='pagada', fecha_pago__gte=inicio_mes).aggregate(t=Sum('monto_neto'))['t'] or 0
     except Exception:
-        pagos_pendientes_monto = 0
-        pagos_oc_mes = 0
+        pass
+
+    # L — Métricas de compras en curso para el dashboard
+    oc_pendientes_entrega = 0
+    oc_sin_respuesta = 0
+    pagos_por_vencer_7d = 0
+    pagos_vencidos = 0
+    try:
+        oc_pendientes_entrega = _OC.objects.exclude(
+            estado__nombre__icontains='recibid'
+        ).exclude(estado__nombre__icontains='cancelad').count()
+        oc_sin_respuesta = _OC.objects.filter(
+            enviada=True, fecha_recepcion__isnull=True
+        ).count()
+        pagos_por_vencer_7d = OrdenPago.objects.filter(
+            estado__in=['pendiente', 'aprobada'],
+            fecha_vencimiento__gte=hoy,
+            fecha_vencimiento__lte=hoy + timedelta(days=7),
+        ).count()
+        pagos_vencidos = OrdenPago.objects.filter(
+            estado__in=['pendiente', 'aprobada'],
+            fecha_vencimiento__lt=hoy,
+        ).count()
+    except Exception:
+        pass
 
     # Últimas fechas conocidas (cuando existan los campos)
     ultima_fecha_usuarios = (
@@ -91,6 +115,11 @@ def dashboard(request):
         'pagos_pendientes_count': pagos_pendientes.count(),
         'pagos_pendientes_monto': pagos_pendientes_monto,
         'pagos_pagados_mes':      pagos_oc_mes,
+        # L — Compras en curso
+        'oc_pendientes_entrega':  oc_pendientes_entrega,
+        'oc_sin_respuesta':       oc_sin_respuesta,
+        'pagos_por_vencer_7d':    pagos_por_vencer_7d,
+        'pagos_vencidos':         pagos_vencidos,
     }
     # Usar el dashboard con paneles inteligentes y logs
     return render(request, 'usuarios/dashboard_paneles.html', context)

@@ -129,50 +129,87 @@ def nueva_orden_pago(request):
         elif not any(n.strip() for n in comp_numeros):
             messages.error(request, 'Agregá al menos un comprobante.')
         else:
-            op = OrdenPago.objects.create(
-                proveedor_id=proveedor_id,
-                orden_compra_id=oc_id,
-                moneda=moneda,
-                fecha_vencimiento=vencimiento or None,
-                observaciones=observaciones,
-                usuario=request.user,
-                estado='pendiente',
-            )
-
+            # G — Validar comprobantes duplicados para este proveedor
+            comp_duplicado = None
             for i, tipo in enumerate(comp_tipos):
-                numero  = comp_numeros[i]  if i < len(comp_numeros)  else ''
-                fecha   = comp_fechas[i]   if i < len(comp_fechas)   else None
-                importe = _to_dec(comp_importes[i]) if i < len(comp_importes) else Decimal('0')
-                saldo   = _to_dec(comp_saldos[i])   if i < len(comp_saldos)   else Decimal('0')
-                if numero.strip():
-                    ComprobanteOrdenPago.objects.create(
-                        orden_pago=op, tipo=tipo, numero=numero,
-                        fecha=fecha or timezone.now().date(),
-                        importe=importe, saldo_pendiente=saldo,
+                num_check = comp_numeros[i].strip() if i < len(comp_numeros) else ''
+                if num_check:
+                    existente = ComprobanteOrdenPago.objects.filter(
+                        orden_pago__proveedor_id=proveedor_id,
+                        tipo=tipo,
+                        numero=num_check,
+                    ).exclude(orden_pago__estado='anulada').select_related('orden_pago').first()
+                    if existente:
+                        comp_duplicado = (tipo.replace('_', ' ').title(), num_check, existente.orden_pago.numero)
+                        break
+
+            if comp_duplicado:
+                tipo_d, num_d, op_num = comp_duplicado
+                messages.error(
+                    request,
+                    f'El comprobante {tipo_d} N° {num_d} ya está registrado '
+                    f'en la OP-{op_num}. Verificá antes de continuar.'
+                )
+            else:
+                op = OrdenPago.objects.create(
+                    proveedor_id=proveedor_id,
+                    orden_compra_id=oc_id,
+                    moneda=moneda,
+                    fecha_vencimiento=vencimiento or None,
+                    observaciones=observaciones,
+                    usuario=request.user,
+                    estado='pendiente',
+                )
+
+                for i, tipo in enumerate(comp_tipos):
+                    numero  = comp_numeros[i]  if i < len(comp_numeros)  else ''
+                    fecha   = comp_fechas[i]   if i < len(comp_fechas)   else None
+                    importe = _to_dec(comp_importes[i]) if i < len(comp_importes) else Decimal('0')
+                    saldo   = _to_dec(comp_saldos[i])   if i < len(comp_saldos)   else Decimal('0')
+                    if numero.strip():
+                        ComprobanteOrdenPago.objects.create(
+                            orden_pago=op, tipo=tipo, numero=numero,
+                            fecha=fecha or timezone.now().date(),
+                            importe=importe, saldo_pendiente=saldo,
+                        )
+
+                for i, metodo in enumerate(fp_metodos):
+                    imp = _to_dec(fp_importes[i]) if i < len(fp_importes) else Decimal('0')
+                    FormaPagoOrdenPago.objects.create(
+                        orden_pago=op, metodo=metodo,
+                        banco=fp_bancos[i]  if i < len(fp_bancos)  else '',
+                        cbu=fp_cbus[i]      if i < len(fp_cbus)    else '',
+                        numero_cheque=fp_cheques[i] if i < len(fp_cheques) else '',
+                        referencia=fp_refs[i]       if i < len(fp_refs)    else '',
+                        importe=imp,
                     )
 
-            for i, metodo in enumerate(fp_metodos):
-                imp = _to_dec(fp_importes[i]) if i < len(fp_importes) else Decimal('0')
-                FormaPagoOrdenPago.objects.create(
-                    orden_pago=op, metodo=metodo,
-                    banco=fp_bancos[i]  if i < len(fp_bancos)  else '',
-                    cbu=fp_cbus[i]      if i < len(fp_cbus)    else '',
-                    numero_cheque=fp_cheques[i] if i < len(fp_cheques) else '',
-                    referencia=fp_refs[i]       if i < len(fp_refs)    else '',
-                    importe=imp,
-                )
+                for i, tipo in enumerate(ret_tipos):
+                    imp = _to_dec(ret_importes[i]) if i < len(ret_importes) else Decimal('0')
+                    RetencionOrdenPago.objects.create(
+                        orden_pago=op, tipo=tipo,
+                        descripcion=ret_descs[i] if i < len(ret_descs) else '',
+                        importe=imp,
+                    )
 
-            for i, tipo in enumerate(ret_tipos):
-                imp = _to_dec(ret_importes[i]) if i < len(ret_importes) else Decimal('0')
-                RetencionOrdenPago.objects.create(
-                    orden_pago=op, tipo=tipo,
-                    descripcion=ret_descs[i] if i < len(ret_descs) else '',
-                    importe=imp,
-                )
+                op.recalcular_totales()
 
-            op.recalcular_totales()
-            messages.success(request, f'Orden de Pago N° {op.numero} creada correctamente.')
-            return redirect('compras:lista_ordenes_pago')
+                # H — Alertar si el monto supera >10% el total de la OC asociada
+                if oc_id:
+                    try:
+                        oc = OrdenCompra.objects.get(pk=oc_id)
+                        if oc.monto_total > 0 and op.monto_total > oc.monto_total * Decimal('1.10'):
+                            messages.warning(
+                                request,
+                                f'Atención: el monto de esta OP (${op.monto_total:.2f}) supera en más '
+                                f'del 10% el total de la OC-{oc.pk:04d} (${oc.monto_total:.2f}). '
+                                f'Verificá si hay diferencias en precios o cantidades.'
+                            )
+                    except OrdenCompra.DoesNotExist:
+                        pass
+
+                messages.success(request, f'Orden de Pago N° {op.numero} creada correctamente.')
+                return redirect('compras:lista_ordenes_pago')
 
     return render(request, 'compras/nueva_orden_pago.html', {
         'proveedores':       proveedores,

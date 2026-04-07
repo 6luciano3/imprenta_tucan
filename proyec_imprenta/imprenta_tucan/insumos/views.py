@@ -328,16 +328,16 @@ def activar_insumo(request, idInsumo: int):
 @require_perm('Insumos', 'Eliminar', redirect_to='lista_insumos')
 @login_required
 def eliminar_insumo(request, idInsumo: int):
-    """Eliminar Insumo con confirmación (POST)."""
+    """Baja lógica del insumo (no se elimina físicamente de la base de datos)."""
     insumo = get_object_or_404(Insumo, pk=idInsumo)
 
     if request.method == 'POST':
         nombre = f"{insumo.codigo} - {insumo.nombre}"
-        insumo.delete()
-        messages.success(request, f'El insumo {nombre} ha sido eliminado exitosamente.')
+        insumo.activo = False
+        insumo.save(update_fields=['activo', 'updated_at'] if hasattr(insumo, 'updated_at') else ['activo'])
+        messages.success(request, f'El insumo {nombre} ha sido dado de baja.')
         return redirect('lista_insumos')
 
-    # Si no es POST, redirigir sin acción
     return redirect('lista_insumos')
 
 
@@ -387,36 +387,33 @@ def validar_proyeccion(request, pk):
         proyeccion.administrador = request.user
         proyeccion.fecha_validacion = timezone.now()
         proyeccion.save()
-        # Actualizar stock proyectado si se acepta o modifica
+        # Generar Orden de Compra sugerida (sin remito ni stock — se actualizan al recibir físicamente)
         if estado in ['aceptada', 'modificada'] and cantidad:
             insumo = proyeccion.insumo
-            # Generar Remito automatico en App Compras en vez de modificar stock directo
-            from django.db import transaction
             try:
+                from django.db import transaction
+                from compras.models import EstadoCompra, DetalleOrdenCompra
                 with transaction.atomic():
-                    from compras.models import Remito, DetalleRemito, EstadoCompra
-                    from django.utils import timezone
-                    estado_rec, _ = EstadoCompra.objects.get_or_create(nombre='Recibida')
-                    remito = Remito.objects.create(
-                        proveedor=proyeccion.proveedor_validado or insumo.proveedor,
-                        numero=f'PROY-{proyeccion.pk:06d}',
-                        fecha=timezone.now().date(),
-                        observaciones=f'Remito automatico por validacion de ProyeccionInsumo #{proyeccion.pk}',
+                    estado_oc, _ = EstadoCompra.objects.get_or_create(nombre='Sugerida')
+                    oc = OrdenCompra.objects.create(
+                        proveedor_id=proveedor_id or (insumo.proveedor.pk if insumo.proveedor else None),
+                        estado=estado_oc,
+                        observaciones=f"Generada por proyección #{proyeccion.pk}. {comentario or ''}".strip(),
+                        usuario=request.user,
                     )
-                    DetalleRemito.objects.create(remito=remito, insumo=insumo, cantidad=int(cantidad))
-                    insumo.stock += int(cantidad)
-                    insumo.save(update_fields=["stock"])
-            except Exception as e_r:
+                    precio = insumo.precio_unitario or 0
+                    DetalleOrdenCompra.objects.create(
+                        orden=oc,
+                        insumo=insumo,
+                        cantidad=int(cantidad),
+                        precio_unitario=precio,
+                    )
+                    oc.calcular_total()
+            except Exception as e_oc:
                 import logging
-                logging.getLogger(__name__).warning(f'Error creando Remito para proyeccion #{proyeccion.pk}: {e_r}')
-            # Generar orden sugerida de compra
-            OrdenCompra.objects.create(
-                insumo=insumo,
-                cantidad=cantidad,
-                proveedor_id=proveedor_id,
-                estado='sugerida',
-                comentario=f"Generada por proyección automática. {comentario}"
-            )
+                logging.getLogger(__name__).warning(
+                    f'Error creando OrdenCompra para proyeccion #{proyeccion.pk}: {e_oc}'
+                )
         messages.success(request, 'Proyección validada correctamente.')
         return redirect('lista_proyecciones')
     proveedores = Proveedor.objects.all()

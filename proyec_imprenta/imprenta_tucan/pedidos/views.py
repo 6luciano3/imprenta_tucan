@@ -73,7 +73,7 @@ def lista_pedidos(request):
     if order_by not in valid_order_fields:
         order_by = "id"
 
-    qs = Pedido.objects.select_related("cliente", "estado").prefetch_related("lineas__producto")
+    qs = Pedido.objects.select_related("cliente", "estado").prefetch_related("lineas__producto").filter(eliminado=False)
 
     if query:
         if query.isdigit():
@@ -671,33 +671,25 @@ def modificar_pedido(request, idPedido: int):
 @login_required
 @requiere_permiso("Pedidos", "Eliminar")
 def eliminar_pedido(request, idPedido: int):
-    """Eliminar Pedido con confirmación (POST). Visible para todos; el servidor valida permisos."""
+    """Baja lógica del pedido — marca eliminado=True sin borrar el registro."""
     pedido = get_object_or_404(Pedido.objects.select_related("cliente", "estado"), pk=idPedido)
     if request.method == "POST":
         if not request.user.is_staff:
-            messages.error(request, "No tenés permisos para eliminar pedidos.")
+            messages.error(request, "No tenés permisos para dar de baja pedidos.")
             return redirect("lista_pedidos")
         estado_nombre = (pedido.estado.nombre or "").lower() if pedido.estado else ""
         if estado_nombre not in ("cancelado", "entregado"):
-            messages.error(request, f"El pedido #{pedido.id} no puede eliminarse porque su estado es '{pedido.estado}'. Solo se pueden eliminar pedidos con estado Cancelado o Entregado.")
+            messages.error(
+                request,
+                f"El pedido #{pedido.id} no puede darse de baja porque su estado es "
+                f"'{pedido.estado}'. Solo se pueden dar de baja pedidos Cancelados o Entregados."
+            )
             return redirect("lista_pedidos")
         descripcion = f"Pedido {pedido.id} - {pedido.cliente}"
         _audit_pedido(request, pedido, 'delete', {'estado': pedido.estado.nombre, 'total': str(pedido.monto_total)})
-        from productos.models import ProductoInsumo
-        # Obtener todas las líneas del pedido
-        lineas = list(pedido.lineas.select_related('producto').all())
-        # Verificar si alguna línea tiene receta definida
-        hay_receta = any(
-            ProductoInsumo.objects.filter(producto=linea.producto).exists()
-            for linea in lineas
-        )
-        with transaction.atomic():
-            if hay_receta:
-                # Construir lista de tuplas (producto, cantidad) para reponer stock
-                old_lineas = [(linea.producto, linea.cantidad) for linea in lineas]
-                ajustar_insumos_por_diferencia(old_lineas, [])
-            pedido.delete()
-        messages.success(request, f"{descripcion} fue eliminado correctamente.")
+        pedido.eliminado = True
+        pedido.save(update_fields=['eliminado'])
+        messages.success(request, f"{descripcion} fue dado de baja correctamente.")
         return redirect("lista_pedidos")
     return redirect("lista_pedidos")
 

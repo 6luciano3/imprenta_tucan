@@ -139,6 +139,49 @@
       </div>
     </div>
 
+    <!-- M — Historial de precios por insumo -->
+    {% if historial_precios %}
+    <div class="bg-white p-6 rounded-xl shadow mt-6">
+      <h2 class="text-lg font-semibold text-gray-800 flex items-center gap-2 mb-4">
+        <span class="material-symbols-outlined text-blue-500">trending_up</span>
+        Historial de precios por insumo
+      </h2>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="text-xs text-gray-500 uppercase border-b border-gray-200">
+              <th class="text-left pb-2 font-semibold">Insumo</th>
+              <th class="text-left pb-2 font-semibold">Remito</th>
+              <th class="text-right pb-2 font-semibold">Precio ant.</th>
+              <th class="text-right pb-2 font-semibold">Precio nuevo</th>
+              <th class="text-right pb-2 font-semibold">Variación</th>
+              <th class="text-left pb-2 font-semibold">Fecha</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-100">
+            {% for h in historial_precios %}
+            <tr class="hover:bg-gray-50">
+              <td class="py-2 font-medium text-gray-800">{{ h.insumo.nombre }}</td>
+              <td class="py-2 text-gray-500 text-xs font-mono">{{ h.remito.numero|default:"—" }}</td>
+              <td class="py-2 text-right font-mono text-gray-500">${{ h.precio_anterior|floatformat:2 }}</td>
+              <td class="py-2 text-right font-mono font-semibold text-gray-800">${{ h.precio_nuevo|floatformat:2 }}</td>
+              <td class="py-2 text-right font-mono font-semibold
+                {% if h.variacion_pct and h.variacion_pct > 0 %}text-red-600
+                {% elif h.variacion_pct and h.variacion_pct < 0 %}text-green-600
+                {% else %}text-gray-400{% endif %}">
+                {% if h.variacion_pct %}
+                  {% if h.variacion_pct > 0 %}+{% endif %}{{ h.variacion_pct|floatformat:1 }}%
+                {% else %}—{% endif %}
+              </td>
+              <td class="py-2 text-gray-400 text-xs">{{ h.fecha|date:"d/m/Y" }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% endif %}
+
   </div>
 </div>
 {% endblock %}

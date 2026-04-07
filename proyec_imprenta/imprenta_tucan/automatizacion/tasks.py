@@ -372,26 +372,91 @@ def tarea_alertas_retraso():
 # ---------------------------------------------------------------------------
 
 def _consultar_stock_http(proveedor, insumo, cantidad_req, consulta):
-    """Envía consulta HTTP al proveedor (fuera de atomic) y actualiza ConsultaStockProveedor."""
+    """Envía consulta HTTP al proveedor con reintentos (exponential backoff)."""
     if not proveedor.api_stock_url:
         return
-    try:
-        resp = requests.post(
-            proveedor.api_stock_url,
-            json={'insumo_id': insumo.id, 'cantidad': cantidad_req},
-            timeout=10,
+    import time
+    last_exc = None
+    for intento in range(3):
+        try:
+            resp = requests.post(
+                proveedor.api_stock_url,
+                json={'insumo_id': insumo.id, 'cantidad': cantidad_req},
+                timeout=10,
+            )
+            data = resp.json()
+            estado_resp = data.get('estado')
+            detalle_resp = data.get('detalle', '')
+            if estado_resp in {'disponible', 'parcial', 'no'}:
+                consulta.estado = estado_resp
+                consulta.respuesta = {'detalle': detalle_resp}
+                consulta.save()
+            return  # éxito — salir del loop
+        except Exception as e:
+            last_exc = e
+            if intento < 2:
+                time.sleep(2 ** intento)  # 1s, luego 2s
+    # Agotados los reintentos
+    consulta.estado = 'error'
+    consulta.respuesta = {'detalle': str(last_exc), 'intentos': 3}
+    consulta.save()
+
+
+@shared_task
+def tarea_alertar_pagos_por_vencer():
+    """
+    Notifica al staff sobre Órdenes de Pago vencidas o próximas a vencer (≤3 días).
+    Debe ejecutarse diariamente con Celery Beat.
+    """
+    from django.utils import timezone as _tz
+    from datetime import timedelta
+    from compras.models import OrdenPago
+
+    hoy = _tz.localdate()
+    limite = hoy + timedelta(days=3)
+
+    vencidas = OrdenPago.objects.filter(
+        estado__in=['pendiente', 'aprobada'],
+        fecha_vencimiento__lt=hoy,
+    ).select_related('proveedor')
+
+    por_vencer = OrdenPago.objects.filter(
+        estado__in=['pendiente', 'aprobada'],
+        fecha_vencimiento__gte=hoy,
+        fecha_vencimiento__lte=limite,
+    ).select_related('proveedor')
+
+    if not vencidas.exists() and not por_vencer.exists():
+        return 'Sin pagos por vencer'
+
+    lineas = []
+    for op in vencidas:
+        lineas.append(
+            f"⚠️ VENCIDA — OP-{op.numero} | {op.proveedor.nombre} | ${op.monto_neto:.2f}"
         )
-        data = resp.json()
-        estado_resp = data.get('estado')
-        detalle_resp = data.get('detalle', '')
-        if estado_resp in {'disponible', 'parcial', 'no'}:
-            consulta.estado = estado_resp
-            consulta.respuesta = {'detalle': detalle_resp}
-            consulta.save()
-    except Exception as e:
-        consulta.estado = 'error'
-        consulta.respuesta = {'detalle': str(e)}
-        consulta.save()
+    for op in por_vencer:
+        dias = (op.fecha_vencimiento - hoy).days
+        sufijo = "hoy" if dias == 0 else f"en {dias} día{'s' if dias > 1 else ''}"
+        lineas.append(
+            f"🔔 Vence {sufijo} — OP-{op.numero} | {op.proveedor.nombre} | ${op.monto_neto:.2f}"
+        )
+
+    try:
+        from core.notifications.engine import enviar_notificacion
+        enviar_notificacion(
+            titulo=(
+                f"Pagos a proveedores: {vencidas.count()} vencido(s), "
+                f"{por_vencer.count()} por vencer"
+            ),
+            mensaje="\n".join(lineas),
+            tipo="warning" if vencidas.exists() else "info",
+            importancia="alta",
+            enlace="/compras/pagos/",
+        )
+    except Exception:
+        pass
+
+    return f'Alertados: {vencidas.count()} vencidos, {por_vencer.count()} por vencer'
 
 
 def _notificar_proveedor_email(oc):
