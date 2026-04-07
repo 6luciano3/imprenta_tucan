@@ -110,13 +110,13 @@
 {% endif %}
 
 <!-- Tabla de clientes -->
-<div class="bg-white shadow rounded-xl overflow-hidden table-responsive">
+<div class="bg-white shadow rounded-xl overflow-x-auto table-responsive">
   <table class="w-full min-w-[980px] text-left text-sm">
     <thead class="bg-gray-100 text-gray-700">
       <tr>
         <th class="py-3 px-5">Nombre</th>
         <th class="py-3 px-5">Apellido</th>
-        <th class="py-3 px-5">Razón Social</th>
+        <th class="py-3 px-5 hidden md:table-cell">Razón Social</th>
         <th class="py-3 px-5 hidden sm:table-cell">Email</th>
         <th class="py-3 px-5 hidden md:table-cell">Teléfono</th>
         <th class="py-3 px-5">Estado</th>
@@ -128,10 +128,15 @@
       <tr class="border-b hover:bg-gray-50">
         <td class="py-3 px-5 font-medium">{{ cliente.nombre }}</td>
         <td class="py-3 px-5">{{ cliente.apellido }}</td>
-        <td class="py-3 px-5">{{ cliente.razon_social|default_if_none:"Monotributista"|default:"Monotributista" }}</td>
+        <td class="py-3 px-5 hidden md:table-cell">{{ cliente.razon_social|default_if_none:"Monotributista"|default:"Monotributista" }}</td>
         <td class="py-3 px-5 hidden sm:table-cell">{{ cliente.email }}</td>
         <td class="py-3 px-5 hidden md:table-cell">{{ cliente.telefono }}</td>
-        <td class="py-3 px-5">{{ cliente.estado }}</td>
+        <td class="py-3 px-5">
+          <span class="px-2 py-0.5 rounded-full text-xs font-semibold
+            {% if cliente.estado == 'Activo' %}bg-green-100 text-green-700{% else %}bg-gray-100 text-gray-500{% endif %}">
+            {{ cliente.estado }}
+          </span>
+        </td>
         <td class="py-3 px-5 flex justify-center gap-3">
           <a href="{% url 'detalle_cliente' cliente.id %}"
              class="text-blue-600 hover:text-blue-800 flex items-center gap-1"
@@ -157,7 +162,7 @@
       </tr>
       {% empty %}
       <tr>
-        <td colspan="5" class="text-center py-6 text-gray-500">No hay clientes registrados.</td>
+        <td colspan="7" class="text-center py-6 text-gray-500">No hay clientes registrados.</td>
       </tr>
       {% endfor %}
     </tbody>
@@ -167,10 +172,10 @@
   <div id="paginacion-clientes" class="px-5 py-4 border-t border-gray-200">
     <div class="flex justify-end items-center gap-2">
       {% if clientes.has_previous %}
-        <a href="?q={{ query }}&order_by={{ order_by }}&direction={{ direction }}&page=1" class="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm">
+        <a href="?q={{ query }}&order_by={{ order_by }}&direction={{ direction }}&estado={{ estado_fil }}&fecha_desde={{ fecha_desde }}&fecha_hasta={{ fecha_hasta }}&page=1" class="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm">
           <span class="material-symbols-outlined text-sm">first_page</span>
         </a>
-        <a href="?q={{ query }}&order_by={{ order_by }}&direction={{ direction }}&page={{ clientes.previous_page_number }}" class="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm">
+        <a href="?q={{ query }}&order_by={{ order_by }}&direction={{ direction }}&estado={{ estado_fil }}&fecha_desde={{ fecha_desde }}&fecha_hasta={{ fecha_hasta }}&page={{ clientes.previous_page_number }}" class="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm">
           <span class="material-symbols-outlined text-sm">chevron_left</span>
         </a>
       {% endif %}
@@ -180,10 +185,10 @@
       </span>
 
       {% if clientes.has_next %}
-        <a href="?q={{ query }}&order_by={{ order_by }}&direction={{ direction }}&page={{ clientes.next_page_number }}" class="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm">
+        <a href="?q={{ query }}&order_by={{ order_by }}&direction={{ direction }}&estado={{ estado_fil }}&fecha_desde={{ fecha_desde }}&fecha_hasta={{ fecha_hasta }}&page={{ clientes.next_page_number }}" class="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm">
           <span class="material-symbols-outlined text-sm">chevron_right</span>
         </a>
-        <a href="?q={{ query }}&order_by={{ order_by }}&direction={{ direction }}&page={{ clientes.paginator.num_pages }}" class="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm">
+        <a href="?q={{ query }}&order_by={{ order_by }}&direction={{ direction }}&estado={{ estado_fil }}&fecha_desde={{ fecha_desde }}&fecha_hasta={{ fecha_hasta }}&page={{ clientes.paginator.num_pages }}" class="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm">
           <span class="material-symbols-outlined text-sm">last_page</span>
         </a>
       {% endif %}
