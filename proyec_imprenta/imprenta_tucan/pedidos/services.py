@@ -222,3 +222,98 @@ def marcar_oferta_aplicada(pedido, oferta):
     except Exception as e:
         import logging
         logging.getLogger(__name__).error(f"marcar_oferta_aplicada: error para oferta {oferta.id}: {e}")
+
+
+def notificar_entrega_pedido(pedido):
+    """
+    Envía notificación multicanal al cliente cuando su pedido pasa a "Entregado".
+    Canales: email (siempre) + WhatsApp (si tiene número) + portal interno.
+    Nunca lanza excepción — los errores se registran en el log y en AutomationLog.
+    """
+    import logging
+    log = logging.getLogger(__name__)
+
+    try:
+        from core.notifications.engine import enviar_notificacion
+        from django.template.loader import render_to_string
+
+        cliente = pedido.cliente
+        lineas  = pedido.lineas.select_related('producto').all()
+
+        # ── Textos ────────────────────────────────────────────────────────────
+        productos_str = ', '.join(
+            f"{l.producto.nombreProducto} (x{l.cantidad})" for l in lineas
+        ) or 'Ver detalle en nuestras oficinas'
+
+        asunto = f'Tu pedido #{pedido.pk} fue entregado — Imprenta Tucán'
+
+        texto_plano = (
+            f"Hola {cliente.nombre},\n\n"
+            f"Te informamos que tu pedido N° {pedido.pk} ha sido entregado.\n\n"
+            f"Productos: {productos_str}\n"
+            f"Total: ${pedido.monto_total:,.2f}\n"
+            f"Fecha de entrega: {pedido.fecha_entrega}\n\n"
+            f"Gracias por confiar en Imprenta Tucán.\n"
+            f"Ante cualquier consulta, no dudes en contactarnos."
+        )
+
+        # ── HTML email ────────────────────────────────────────────────────────
+        try:
+            html_body = render_to_string('pedidos/email_entrega.html', {
+                'pedido':   pedido,
+                'cliente':  cliente,
+                'lineas':   lineas,
+            })
+        except Exception:
+            html_body = None   # fallback a texto plano si el template falla
+
+        meta = {'pedido_id': pedido.pk, 'cliente_id': cliente.pk}
+
+        # ── Email ─────────────────────────────────────────────────────────────
+        if cliente.email:
+            resultado = enviar_notificacion(
+                destinatario=cliente.email,
+                mensaje=texto_plano,
+                canal='email',
+                asunto=asunto,
+                html=html_body,
+                metadata=meta,
+            )
+            if not resultado.get('ok'):
+                log.warning('notificar_entrega: email falló para pedido #%s: %s',
+                            pedido.pk, resultado.get('error'))
+
+        # ── WhatsApp ──────────────────────────────────────────────────────────
+        numero_wa = cliente.numero_whatsapp
+        if numero_wa:
+            texto_wa = (
+                f"✅ *Imprenta Tucán* — Tu pedido N° {pedido.pk} fue entregado.\n"
+                f"Productos: {productos_str}\n"
+                f"Total: ${pedido.monto_total:,.2f}\n"
+                f"¡Gracias por tu confianza! 🎉"
+            )
+            resultado_wa = enviar_notificacion(
+                destinatario=numero_wa,
+                mensaje=texto_wa,
+                canal='whatsapp',
+                asunto=asunto,
+                metadata=meta,
+            )
+            if not resultado_wa.get('ok'):
+                log.warning('notificar_entrega: WhatsApp falló para pedido #%s: %s',
+                            pedido.pk, resultado_wa.get('error'))
+
+        # ── Portal interno ────────────────────────────────────────────────────
+        enviar_notificacion(
+            destinatario=str(cliente.pk),
+            mensaje=f'Pedido #{pedido.pk} de {cliente.nombre} {cliente.apellido} entregado.',
+            canal='portal',
+            asunto='Entrega de pedido',
+            metadata=meta,
+        )
+
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).exception(
+            'notificar_entrega_pedido: error inesperado en pedido #%s: %s', pedido.pk, exc
+        )

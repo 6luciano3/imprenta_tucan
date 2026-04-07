@@ -28,6 +28,7 @@ class Pedido(models.Model):
             aplicar_descuento_oferta,
             ajustar_score_cancelacion,
             marcar_oferta_aplicada,
+            notificar_entrega_pedido,
         )
         oferta_aceptada = None
         _should_reserve_new = False
@@ -47,6 +48,8 @@ class Pedido(models.Model):
                 reservar_insumos_para_pedido(self)
             if "cancelad" in new_estado and "cancelad" not in old_estado:
                 ajustar_score_cancelacion(self)
+            if "entreg" in new_estado and "entreg" not in old_estado:
+                self._notificar_entrega = True   # se dispara en post_save para tener pk seguro
 
         super().save(*args, **kwargs)
 
@@ -54,6 +57,9 @@ class Pedido(models.Model):
             reservar_insumos_para_pedido(self)
         if oferta_aceptada:
             marcar_oferta_aplicada(self, oferta_aceptada)
+        if getattr(self, '_notificar_entrega', False):
+            self._notificar_entrega = False
+            notificar_entrega_pedido(self)
 
 
 # NUEVO: Soporte para múltiples productos por pedido
