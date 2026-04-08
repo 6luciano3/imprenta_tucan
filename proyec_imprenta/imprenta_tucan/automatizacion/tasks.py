@@ -53,8 +53,9 @@ def tarea_prediccion_demanda():
             try:
                 cantidad_proyectada = predecir_demanda_media_movil(insumo, periodo_siguiente, meses=meses) or 0
                 if cantidad_proyectada <= 0:
-                    # Si no hay historial usar stock_minimo * 2 como base
-                    cantidad_proyectada = int(insumo.stock_minimo_sugerido or 0) * 2 or 10
+                    # B6: sin historial, usar el stock_minimo_sugerido como fallback neutro.
+                    # Multiplicar por 2 inflaba proyecciones artificialmente cuando no hay datos reales.
+                    cantidad_proyectada = int(insumo.stock_minimo_sugerido or 0) or int(Parametro.get('PROYECCION_FALLBACK_CANTIDAD', 5))
 
                 # Proveedor sugerido: el de mayor score
                 score = ScoreProveedor.objects.filter(
@@ -330,24 +331,79 @@ def tarea_verificar_generacion_ofertas():
 
 @shared_task
 def tarea_expirar_ofertas():
-    """Marca como 'vencidas' todas las ofertas enviadas/pendientes cuya fecha_expiracion ya pasó."""
+    """
+    Marca como 'vencidas' todas las ofertas enviadas/pendientes cuya fecha_expiracion ya pasó.
+    A6: lógica unificada — registra log por oferta, notifica al cliente (si tiene email verificado)
+    y notifica al staff con el resumen. tarea_vencer_ofertas fue eliminada (era duplicada).
+    """
     try:
         from automatizacion.models import OfertaPropuesta, AutomationLog
-        expiradas = OfertaPropuesta.objects.filter(
+
+        ahora = timezone.now()
+        vencidas_qs = OfertaPropuesta.objects.filter(
             estado__in=['pendiente', 'enviada'],
-            fecha_expiracion__lt=timezone.now(),
+            fecha_expiracion__lt=ahora,
+        ).select_related('cliente')
+
+        total = vencidas_qs.count()
+        if total == 0:
+            return 'expirar_ofertas: ninguna oferta vencida'
+
+        vencidas_ids = list(vencidas_qs.values_list('id', flat=True))
+
+        # Marcar en bulk con fecha_validacion
+        OfertaPropuesta.objects.filter(id__in=vencidas_ids).update(
+            estado='vencida',
+            fecha_validacion=ahora,
         )
-        count = expiradas.count()
-        expiradas.update(estado='vencida')
-        if count:
-            AutomationLog.objects.create(
-                evento='ofertas_expiradas',
-                descripcion=f'{count} ofertas marcadas como vencidas automáticamente.',
-                datos={'expiradas': count},
-            )
-        return f"expirar_ofertas: {count} ofertas vencidas"
+
+        # Log individual por oferta
+        try:
+            logs = [
+                AutomationLog(
+                    evento='oferta_vencida',
+                    descripcion=f'Oferta #{oid} vencida automáticamente',
+                    datos={'oferta_id': oid},
+                )
+                for oid in vencidas_ids
+            ]
+            AutomationLog.objects.bulk_create(logs, ignore_conflicts=True)
+        except Exception:
+            pass
+
+        # Notificar al cliente (solo si tiene email verificado)
+        try:
+            from core.notifications.engine import enviar_notificacion
+            for oferta in OfertaPropuesta.objects.filter(id__in=vencidas_ids).select_related('cliente'):
+                cliente = oferta.cliente
+                if not getattr(cliente, 'email_verificado', False):
+                    continue
+                enviar_notificacion(
+                    destinatario=cliente.email,
+                    canal='email',
+                    asunto=f'Tu oferta "{oferta.titulo}" ha vencido',
+                    mensaje=(
+                        f'Hola {cliente.nombre}, '
+                        f'la oferta "{oferta.titulo}" que preparamos especialmente para vos '
+                        f'ha vencido sin ser respondida. '
+                        f'Comunicate con nosotros si querés que generemos una nueva propuesta.'
+                    ),
+                )
+        except Exception:
+            pass
+
+        # Notificar al staff
+        try:
+            from usuarios.models import Usuario, Notificacion
+            mensaje = f'{total} oferta(s) vencieron sin respuesta del cliente y fueron cerradas automáticamente.'
+            for u in Usuario.objects.filter(is_staff=True):
+                Notificacion.objects.create(usuario=u, mensaje=mensaje)
+        except Exception:
+            pass
+
+        return f'expirar_ofertas: {total} oferta(s) marcadas como vencidas'
     except Exception as e:
-        return f"expirar_ofertas: error {e}"
+        return f'expirar_ofertas: error {e}'
 
 @shared_task
 def tarea_alertas_retraso():
@@ -525,17 +581,20 @@ def _crear_propuesta_compra(insumo, cantidad_req, comentario_oc, motivo_trigger,
 
 
 
-def _enviar_cotizacion_multiples_proveedores(insumo, cantidad_req, comentario, motivo_trigger, criterios_pesos, auto_aprobar=True):
+def _enviar_cotizacion_multiples_proveedores(insumo, cantidad_req, comentario, motivo_trigger, criterios_pesos, auto_aprobar=None):
     """
     PROCESO INTELIGENTE: Envía solicitud de cotización automáticamente a los top N proveedores
     con email real (no .local). Crea una OrdenCompra por cada proveedor.
-    
-    Si auto_aprobar=True (por defecto):
-    - Aprueba automáticamente la orden (estado='confirmada')
-    - Envía email automáticamente al proveedor
-    
+
+    auto_aprobar se lee de Parametro('AUTO_APROBAR_PROPUESTAS'). Si se pasa explícitamente
+    sobreescribe el parámetro (útil para tests y llamadas manuales).
+
     Notifica al admin con el resumen de envios.
     """
+    # B3: leer de Parametro cuando no se pasa explícitamente, para evitar que el default
+    # del parámetro de función override la configuración del sistema.
+    if auto_aprobar is None:
+        auto_aprobar = bool(Parametro.get('AUTO_APROBAR_PROPUESTAS', False))
     from automatizacion.models import CompraPropuesta, ConsultaStockProveedor, ScoreProveedor
     from pedidos.models import OrdenCompra
     from automatizacion.services import enviar_email_orden_compra_proveedor
@@ -854,92 +913,9 @@ def tarea_automatizacion_presupuestos_ponderada():
         return f"auto_presupuesto: error {e}"
 
 
-@shared_task
-def tarea_vencer_ofertas():
-    """
-    Cierra automáticamente las ofertas que no fueron respondidas antes de su fecha_expiracion.
-    - Afecta solo estados 'pendiente' y 'enviada'.
-    - Registra un AutomationLog por cada oferta vencida.
-    - Notifica al staff sobre el total de ofertas vencidas.
-    Se debe programar para ejecutarse diariamente (por ejemplo a las 00:00).
-    """
-    try:
-        ahora = timezone.now()
-        vencidas_qs = OfertaPropuesta.objects.filter(
-            estado__in=['pendiente', 'enviada'],
-            fecha_expiracion__lt=ahora,
-        ).select_related('cliente')
-
-        total = vencidas_qs.count()
-        if total == 0:
-            return 'vencer_ofertas: ninguna oferta vencida'
-
-        vencidas_ids = list(vencidas_qs.values_list('id', flat=True))
-
-        # Marcar como vencidas en bulk
-        OfertaPropuesta.objects.filter(id__in=vencidas_ids).update(
-            estado='vencida',
-            fecha_validacion=ahora,
-        )
-
-        # Registrar log por cada una
-        try:
-            from automatizacion.models import AutomationLog
-            logs = [
-                AutomationLog(
-                    evento='oferta_vencida',
-                    descripcion=f'Oferta #{oid} vencida automáticamente',
-                    datos={'oferta_id': oid},
-                )
-                for oid in vencidas_ids
-            ]
-            AutomationLog.objects.bulk_create(logs, ignore_conflicts=True)
-        except Exception:
-            pass
-
-        # Notificar al cliente por email
-        try:
-            from core.notifications.engine import enviar_notificacion
-            from automatizacion.models import OfertaPropuesta as OP
-            for oferta in OP.objects.filter(id__in=vencidas_ids).select_related('cliente'):
-                cliente = oferta.cliente
-                if not getattr(cliente, 'email_verificado', False):
-                    continue
-                enviar_notificacion(
-                    destinatario=cliente.email,
-                    canal='email',
-                    asunto=f'Tu oferta "{oferta.titulo}" ha vencido',
-                    mensaje=(
-                        f'Hola {cliente.nombre}, '
-                        f'la oferta "{oferta.titulo}" que preparamos especialmente para vos '
-                        f'ha vencido sin ser respondida. '
-                        f'Comunicate con nosotros si queres que generemos una nueva propuesta.'
-                    ),
-                )
-        except Exception:
-            pass
-        # Notificar al staff
-        try:
-            from usuarios.models import Usuario, Notificacion
-            mensaje = f'{total} oferta(s) vencieron sin respuesta del cliente y fueron cerradas automáticamente.'
-            for u in Usuario.objects.filter(is_staff=True):
-                Notificacion.objects.create(usuario=u, mensaje=mensaje)
-        except Exception:
-            pass
-
-        return f'vencer_ofertas: {total} oferta(s) marcadas como vencidas'
-    except Exception as e:
-        return f'vencer_ofertas: error {e}'
-
-
-@shared_task
-def tarea_prediccion_demanda_semanal():
-    """
-    Disparador semanal (cada domingo) para ejecutar la prediccion de demanda
-    y notificar al administrador con el reporte de proyecciones.
-    """
-    return tarea_prediccion_demanda()
-
+# A6: tarea_vencer_ofertas eliminada — su lógica fue integrada en tarea_expirar_ofertas.
+# B8: tarea_prediccion_demanda_semanal eliminada — era un wrapper de tarea_prediccion_demanda
+#     que ya se ejecuta cada hora. La tarea semanal no aportaba valor extra.
 
 @shared_task
 def tarea_recordatorio_presupuestos():
@@ -1071,6 +1047,11 @@ def tarea_clientes_inactivos():
     except Exception:
         dias_inactividad = 90
 
+    try:
+        descuento_reactivacion = int(Parametro.get('CLIENTE_INACTIVO_DESCUENTO', 10))
+    except Exception:
+        descuento_reactivacion = 10
+
     fecha_limite = timezone.now().date() - timedelta(days=dias_inactividad)
 
     clientes_activos = Cliente.objects.filter(estado='Activo').values_list('id', flat=True)
@@ -1126,7 +1107,7 @@ def tarea_clientes_inactivos():
                     
                     <p>¡Te extrañamos! Han pasado <strong>{dias_sin_pedido} días</strong> desde tu último pedido.</p>
                     
-                    <p>Queremos ofrecerte un <strong>descuento especial del 10%</strong> en tu próxima orden 
+                    <p>Queremos ofrecerte un <strong>descuento especial del {descuento_reactivacion}%</strong> en tu próxima orden
                     como agradecimiento por tu preferencia.</p>
                     
                     <div style="text-align: center; margin: 30px 0;">
@@ -1159,7 +1140,7 @@ def tarea_clientes_inactivos():
 
             try:
                 from core.notifications.engine import enviar_notificacion
-                mensaje_texto = f"Hola {cliente.nombre},\n\n¡Te extrañamos! Han pasado {dias_sin_pedido} días desde tu último pedido.\n\nQueremos ofrecerte un descuento especial del 10% en tu próxima orden.\n\nVisita nuestro sitio para más información.\n\n¡Te esperamos de vuelta!\n\nSaludos,\nEquipo Imprenta Tucán"
+                mensaje_texto = f"Hola {cliente.nombre},\n\n¡Te extrañamos! Han pasado {dias_sin_pedido} días desde tu último pedido.\n\nQueremos ofrecerte un descuento especial del {descuento_reactivacion}% en tu próxima orden.\n\nVisita nuestro sitio para más información.\n\n¡Te esperamos de vuelta!\n\nSaludos,\nEquipo Imprenta Tucán"
                 enviar_notificacion(
                     destinatario=cliente.email,
                     canal='email',

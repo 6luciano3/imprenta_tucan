@@ -145,8 +145,8 @@ def proyeccion_demanda_config(request):
 
     # Parámetros informativos (no se pueden cambiar desde aquí — el crontab es fijo en settings)
     INFO_SCHEDULE = {
-        'crontab_fijo': 'Domingo 06:00 AM (configurado en settings.py)',
-        'tarea': 'automatizacion.tasks.tarea_prediccion_demanda_semanal',
+        'crontab_fijo': 'Cada hora (configurado en settings.py)',
+        'tarea': 'automatizacion.tasks.tarea_prediccion_demanda',
     }
 
     if request.method == 'POST':

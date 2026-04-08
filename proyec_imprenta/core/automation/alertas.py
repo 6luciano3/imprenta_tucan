@@ -107,9 +107,9 @@ def revisar_pedidos_retrasados() -> dict:
 
     estados_finales = {'completado', 'cancelado', 'entregado'}
     try:
-        pedidos = Pedido.objects.exclude(estado__nombre__in=estados_finales)
+        pedidos = Pedido.objects.exclude(estado__nombre__in=estados_finales).select_related('estado', 'cliente')
     except Exception:
-        pedidos = Pedido.objects.all()
+        pedidos = Pedido.objects.all().select_related('estado', 'cliente')
 
     revisados = retrasados = alertas_totales = 0
     for pedido in pedidos:

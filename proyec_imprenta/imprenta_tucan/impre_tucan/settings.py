@@ -223,6 +223,11 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'compras.tasks.alertar_ordenes_vencidas',
         'schedule': 24 * 60 * 60,  # cada día
     },
+    # A3: tarea_alertar_pagos_por_vencer programada diariamente
+    'alertar-pagos-por-vencer-diario': {
+        'task': 'automatizacion.tasks.tarea_alertar_pagos_por_vencer',
+        'schedule': 24 * 60 * 60,  # cada día
+    },
 }
 
 from .celery import app as celery_app
@@ -265,15 +270,5 @@ ANYMAIL = {
     }
 }
 
-# Celery Beat - Prediccion de demanda semanal (cada domingo a las 6am)
-from celery.schedules import crontab
-CELERY_BEAT_SCHEDULE_EXTRA = {
-    'prediccion-demanda-semanal': {
-        'task': 'automatizacion.tasks.tarea_prediccion_demanda_semanal',
-        'schedule': crontab(hour=6, minute=0, day_of_week=0),  # Domingo 6:00am
-    },
-}
-if 'CELERY_BEAT_SCHEDULE' in dir():
-    CELERY_BEAT_SCHEDULE.update(CELERY_BEAT_SCHEDULE_EXTRA)
-else:
-    CELERY_BEAT_SCHEDULE = CELERY_BEAT_SCHEDULE_EXTRA
+# B8: tarea_prediccion_demanda_semanal era un wrapper sin valor — ya se ejecuta cada hora.
+# CELERY_BEAT_SCHEDULE_EXTRA eliminado.
