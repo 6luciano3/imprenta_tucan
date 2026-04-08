@@ -26,6 +26,7 @@ class Pedido(models.Model):
         # T-05: lógica de negocio delegada a services.py
         from .services import (
             reservar_insumos_para_pedido,
+            devolver_insumos_para_pedido,
             aplicar_descuento_oferta,
             ajustar_score_cancelacion,
             marcar_oferta_aplicada,
@@ -49,6 +50,9 @@ class Pedido(models.Model):
                 reservar_insumos_para_pedido(self)
             if "cancelad" in new_estado and "cancelad" not in old_estado:
                 ajustar_score_cancelacion(self)
+                # Si venía de "En Proceso", devolver el stock consumido
+                if "proceso" in old_estado:
+                    devolver_insumos_para_pedido(self)
             if "entreg" in new_estado and "entreg" not in old_estado:
                 self._notificar_entrega = True   # se dispara en post_save para tener pk seguro
 

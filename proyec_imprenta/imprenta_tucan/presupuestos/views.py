@@ -266,6 +266,17 @@ def editar_presupuesto(request, pk):
     global_descuento = int(primer_det.descuento) if primer_det else 0
     global_iva_aplicada = (primer_det.iva > 0) if primer_det else True
 
+    from configuracion.models import Parametro
+    try:
+        descuentos_tipos = {
+            'nuevo':       int(Parametro.get('DESCUENTO_CLIENTE_NUEVO',       0)),
+            'estandar':    int(Parametro.get('DESCUENTO_CLIENTE_ESTANDAR',    5)),
+            'estrategico': int(Parametro.get('DESCUENTO_CLIENTE_ESTRATEGICO', 15)),
+            'premium':     int(Parametro.get('DESCUENTO_CLIENTE_PREMIUM',     25)),
+        }
+    except Exception:
+        descuentos_tipos = {'nuevo': 0, 'estandar': 5, 'estrategico': 15, 'premium': 25}
+
     return render(request, 'presupuestos/editar_presupuesto.html', {
         'form': form,
         'presupuesto': presupuesto,
@@ -275,6 +286,7 @@ def editar_presupuesto(request, pk):
         'clientes_data': clientes_data,
         'global_descuento': global_descuento,
         'global_iva_aplicada': global_iva_aplicada,
+        'descuentos_tipos_json': descuentos_tipos,
     })
 
 

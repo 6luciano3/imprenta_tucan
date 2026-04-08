@@ -140,6 +140,52 @@ def reservar_insumos_para_pedido(pedido):
     OrdenProduccion.objects.get_or_create(pedido=pedido)
 
 
+def devolver_insumos_para_pedido(pedido):
+    """Revierte el descuento de stock generado por reservar_insumos_para_pedido.
+    Se llama cuando un pedido en estado 'En Proceso' es cancelado.
+    Suma de vuelta las cantidades al stock de cada insumo y registra en auditoría.
+    """
+    from insumos.models import Insumo
+    from pedidos.models import OrdenProduccion
+    from auditoria.models import AuditEntry
+    import json
+
+    consumos = calcular_consumo_pedido(pedido)
+    for insumo_id, cantidad in consumos.items():
+        try:
+            insumo = Insumo.objects.select_for_update().get(idInsumo=insumo_id)
+        except Insumo.DoesNotExist:
+            continue
+        stock_anterior = insumo.stock
+        insumo.stock += int(cantidad)
+        insumo.save(update_fields=['stock', 'updated_at'])
+
+        AuditEntry.objects.create(
+            app_label='insumos',
+            model='Insumo',
+            object_id=str(insumo.idInsumo),
+            object_repr=str(insumo),
+            action=AuditEntry.ACTION_UPDATE,
+            changes=json.dumps({'stock': {'before': stock_anterior, 'after': int(insumo.stock)}}),
+            extra=json.dumps({
+                'category': 'stock-movement',
+                'motivo': f'Devolución por cancelación de Pedido #{pedido.pk}',
+                'pedido_id': pedido.pk,
+                'cantidad_devuelta': int(cantidad),
+                'before': stock_anterior,
+                'after': int(insumo.stock),
+            }),
+        )
+
+    # Cancelar la OrdenProduccion asociada si existe
+    try:
+        op = OrdenProduccion.objects.get(pedido=pedido)
+        op.estado = 'cancelada'
+        op.save(update_fields=['estado'])
+    except OrdenProduccion.DoesNotExist:
+        pass
+
+
 def verificar_stock_consumo(consumo: dict) -> tuple[bool, dict]:
     """Verifica stock disponible para un dict de consumo {insumo_id: requerido}.
     Retorna (ok, faltantes: {insumo_id: faltan}).

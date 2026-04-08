@@ -25,6 +25,7 @@ from .utils import (
     verificar_insumos_para_lineas,
     verificar_insumos_para_ajuste,
     ajustar_insumos_por_diferencia,
+    calcular_insumos_bajo_minimo,
 )
 from productos.models import Producto
 from proveedores.models import Proveedor
@@ -373,8 +374,15 @@ def verificar_stock(request):
         return JsonResponse({"ok": True, "faltantes": []})
 
     ok, faltantes = verificar_insumos_para_lineas(lineas)
+
+    # Calcular insumos que quedarán bajo mínimo (advertencia, no bloqueo)
+    try:
+        bajo_minimo = calcular_insumos_bajo_minimo(lineas)
+    except Exception:
+        bajo_minimo = []
+
     if ok:
-        return JsonResponse({"ok": True, "faltantes": []})
+        return JsonResponse({"ok": True, "faltantes": [], "bajo_minimo": bajo_minimo})
 
     # Enriquecer faltantes con código y nombre si está disponible
     detalle = []
@@ -387,7 +395,7 @@ def verificar_stock(request):
         for iid, falt in faltantes.items():
             codigo, nombre = info.get(iid, ("-", f"Insumo {iid}"))
             detalle.append({"id": iid, "codigo": codigo, "nombre": nombre, "faltan": float(falt)})
-    return JsonResponse({"ok": False, "faltantes": detalle})
+    return JsonResponse({"ok": False, "faltantes": detalle, "bajo_minimo": []})
 
 
 @require_POST
@@ -809,26 +817,40 @@ def exportar_pedidos_csv(request):
 def cambiar_estado_pedido(request, idPedido: int):
     """Cambia el estado de un pedido desde la lista de pedidos."""
     nuevo_estado_id = request.POST.get('nuevo_estado')
-    
+
     if not nuevo_estado_id:
         messages.error(request, "Debe seleccionar un estado.")
         return redirect('lista_pedidos')
-    
+
     try:
-        pedido = Pedido.objects.get(pk=idPedido)
-        nuevo_estado = EstadoPedido.objects.get(pk=nuevo_estado_id)
-        
-        estado_anterior = pedido.estado
-        pedido.estado = nuevo_estado
-        pedido.save()
-        _audit_pedido(request, pedido, 'update', {'estado': [estado_anterior.nombre, nuevo_estado.nombre]})
-        messages.success(request, f"Pedido #{pedido.id} cambiado de '{estado_anterior.nombre}' a '{nuevo_estado.nombre}'")
-        
+        with transaction.atomic():
+            pedido = Pedido.objects.select_related('estado').get(pk=idPedido)
+            nuevo_estado = EstadoPedido.objects.get(pk=nuevo_estado_id)
+
+            estado_anterior = pedido.estado
+            old_nombre = estado_anterior.nombre.lower() if estado_anterior else ""
+            new_nombre = nuevo_estado.nombre.lower()
+
+            pedido.estado = nuevo_estado
+            pedido.save()
+            _audit_pedido(request, pedido, 'update', {'estado': [estado_anterior.nombre, nuevo_estado.nombre]})
+
+            if "cancelad" in new_nombre and "proceso" in old_nombre:
+                messages.success(
+                    request,
+                    f"Pedido #{pedido.id} cancelado. El stock consumido fue devuelto al inventario."
+                )
+            else:
+                messages.success(
+                    request,
+                    f"Pedido #{pedido.id} cambiado de '{estado_anterior.nombre}' a '{nuevo_estado.nombre}'."
+                )
+
     except Pedido.DoesNotExist:
         messages.error(request, "Pedido no encontrado.")
     except EstadoPedido.DoesNotExist:
         messages.error(request, "Estado no válido.")
     except Exception as e:
         messages.error(request, f"Error al cambiar estado: {str(e)}")
-    
+
     return redirect('lista_pedidos')

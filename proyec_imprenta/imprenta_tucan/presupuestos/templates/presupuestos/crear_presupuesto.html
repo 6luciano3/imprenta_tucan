@@ -220,6 +220,12 @@
                 <option value="25">25 %</option>
                 <option value="30">30 %</option>
               </select>
+              <div id="desc_auto_badge" class="mt-1 d-none">
+                <small class="text-success fw-semibold">
+                  <span class="material-symbols-outlined" style="font-size:.9rem;vertical-align:-.15em;">local_offer</span>
+                  <span id="desc_auto_label"></span>
+                </small>
+              </div>
             </div>
             <div class="pb-1">
               <div class="form-check form-switch">
@@ -516,6 +522,8 @@
     {% endfor %}
   };
 
+  const TIPO_LABELS_CREAR = { 'nuevo': 'Nuevo', 'estandar': 'Estándar', 'estrategico': 'Estratégico', 'premium': 'Premium' };
+
   function fillClienteInfo(pk) {
     const d = CLIENTES_DATA[pk] || {};
     document.getElementById('info_cuit').value         = d.cuit        || '-';
@@ -528,8 +536,21 @@
     document.getElementById('info_pais').value         = d.pais        || '-';
     document.getElementById('info_tipo_cliente').value = d.tipo_cliente || '-';
     const descPct = DESCUENTOS_POR_TIPO[d.tipo_cliente] ?? 0;
-    descuentoSelect.value = String(descPct);
+    const descStr = String(descPct);
+    const optionExists = Array.from(descuentoSelect.options).some(o => o.value === descStr);
+    if (optionExists) descuentoSelect.value = descStr;
     recalcGrandTotal();
+    // Mostrar badge de descuento automático
+    const badge = document.getElementById('desc_auto_badge');
+    const badgeLabel = document.getElementById('desc_auto_label');
+    if (badge && badgeLabel) {
+      if (descPct > 0 && d.tipo_cliente) {
+        badgeLabel.textContent = `${descPct}% aplicado por tipo ${TIPO_LABELS_CREAR[d.tipo_cliente] || d.tipo_cliente}`;
+        badge.classList.remove('d-none');
+      } else {
+        badge.classList.add('d-none');
+      }
+    }
     const rsField = document.getElementById('{{ form.razon_social.id_for_label }}');
     if (rsField) {
       rsField.value = d.razon_social || 'Sin Razón Social';

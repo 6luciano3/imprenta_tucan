@@ -132,6 +132,51 @@ def _calcular_requerimientos(lineas: list[tuple]) -> dict:
     return requeridos
 
 
+def calcular_insumos_bajo_minimo(lineas: list[tuple]) -> list[dict]:
+    """Dado un conjunto de líneas (producto, cantidad), retorna los insumos que,
+    después de consumir esas cantidades, quedarán por debajo de su stock_minimo_manual.
+    Solo incluye insumos con stock suficiente (no están en faltantes).
+    """
+    try:
+        from insumos.models import Insumo
+        from productos.models import ProductoInsumo
+    except Exception:
+        return []
+
+    requeridos = defaultdict(float)
+    for producto, cantidad in lineas:
+        if not producto or not cantidad:
+            continue
+        for r in ProductoInsumo.objects.filter(producto=producto).only('insumo_id', 'cantidad_por_unidad', 'es_costo_fijo'):
+            if r.es_costo_fijo:
+                requeridos[r.insumo_id] += float(r.cantidad_por_unidad)
+            else:
+                requeridos[r.insumo_id] += float(r.cantidad_por_unidad) * float(cantidad)
+
+    if not requeridos:
+        return []
+
+    resultado = []
+    for ins in Insumo.objects.filter(idInsumo__in=requeridos.keys()).only(
+        'idInsumo', 'codigo', 'nombre', 'stock', 'stock_minimo_manual'
+    ):
+        req = requeridos[ins.idInsumo]
+        stock_actual = float(ins.stock)
+        if stock_actual < req:
+            continue  # ya detectado como faltante
+        stock_tras = stock_actual - req
+        minimo = float(ins.stock_minimo_manual or 0)
+        if minimo > 0 and stock_tras < minimo:
+            resultado.append({
+                'id': ins.idInsumo,
+                'codigo': ins.codigo,
+                'nombre': ins.nombre,
+                'stock_tras': round(stock_tras, 2),
+                'stock_minimo': round(minimo, 2),
+            })
+    return resultado
+
+
 def verificar_insumos_para_ajuste(old_lineas: list[tuple], new_lineas: list[tuple]) -> tuple[bool, dict]:
     """Verifica sólo el ajuste neto de insumos entre estado anterior y nuevo.
     Retorna (ok, faltantes_por_insumo_id) considerando únicamente necesidades netas positivas.

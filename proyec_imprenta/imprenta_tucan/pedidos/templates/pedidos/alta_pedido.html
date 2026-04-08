@@ -68,6 +68,7 @@
   <div class="card shadow-sm">
     <div class="card-body">
       <div id="stockAlert" class="alert alert-danger d-none" role="alert"></div>
+      <div id="stockWarning" class="alert alert-warning d-none" role="alert"></div>
       <form method="post" novalidate>
         {% csrf_token %}
 
@@ -252,6 +253,7 @@
     const mgmtInitial = document.querySelector('[name="lineas-INITIAL_FORMS"]');
     const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
     const stockAlert = document.getElementById('stockAlert');
+    const stockWarning = document.getElementById('stockWarning');
     const btnSubmit = document.getElementById('btnSubmit');
     const confirmPedidoModal = document.getElementById('confirmPedidoModal');
     const pedidoResumenCliente = document.getElementById('pedidoResumenCliente');
@@ -539,12 +541,12 @@
 
     function clearStockAlert() {
       stockAlert.classList.add('d-none');
-      stockAlert.textContent = '';
-      // btnSubmit.disabled = false; // Ya no se deshabilita
+      stockAlert.innerHTML = '';
+      stockWarning.classList.add('d-none');
+      stockWarning.innerHTML = '';
     }
 
     async function checkStock() {
-      // Construye las líneas visibles y no marcadas como DELETE
       const lineas = [];
       tbody.querySelectorAll('tr.linea').forEach(tr => {
         if (tr.classList.contains('tr-hidden')) return;
@@ -567,17 +569,32 @@
         });
         if (!resp.ok) { throw new Error('Error al verificar stock'); }
         const data = await resp.json();
-        if (data.ok) { clearStockAlert(); return; }
-        // Mostrar faltantes
-        const detalle = (data.faltantes || []).map(f => `${f.codigo} - ${f.nombre}: faltan ${Number(f.faltan).toFixed(2)}`).join(', ');
-        stockAlert.textContent = detalle || 'No hay insumos suficientes para las cantidades seleccionadas.';
-        stockAlert.classList.remove('d-none');
-        // btnSubmit.disabled = true; // Ya no se deshabilita
+
+        // Alerta roja: insumos faltantes (bloquea)
+        if (!data.ok) {
+          const detalle = (data.faltantes || []).map(f => `<strong>${f.codigo}</strong> ${f.nombre}: faltan ${Number(f.faltan).toFixed(2)}`).join('<br>');
+          stockAlert.innerHTML = '<strong>⚠ Stock insuficiente:</strong><br>' + (detalle || 'No hay insumos suficientes.');
+          stockAlert.classList.remove('d-none');
+        } else {
+          stockAlert.classList.add('d-none');
+          stockAlert.innerHTML = '';
+        }
+
+        // Alerta amarilla: insumos que quedarán bajo mínimo (advertencia)
+        const bajoMinimo = data.bajo_minimo || [];
+        if (bajoMinimo.length > 0) {
+          const detalleMin = bajoMinimo.map(f =>
+            `<strong>${f.codigo}</strong> ${f.nombre}: quedará en ${Number(f.stock_tras).toFixed(2)} (mínimo: ${Number(f.stock_minimo).toFixed(2)})`
+          ).join('<br>');
+          stockWarning.innerHTML = '<strong>⚠ Stock bajo mínimo tras este pedido:</strong><br>' + detalleMin;
+          stockWarning.classList.remove('d-none');
+        } else {
+          stockWarning.classList.add('d-none');
+          stockWarning.innerHTML = '';
+        }
       } catch (e) {
-        // En caso de error en AJAX, no bloquear envío pero mostrar advertencia genérica
-        stockAlert.textContent = 'No se pudo verificar el stock en este momento.';
+        stockAlert.innerHTML = 'No se pudo verificar el stock en este momento.';
         stockAlert.classList.remove('d-none');
-        // btnSubmit.disabled = false; // Ya no se deshabilita
       }
     }
 
@@ -646,6 +663,9 @@
       'nuevo': 'Nuevo',
     };
 
+    // Descuentos por tipo_cliente (fallback cuando no hay score de ranking)
+    const TIPO_DESCUENTOS = { 'nuevo': 0, 'estandar': 5, 'estrategico': 15, 'premium': 25 };
+
     const TIER_BADGE_COLORS = {
       'Premium': 'bg-warning text-dark',
       'Estrat\u00e9gico': 'bg-primary text-white',
@@ -653,6 +673,21 @@
       'Nuevo': 'bg-success text-white',
       'Sin ranking': 'bg-secondary text-white',
     };
+
+    function _setDescuento(descStr, labelText) {
+      if (!descuentoSel) return;
+      const optionExists = Array.from(descuentoSel.options).some(o => o.value === descStr);
+      if (optionExists) {
+        descuentoSel.value = descStr;
+        descuentoSel.dispatchEvent(new Event('change'));
+      }
+      if (rankingBadge && rankingBadgeText) {
+        rankingBadgeText.className = 'badge bg-secondary text-white';
+        rankingBadgeText.textContent = TIPO_LABELS[descuentoSel && descuentoSel.value ? '' : ''] || '';
+        if (rankingBadgeHint) rankingBadgeHint.textContent = labelText;
+        rankingBadge.classList.remove('d-none');
+      }
+    }
 
     function updateClienteFields() {
       const id = clienteSelect.value;
@@ -663,22 +698,39 @@
       telefonoInput.value = datos.telefono || '';
       document.getElementById('tipoCliente').value = TIPO_LABELS[datos.tipo_cliente] || datos.tipo_cliente || '';
 
-      // Aplicar descuento según ranking
-      if (datos.tier && datos.descuento_ranking !== undefined && descuentoSel) {
+      // Aplicar descuento según ranking (score real)
+      const tieneRanking = datos.tier && datos.tier !== 'Sin ranking' && datos.score !== null && datos.score !== undefined;
+      if (tieneRanking && datos.descuento_ranking !== undefined && descuentoSel) {
         const descStr = String(datos.descuento_ranking);
         const optionExists = Array.from(descuentoSel.options).some(o => o.value === descStr);
         if (optionExists) {
           descuentoSel.value = descStr;
           descuentoSel.dispatchEvent(new Event('change'));
         }
-        // Mostrar badge del tier
         if (rankingBadge && rankingBadgeText) {
           const color = TIER_BADGE_COLORS[datos.tier] || 'bg-secondary text-white';
           rankingBadgeText.className = 'badge ' + color;
           rankingBadgeText.textContent = datos.tier;
           const scoreText = datos.score !== null && datos.score !== undefined ? ` (score: ${datos.score})` : '';
-          if (rankingBadgeHint) rankingBadgeHint.textContent = `Descuento ${datos.descuento_ranking}% aplicado automáticamente${scoreText}`;
+          if (rankingBadgeHint) rankingBadgeHint.textContent = `Descuento ${datos.descuento_ranking}% por ranking${scoreText}`;
           rankingBadge.classList.remove('d-none');
+        }
+      } else if (datos.tipo_cliente && TIPO_DESCUENTOS[datos.tipo_cliente] !== undefined && descuentoSel) {
+        // Fallback: aplicar descuento según tipo_cliente cuando no hay ranking
+        const descPct = TIPO_DESCUENTOS[datos.tipo_cliente];
+        const descStr = String(descPct);
+        const optionExists = Array.from(descuentoSel.options).some(o => o.value === descStr);
+        if (optionExists) {
+          descuentoSel.value = descStr;
+          descuentoSel.dispatchEvent(new Event('change'));
+        }
+        if (rankingBadge && rankingBadgeText && descPct > 0) {
+          rankingBadgeText.className = 'badge bg-secondary text-white';
+          rankingBadgeText.textContent = TIPO_LABELS[datos.tipo_cliente] || datos.tipo_cliente;
+          if (rankingBadgeHint) rankingBadgeHint.textContent = `Descuento ${descPct}% por tipo de cliente`;
+          rankingBadge.classList.remove('d-none');
+        } else if (rankingBadge) {
+          rankingBadge.classList.add('d-none');
         }
       } else if (rankingBadge) {
         rankingBadge.classList.add('d-none');

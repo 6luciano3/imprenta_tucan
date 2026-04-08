@@ -198,6 +198,12 @@
               <option value="25" {% if global_descuento == 25 %}selected{% endif %}>25%</option>
               <option value="30" {% if global_descuento == 30 %}selected{% endif %}>30%</option>
             </select>
+            <div id="desc_auto_badge" class="mt-1 d-none">
+              <small class="text-success fw-semibold">
+                <span class="material-symbols-outlined" style="font-size:.9rem;vertical-align:-.15em;">local_offer</span>
+                <span id="desc_auto_label"></span>
+              </small>
+            </div>
           </div>
           <div class="form-check mb-1">
             <input type="checkbox" class="form-check-input" id="pres_aplicar_iva" {% if global_iva_aplicada %}checked{% endif %}>
@@ -287,8 +293,8 @@
     return html + '</select>';
   }
 
-  // Descuento por defecto según tipo de cliente
-  const DESCUENTOS_POR_TIPO = { 'nuevo': 0, 'estandar': 5, 'estrategico': 15, 'premium': 25 };
+  // Descuento por defecto según tipo de cliente (desde Parametro)
+  const DESCUENTOS_POR_TIPO = {{ descuentos_tipos_json|safe }};
 
   function recalcAll() {
     let subtotal = 0;
@@ -439,6 +445,8 @@
     document.getElementById('info_tipo_cliente').value = d.tipo_cliente || '-';
   }
 
+  const TIPO_LABELS_EDIT = { 'nuevo': 'Nuevo', 'estandar': 'Estándar', 'estrategico': 'Estratégico', 'premium': 'Premium' };
+
   // Rellena los campos informativos Y aplica los valores por defecto del cliente
   // (descuento según tipo, razón social). Solo se llama cuando el usuario cambia de cliente.
   function fillClienteInfo(pk) {
@@ -446,8 +454,23 @@
     const d = CLIENTES_DATA[pk] || {};
     // Aplicar descuento automático según tipo de cliente
     const descPct = DESCUENTOS_POR_TIPO[d.tipo_cliente] ?? 0;
-    descuentoSelect.value = String(descPct);
+    const descStr = String(descPct);
+    const optionExists = Array.from(descuentoSelect.options).some(o => o.value === descStr);
+    if (optionExists) {
+      descuentoSelect.value = descStr;
+    }
     recalcGrandTotal();
+    // Mostrar badge si hubo descuento automático
+    const badge = document.getElementById('desc_auto_badge');
+    const badgeLabel = document.getElementById('desc_auto_label');
+    if (badge && badgeLabel) {
+      if (descPct > 0 && d.tipo_cliente) {
+        badgeLabel.textContent = `${descPct}% aplicado por tipo ${TIPO_LABELS_EDIT[d.tipo_cliente] || d.tipo_cliente}`;
+        badge.classList.remove('d-none');
+      } else {
+        badge.classList.add('d-none');
+      }
+    }
     // Sincronizar razón social del presupuesto con la del cliente seleccionado
     const rsField = document.getElementById('{{ form.razon_social.id_for_label }}');
     if (rsField) {
