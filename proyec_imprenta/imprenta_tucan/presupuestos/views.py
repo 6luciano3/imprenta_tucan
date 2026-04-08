@@ -293,8 +293,10 @@ def editar_presupuesto(request, pk):
             'estrategico': int(Parametro.get('DESCUENTO_CLIENTE_ESTRATEGICO', 15)),
             'premium':     int(Parametro.get('DESCUENTO_CLIENTE_PREMIUM',     25)),
         }
+        iva_default = int(Parametro.get('IVA_PORCENTAJE', 21))
     except Exception:
         descuentos_tipos = {'nuevo': 0, 'estandar': 5, 'estrategico': 15, 'premium': 25}
+        iva_default = 21
 
     return render(request, 'presupuestos/editar_presupuesto.html', {
         'form': form,
@@ -306,6 +308,7 @@ def editar_presupuesto(request, pk):
         'global_descuento': global_descuento,
         'global_iva_aplicada': global_iva_aplicada,
         'descuentos_tipos_json': descuentos_tipos,
+        'iva_default': iva_default,
     })
 
 
