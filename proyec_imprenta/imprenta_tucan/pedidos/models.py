@@ -89,6 +89,17 @@ class OrdenProduccion(models.Model):
 
 
 class OrdenCompra(models.Model):
+    """
+    DEPRECATED (C-6): Este modelo es el usado por el flujo de automatización (pedidos/tasks).
+    El modelo completo de compras (con detalles, remitos, estados, pagos) está en
+    `compras.models.OrdenCompra`. Todas las referencias nuevas deben apuntar a ese modelo.
+
+    Este modelo se mantiene por compatibilidad con:
+      - proveedores/views.py (orden_compra_confirmar / orden_compra_rechazar via token)
+      - core/motor/proveedor_engine.py (_latencia_promedio_dias)
+      - automatizacion/services.py (enviar_email_orden_compra_proveedor)
+    No agregar nuevas funcionalidades aquí.
+    """
     insumo = models.ForeignKey('insumos.Insumo', on_delete=models.CASCADE, to_field='idInsumo')
     cantidad = models.PositiveIntegerField()
     proveedor = models.ForeignKey('proveedores.Proveedor', on_delete=models.CASCADE)

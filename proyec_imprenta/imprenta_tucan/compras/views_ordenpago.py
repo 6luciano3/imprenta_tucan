@@ -309,7 +309,9 @@ def aprobar_orden_pago(request, pk):
 def registrar_pago(request, pk):
     from datetime import date
     op = get_object_or_404(OrdenPago, pk=pk)
-    if op.estado in ('pendiente', 'aprobada'):
+    # S-6: solo se puede pagar una orden que fue previamente aprobada.
+    # El estado 'pendiente' requiere pasar por aprobación primero.
+    if op.estado == 'aprobada':
         estado_anterior = op.estado
         op.estado = 'pagada'
         fecha_pago = request.POST.get('fecha_pago')

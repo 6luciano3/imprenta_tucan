@@ -53,6 +53,8 @@ class Insumo(models.Model):
     codigo = models.CharField(max_length=20, unique=True)
     proveedor = models.ForeignKey('proveedores.Proveedor', on_delete=models.SET_NULL,
                                   related_name='insumos', null=True, blank=True)
+    # DEPRECATED (M-4): usar `stock` en su lugar. Este campo es un remanente del modelo original
+    # y no se actualiza en ningún flujo actual. Se mantiene para no romper migraciones existentes.
     cantidad = models.PositiveIntegerField(default=0)
     precio_unitario = models.DecimalField(max_digits=10, decimal_places=2, default=0,
                                           validators=[MinValueValidator(0)])

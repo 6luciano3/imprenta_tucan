@@ -295,16 +295,34 @@ def alta_pedido(request):
         for cliente_id, score in RankingCliente.objects.values_list('cliente_id', 'score')
     }
 
+    # S-7: leer umbrales y descuentos de Parametro para consistencia con presupuestos.
+    from configuracion.models import Parametro as _Param
+    try:
+        _desc = {
+            'nuevo':       int(_Param.get('DESCUENTO_CLIENTE_NUEVO',       0)),
+            'estandar':    int(_Param.get('DESCUENTO_CLIENTE_ESTANDAR',    5)),
+            'estrategico': int(_Param.get('DESCUENTO_CLIENTE_ESTRATEGICO', 15)),
+            'premium':     int(_Param.get('DESCUENTO_CLIENTE_PREMIUM',     25)),
+        }
+        _umbrales = {
+            'premium':     float(_Param.get('UMBRAL_TIER_PREMIUM',     90)),
+            'estrategico': float(_Param.get('UMBRAL_TIER_ESTRATEGICO', 60)),
+            'estandar':    float(_Param.get('UMBRAL_TIER_ESTANDAR',    30)),
+        }
+    except Exception:
+        _desc = {'nuevo': 0, 'estandar': 5, 'estrategico': 15, 'premium': 25}
+        _umbrales = {'premium': 90, 'estrategico': 60, 'estandar': 30}
+
     def _score_a_tier(score):
         if score is None:
             return {'tier': 'Sin ranking', 'descuento': 0, 'color': 'secondary'}
-        if score >= 90:
-            return {'tier': 'Premium', 'descuento': 15, 'color': 'warning'}
-        if score >= 60:
-            return {'tier': 'Estratégico', 'descuento': 10, 'color': 'primary'}
-        if score >= 30:
-            return {'tier': 'Estándar', 'descuento': 7, 'color': 'info'}
-        return {'tier': 'Nuevo', 'descuento': 5, 'color': 'success'}
+        if score >= _umbrales['premium']:
+            return {'tier': 'Premium', 'descuento': _desc['premium'], 'color': 'warning'}
+        if score >= _umbrales['estrategico']:
+            return {'tier': 'Estratégico', 'descuento': _desc['estrategico'], 'color': 'primary'}
+        if score >= _umbrales['estandar']:
+            return {'tier': 'Estándar', 'descuento': _desc['estandar'], 'color': 'info'}
+        return {'tier': 'Nuevo', 'descuento': _desc['nuevo'], 'color': 'success'}
 
     clientes_data = []
     for c in Cliente.objects.all():

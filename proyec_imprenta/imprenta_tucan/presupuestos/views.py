@@ -10,6 +10,23 @@ from .utils import _fmt_ars
 from configuracion.permissions import require_perm
 
 
+def _audit_presupuesto(request, presupuesto, action):
+    """M-3: registra auditoría para creación/edición/eliminación de presupuestos."""
+    try:
+        from auditoria.models import AuditEntry
+        AuditEntry.objects.create(
+            user=request.user if request.user.is_authenticated else None,
+            app_label='presupuestos',
+            model='Presupuesto',
+            object_id=str(presupuesto.pk),
+            object_repr=str(presupuesto),
+            action=action,
+            ip_address=request.META.get('REMOTE_ADDR'),
+        )
+    except Exception:
+        pass
+
+
 @login_required
 @requiere_permiso("Comercial")
 def index(request):
@@ -18,7 +35,6 @@ def index(request):
 
 @require_perm('Presupuestos', 'Listar')
 @login_required
-@requiere_permiso("Comercial")
 def lista_presupuestos(request):
     query       = request.GET.get('q', '') or request.GET.get('criterio', '')
     order_by    = request.GET.get('order_by', 'fecha')
@@ -84,7 +100,6 @@ def lista_presupuestos(request):
 
 @require_perm('Presupuestos', 'Crear')
 @login_required
-@requiere_permiso("Comercial")
 def crear_presupuesto(request):
     from decimal import Decimal
     from datetime import date, timedelta
@@ -175,6 +190,7 @@ def crear_presupuesto(request):
                     continue
             presupuesto.total = total
             presupuesto.save()
+            _audit_presupuesto(request, presupuesto, 'create')
             from django.contrib import messages
             messages.success(
                 request,
@@ -196,7 +212,6 @@ def crear_presupuesto(request):
 
 @require_perm('Presupuestos', 'Editar')
 @login_required
-@requiere_permiso("Comercial")
 def editar_presupuesto(request, pk):
     from decimal import Decimal
     from datetime import date, timedelta
@@ -208,46 +223,50 @@ def editar_presupuesto(request, pk):
     if request.method == 'POST':
         form = PresupuestoForm(request.POST, instance=presupuesto)
         if form.is_valid():
+            from django.db import transaction as _tx
             presupuesto = form.save(commit=False)
-            # Reconstruir detalles desde los campos ocultos enviados
-            presupuesto.save()
-            presupuesto.detalles.all().delete()
-            total = Decimal('0')
-            indices = set()
-            for key in request.POST:
-                if key.startswith('det-') and key.endswith('-producto'):
-                    indices.add(key.split('-')[1])
-            descuento_global = request.POST.get('descuento_global', '0').strip()
-            iva_aplicada_val = request.POST.get('iva_aplicada', '0').strip()
-            descuento_pct = Decimal(descuento_global or '0')
-            iva_pct = Decimal(iva_aplicada_val or '0')
-            for idx in indices:
-                prod_pk = request.POST.get(f'det-{idx}-producto', '').strip()
-                cantidad_raw = request.POST.get(f'det-{idx}-cantidad', '').strip()
-                precio_raw = request.POST.get(f'det-{idx}-precio_unitario', '').strip()
-                if not prod_pk or not cantidad_raw or not precio_raw:
-                    continue
-                try:
-                    prod = ProductoModel.objects.get(pk=int(prod_pk))
-                    cantidad = int(cantidad_raw)
-                    precio = Decimal(precio_raw)
-                    neto = cantidad * precio
-                    con_descuento = neto * (1 - descuento_pct / Decimal('100'))
-                    subtotal = con_descuento * (1 + iva_pct / Decimal('100'))
-                    PresupuestoDetalle.objects.create(
-                        presupuesto=presupuesto,
-                        producto=prod,
-                        cantidad=cantidad,
-                        precio_unitario=precio,
-                        descuento=descuento_pct,
-                        iva=iva_pct,
-                        subtotal=subtotal,
-                    )
-                    total += subtotal
-                except Exception:
-                    continue
-            presupuesto.total = total
-            presupuesto.save()
+            # S-3: delete + recreate de detalles dentro de una transacción atómica
+            # para evitar que el presupuesto quede sin detalles si algo falla a mitad.
+            with _tx.atomic():
+                presupuesto.save()
+                presupuesto.detalles.all().delete()
+                total = Decimal('0')
+                indices = set()
+                for key in request.POST:
+                    if key.startswith('det-') and key.endswith('-producto'):
+                        indices.add(key.split('-')[1])
+                descuento_global = request.POST.get('descuento_global', '0').strip()
+                iva_aplicada_val = request.POST.get('iva_aplicada', '0').strip()
+                descuento_pct = Decimal(descuento_global or '0')
+                iva_pct = Decimal(iva_aplicada_val or '0')
+                for idx in indices:
+                    prod_pk = request.POST.get(f'det-{idx}-producto', '').strip()
+                    cantidad_raw = request.POST.get(f'det-{idx}-cantidad', '').strip()
+                    precio_raw = request.POST.get(f'det-{idx}-precio_unitario', '').strip()
+                    if not prod_pk or not cantidad_raw or not precio_raw:
+                        continue
+                    try:
+                        prod = ProductoModel.objects.get(pk=int(prod_pk))
+                        cantidad = int(cantidad_raw)
+                        precio = Decimal(precio_raw)
+                        neto = cantidad * precio
+                        con_descuento = neto * (1 - descuento_pct / Decimal('100'))
+                        subtotal = con_descuento * (1 + iva_pct / Decimal('100'))
+                        PresupuestoDetalle.objects.create(
+                            presupuesto=presupuesto,
+                            producto=prod,
+                            cantidad=cantidad,
+                            precio_unitario=precio,
+                            descuento=descuento_pct,
+                            iva=iva_pct,
+                            subtotal=subtotal,
+                        )
+                        total += subtotal
+                    except Exception:
+                        continue
+                presupuesto.total = total
+                presupuesto.save()
+            _audit_presupuesto(request, presupuesto, 'update')
             return redirect('presupuestos:lista')
     else:
         form = PresupuestoForm(instance=presupuesto)
@@ -351,7 +370,19 @@ def clonar_presupuesto(request, pk):
     from datetime import date, timedelta
     from django.db import transaction
     with transaction.atomic():
+        # S-2: generar número de forma atómica igual que en crear_presupuesto
+        ultimo = Presupuesto.objects.select_for_update().order_by('-id').first()
+        if ultimo and ultimo.numero and ultimo.numero.startswith('P-'):
+            try:
+                last_num = int(ultimo.numero.split('-')[1])
+            except Exception:
+                last_num = ultimo.id
+        else:
+            last_num = ultimo.id if ultimo else 0
+        nuevo_numero = f"P-{last_num + 1:05d}"
+
         nuevo = Presupuesto.objects.create(
+            numero=nuevo_numero,
             cliente=original.cliente,
             validez=date.today() + timedelta(days=15),
             total=original.total,
@@ -375,10 +406,10 @@ def clonar_presupuesto(request, pk):
 
 @require_perm('Presupuestos', 'Eliminar')
 @login_required
-@requiere_permiso("Comercial")
 def eliminar_presupuesto(request, pk):
     presupuesto = get_object_or_404(Presupuesto, pk=pk)
     if request.method == 'POST':
+        _audit_presupuesto(request, presupuesto, 'delete')
         presupuesto.delete()
         return redirect('presupuestos:lista')
     return render(request, 'presupuestos/eliminar_presupuesto.html', {'presupuesto': presupuesto})
@@ -386,7 +417,6 @@ def eliminar_presupuesto(request, pk):
 
 @require_perm('Presupuestos', 'Listar')
 @login_required
-@requiere_permiso("Comercial")
 def enviar_presupuesto(request, pk):
     import urllib.parse
     from django.conf import settings
@@ -440,10 +470,16 @@ def enviar_presupuesto(request, pk):
             return JsonResponse({'error': f'Error al enviar: {e}'}, status=500)
 
     elif metodo == 'whatsapp':
-        numero = (cliente.celular or cliente.telefono or '').strip()
-        numero_digits = ''.join(c for c in numero if c.isdigit())
+        # M-10: usar numero_whatsapp (E.164 validado) si está disponible;
+        # si no, extraer dígitos del celular/teléfono como fallback degradado.
+        numero_wa = getattr(cliente, 'numero_whatsapp', None)
+        if numero_wa:
+            numero_digits = ''.join(c for c in numero_wa if c.isdigit())
+        else:
+            numero = (cliente.celular or cliente.telefono or '').strip()
+            numero_digits = ''.join(c for c in numero if c.isdigit())
         if not numero_digits:
-            return JsonResponse({'error': 'El cliente no tiene celular/teléfono registrado'}, status=400)
+            return JsonResponse({'error': 'El cliente no tiene número de WhatsApp/celular registrado'}, status=400)
         nombre_cliente = f'{cliente.nombre} {cliente.apellido}'
         pdf_link   = request.build_absolute_uri(f'/presupuestos/pdf/{presupuesto.token}/')
         link_aceptar  = request.build_absolute_uri(f'/presupuestos/ok/{presupuesto.token}/aceptado/')
@@ -485,19 +521,6 @@ def enviar_presupuesto(request, pk):
             
         except Exception as e:
             return JsonResponse({'error': f'Error: {str(e)}'}, status=500)
-        
-        # Fallback: devolver URL de wa.me
-        texto = (
-            f'Hola {nombre_cliente}! Le enviamos el presupuesto '
-            f'{presupuesto.numero} de Imprenta Tucán por un total de {_fmt_ars(presupuesto.total)}.\n'
-            f'{validez_texto}\n'
-            f'📷 Ver imagen del presupuesto:\n{link_imagen}\n\n'
-            f'✅ *ACEPTAR presupuesto* (un clic):\n{link_aceptar}\n\n'
-            f'❌ *RECHAZAR presupuesto* (un clic):\n{link_rechazar}\n\n'
-            f'📄 Ver detalle completo / PDF:\n{pdf_link}'
-        )
-        wa_url = f'https://wa.me/{numero_digits}?text={urllib.parse.quote(texto)}'
-        return JsonResponse({'status': 'ok', 'url': wa_url, 'texto': texto})
 
     elif metodo == 'sms':
         numero = (cliente.celular or cliente.telefono or '').strip()
@@ -547,12 +570,21 @@ def procesar_respuesta(request, token, accion):
 
 
 def accion_directa(request, token, accion):
-    """Acepta o rechaza un presupuesto via GET (enlace directo desde WhatsApp/email)."""
+    """
+    Acepta o rechaza un presupuesto desde el enlace enviado por WhatsApp/email.
+
+    C-2: GET muestra una pantalla de confirmación para evitar que bots de preview
+    (WhatsApp, Slack, email clients) procesen la acción automáticamente.
+    Solo POST modifica el estado.
+    C-3: toda la modificación de estado + creación de pedido va dentro de transaction.atomic().
+    """
+    from django.http import HttpResponseBadRequest
+    from django.db import transaction
+
     presupuesto = get_object_or_404(Presupuesto, token=token)
     detalles = presupuesto.detalles.select_related('producto').all()
 
     if accion not in ('aceptado', 'rechazado'):
-        from django.http import HttpResponseBadRequest
         return HttpResponseBadRequest('Acción inválida')
 
     if presupuesto.respuesta_cliente != 'pendiente':
@@ -562,57 +594,74 @@ def accion_directa(request, token, accion):
             'ya_respondido': True,
         })
 
-    presupuesto.respuesta_cliente = accion
-    presupuesto.save()
-    
-    # Si se acepta, crear automáticamente el pedido
+    # C-2: en GET mostrar pantalla de confirmación; solo procesar en POST
+    if request.method != 'POST':
+        return render(request, 'presupuestos/confirmar_accion.html', {
+            'presupuesto': presupuesto,
+            'detalles': detalles,
+            'accion': accion,
+            'token': token,
+        })
+
+    # POST: procesar la acción de forma atómica
     pedido_creado = None
-    if accion == 'aceptado':
-        try:
-            from pedidos.models import Pedido, LineaPedido, EstadoPedido
-            from django.utils import timezone
-            from datetime import timedelta
-            
-            # Obtener o crear estado inicial
-            estado_inicial, _ = EstadoPedido.objects.get_or_create(
-                nombre='Pendiente',
-                defaults={'descripcion': 'Pedido pendiente de confirmación'}
-            )
-            
-            # Calcular fecha de entrega
-            fecha_entrega = presupuesto.validez if presupuesto.validez else (timezone.now().date() + timedelta(days=7))
-            
-            # Crear el pedido
-            pedido = Pedido.objects.create(
-                cliente=presupuesto.cliente,
-                estado=estado_inicial,
-                fecha_pedido=timezone.now().date(),
-                fecha_entrega=fecha_entrega,
-                monto_total=presupuesto.total,
-            )
-            
-            # Crear las líneas del pedido
-            for detalle in detalles:
-                LineaPedido.objects.create(
-                    pedido=pedido,
-                    producto=detalle.producto,
-                    cantidad=detalle.cantidad,
-                    precio_unitario=detalle.precio_unitario,
+    error_pedido = None
+    with transaction.atomic():
+        presupuesto.respuesta_cliente = accion
+        presupuesto.save(update_fields=['respuesta_cliente'])
+
+        if accion == 'aceptado':
+            try:
+                from pedidos.models import Pedido, LineaPedido, EstadoPedido
+                from django.utils import timezone
+                from datetime import timedelta
+                import logging
+
+                estado_inicial, _ = EstadoPedido.objects.get_or_create(nombre='Pendiente')
+                fecha_entrega = presupuesto.validez if presupuesto.validez else (timezone.now().date() + timedelta(days=7))
+
+                pedido = Pedido.objects.create(
+                    cliente=presupuesto.cliente,
+                    estado=estado_inicial,
+                    fecha_entrega=fecha_entrega,
+                    monto_total=presupuesto.total,
                 )
-            
-            # Vincular pedido al presupuesto
-            presupuesto.pedido_relacionado = pedido
-            presupuesto.save()
-            pedido_creado = pedido
-            
-        except Exception as e:
-            pass
-    
+                for detalle in detalles:
+                    LineaPedido.objects.create(
+                        pedido=pedido,
+                        producto=detalle.producto,
+                        cantidad=detalle.cantidad,
+                        precio_unitario=detalle.precio_unitario,
+                    )
+                presupuesto.pedido_relacionado = pedido
+                presupuesto.save(update_fields=['pedido_relacionado'])
+                pedido_creado = pedido
+
+            except Exception as exc:
+                import logging
+                logging.getLogger(__name__).error(
+                    'accion_directa: error creando pedido desde presupuesto #%s: %s',
+                    presupuesto.pk, exc,
+                )
+                # Notificar al staff
+                try:
+                    from core.notifications.engine import enviar_notificacion
+                    enviar_notificacion(
+                        destinatario='staff',
+                        mensaje=f'Error al crear pedido desde presupuesto #{presupuesto.pk}: {exc}',
+                        canal='portal',
+                        asunto='Error en conversión de presupuesto',
+                    )
+                except Exception:
+                    pass
+                error_pedido = str(exc)
+
     return render(request, 'presupuestos/respuesta_cliente.html', {
         'presupuesto': presupuesto,
         'detalles': detalles,
         'respuesta_registrada': True,
         'pedido_creado': pedido_creado,
+        'error_pedido': error_pedido,
     })
 
 

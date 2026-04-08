@@ -20,6 +20,22 @@ ESTADOS_BLOQUEANTES = ["Pendiente", "En Proceso", "Completado"]
 
 
 # Alta de cliente
+def _audit_cliente(request, cliente, action):
+    try:
+        from auditoria.models import AuditEntry
+        AuditEntry.objects.create(
+            user=request.user if request.user.is_authenticated else None,
+            app_label='clientes',
+            model='Cliente',
+            object_id=str(cliente.pk),
+            object_repr=str(cliente),
+            action=action,
+            ip_address=request.META.get('REMOTE_ADDR'),
+        )
+    except Exception:
+        pass
+
+
 @login_required
 @requiere_permiso("Clientes", "Crear")
 def alta_cliente(request):
@@ -27,6 +43,7 @@ def alta_cliente(request):
         form = ClienteForm(request.POST)
         if form.is_valid():
             cliente = form.save()
+            _audit_cliente(request, cliente, 'create')
             messages.success(request, f"El cliente {cliente.nombre} {cliente.apellido} ha sido creado exitosamente.")
             return redirect("lista_clientes")
         else:
@@ -107,6 +124,7 @@ def editar_cliente(request, id):
         form = ClienteForm(request.POST, instance=cliente)
         if form.is_valid():
             cliente_actualizado = form.save()
+            _audit_cliente(request, cliente_actualizado, 'update')
             messages.success(
                 request, f"El cliente {cliente_actualizado.nombre} {cliente_actualizado.apellido} ha sido actualizado exitosamente.")
             return redirect("lista_clientes")
@@ -132,6 +150,7 @@ def eliminar_cliente(request, id):
         nombre_cliente = f"{cliente.nombre} {cliente.apellido}"
         cliente.estado = 'Inactivo'
         cliente.save()
+        _audit_cliente(request, cliente, 'delete')
         messages.success(request, f"El cliente {nombre_cliente} ha sido desactivado.")
         return redirect("lista_clientes")
     return redirect("lista_clientes")
@@ -139,12 +158,13 @@ def eliminar_cliente(request, id):
 
 # Activar/desactivar cliente (toggle)
 @login_required
-@requiere_permiso("Clientes")
+@requiere_permiso("Clientes", "Editar")
 def activar_cliente(request, id):
     cliente = get_object_or_404(Cliente, id=id)
     if request.method == "POST":
         cliente.estado = "Inactivo" if cliente.estado == "Activo" else "Activo"
         cliente.save()
+        _audit_cliente(request, cliente, 'update')
         estado_txt = "activado" if cliente.estado == "Activo" else "desactivado"
         messages.success(request, f"El cliente {cliente.nombre} {cliente.apellido} ha sido {estado_txt}.")
     return redirect("lista_clientes")

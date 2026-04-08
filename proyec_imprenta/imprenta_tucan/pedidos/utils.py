@@ -104,14 +104,23 @@ def descontar_insumos_para_lineas(lineas: list[tuple]) -> None:
     # Lock de filas para evitar condiciones de carrera
     insumos = list(Insumo.objects.select_for_update().filter(idInsumo__in=requeridos.keys()))
     insumos_by_id = {i.idInsumo: i for i in insumos}
+    import logging as _log
+    _logger = _log.getLogger(__name__)
     for insumo_id, req in requeridos.items():
         ins = insumos_by_id.get(insumo_id)
         if not ins:
             continue
+        stock_prev = int(float(ins.stock))
         ins.stock = int(float(ins.stock) - req)
         if ins.stock < 0:
+            # M-12: registrar el desvío en lugar de truncar silenciosamente
+            _logger.warning(
+                'descontar_insumos_para_lineas: stock negativo en insumo #%s (%s): '
+                'stock_anterior=%s req=%s → truncado a 0',
+                ins.idInsumo, ins.nombre, stock_prev, req,
+            )
             ins.stock = 0
-        ins.save(update_fields=["stock", "updated_at"])  # updated_at existe en modelo
+        ins.save(update_fields=["stock", "updated_at"])
 
 
 def _calcular_requerimientos(lineas: list[tuple]) -> dict:
@@ -225,13 +234,44 @@ def ajustar_insumos_por_diferencia(old_lineas: list[tuple], new_lineas: list[tup
     insumos = list(Insumo.objects.select_for_update().filter(idInsumo__in=insumo_ids))
     insumos_by_id = {i.idInsumo: i for i in insumos}
 
+    import json
+    import logging
+    from auditoria.models import AuditEntry
+    log = logging.getLogger(__name__)
+
     for iid, delta in netos.items():
         ins = insumos_by_id.get(iid)
         if not ins or delta == 0:
             continue
+        stock_anterior = int(float(ins.stock))
         # delta > 0 => descontar; delta < 0 => reponer
         ins.stock = int(float(ins.stock) - delta)
-        # Si reponemos, delta es negativo => resta de negativo suma
         if ins.stock < 0:
+            # S-4 / M-12: loguear desvío en lugar de truncar silenciosamente
+            log.warning(
+                'ajustar_insumos_por_diferencia: stock negativo en insumo #%s (%s): '
+                'stock_anterior=%s delta=%s → truncado a 0',
+                ins.idInsumo, ins.nombre, stock_anterior, delta,
+            )
             ins.stock = 0
-        ins.save(update_fields=["stock", "updated_at"])  # mantener updated_at
+        ins.save(update_fields=["stock", "updated_at"])
+
+        # S-4: registrar en auditoría (kardex de ajustes diferenciales por modificación de pedido)
+        try:
+            AuditEntry.objects.create(
+                app_label='insumos',
+                model='Insumo',
+                object_id=str(ins.idInsumo),
+                object_repr=str(ins),
+                action=AuditEntry.ACTION_UPDATE,
+                changes=json.dumps({'stock': {'before': stock_anterior, 'after': int(ins.stock)}}),
+                extra=json.dumps({
+                    'category': 'stock-movement',
+                    'motivo': 'Ajuste diferencial por modificación de pedido En Proceso',
+                    'delta': float(delta),
+                    'before': stock_anterior,
+                    'after': int(ins.stock),
+                }),
+            )
+        except Exception as exc:
+            log.warning('ajustar_insumos_por_diferencia: no se pudo registrar AuditEntry para insumo #%s: %s', ins.idInsumo, exc)

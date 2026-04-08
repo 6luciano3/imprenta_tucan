@@ -5,6 +5,7 @@ from django.views.decorators.http import require_POST
 from django.utils import timezone
 from .models import OrdenCompra, DetalleOrdenCompra, Remito, DetalleRemito, EstadoCompra, OrdenPago, ComprobanteOrdenPago, FormaPagoOrdenPago, RetencionOrdenPago
 from .forms import OrdenCompraForm, DetalleOrdenCompraFormSet, RemitoForm, DetalleRemitoFormSet
+from configuracion.permissions import require_perm
 
 
 def _datos_empresa() -> dict:
@@ -48,6 +49,7 @@ def _registrar_auditoria(request, instance, action="create"):
 # ── Ordenes de Compra ─────────────────────────────────────────────────────────
 
 @login_required
+@require_perm('Compras', 'Listar')
 def lista_ordenes(request):
     from django.core.paginator import Paginator, EmptyPage
     from django.db import models
@@ -108,6 +110,7 @@ def lista_ordenes(request):
 
 
 @login_required
+@require_perm('Compras', 'Crear')
 def nueva_orden(request):
     if request.method == "POST":
         form = OrdenCompraForm(request.POST)
@@ -495,8 +498,9 @@ def _procesar_recepcion_orden(orden, usuario=None):
         return detalles_creados
 
 
+@login_required
 def confirmar_orden_publico(request, pk):
-    """Endpoint público — el proveedor hace clic en el link del email."""
+    """Confirmación de orden de compra — requiere staff autenticado."""
     orden = get_object_or_404(OrdenCompra.objects.prefetch_related("detalles__insumo"), pk=pk)
     try:
         detalles_creados = _procesar_recepcion_orden(orden, usuario=None)
@@ -550,6 +554,7 @@ def marcar_orden_recibida(request, pk):
     return redirect('compras:detalle_orden_compra', pk=pk)
 
 
+@login_required
 def rechazar_orden_publico(request, pk):
     orden = get_object_or_404(OrdenCompra, pk=pk)
     
@@ -636,6 +641,7 @@ def enviar_orden_whatsapp(request, pk):
 
 
 @login_required
+@require_perm('Compras', 'Editar')
 def cambiar_estado_orden(request, pk):
     orden = get_object_or_404(OrdenCompra, pk=pk)
     if request.method == "POST":

@@ -259,9 +259,12 @@ class OrdenPago(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.numero:
-            ultimo = OrdenPago.objects.order_by('-id').first()
-            siguiente = (ultimo.id + 1) if ultimo else 1
-            self.numero = f'{siguiente:05d}'
+            # C-5: select_for_update() evita race condition cuando dos OPs se crean simultáneamente.
+            from django.db import transaction
+            with transaction.atomic():
+                ultimo = OrdenPago.objects.select_for_update().order_by('-id').first()
+                siguiente = (ultimo.id + 1) if ultimo else 1
+                self.numero = f'{siguiente:05d}'
         self.monto_neto = self.monto_total - self.monto_retenciones
         super().save(*args, **kwargs)
 

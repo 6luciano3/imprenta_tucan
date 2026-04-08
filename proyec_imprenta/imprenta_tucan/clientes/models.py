@@ -44,7 +44,9 @@ class Cliente(models.Model):
     )
     apellido = models.CharField(max_length=100)
     razon_social = models.CharField(max_length=150, blank=True, null=True, db_column='razónSocial')
-    cuit = models.CharField(max_length=11, blank=False, null=False, unique=True, verbose_name="CUIT", default="00000000000")
+    # M-5: default vacío para evitar múltiples registros con "00000000000" que rompen unique.
+    # El form valida que CUIT no esté vacío al crear. unique=True sigue activo.
+    cuit = models.CharField(max_length=11, blank=True, null=False, unique=True, verbose_name="CUIT", default="")
     direccion = models.CharField(max_length=200, db_column='dirección')
     ciudad = models.CharField(max_length=100, default='Posadas')
     provincia = models.CharField(max_length=100, default='Misiones')

@@ -102,42 +102,45 @@ def reservar_insumos_para_pedido(pedido):
     from insumos.models import Insumo
     from pedidos.models import OrdenProduccion
     from auditoria.models import AuditEntry
+    from django.db import transaction
     import json
 
     consumos = calcular_consumo_pedido(pedido)
-    for insumo_id, cantidad in consumos.items():
-        insumo = Insumo.objects.select_for_update().get(idInsumo=insumo_id)
-        if insumo.stock < cantidad:
-            raise ValueError(f"Stock insuficiente para {insumo.nombre}: "
-                             f"disponible={insumo.stock}, requerido={cantidad}")
-        stock_anterior = insumo.stock
-        insumo.stock -= int(cantidad)
-        insumo.save()
+    # C-4: toda la reserva va dentro de una transacción para garantizar consistencia.
+    # Si cualquier insumo falla, el stock de los anteriores no se modifica.
+    with transaction.atomic():
+        for insumo_id, cantidad in consumos.items():
+            insumo = Insumo.objects.select_for_update().get(idInsumo=insumo_id)
+            if insumo.stock < cantidad:
+                raise ValueError(f"Stock insuficiente para {insumo.nombre}: "
+                                 f"disponible={insumo.stock}, requerido={cantidad}")
+            stock_anterior = insumo.stock
+            insumo.stock -= int(cantidad)
+            insumo.save()
 
-        # Registrar en auditoría con descripción clara
-        AuditEntry.objects.create(
-            app_label='insumos',
-            model='Insumo',
-            object_id=str(insumo.idInsumo),
-            object_repr=str(insumo),
-            action=AuditEntry.ACTION_UPDATE,
-            changes=json.dumps({
-                'stock': {
+            AuditEntry.objects.create(
+                app_label='insumos',
+                model='Insumo',
+                object_id=str(insumo.idInsumo),
+                object_repr=str(insumo),
+                action=AuditEntry.ACTION_UPDATE,
+                changes=json.dumps({
+                    'stock': {
+                        'before': stock_anterior,
+                        'after': int(insumo.stock),
+                    }
+                }),
+                extra=json.dumps({
+                    'category': 'stock-movement',
+                    'motivo': f'Descuento automático por Pedido #{pedido.pk} → "{pedido.estado}"',
+                    'pedido_id': pedido.pk,
+                    'cantidad_descontada': int(cantidad),
                     'before': stock_anterior,
                     'after': int(insumo.stock),
-                }
-            }),
-            extra=json.dumps({
-                'category': 'stock-movement',
-                'motivo': f'Descuento automático por Pedido #{pedido.pk} → "{pedido.estado}"',
-                'pedido_id': pedido.pk,
-                'cantidad_descontada': int(cantidad),
-                'before': stock_anterior,
-                'after': int(insumo.stock),
-            }),
-        )
+                }),
+            )
 
-    OrdenProduccion.objects.get_or_create(pedido=pedido)
+        OrdenProduccion.objects.get_or_create(pedido=pedido)
 
 
 def devolver_insumos_para_pedido(pedido):
