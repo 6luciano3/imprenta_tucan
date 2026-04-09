@@ -49,6 +49,24 @@ def _datos_empresa() -> dict:
         }
 
 
+def _user_has_perm(user, modulo, accion):
+    """Chequea programáticamente si un usuario tiene un permiso (sin ser decorator)."""
+    if user.is_staff or user.is_superuser:
+        return True
+    rol = getattr(user, 'rol', None)
+    if not rol:
+        return False
+    import json
+    for p in rol.permisos.filter(modulo=modulo, estado='Activo'):
+        try:
+            acciones = set(json.loads(p.acciones or '[]'))
+        except Exception:
+            acciones = set()
+        if accion in acciones:
+            return True
+    return False
+
+
 def _registrar_auditoria(request, instance, action="create"):
     try:
         from auditoria.models import AuditEntry
@@ -564,6 +582,7 @@ def confirmar_orden_publico(request, pk, token):
 
 @login_required
 @require_POST
+@require_perm('Compras', 'Crear')
 def marcar_orden_recibida(request, pk):
     """Vista interna — el staff marca la orden como recibida al llegar la mercadería."""
     orden = get_object_or_404(OrdenCompra.objects.prefetch_related("detalles__insumo"), pk=pk)
@@ -701,26 +720,97 @@ def cambiar_estado_orden(request, pk):
 @login_required
 @require_perm('Compras', 'Listar')
 def lista_remitos(request):
-    remitos = Remito.objects.select_related("proveedor", "usuario", "orden_compra").prefetch_related("detalles__insumo")
-    return render(request, "compras/lista_remitos.html", {"remitos": remitos})
+    from django.core.paginator import Paginator
+    from django.db.models import Sum, F, ExpressionWrapper, DecimalField
+    from django.db.models.functions import Coalesce
+    from django.urls import reverse
+    from decimal import Decimal
+    from proveedores.models import Proveedor
+
+    remitos = (
+        Remito.objects
+        .select_related("proveedor", "usuario", "orden_compra")
+        .prefetch_related("detalles__insumo")
+        .annotate(
+            monto_total=Coalesce(
+                Sum(
+                    ExpressionWrapper(
+                        F('detalles__cantidad') * F('detalles__precio_unitario'),
+                        output_field=DecimalField(max_digits=14, decimal_places=2)
+                    )
+                ),
+                Decimal('0.00'),
+                output_field=DecimalField(max_digits=14, decimal_places=2)
+            )
+        )
+        .order_by('-fecha', '-id')
+    )
+
+    # Filtros
+    numero_q   = request.GET.get('numero', '').strip()
+    proveedor_q = request.GET.get('proveedor', '').strip()
+    fecha_from = request.GET.get('fecha_from', '').strip()
+    fecha_to   = request.GET.get('fecha_to', '').strip()
+    anulado_q  = request.GET.get('anulado', '').strip()
+
+    if numero_q:
+        remitos = remitos.filter(numero__icontains=numero_q)
+    if proveedor_q:
+        remitos = remitos.filter(proveedor_id=proveedor_q)
+    if fecha_from:
+        remitos = remitos.filter(fecha__gte=fecha_from)
+    if fecha_to:
+        remitos = remitos.filter(fecha__lte=fecha_to)
+    if anulado_q == 'true':
+        remitos = remitos.filter(anulado=True)
+    elif anulado_q == 'false':
+        remitos = remitos.filter(anulado=False)
+
+    paginator = Paginator(remitos, 30)
+    page_obj  = paginator.get_page(request.GET.get('page'))
+
+    proveedores = Proveedor.objects.filter(activo=True).order_by('nombre')
+
+    return render(request, "compras/lista_remitos.html", {
+        "page_obj":    page_obj,
+        "remitos":     page_obj.object_list,
+        "proveedores": proveedores,
+        "filtros": {
+            "numero":    numero_q,
+            "proveedor": proveedor_q,
+            "fecha_from": fecha_from,
+            "fecha_to":   fecha_to,
+            "anulado":   anulado_q,
+        },
+        "can_edit":      _user_has_perm(request.user, 'Compras', 'Editar'),
+        "can_delete":    _user_has_perm(request.user, 'Compras', 'Eliminar'),
+        "exportar_url":  reverse('compras:exportar_remitos'),
+    })
 
 
 
 
 def _generar_numero_remito():
+    """Genera el próximo número de remito del año en curso. Thread-safe con select_for_update."""
     from django.utils import timezone
     from .models import Remito
     anio = timezone.now().year
     prefijo = f"R-{anio}-"
-    ultimo = Remito.objects.filter(numero__startswith=prefijo).order_by("-numero").first()
-    if ultimo:
-        try:
-            seq = int(ultimo.numero.split("-")[-1]) + 1
-        except (ValueError, IndexError):
+    with transaction.atomic():
+        ultimo = (
+            Remito.objects.select_for_update()
+            .filter(numero__startswith=prefijo)
+            .order_by("-id")
+            .first()
+        )
+        if ultimo:
+            try:
+                seq = int(ultimo.numero.split("-")[-1]) + 1
+            except (ValueError, IndexError):
+                seq = 1
+        else:
             seq = 1
-    else:
-        seq = 1
-    return f"{prefijo}{seq:04d}"
+        return f"{prefijo}{seq:04d}"
 
 @login_required
 @require_perm('Compras', 'Crear')
@@ -743,14 +833,57 @@ def nuevo_remito(request):
         if form.is_valid() and formset.is_valid():
             from .models import HistorialPrecioInsumo, MovimientoStock
             from decimal import Decimal
-            try:
-                with transaction.atomic():
-                    remito = form.save(commit=False)
-                    remito.usuario = request.user
-                    remito.save()
-                    actualizados = []
-                    for df in formset:
-                        if df.cleaned_data and not df.cleaned_data.get("DELETE", False):
+            from insumos.models import Insumo as InsumoModel
+
+            orden_vinculada = form.cleaned_data.get("orden_compra")
+
+            # C-1/M-2: Construir mapa cantidad disponible por insumo en la OC
+            cantidades_oc = {}
+            insumo_ids_oc = set()
+            if orden_vinculada:
+                for det in orden_vinculada.detalles.select_related("insumo").all():
+                    cantidades_oc[det.insumo.pk] = det.cantidad
+                    insumo_ids_oc.add(det.insumo.pk)
+
+            # Validaciones cruzadas con la OC antes de guardar
+            errores_cruzados = []
+            filas_validas = [
+                df for df in formset
+                if df.cleaned_data and not df.cleaned_data.get("DELETE", False)
+            ]
+            if orden_vinculada:
+                cantidades_remito = {}
+                for df in filas_validas:
+                    insumo = df.cleaned_data["insumo"]
+                    cantidad = df.cleaned_data["cantidad"]
+                    # C-2/M-3: insumo debe pertenecer a la OC
+                    if insumo.pk not in insumo_ids_oc:
+                        errores_cruzados.append(
+                            f"El insumo «{insumo}» no pertenece a la OC-{orden_vinculada.pk:04d}."
+                        )
+                    # C-1/M-2: acumular cantidades por insumo
+                    cantidades_remito[insumo.pk] = cantidades_remito.get(insumo.pk, 0) + cantidad
+
+                for insumo_pk, cant_remito in cantidades_remito.items():
+                    cant_oc = cantidades_oc.get(insumo_pk, 0)
+                    if cant_remito > cant_oc:
+                        from insumos.models import Insumo as _I
+                        nombre_ins = _I.objects.filter(pk=insumo_pk).values_list("nombre", flat=True).first() or str(insumo_pk)
+                        errores_cruzados.append(
+                            f"«{nombre_ins}»: cantidad en remito ({cant_remito}) supera la cantidad de la OC ({cant_oc})."
+                        )
+
+            if errores_cruzados:
+                for err in errores_cruzados:
+                    messages.error(request, err)
+            else:
+                try:
+                    with transaction.atomic():
+                        remito = form.save(commit=False)
+                        remito.usuario = request.user
+                        remito.save()
+                        actualizados = []
+                        for df in filas_validas:
                             insumo = df.cleaned_data["insumo"]
                             cantidad = df.cleaned_data["cantidad"]
                             precio_unitario = df.cleaned_data.get("precio_unitario") or 0
@@ -758,13 +891,14 @@ def nuevo_remito(request):
                                 remito=remito, insumo=insumo,
                                 cantidad=cantidad, precio_unitario=precio_unitario,
                             )
-                            # Si el remito trae precio real, actualizar insumo y registrar historial
                             precio_decimal = Decimal(str(precio_unitario))
-                            if precio_decimal > 0 and precio_decimal != (insumo.precio_unitario or 0):
-                                precio_anterior = insumo.precio_unitario or Decimal('0')
-                                insumo.precio_unitario = precio_decimal
+                            # C-3/M-1: select_for_update evita race condition en stock
+                            insumo_locked = InsumoModel.objects.select_for_update().get(pk=insumo.pk)
+                            if precio_decimal > 0 and precio_decimal != (insumo_locked.precio_unitario or 0):
+                                precio_anterior = insumo_locked.precio_unitario or Decimal('0')
+                                insumo_locked.precio_unitario = precio_decimal
                                 HistorialPrecioInsumo.objects.create(
-                                    insumo=insumo,
+                                    insumo=insumo_locked,
                                     precio_anterior=precio_anterior,
                                     precio_nuevo=precio_decimal,
                                     origen='remito',
@@ -772,41 +906,77 @@ def nuevo_remito(request):
                                     usuario=request.user,
                                     remito=remito,
                                 )
-                            stock_anterior = insumo.stock or 0
-                            insumo.stock = stock_anterior + cantidad
-                            insumo.save(update_fields=["stock", "precio_unitario", "updated_at"])
+                            stock_anterior = insumo_locked.stock or 0
+                            insumo_locked.stock = stock_anterior + cantidad
+                            insumo_locked.save(update_fields=["stock", "precio_unitario", "updated_at"])
                             MovimientoStock.objects.create(
-                                insumo=insumo,
+                                insumo=insumo_locked,
                                 tipo="entrada",
                                 origen="remito",
                                 cantidad=cantidad,
                                 stock_anterior=stock_anterior,
-                                stock_posterior=insumo.stock,
+                                stock_posterior=insumo_locked.stock,
                                 referencia=f"Remito {remito.numero}",
                                 remito=remito,
                                 fecha=remito.fecha,
                                 usuario=request.user if request.user.is_authenticated else None,
                             )
-                            actualizados.append(f"{insumo.nombre} (+{cantidad})")
-                    # Si hay orden de compra vinculada, marcarla como Recibida
-                    if remito.orden_compra:
-                        try:
-                            estado_recibida = EstadoCompra.objects.get(nombre="Recibida")
-                            remito.orden_compra.estado = estado_recibida
-                            remito.orden_compra.fecha_recepcion = remito.fecha
-                            remito.orden_compra.save(update_fields=["estado", "fecha_recepcion", "actualizado_en"])
-                        except EstadoCompra.DoesNotExist:
-                            pass
-                    _registrar_auditoria(request, remito, "create")
-            except Exception as e:
-                logger.error(f"Error al registrar remito: {e}", exc_info=True)
-                messages.error(request, f"Error al registrar el remito: {e}")
-                return redirect('compras:nuevo_remito_compra')
-            messages.success(
-                request,
-                f"Remito {remito.numero} registrado. Stock actualizado: {', '.join(actualizados)}."
-            )
-            return redirect('compras:lista_remitos_compra')
+                            actualizados.append(f"{insumo_locked.nombre} (+{cantidad})")
+
+                        # Marcar OC como Recibida y crear OrdenPago si corresponde
+                        if remito.orden_compra:
+                            orden = remito.orden_compra
+                            try:
+                                estado_recibida = EstadoCompra.objects.get(nombre="Recibida")
+                                orden.estado = estado_recibida
+                                orden.fecha_recepcion = remito.fecha
+                                orden.save(update_fields=["estado", "fecha_recepcion", "actualizado_en"])
+                            except EstadoCompra.DoesNotExist:
+                                pass
+
+                            # C-5/M-4: crear OrdenPago si no existe ya para esta OC
+                            if not OrdenPago.objects.filter(orden_compra=orden).exists():
+                                try:
+                                    from datetime import timedelta, date as _date
+                                    _DIAS_PAGO = {
+                                        'contado': 0, '15_dias': 15, '30_dias': 30,
+                                        '60_dias': 60, '90_dias': 90,
+                                    }
+                                    dias_venc = _DIAS_PAGO.get(getattr(orden, 'condicion_pago', 'contado'), 30)
+                                    monto = sum(
+                                        (df.cleaned_data.get("precio_unitario") or 0) * df.cleaned_data["cantidad"]
+                                        for df in filas_validas
+                                    )
+                                    OrdenPago.objects.create(
+                                        proveedor=orden.proveedor,
+                                        orden_compra=orden,
+                                        estado='pendiente',
+                                        monto_total=monto,
+                                        fecha_vencimiento=_date.today() + timedelta(days=dias_venc),
+                                        observaciones=(
+                                            f'Generada al registrar Remito {remito.numero} '
+                                            f'de OC-{orden.pk:04d}. Completar N° de factura.'
+                                        ),
+                                        usuario=request.user,
+                                    )
+                                except Exception as e_op:
+                                    logger.error(
+                                        f"Error al crear OrdenPago para Remito {remito.numero}: {e_op}",
+                                        exc_info=True,
+                                    )
+
+                        _registrar_auditoria(request, remito, "create")
+
+                except Exception as e:
+                    logger.error(f"Error al registrar remito: {e}", exc_info=True)
+                    messages.error(request, f"Error al registrar el remito: {e}")
+                    return redirect('compras:nuevo_remito_compra')
+
+                messages.success(
+                    request,
+                    f"Remito {remito.numero} registrado. Stock actualizado: {', '.join(actualizados)}."
+                )
+                return redirect('compras:lista_remitos_compra')
         else:
             messages.error(request, "Por favor corrija los errores en el formulario.")
     else:
@@ -827,6 +997,9 @@ def nuevo_remito(request):
 def editar_remito(request, pk):
     """Permite corregir observaciones y fecha de un remito. NO reversa stock — es solo edición de cabecera."""
     remito = get_object_or_404(Remito.objects.select_related('proveedor', 'orden_compra'), pk=pk)
+    if remito.anulado:
+        messages.error(request, f'El remito {remito.numero} está anulado y no puede editarse.')
+        return redirect('compras:lista_remitos_compra')
     if request.method == 'POST':
         nueva_fecha = request.POST.get('fecha')
         nuevas_obs  = request.POST.get('observaciones', '')
@@ -851,7 +1024,7 @@ def anular_remito(request, pk):
     from decimal import Decimal
     remito = get_object_or_404(Remito.objects.prefetch_related('detalles__insumo'), pk=pk)
 
-    if remito.observaciones.startswith('[ANULADO]'):
+    if remito.anulado:
         messages.error(request, f'El remito {remito.numero} ya fue anulado.')
         return redirect('compras:lista_remitos_compra')
 
@@ -877,12 +1050,109 @@ def anular_remito(request, pk):
                 usuario=request.user,
                 observaciones=f'Remito anulado. Motivo: {motivo}',
             )
+        remito.anulado = True
         remito.observaciones = f'[ANULADO] {motivo}\n\n' + remito.observaciones
-        remito.save(update_fields=['observaciones'])
+        remito.save(update_fields=['anulado', 'observaciones'])
         _registrar_auditoria(request, remito, 'update')
 
     messages.success(request, f'Remito {remito.numero} anulado y stock revertido.')
     return redirect('compras:lista_remitos_compra')
+
+
+@login_required
+@require_perm('Compras', 'Listar')
+def detalle_remito(request, pk):
+    """Vista de detalle de un remito (solo lectura)."""
+    remito = get_object_or_404(
+        Remito.objects.select_related('proveedor', 'usuario', 'orden_compra')
+                      .prefetch_related('detalles__insumo'),
+        pk=pk
+    )
+    from django.db.models import Sum, F, ExpressionWrapper, DecimalField
+    from django.db.models.functions import Coalesce
+    from decimal import Decimal
+    total = remito.detalles.aggregate(
+        total=Coalesce(
+            Sum(ExpressionWrapper(
+                F('cantidad') * F('precio_unitario'),
+                output_field=DecimalField(max_digits=14, decimal_places=2)
+            )),
+            Decimal('0.00'),
+            output_field=DecimalField(max_digits=14, decimal_places=2)
+        )
+    )['total']
+    return render(request, 'compras/detalle_remito.html', {
+        'remito': remito,
+        'total':  total,
+        'can_edit':   _user_has_perm(request.user, 'Compras', 'Editar'),
+        'can_delete': _user_has_perm(request.user, 'Compras', 'Eliminar'),
+    })
+
+
+@login_required
+@require_perm('Compras', 'Listar')
+def exportar_remitos_excel(request):
+    """Exporta los remitos filtrados a CSV."""
+    import csv
+    from django.http import HttpResponse
+    from django.db.models import Sum, F, ExpressionWrapper, DecimalField
+    from django.db.models.functions import Coalesce
+    from decimal import Decimal
+
+    remitos = (
+        Remito.objects
+        .select_related('proveedor', 'usuario', 'orden_compra')
+        .annotate(
+            monto_total=Coalesce(
+                Sum(ExpressionWrapper(
+                    F('detalles__cantidad') * F('detalles__precio_unitario'),
+                    output_field=DecimalField(max_digits=14, decimal_places=2)
+                )),
+                Decimal('0.00'),
+                output_field=DecimalField(max_digits=14, decimal_places=2)
+            )
+        )
+        .order_by('-fecha', '-id')
+    )
+
+    # Aplicar los mismos filtros que la lista
+    numero_q    = request.GET.get('numero', '').strip()
+    proveedor_q = request.GET.get('proveedor', '').strip()
+    fecha_from  = request.GET.get('fecha_from', '').strip()
+    fecha_to    = request.GET.get('fecha_to', '').strip()
+    anulado_q   = request.GET.get('anulado', '').strip()
+
+    if numero_q:
+        remitos = remitos.filter(numero__icontains=numero_q)
+    if proveedor_q:
+        remitos = remitos.filter(proveedor_id=proveedor_q)
+    if fecha_from:
+        remitos = remitos.filter(fecha__gte=fecha_from)
+    if fecha_to:
+        remitos = remitos.filter(fecha__lte=fecha_to)
+    if anulado_q == 'true':
+        remitos = remitos.filter(anulado=True)
+    elif anulado_q == 'false':
+        remitos = remitos.filter(anulado=False)
+
+    response = HttpResponse(content_type='text/csv; charset=utf-8')
+    response['Content-Disposition'] = 'attachment; filename="remitos_compra.csv"'
+    response.write('\ufeff')  # BOM para Excel
+    writer = csv.writer(response)
+    writer.writerow(['N° Remito', 'Fecha', 'Proveedor', 'Orden Vinculada', 'Total', 'Estado', 'Registrado por', 'Observaciones'])
+
+    for r in remitos:
+        writer.writerow([
+            r.numero,
+            r.fecha.strftime('%d/%m/%Y') if r.fecha else '',
+            str(r.proveedor),
+            f'OC-{r.orden_compra.pk:04d}' if r.orden_compra else '',
+            f'{r.monto_total:.2f}',
+            'Anulado' if r.anulado else 'Activo',
+            str(r.usuario) if r.usuario else 'Sistema',
+            r.observaciones or '',
+        ])
+    return response
 
 
 # ── API: items de solicitud de cotizacion confirmada ─────────────────────────
@@ -905,8 +1175,8 @@ def api_items_solicitud(request, pk):
                 "insumo_nombre": f"{item.insumo.codigo} - {item.insumo.nombre}",
                 "cantidad": item.cantidad,
                 "precio_unitario": float(item.precio_unitario_respuesta or 0),
-                "codigo": item.insumo.codigo or '',
-                "unidad_medida": item.insumo.unidad_medida or '',
+                "insumo_codigo": item.insumo.codigo or '',
+                "unidad": item.insumo.unidad_medida or '',
             })
         return JsonResponse({"ok": True, "proveedor_id": sc.proveedor_id, "items": items})
     except Exception as e:
@@ -1303,11 +1573,12 @@ def api_items_orden(request, pk):
         items = []
         for d in oc.detalles.all():
             items.append({
-                "insumo_id": d.insumo.idInsumo,
-                "insumo_nombre": d.insumo.nombre,
-                "insumo_codigo": d.insumo.codigo,
-                "cantidad": d.cantidad,
-                "unidad": d.insumo.unidad_medida or "-",
+                "insumo_id":      d.insumo.idInsumo,
+                "insumo_nombre":  d.insumo.nombre,
+                "insumo_codigo":  d.insumo.codigo,
+                "cantidad":       d.cantidad,
+                "precio_unitario": str(d.precio_unitario) if d.precio_unitario else "0.00",
+                "unidad":         d.insumo.unidad_medida or "-",
             })
         from django.http import JsonResponse
         return JsonResponse({"ok": True, "proveedor_id": oc.proveedor_id, "items": items})

@@ -56,6 +56,8 @@ urlpatterns = [
     path("pagos/<int:pk>/registrar-pago/",      vop.registrar_pago,           name="registrar_pago"),
     path("pagos/<int:pk>/anular/",              vop.anular_orden_pago,           name="anular_orden_pago"),
     path("pagos/exportar/",                     vop.exportar_ordenes_pago_excel, name="exportar_ordenes_pago"),
+    path("remitos/<int:pk>/",                   views.detalle_remito,            name="detalle_remito"),
     path("remitos/<int:pk>/editar/",            views.editar_remito,             name="editar_remito"),
     path("remitos/<int:pk>/anular/",            views.anular_remito,             name="anular_remito"),
+    path("remitos/exportar/",                   views.exportar_remitos_excel,    name="exportar_remitos"),
 ]

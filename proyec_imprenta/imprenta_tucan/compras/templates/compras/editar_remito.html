@@ -15,6 +15,15 @@
 <div class="mb-4 px-4 py-3 rounded-lg {% if msg.tags == 'error' %}bg-red-50 text-red-700 border border-red-200{% else %}bg-green-50 text-green-700 border border-green-200{% endif %}">{{ msg }}</div>
 {% endfor %}{% endif %}
 
+{% if remito.anulado %}
+<div class="bg-red-50 border border-red-200 rounded-xl p-4 mb-6 flex items-start gap-3">
+  <span class="material-symbols-outlined text-red-500 mt-0.5">block</span>
+  <div class="text-sm text-red-800">
+    <strong>Este remito está anulado</strong> y no puede editarse.
+    <a href="{% url 'compras:lista_remitos_compra' %}" class="underline ml-1">Volver al listado</a>
+  </div>
+</div>
+{% else %}
 <div class="bg-yellow-50 border border-yellow-200 rounded-xl p-4 mb-6 flex items-start gap-3">
   <span class="material-symbols-outlined text-yellow-600 mt-0.5">info</span>
   <div class="text-sm text-yellow-800">
@@ -22,6 +31,7 @@
     Para corregir cantidades de insumos, anulá este remito y creá uno nuevo.
   </div>
 </div>
+{% endif %}
 
 <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6 max-w-2xl">
   <form method="post">

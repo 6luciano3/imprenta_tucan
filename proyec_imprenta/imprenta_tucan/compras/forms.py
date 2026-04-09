@@ -83,11 +83,11 @@ class RemitoForm(forms.ModelForm):
         model = Remito
         fields = ["proveedor", "numero", "fecha", "orden_compra", "observaciones"]
         widgets = {
-            "proveedor": forms.Select(attrs={"class": "form-select", "required": True}),
-            "numero": forms.TextInput(attrs={"class": "form-control", "required": True, "placeholder": "Ej: R-0001"}),
-            "fecha": forms.DateInput(attrs={"class": "form-control", "type": "date", "required": True}),
-            "orden_compra": forms.Select(attrs={"class": "form-select"}),
-            "observaciones": forms.Textarea(attrs={"class": "form-control", "rows": 2}),
+            "proveedor":    forms.Select(attrs={"class": _SELECT_CLS, "required": True}),
+            "numero":       forms.TextInput(attrs={"class": _CTRL_CLS, "required": True, "placeholder": "Ej: R-0001"}),
+            "fecha":        forms.DateInput(attrs={"class": _CTRL_CLS, "type": "date", "required": True}, format="%Y-%m-%d"),
+            "orden_compra": forms.Select(attrs={"class": _SELECT_CLS}),
+            "observaciones":forms.Textarea(attrs={"class": _CTRL_CLS, "rows": 2}),
         }
 
     def __init__(self, *args, **kwargs):
@@ -104,12 +104,12 @@ class RemitoForm(forms.ModelForm):
 class DetalleRemitoForm(forms.Form):
     insumo = forms.ModelChoiceField(
         queryset=Insumo.objects.filter(activo=True).order_by("nombre"),
-        widget=forms.Select(attrs={"class": "form-select"}),
+        widget=forms.Select(attrs={"class": _INPUT_CLS + " bg-white"}),
         label="Insumo"
     )
     cantidad = forms.IntegerField(
         min_value=1,
-        widget=forms.NumberInput(attrs={"class": "form-control", "min": "1"}),
+        widget=forms.NumberInput(attrs={"class": _INPUT_CLS, "min": "1"}),
         label="Cantidad"
     )
     precio_unitario = forms.DecimalField(
@@ -117,7 +117,7 @@ class DetalleRemitoForm(forms.Form):
         decimal_places=2,
         required=False,
         initial=0,
-        widget=forms.NumberInput(attrs={"class": "form-control", "min": "0", "step": "0.01", "placeholder": "0.00"}),
+        widget=forms.NumberInput(attrs={"class": _INPUT_CLS + " text-right", "min": "0", "step": "0.01", "placeholder": "0.00"}),
         label="Precio Unitario"
     )
 

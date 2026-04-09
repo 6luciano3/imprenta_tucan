@@ -120,6 +120,7 @@ class Remito(models.Model):
         "usuarios.Usuario", on_delete=models.SET_NULL, null=True, blank=True, related_name="remitos_compras"
     )
     observaciones = models.TextField(blank=True)
+    anulado = models.BooleanField(default=False, help_text="Indica si el remito fue anulado (baja lógica)")
     creado_en = models.DateTimeField(auto_now_add=True)
 
     class Meta:
