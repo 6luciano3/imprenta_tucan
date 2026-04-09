@@ -42,21 +42,23 @@ class OrdenCompraForm(forms.ModelForm):
         self.fields["solicitud_cotizacion"].label_from_instance = lambda obj: f"SC-{obj.pk:04d} | {obj.proveedor} | {obj.creada.strftime('%d/%m/%Y')}"
 
 
+_INPUT_CLS = "w-full text-xs border border-gray-200 rounded px-2 py-1.5 text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-400 focus:border-blue-400"
+
 class DetalleOrdenCompraForm(forms.Form):
     insumo = forms.ModelChoiceField(
         queryset=Insumo.objects.filter(activo=True).order_by("nombre"),
-        widget=forms.Select(attrs={"class": "form-select insumo-select"}),
+        widget=forms.Select(attrs={"class": _INPUT_CLS + " bg-white"}),
         label="Insumo"
     )
     cantidad = forms.IntegerField(
         min_value=1,
-        widget=forms.NumberInput(attrs={"class": "form-control", "min": "1"}),
+        widget=forms.NumberInput(attrs={"class": _INPUT_CLS, "min": "1"}),
         label="Cantidad"
     )
     precio_unitario = forms.DecimalField(
-        min_value=0,
+        min_value=0.01,
         decimal_places=2,
-        widget=forms.NumberInput(attrs={"class": "form-control", "min": "0", "step": "0.01"}),
+        widget=forms.NumberInput(attrs={"class": _INPUT_CLS + " text-right", "min": "0.01", "step": "0.01", "placeholder": "0.00"}),
         label="Precio Unitario"
     )
 

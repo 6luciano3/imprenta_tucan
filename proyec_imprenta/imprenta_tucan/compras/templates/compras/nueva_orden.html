@@ -40,21 +40,70 @@
       </button>
     </div>
     {{ formset.management_form }}
-    <div class="grid grid-cols-4 gap-2 mb-2 text-xs font-medium text-gray-500 uppercase">
-      <div class="col-span-2">Insumo</div><div>Cantidad</div><div>Precio Unitario</div>
-    </div>
-    <div id="detalles-container">
-      {% for df in formset %}
-      <div class="detalle-row grid grid-cols-4 gap-2 mb-2 items-end">
-        <div class="col-span-2">{{ df.insumo }}</div>
-        <div>{{ df.cantidad }}</div>
-        <div class="flex gap-1">{{ df.precio_unitario }}
-          <button type="button" onclick="eliminarLinea(this)" class="px-2 py-2 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 border border-red-200">
-            <span class="material-symbols-outlined text-sm">delete</span>
-          </button>
-        </div>
-      </div>
-      {% endfor %}
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm table-fixed" id="tabla-insumos">
+        <thead>
+          <tr class="text-xs font-semibold text-gray-500 uppercase border-b border-gray-200">
+            <th class="pb-2 pr-2 text-center w-8">#</th>
+            <th class="pb-2 pr-2 text-left w-16">Código</th>
+            <th class="pb-2 pr-2 text-left w-52">Descripción</th>
+            <th class="pb-2 pr-2 text-center w-12">Cant.</th>
+            <th class="pb-2 pr-2 text-left w-16">Unidad</th>
+            <th class="pb-2 pr-2 text-right w-28">P. Unit.</th>
+            <th class="pb-2 pr-2 text-right w-32">Subtotal</th>
+            <th class="pb-2 text-center w-10"></th>
+          </tr>
+        </thead>
+        <tbody id="detalles-container">
+          {% for df in formset %}
+          <tr class="detalle-row border-b border-gray-100 hover:bg-gray-50">
+            <td class="py-2 pr-2 text-center text-gray-400 text-xs fila-num">{{ forloop.counter }}</td>
+            <td class="py-2 pr-2">
+              <input type="text" class="w-full text-xs bg-gray-50 border border-gray-200 rounded px-2 py-1.5 text-gray-500" readonly placeholder="Auto" data-codigo>
+            </td>
+            <td class="py-2 pr-2">{{ df.insumo }}</td>
+            <td class="py-2 pr-2">{{ df.cantidad }}</td>
+            <td class="py-2 pr-2">
+              <input type="text" class="w-full text-xs bg-gray-50 border border-gray-200 rounded px-2 py-1.5 text-gray-500" readonly placeholder="–" data-unidad>
+            </td>
+            <td class="py-2 pr-2">
+              <div class="flex items-center gap-1 justify-end">
+                <span class="text-gray-400 text-xs">$</span>
+                {{ df.precio_unitario }}
+              </div>
+            </td>
+            <td class="py-2 pr-2 text-right font-mono text-sm font-semibold text-gray-700">
+              <span class="subtotal-fila">$ 0.00</span>
+            </td>
+            <td class="py-2 text-center">
+              <button type="button" onclick="eliminarLinea(this)" class="p-1 rounded hover:bg-red-50 text-red-400 hover:text-red-600">
+                <span class="material-symbols-outlined text-base">delete</span>
+              </button>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+        <tfoot class="border-t-2 border-gray-200">
+          <tr>
+            <td colspan="5"></td>
+            <td class="pt-3 pb-1 pr-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wide">Subtotal:</td>
+            <td class="pt-3 pb-1 pr-2 text-right font-mono text-sm font-semibold text-gray-700">$ <span id="val-subtotal">0.00</span></td>
+            <td></td>
+          </tr>
+          <tr>
+            <td colspan="5"></td>
+            <td class="pb-1 pr-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wide">IVA {{ iva_tasa }}%:</td>
+            <td class="pb-1 pr-2 text-right font-mono text-sm text-gray-600">$ <span id="val-iva">0.00</span></td>
+            <td></td>
+          </tr>
+          <tr class="border-t border-gray-300">
+            <td colspan="5"></td>
+            <td class="pt-2 pr-2 text-right text-xs font-bold text-gray-800 uppercase tracking-wide">TOTAL:</td>
+            <td class="pt-2 pr-2 text-right font-mono text-base font-bold text-blue-700">$ <span id="val-total">0.00</span></td>
+            <td></td>
+          </tr>
+        </tfoot>
+      </table>
     </div>
   </div>
   <div class="flex gap-3">
@@ -65,8 +114,119 @@
   </div>
 </form>
 <script>
-// Autocompletar desde Solicitud de Cotizacion
+const IVA_TASA = {{ iva_tasa }};
+
+// ── Utilidades ────────────────────────────────────────────────────────────────
+function fmt(n) { return parseFloat(n || 0).toFixed(2); }
+
+function renumerarFilas() {
+  document.querySelectorAll('#detalles-container .detalle-row').forEach((tr, i) => {
+    const num = tr.querySelector('.fila-num');
+    if (num) num.textContent = i + 1;
+  });
+}
+
+function recalcularTotales() {
+  let subtotal = 0;
+  document.querySelectorAll('#detalles-container .detalle-row').forEach(tr => {
+    const cant   = parseFloat(tr.querySelector("input[name$='-cantidad']")?.value || 0);
+    const precio = parseFloat(tr.querySelector("input[name$='-precio_unitario']")?.value || 0);
+    const sub = cant * precio;
+    const span = tr.querySelector('.subtotal-fila');
+    if (span) span.textContent = `$ ${fmt(sub)}`;
+    subtotal += sub;
+  });
+  const iva   = subtotal * (IVA_TASA / 100);
+  const total = subtotal + iva;
+  document.getElementById('val-subtotal').textContent = fmt(subtotal);
+  document.getElementById('val-iva').textContent      = fmt(iva);
+  document.getElementById('val-total').textContent    = fmt(total);
+}
+
+// ── Clonar fila con índice nuevo ──────────────────────────────────────────────
+function crearFila(idx) {
+  const plantilla = document.querySelector('#detalles-container .detalle-row');
+  const row = plantilla.cloneNode(true);
+  row.querySelectorAll('input,select').forEach(el => {
+    el.name = el.name.replace(/-\d+-/, `-${idx}-`);
+    el.id   = el.id   ? el.id.replace(/-\d+-/, `-${idx}-`) : '';
+    if (el.tagName === 'INPUT' && !el.hasAttribute('data-codigo') && !el.hasAttribute('data-unidad')) el.value = '';
+    if (el.tagName === 'INPUT' && (el.hasAttribute('data-codigo') || el.hasAttribute('data-unidad'))) el.value = '';
+    if (el.tagName === 'SELECT') el.selectedIndex = 0;
+  });
+  row.querySelector('.fila-num').textContent    = idx + 1;
+  row.querySelector('.subtotal-fila').textContent = '$ 0.00';
+  return row;
+}
+
+function agregarLinea() {
+  const container  = document.getElementById('detalles-container');
+  const totalInput = document.getElementById('id_detalles-TOTAL_FORMS');
+  const n = parseInt(totalInput.value);
+  const row = crearFila(n);
+  container.appendChild(row);
+  totalInput.value = n + 1;
+  renumerarFilas();
+}
+
+function eliminarLinea(btn) {
+  const rows = document.querySelectorAll('#detalles-container .detalle-row');
+  if (rows.length <= 1) return;
+  btn.closest('.detalle-row').remove();
+  const totalInput = document.getElementById('id_detalles-TOTAL_FORMS');
+  document.querySelectorAll('#detalles-container .detalle-row').forEach((tr, i) => {
+    tr.querySelectorAll('input,select').forEach(el => {
+      if (el.name) el.name = el.name.replace(/-\d+-/, `-${i}-`);
+      if (el.id)   el.id   = el.id.replace(/-\d+-/, `-${i}-`);
+    });
+  });
+  totalInput.value = document.querySelectorAll('#detalles-container .detalle-row').length;
+  renumerarFilas();
+  recalcularTotales();
+}
+
+// ── Autocompletar código/unidad y pre-llenar precio/cantidad ──────────────────
+document.addEventListener("change", function(e) {
+  if (e.target.matches("select[name$='-insumo']")) {
+    const insumoId = e.target.value;
+    const row = e.target.closest(".detalle-row");
+    if (!row) return;
+    const codInput    = row.querySelector('[data-codigo]');
+    const uniInput    = row.querySelector('[data-unidad]');
+    const cantInput   = row.querySelector("input[name$='-cantidad']");
+    const precioInput = row.querySelector("input[name$='-precio_unitario']");
+    if (!insumoId) {
+      if (codInput) codInput.value = '';
+      if (uniInput) uniInput.value = '';
+      return;
+    }
+    fetch(`/compras/api/insumo/${insumoId}/sugerencia/`)
+      .then(r => r.json())
+      .then(data => {
+        if (codInput)  codInput.value  = data.codigo || '';
+        if (uniInput)  uniInput.value  = data.unidad_medida || '';
+        if (cantInput  && !cantInput.value  && data.cantidad_sugerida) cantInput.value  = data.cantidad_sugerida;
+        if (precioInput && !precioInput.value && data.precio_unitario)  precioInput.value = fmt(data.precio_unitario);
+        recalcularTotales();
+      })
+      .catch(() => {});
+    return;
+  }
+  if (e.target.matches("input[name$='-cantidad']") || e.target.matches("input[name$='-precio_unitario']")) {
+    recalcularTotales();
+  }
+});
+
+document.addEventListener("input", function(e) {
+  if (e.target.matches("input[name$='-cantidad']") || e.target.matches("input[name$='-precio_unitario']")) {
+    recalcularTotales();
+  }
+});
+
+// ── Importar desde Solicitud de Cotizacion ────────────────────────────────────
 document.addEventListener("DOMContentLoaded", function() {
+  recalcularTotales();
+
   const scSelect = document.getElementById("id_solicitud_cotizacion");
   if (!scSelect) return;
   scSelect.addEventListener("change", function() {
@@ -79,94 +239,50 @@ document.addEventListener("DOMContentLoaded", function() {
           alert("La solicitud no tiene insumos disponibles para importar.");
           return;
         }
-        // Setear proveedor
         const provSelect = document.querySelector("[name=proveedor]");
         if (provSelect) {
           for (let opt of provSelect.options) {
             if (opt.value == data.proveedor_id) { opt.selected = true; break; }
           }
         }
-        // Guardar referencia a la primera fila antes de limpiar
-        const container = document.getElementById("detalles-container");
-        const total = document.getElementById("id_detalles-TOTAL_FORMS");
-        const plantilla = container.querySelector(".detalle-row");
-        if (!plantilla) return;
-        const plantillaClone = plantilla.cloneNode(true);
-        // Limpiar container
-        container.innerHTML = "";
-        total.value = 0;
-        // Agregar una fila por cada item
+        const container  = document.getElementById("detalles-container");
+        const totalInput = document.getElementById("id_detalles-TOTAL_FORMS");
+        // Limpiar todas las filas excepto la primera (usada como plantilla)
+        const existingRows = Array.from(container.querySelectorAll('.detalle-row'));
+        existingRows.forEach((r, i) => { if (i > 0) r.remove(); });
+
         data.items.forEach((item, idx) => {
-          const row = plantillaClone.cloneNode(true);
-          row.querySelectorAll("input,select").forEach(el => {
-            el.name = el.name.replace(/-\d+-/, `-${idx}-`);
-            el.id = el.id ? el.id.replace(/-\d+-/, `-${idx}-`) : "";
-            if (el.tagName === "INPUT") el.value = "";
-            if (el.tagName === "SELECT") el.selectedIndex = 0;
-          });
-          // Setear valores del item
-          const insumoSel = row.querySelector("select[name$=\"-insumo\"]");
-          const cantInput = row.querySelector("input[name$=\"-cantidad\"]");
-          const precioInput = row.querySelector("input[name$=\"-precio_unitario\"]");
-          if (insumoSel) {
-            for (let opt of insumoSel.options) {
-              if (opt.value == item.insumo_id) { opt.selected = true; break; }
-            }
+          let row;
+          if (idx === 0) {
+            row = container.querySelector('.detalle-row');
+            row.querySelectorAll('input,select').forEach(el => {
+              el.name = el.name.replace(/-\d+-/, `-0-`);
+              el.id   = el.id   ? el.id.replace(/-\d+-/, `-0-`) : '';
+            });
+          } else {
+            row = crearFila(idx);
+            container.appendChild(row);
           }
-          if (cantInput) cantInput.value = item.cantidad;
-          if (precioInput) precioInput.value = item.precio_unitario.toFixed(2);
-          container.appendChild(row);
+          const insumoSel   = row.querySelector("select[name$='-insumo']");
+          const cantInput   = row.querySelector("input[name$='-cantidad']");
+          const precioInput = row.querySelector("input[name$='-precio_unitario']");
+          const codInput    = row.querySelector('[data-codigo]');
+          const uniInput    = row.querySelector('[data-unidad]');
+          if (insumoSel)   { for (let opt of insumoSel.options) { if (opt.value == item.insumo_id) { opt.selected = true; break; } } }
+          if (cantInput)   cantInput.value   = item.cantidad;
+          if (precioInput) precioInput.value = fmt(item.precio_unitario);
+          if (codInput)    codInput.value    = item.codigo || '';
+          if (uniInput)    uniInput.value    = item.unidad_medida || '';
         });
-        total.value = data.items.length;
+        totalInput.value = data.items.length;
+        renumerarFilas();
+        recalcularTotales();
       })
       .catch(e => {
         console.error("Error cargando items:", e);
         alert("Error al cargar los items de la solicitud.");
       });
   });
-});
-
-function agregarLinea() {
-  const container = document.getElementById('detalles-container');
-  const total = document.getElementById('id_detalles-TOTAL_FORMS');
-  const n = parseInt(total.value);
-  const first = container.querySelector('.detalle-row');
-  if (!first) return;
-  const row = first.cloneNode(true);
-  row.querySelectorAll('input,select').forEach(el => {
-    el.name = el.name.replace(/-\d+-/, `-${n}-`);
-    el.id = el.id ? el.id.replace(/-\d+-/, `-${n}-`) : '';
-    if (el.tagName === 'INPUT') el.value = el.type === 'number' ? '' : '';
-    if (el.tagName === 'SELECT') el.selectedIndex = 0;
-  });
-  container.appendChild(row);
-  total.value = n + 1;
-}
-function eliminarLinea(btn) {
-  const rows = document.querySelectorAll('.detalle-row');
-  if (rows.length > 1) btn.closest('.detalle-row').remove();
-}
-
-// Autocompletar cantidad sugerida y precio al elegir insumo
-document.addEventListener("change", function(e) {
-  if (!e.target.matches("select[name$='-insumo']")) return;
-  const insumoId = e.target.value;
-  if (!insumoId) return;
-  const row = e.target.closest(".detalle-row");
-  if (!row) return;
-  fetch(`/compras/api/insumo/${insumoId}/sugerencia/`)
-    .then(r => r.json())
-    .then(data => {
-      const cantInput = row.querySelector("input[name$='-cantidad']");
-      const precioInput = row.querySelector("input[name$='-precio_unitario']");
-      if (cantInput && !cantInput.value && data.cantidad_sugerida) {
-        cantInput.value = data.cantidad_sugerida;
-      }
-      if (precioInput && !precioInput.value && data.precio_unitario) {
-        precioInput.value = parseFloat(data.precio_unitario).toFixed(2);
-      }
-    })
-    .catch(() => {});
 });
 </script>
 {% endblock %}

@@ -160,7 +160,11 @@ def nueva_orden(request):
     else:
         form = OrdenCompraForm()
         formset = DetalleOrdenCompraFormSet(prefix="detalles")
-    return render(request, "compras/nueva_orden.html", {"form": form, "formset": formset})
+    return render(request, "compras/nueva_orden.html", {
+        "form": form,
+        "formset": formset,
+        "iva_tasa": int(_tasa_iva()),
+    })
 
 
 @login_required
@@ -899,6 +903,8 @@ def api_items_solicitud(request, pk):
                 "insumo_nombre": f"{item.insumo.codigo} - {item.insumo.nombre}",
                 "cantidad": item.cantidad,
                 "precio_unitario": float(item.precio_unitario_respuesta or 0),
+                "codigo": item.insumo.codigo or '',
+                "unidad_medida": item.insumo.unidad_medida or '',
             })
         return JsonResponse({"ok": True, "proveedor_id": sc.proveedor_id, "items": items})
     except Exception as e:
@@ -1155,8 +1161,10 @@ def api_insumo_sugerencia(request, insumo_pk):
     from insumos.models import Insumo
     insumo = get_object_or_404(Insumo, pk=insumo_pk, activo=True)
     return JsonResponse({
-        'cantidad_sugerida': insumo.cantidad_compra_sugerida or '',
-        'precio_unitario': float(insumo.precio_unitario) if insumo.precio_unitario else '',
+        'cantidad_sugerida': insumo.cantidad_compra_sugerida or 0,
+        'precio_unitario': float(insumo.precio_unitario) if insumo.precio_unitario else 0,
+        'codigo': insumo.codigo or '',
+        'unidad_medida': insumo.unidad_medida or '',
     })
 
 
