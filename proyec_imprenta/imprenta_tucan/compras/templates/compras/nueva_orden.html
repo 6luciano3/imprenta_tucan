@@ -23,12 +23,21 @@
         Importar desde Solicitud de Cotizacion confirmada (opcional)
       </label>
       {{ form.solicitud_cotizacion }}
+      <div id="sc-loading" class="hidden mt-2 flex items-center gap-2 text-blue-600 text-xs">
+        <svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+        </svg>
+        Cargando insumos...
+      </div>
       <p class="text-xs text-blue-500 mt-1">Al seleccionar una solicitud se completaran automaticamente los insumos y precios.</p>
     </div>
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
       <div><label class="block text-xs font-medium text-gray-500 mb-1">Proveedor</label>{{ form.proveedor }}{% if form.proveedor.errors %}<p class="text-red-500 text-xs mt-1">{{ form.proveedor.errors.0 }}</p>{% endif %}</div>
       <div><label class="block text-xs font-medium text-gray-500 mb-1">Estado</label>{{ form.estado }}{% if form.estado.errors %}<p class="text-red-500 text-xs mt-1">{{ form.estado.errors.0 }}</p>{% endif %}</div>
-      <div><label class="block text-xs font-medium text-gray-500 mb-1">Fecha de Recepcion</label>{{ form.fecha_recepcion }}</div>
+      <div><label class="block text-xs font-medium text-gray-500 mb-1">Fecha de Recepción</label>{{ form.fecha_recepcion }}</div>
+      <div><label class="block text-xs font-medium text-gray-500 mb-1">Fecha Estimada de Entrega</label>{{ form.fecha_entrega }}</div>
+      <div><label class="block text-xs font-medium text-gray-500 mb-1">Condición de Pago</label>{{ form.condicion_pago }}</div>
       <div><label class="block text-xs font-medium text-gray-500 mb-1">Observaciones</label>{{ form.observaciones }}</div>
     </div>
   </div>
@@ -143,18 +152,25 @@ function recalcularTotales() {
   document.getElementById('val-total').textContent    = fmt(total);
 }
 
+// M3: regex específica para el prefijo del formset (evita matches parciales)
+function reindexarNombre(name, idx) {
+  return name.replace(/^(detalles-)\d+-/, `$1${idx}-`);
+}
+function reindexarId(id, idx) {
+  return id.replace(/^(id_detalles-)\d+-/, `$1${idx}-`);
+}
+
 // ── Clonar fila con índice nuevo ──────────────────────────────────────────────
 function crearFila(idx) {
   const plantilla = document.querySelector('#detalles-container .detalle-row');
   const row = plantilla.cloneNode(true);
   row.querySelectorAll('input,select').forEach(el => {
-    el.name = el.name.replace(/-\d+-/, `-${idx}-`);
-    el.id   = el.id   ? el.id.replace(/-\d+-/, `-${idx}-`) : '';
-    if (el.tagName === 'INPUT' && !el.hasAttribute('data-codigo') && !el.hasAttribute('data-unidad')) el.value = '';
-    if (el.tagName === 'INPUT' && (el.hasAttribute('data-codigo') || el.hasAttribute('data-unidad'))) el.value = '';
+    if (el.name) el.name = reindexarNombre(el.name, idx);
+    if (el.id)   el.id   = reindexarId(el.id, idx);
+    if (el.tagName === 'INPUT') el.value = '';
     if (el.tagName === 'SELECT') el.selectedIndex = 0;
   });
-  row.querySelector('.fila-num').textContent    = idx + 1;
+  row.querySelector('.fila-num').textContent      = idx + 1;
   row.querySelector('.subtotal-fila').textContent = '$ 0.00';
   return row;
 }
@@ -176,8 +192,8 @@ function eliminarLinea(btn) {
   const totalInput = document.getElementById('id_detalles-TOTAL_FORMS');
   document.querySelectorAll('#detalles-container .detalle-row').forEach((tr, i) => {
     tr.querySelectorAll('input,select').forEach(el => {
-      if (el.name) el.name = el.name.replace(/-\d+-/, `-${i}-`);
-      if (el.id)   el.id   = el.id.replace(/-\d+-/, `-${i}-`);
+      if (el.name) el.name = reindexarNombre(el.name, i);
+      if (el.id)   el.id   = reindexarId(el.id, i);
     });
   });
   totalInput.value = document.querySelectorAll('#detalles-container .detalle-row').length;
@@ -232,9 +248,12 @@ document.addEventListener("DOMContentLoaded", function() {
   scSelect.addEventListener("change", function() {
     const scId = this.value;
     if (!scId) return;
+    const spinner = document.getElementById('sc-loading');
+    if (spinner) spinner.classList.remove('hidden');
     fetch(`/compras/api/solicitud/${scId}/items/`)
       .then(r => r.json())
       .then(data => {
+        if (spinner) spinner.classList.add('hidden');
         if (!data.ok || !data.items.length) {
           alert("La solicitud no tiene insumos disponibles para importar.");
           return;
@@ -248,16 +267,15 @@ document.addEventListener("DOMContentLoaded", function() {
         const container  = document.getElementById("detalles-container");
         const totalInput = document.getElementById("id_detalles-TOTAL_FORMS");
         // Limpiar todas las filas excepto la primera (usada como plantilla)
-        const existingRows = Array.from(container.querySelectorAll('.detalle-row'));
-        existingRows.forEach((r, i) => { if (i > 0) r.remove(); });
+        Array.from(container.querySelectorAll('.detalle-row')).forEach((r, i) => { if (i > 0) r.remove(); });
 
         data.items.forEach((item, idx) => {
           let row;
           if (idx === 0) {
             row = container.querySelector('.detalle-row');
             row.querySelectorAll('input,select').forEach(el => {
-              el.name = el.name.replace(/-\d+-/, `-0-`);
-              el.id   = el.id   ? el.id.replace(/-\d+-/, `-0-`) : '';
+              if (el.name) el.name = reindexarNombre(el.name, 0);
+              if (el.id)   el.id   = reindexarId(el.id, 0);
             });
           } else {
             row = crearFila(idx);
@@ -279,6 +297,7 @@ document.addEventListener("DOMContentLoaded", function() {
         recalcularTotales();
       })
       .catch(e => {
+        if (spinner) spinner.classList.add('hidden');
         console.error("Error cargando items:", e);
         alert("Error al cargar los items de la solicitud.");
       });

@@ -889,14 +889,16 @@ def anular_remito(request, pk):
 @login_required
 def api_items_solicitud(request, pk):
     """Devuelve los items de una SolicitudCotizacion confirmada en formato JSON."""
+    from automatizacion.models import SolicitudCotizacion
+    from django.db.models import Q
     try:
-        from automatizacion.models import SolicitudCotizacion
         sc = SolicitudCotizacion.objects.prefetch_related("items__insumo").get(
             pk=pk, estado="confirmada"
         )
+    except SolicitudCotizacion.DoesNotExist:
+        return JsonResponse({"ok": False, "error": "Solicitud no encontrada o no confirmada."}, status=404)
+    try:
         items = []
-        # Incluir items con disponible=True o disponible=None (confirmacion sin detalle por item)
-        from django.db.models import Q
         for item in sc.items.filter(Q(disponible=True) | Q(disponible__isnull=True)):
             items.append({
                 "insumo_id": item.insumo.idInsumo,
@@ -908,7 +910,8 @@ def api_items_solicitud(request, pk):
             })
         return JsonResponse({"ok": True, "proveedor_id": sc.proveedor_id, "items": items})
     except Exception as e:
-        return JsonResponse({"ok": False, "error": str(e)}, status=404)
+        logger.error("api_items_solicitud SC#%s: %s", pk, e, exc_info=True)
+        return JsonResponse({"ok": False, "error": "Error interno al procesar la solicitud."}, status=500)
 
 
 # ── Actualizar precio de insumo ───────────────────────────────────────────────

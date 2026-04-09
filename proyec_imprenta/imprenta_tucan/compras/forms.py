@@ -5,16 +5,21 @@ from proveedores.models import Proveedor
 from insumos.models import Insumo
 
 
+_SELECT_CLS = "w-full text-xs border border-gray-200 rounded px-2 py-1.5 bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-400 focus:border-blue-400"
+_CTRL_CLS   = "w-full text-xs border border-gray-200 rounded px-2 py-1.5 text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-400 focus:border-blue-400"
+
 class OrdenCompraForm(forms.ModelForm):
     class Meta:
         model = OrdenCompra
-        fields = ["solicitud_cotizacion", "proveedor", "estado", "fecha_recepcion", "observaciones"]
+        fields = ["solicitud_cotizacion", "proveedor", "estado", "fecha_recepcion", "fecha_entrega", "condicion_pago", "observaciones"]
         widgets = {
-            "solicitud_cotizacion": forms.Select(attrs={"class": "form-select", "id": "id_solicitud_cotizacion"}),
-            "proveedor": forms.Select(attrs={"class": "form-select", "required": True}),
-            "estado": forms.Select(attrs={"class": "form-select", "required": True}),
-            "fecha_recepcion": forms.DateInput(attrs={"class": "form-control", "type": "date"}, format="%Y-%m-%d"),
-            "observaciones": forms.Textarea(attrs={"class": "form-control", "rows": 2}),
+            "solicitud_cotizacion": forms.Select(attrs={"class": _SELECT_CLS, "id": "id_solicitud_cotizacion"}),
+            "proveedor":      forms.Select(attrs={"class": _SELECT_CLS, "required": True}),
+            "estado":         forms.Select(attrs={"class": _SELECT_CLS, "required": True}),
+            "fecha_recepcion":forms.DateInput(attrs={"class": _CTRL_CLS, "type": "date"}, format="%Y-%m-%d"),
+            "fecha_entrega":  forms.DateInput(attrs={"class": _CTRL_CLS, "type": "date"}, format="%Y-%m-%d"),
+            "condicion_pago": forms.Select(attrs={"class": _SELECT_CLS}),
+            "observaciones":  forms.Textarea(attrs={"class": _CTRL_CLS, "rows": 2}),
         }
 
     def __init__(self, *args, **kwargs):
@@ -24,13 +29,16 @@ class OrdenCompraForm(forms.ModelForm):
         self.fields["proveedor"].label_from_instance = lambda obj: obj.nombre
         self.fields["estado"].queryset = EstadoCompra.objects.all()
         self.fields["fecha_recepcion"].label = "Fecha de Recepcion"
-        # Defaults automaticos
+        self.fields["fecha_entrega"].label = "Fecha Estimada de Entrega"
+        self.fields["fecha_entrega"].required = False
+        self.fields["condicion_pago"].label = "Condición de Pago"
+        # Defaults automáticos
         if not self.initial.get("fecha_recepcion"):
             self.initial["fecha_recepcion"] = timezone.now().date()
         if not self.initial.get("estado"):
             try:
-                estado_recibida = EstadoCompra.objects.get(nombre="Recibida")
-                self.initial["estado"] = estado_recibida.pk
+                # M2: default "Pendiente" en lugar de "Recibida"
+                self.initial["estado"] = EstadoCompra.objects.get(nombre="Pendiente").pk
             except EstadoCompra.DoesNotExist:
                 pass
         from automatizacion.models import SolicitudCotizacion
