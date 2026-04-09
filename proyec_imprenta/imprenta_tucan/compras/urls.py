@@ -14,9 +14,9 @@ urlpatterns = [
     path("ordenes/<int:pk>/estado/", views.cambiar_estado_orden, name="cambiar_estado_orden"),
     path("ordenes/<int:pk>/enviar-email/", views.enviar_orden_email, name="enviar_orden_email"),
     path("ordenes/<int:pk>/enviar-whatsapp/", views.enviar_orden_whatsapp, name="enviar_orden_whatsapp"),
-    # Vistas públicas para proveedores
-    path("ordenes/<int:pk>/confirmar/", views.confirmar_orden_publico, name="confirmar_orden_publico"),
-    path("ordenes/<int:pk>/rechazar/", views.rechazar_orden_publico, name="rechazar_orden_publico"),
+    # Vistas públicas para proveedores (sin login, autenticadas por token único)
+    path("ordenes/<int:pk>/confirmar/<str:token>/", views.confirmar_orden_publico, name="confirmar_orden_publico"),
+    path("ordenes/<int:pk>/rechazar/<str:token>/", views.rechazar_orden_publico, name="rechazar_orden_publico"),
     # Recepción interna de mercadería (staff)
     path("ordenes/<int:pk>/recibir/", views.marcar_orden_recibida, name="marcar_orden_recibida"),
     path("ordenes/<int:pk>/pdf/", views.orden_pdf, name="orden_pdf"),

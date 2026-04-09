@@ -3,9 +3,30 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
 from django.utils import timezone
+from django.db import transaction
+from django.http import JsonResponse
 from .models import OrdenCompra, DetalleOrdenCompra, Remito, DetalleRemito, EstadoCompra, OrdenPago, ComprobanteOrdenPago, FormaPagoOrdenPago, RetencionOrdenPago
 from .forms import OrdenCompraForm, DetalleOrdenCompraFormSet, RemitoForm, DetalleRemitoFormSet
 from configuracion.permissions import require_perm
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+def _tasa_iva() -> float:
+    """Devuelve la tasa de IVA configurada (ej. 21.0). Fallback: 21.0."""
+    try:
+        from configuracion.models import Parametro
+        return float(Parametro.get('IVA_PORCENTAJE', 21))
+    except Exception:
+        return 21.0
+
+
+def _calcular_iva(subtotal: float) -> tuple[float, float]:
+    """Retorna (monto_iva, total) para un subtotal dado, usando la tasa configurada."""
+    tasa = _tasa_iva()
+    iva = subtotal * (tasa / 100)
+    return iva, subtotal + iva
 
 
 def _datos_empresa() -> dict:
@@ -174,9 +195,8 @@ def detalle_orden_json(request, pk):
         })
     
     subtotal = float(orden.monto_total)
-    iva = subtotal * 0.21
-    total = subtotal + iva
-    
+    iva, total = _calcular_iva(subtotal)
+
     # Obtener texto de condición de pago
     condicion_pago_text = dict(OrdenCompra.CONDICIONES_PAGO).get(orden.condicion_pago, 'Contado')
     
@@ -235,8 +255,8 @@ def enviar_orden_email(request, pk):
             orden.save(update_fields=["monto_total"])
     
     subtotal = float(orden.monto_total)
-    iva = subtotal * 0.21
-    total = subtotal + iva
+    iva, total = _calcular_iva(subtotal)
+    tasa_iva = _tasa_iva()
     condicion_pago_text = dict(OrdenCompra.CONDICIONES_PAGO).get(orden.condicion_pago, 'Contado')
     empresa = _datos_empresa()
 
@@ -261,6 +281,8 @@ def enviar_orden_email(request, pk):
     dominio = request.get_host()
     protocolo = 'http' if 'localhost' in dominio or '127.0.0.1' in dominio else 'https'
     url_verificar = f"{protocolo}://{dominio}/compras/ordenes/{orden.pk}/"
+    url_confirmar = f"{protocolo}://{dominio}/compras/ordenes/{orden.pk}/confirmar/{orden.token_proveedor}/"
+    url_rechazar  = f"{protocolo}://{dominio}/compras/ordenes/{orden.pk}/rechazar/{orden.token_proveedor}/"
     
     html_message = f"""
     <!DOCTYPE html>
@@ -346,7 +368,7 @@ def enviar_orden_email(request, pk):
                 
                 <div class="totals">
                     <div class="row"><span>Subtotal:</span><span>$ {subtotal:.2f}</span></div>
-                    <div class="row"><span>IVA 21%:</span><span>$ {iva:.2f}</span></div>
+                    <div class="row"><span>IVA {tasa_iva:.0f}%:</span><span>$ {iva:.2f}</span></div>
                     <div class="row total"><span>TOTAL:</span><span>$ {total:.2f}</span></div>
                 </div>
                 
@@ -360,8 +382,8 @@ def enviar_orden_email(request, pk):
             <div class="botones">
                 <p style="margin-bottom: 15px; color: #666;">¿Qué deseas hacer con esta orden?</p>
                 <a href="{url_verificar}" class="btn btn-primary">VER EN WEB</a>
-                <a href="{url_verificar}confirmar/" class="btn btn-success">CONFIRMAR ORDEN</a>
-                <a href="{url_verificar}rechazar/" class="btn btn-warning">RECHAZAR</a>
+                <a href="{url_confirmar}" class="btn btn-success">CONFIRMAR ORDEN</a>
+                <a href="{url_rechazar}" class="btn btn-warning">RECHAZAR</a>
             </div>
             
             <div class="footer">
@@ -492,16 +514,24 @@ def _procesar_recepcion_orden(orden, usuario=None):
                 ),
                 usuario=usuario,
             )
-        except Exception:
-            pass
+        except Exception as e_op:
+            logger.error(
+                f"Error al crear OrdenPago automática para OC-{orden.pk:04d}: {e_op}",
+                exc_info=True,
+            )
 
         return detalles_creados
 
 
-@login_required
-def confirmar_orden_publico(request, pk):
-    """Confirmación de orden de compra — requiere staff autenticado."""
-    orden = get_object_or_404(OrdenCompra.objects.prefetch_related("detalles__insumo"), pk=pk)
+def confirmar_orden_publico(request, pk, token):
+    """
+    Vista pública para proveedores. Accesible sin login mediante token único.
+    El token se incluye en el email/WhatsApp enviado al proveedor.
+    """
+    orden = get_object_or_404(
+        OrdenCompra.objects.prefetch_related("detalles__insumo"),
+        pk=pk, token_proveedor=token,
+    )
     try:
         detalles_creados = _procesar_recepcion_orden(orden, usuario=None)
         mensaje = f"Orden confirmada. Stock actualizado: {', '.join(detalles_creados[:3])}"
@@ -554,9 +584,9 @@ def marcar_orden_recibida(request, pk):
     return redirect('compras:detalle_orden_compra', pk=pk)
 
 
-@login_required
-def rechazar_orden_publico(request, pk):
-    orden = get_object_or_404(OrdenCompra, pk=pk)
+def rechazar_orden_publico(request, pk, token):
+    """Vista pública para proveedores. Valida token único en lugar de requerir login."""
+    orden = get_object_or_404(OrdenCompra, pk=pk, token_proveedor=token)
     
     try:
         estado_rechazado = EstadoCompra.objects.get(nombre__icontains='rechazado')
@@ -611,9 +641,8 @@ def enviar_orden_whatsapp(request, pk):
             orden.save(update_fields=["monto_total"])
     
     subtotal = float(orden.monto_total)
-    iva = subtotal * 0.21
-    total = subtotal + iva
-    
+    iva, total = _calcular_iva(subtotal)
+
     mensaje = f"*ORDEN DE COMPRA*\n"
     mensaje += f"*Nº {orden.pk:04d}*\n\n"
     mensaje += f"*Fecha:* {orden.fecha_creacion.strftime('%d/%m/%Y')}\n\n"
@@ -624,12 +653,18 @@ def enviar_orden_whatsapp(request, pk):
         mensaje += f"• {d.cantidad} {getattr(d.insumo, 'unidad_medida', '') or 'un'} {d.insumo.nombre} - $ {d.subtotal():.2f}\n"
     
     mensaje += f"\n*Subtotal:* $ {subtotal:.2f}\n"
-    mensaje += f"*IVA 21%:* $ {iva:.2f}\n"
+    mensaje += f"*IVA {_tasa_iva():.0f}%:* $ {iva:.2f}\n"
     mensaje += f"*TOTAL:* $ {total:.2f}\n\n"
-    mensaje += f"*Entrega:* Depósito Gráfica Tucán"
-    
-    mensaje编码 = urllib.parse.quote(mensaje)
-    url_whatsapp = f"https://wa.me/{telefono}?text={mensaje编码}"
+    dominio = request.get_host()
+    protocolo = 'http' if 'localhost' in dominio or '127.0.0.1' in dominio else 'https'
+    url_confirmar_wa = f"{protocolo}://{dominio}/compras/ordenes/{orden.pk}/confirmar/{orden.token_proveedor}/"
+    url_rechazar_wa  = f"{protocolo}://{dominio}/compras/ordenes/{orden.pk}/rechazar/{orden.token_proveedor}/"
+    mensaje += f"*Entrega:* Depósito Gráfica Tucán\n\n"
+    mensaje += f"✅ Confirmar: {url_confirmar_wa}\n"
+    mensaje += f"❌ Rechazar: {url_rechazar_wa}"
+
+    mensaje_encoded = urllib.parse.quote(mensaje)
+    url_whatsapp = f"https://wa.me/{telefono}?text={mensaje_encoded}"
     
     # Marcar orden como enviada
     from django.utils import timezone
@@ -660,6 +695,7 @@ def cambiar_estado_orden(request, pk):
 # ── Remitos ───────────────────────────────────────────────────────────────────
 
 @login_required
+@require_perm('Compras', 'Listar')
 def lista_remitos(request):
     remitos = Remito.objects.select_related("proveedor", "usuario", "orden_compra").prefetch_related("detalles__insumo")
     return render(request, "compras/lista_remitos.html", {"remitos": remitos})
@@ -683,6 +719,7 @@ def _generar_numero_remito():
     return f"{prefijo}{seq:04d}"
 
 @login_required
+@require_perm('Compras', 'Crear')
 def nuevo_remito(request):
     orden_id = request.GET.get('orden')
     
@@ -700,63 +737,67 @@ def nuevo_remito(request):
         form = RemitoForm(request.POST)
         formset = DetalleRemitoFormSet(request.POST, prefix="detalles")
         if form.is_valid() and formset.is_valid():
-            remito = form.save(commit=False)
-            remito.usuario = request.user
-            remito.save()
-            actualizados = []
-            for df in formset:
-                if df.cleaned_data and not df.cleaned_data.get("DELETE", False):
-                    insumo = df.cleaned_data["insumo"]
-                    cantidad = df.cleaned_data["cantidad"]
-                    precio_unitario = df.cleaned_data.get("precio_unitario") or 0
-                    DetalleRemito.objects.create(
-                        remito=remito, insumo=insumo,
-                        cantidad=cantidad, precio_unitario=precio_unitario,
-                    )
-                    # Si el remito trae precio real, actualizar insumo y registrar historial
-                    from .models import HistorialPrecioInsumo
-                    from decimal import Decimal
-                    precio_decimal = Decimal(str(precio_unitario))
-                    if precio_decimal > 0 and precio_decimal != (insumo.precio_unitario or 0):
-                        precio_anterior = insumo.precio_unitario or Decimal('0')
-                        insumo.precio_unitario = precio_decimal
-                        HistorialPrecioInsumo.objects.create(
-                            insumo=insumo,
-                            precio_anterior=precio_anterior,
-                            precio_nuevo=precio_decimal,
-                            origen='remito',
-                            motivo=f'Precio actualizado al recibir Remito {remito.numero}',
-                            usuario=request.user,
-                            remito=remito,
-                        )
-                    stock_anterior = insumo.stock or 0
-                    insumo.stock = stock_anterior + cantidad
-                    insumo.save(update_fields=["stock", "precio_unitario", "updated_at"])
-                    # Registrar MovimientoStock
-                    from .models import MovimientoStock
-                    MovimientoStock.objects.create(
-                        insumo=insumo,
-                        tipo="entrada",
-                        origen="remito",
-                        cantidad=cantidad,
-                        stock_anterior=stock_anterior,
-                        stock_posterior=insumo.stock,
-                        referencia=f"Remito {remito.numero}",
-                        remito=remito,
-                        fecha=remito.fecha,
-                        usuario=request.user if request.user.is_authenticated else None,
-                    )
-                    actualizados.append(f"{insumo.nombre} (+{cantidad})")
-            # Si hay orden de compra vinculada, marcarla como Recibida
-            if remito.orden_compra:
-                try:
-                    estado_recibida = EstadoCompra.objects.get(nombre="Recibida")
-                    remito.orden_compra.estado = estado_recibida
-                    remito.orden_compra.fecha_recepcion = remito.fecha
-                    remito.orden_compra.save(update_fields=["estado", "fecha_recepcion", "actualizado_en"])
-                except EstadoCompra.DoesNotExist:
-                    pass
-            _registrar_auditoria(request, remito, "create")
+            from .models import HistorialPrecioInsumo, MovimientoStock
+            from decimal import Decimal
+            try:
+                with transaction.atomic():
+                    remito = form.save(commit=False)
+                    remito.usuario = request.user
+                    remito.save()
+                    actualizados = []
+                    for df in formset:
+                        if df.cleaned_data and not df.cleaned_data.get("DELETE", False):
+                            insumo = df.cleaned_data["insumo"]
+                            cantidad = df.cleaned_data["cantidad"]
+                            precio_unitario = df.cleaned_data.get("precio_unitario") or 0
+                            DetalleRemito.objects.create(
+                                remito=remito, insumo=insumo,
+                                cantidad=cantidad, precio_unitario=precio_unitario,
+                            )
+                            # Si el remito trae precio real, actualizar insumo y registrar historial
+                            precio_decimal = Decimal(str(precio_unitario))
+                            if precio_decimal > 0 and precio_decimal != (insumo.precio_unitario or 0):
+                                precio_anterior = insumo.precio_unitario or Decimal('0')
+                                insumo.precio_unitario = precio_decimal
+                                HistorialPrecioInsumo.objects.create(
+                                    insumo=insumo,
+                                    precio_anterior=precio_anterior,
+                                    precio_nuevo=precio_decimal,
+                                    origen='remito',
+                                    motivo=f'Precio actualizado al recibir Remito {remito.numero}',
+                                    usuario=request.user,
+                                    remito=remito,
+                                )
+                            stock_anterior = insumo.stock or 0
+                            insumo.stock = stock_anterior + cantidad
+                            insumo.save(update_fields=["stock", "precio_unitario", "updated_at"])
+                            MovimientoStock.objects.create(
+                                insumo=insumo,
+                                tipo="entrada",
+                                origen="remito",
+                                cantidad=cantidad,
+                                stock_anterior=stock_anterior,
+                                stock_posterior=insumo.stock,
+                                referencia=f"Remito {remito.numero}",
+                                remito=remito,
+                                fecha=remito.fecha,
+                                usuario=request.user if request.user.is_authenticated else None,
+                            )
+                            actualizados.append(f"{insumo.nombre} (+{cantidad})")
+                    # Si hay orden de compra vinculada, marcarla como Recibida
+                    if remito.orden_compra:
+                        try:
+                            estado_recibida = EstadoCompra.objects.get(nombre="Recibida")
+                            remito.orden_compra.estado = estado_recibida
+                            remito.orden_compra.fecha_recepcion = remito.fecha
+                            remito.orden_compra.save(update_fields=["estado", "fecha_recepcion", "actualizado_en"])
+                        except EstadoCompra.DoesNotExist:
+                            pass
+                    _registrar_auditoria(request, remito, "create")
+            except Exception as e:
+                logger.error(f"Error al registrar remito: {e}", exc_info=True)
+                messages.error(request, f"Error al registrar el remito: {e}")
+                return redirect('compras:nuevo_remito_compra')
             messages.success(
                 request,
                 f"Remito {remito.numero} registrado. Stock actualizado: {', '.join(actualizados)}."
@@ -778,6 +819,7 @@ def nuevo_remito(request):
 
 
 @login_required
+@require_perm('Compras', 'Editar')
 def editar_remito(request, pk):
     """Permite corregir observaciones y fecha de un remito. NO reversa stock — es solo edición de cabecera."""
     remito = get_object_or_404(Remito.objects.select_related('proveedor', 'orden_compra'), pk=pk)
@@ -796,6 +838,7 @@ def editar_remito(request, pk):
 
 @require_POST
 @login_required
+@require_perm('Compras', 'Eliminar')
 def anular_remito(request, pk):
     """
     Anula un remito: revierte el stock de cada insumo y registra MovimientoStock de ajuste.
@@ -839,8 +882,7 @@ def anular_remito(request, pk):
 
 
 # ── API: items de solicitud de cotizacion confirmada ─────────────────────────
-from django.http import JsonResponse
-
+@login_required
 def api_items_solicitud(request, pk):
     """Devuelve los items de una SolicitudCotizacion confirmada en formato JSON."""
     try:
@@ -1336,11 +1378,10 @@ def orden_pdf(request, pk):
     
     # Totales
     subtotal = float(orden.monto_total)
-    iva = subtotal * 0.21
-    total = subtotal + iva
+    iva, total = _calcular_iva(subtotal)
     
     data.append(["", "", "", "", "Subtotal", f"$ {subtotal:.2f}"])
-    data.append(["", "", "", "", "IVA 21%", f"$ {iva:.2f}"])
+    data.append(["", "", "", "", f"IVA {_tasa_iva():.0f}%", f"$ {iva:.2f}"])
     data.append(["", "", "", "", "<b>Total</b>", f"<b>$ {total:.2f}</b>"])
     
     t = Table(data, colWidths=[1*cm, 2*cm, 5*cm, 1.5*cm, 2*cm, 2.5*cm, 2.5*cm])

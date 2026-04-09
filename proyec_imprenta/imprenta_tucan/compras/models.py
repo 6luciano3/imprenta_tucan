@@ -1,3 +1,4 @@
+import secrets
 from django.db import models
 
 
@@ -13,6 +14,26 @@ class EstadoCompra(models.Model):
 
 
 class OrdenCompra(models.Model):
+    """
+    Orden de compra a un proveedor.
+
+    Ciclo de estados (via EstadoCompra FK):
+        [Pendiente] ──aprobación──► [Aprobada] ──envío──► [Enviada]
+                                        │
+                                        └──recepción──► [Recibida]  (genera Remito + OrdenPago)
+        Cualquier estado ──► [Cancelada] | [Rechazada]
+
+    Flujos de confirmación:
+      - Staff interno: POST a marcar_orden_recibida()
+      - Proveedor externo: GET a confirmar_orden_publico(pk, token_proveedor) (sin login)
+
+    Al confirmar recepción (_procesar_recepcion_orden):
+      - Crea Remito automático
+      - Actualiza stock de cada insumo
+      - Registra MovimientoStock (kardex)
+      - Actualiza HistorialPrecioInsumo si el precio cambió
+      - Crea OrdenPago pendiente con vencimiento según condicion_pago
+    """
     CONDICIONES_PAGO = [
         ('contado', 'Contado'),
         ('15_dias', '15 días'),
@@ -44,6 +65,10 @@ class OrdenCompra(models.Model):
     )
     enviada = models.BooleanField(default=False, help_text="Indica si la orden fue enviada al proveedor")
     fecha_envio = models.DateTimeField(null=True, blank=True, help_text="Fecha en que se envió la orden al proveedor")
+    token_proveedor = models.CharField(
+        max_length=64, unique=True, blank=True,
+        help_text="Token único enviado al proveedor para confirmar/rechazar sin login"
+    )
     creado_en = models.DateTimeField(auto_now_add=True)
     actualizado_en = models.DateTimeField(auto_now=True)
 
@@ -54,6 +79,11 @@ class OrdenCompra(models.Model):
 
     def __str__(self):
         return f"OC-{self.pk:04d} | {self.proveedor} | {self.estado}"
+
+    def save(self, *args, **kwargs):
+        if not self.token_proveedor:
+            self.token_proveedor = secrets.token_urlsafe(32)
+        super().save(*args, **kwargs)
 
     def calcular_total(self):
         total = sum(d.subtotal() for d in self.detalles.all())
@@ -211,6 +241,28 @@ class HistorialPrecioInsumo(models.Model):
 # ─────────────────────────────────────────────
 
 class OrdenPago(models.Model):
+    """
+    Orden de pago a un proveedor, generalmente asociada a una OrdenCompra.
+
+    Ciclo de estados:
+        [pendiente] ──aprobación (aprobar_orden_pago)──► [aprobada]
+                                                              │
+                                                    registrar_pago()
+                                                              │
+                                                              ▼
+                                                          [pagada]
+        [pendiente] | [aprobada] ──anulación──► [anulada]
+
+    Submodelos asociados:
+      - ComprobanteOrdenPago: facturas, notas de crédito/débito, recibos
+      - FormaPagoOrdenPago: transferencia, cheque, efectivo
+      - RetencionOrdenPago: IVA, ganancias, SUSS, etc.
+
+    Notas:
+      - El número se auto-genera con select_for_update() para evitar duplicados concurrentes.
+      - monto_neto = monto_total − monto_retenciones (calculado en save()).
+      - Solo se puede pasar a 'pagada' si el estado es 'aprobada' (validado en views_ordenpago).
+    """
     ESTADOS = [
         ('pendiente',  'Pendiente'),
         ('aprobada',   'Aprobada'),

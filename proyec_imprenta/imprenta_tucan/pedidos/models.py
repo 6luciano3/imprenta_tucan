@@ -90,15 +90,24 @@ class OrdenProduccion(models.Model):
 
 class OrdenCompra(models.Model):
     """
-    DEPRECATED (C-6): Este modelo es el usado por el flujo de automatización (pedidos/tasks).
-    El modelo completo de compras (con detalles, remitos, estados, pagos) está en
-    `compras.models.OrdenCompra`. Todas las referencias nuevas deben apuntar a ese modelo.
+    DEPRECATED — NO AGREGAR NUEVAS FUNCIONALIDADES AQUÍ.
 
-    Este modelo se mantiene por compatibilidad con:
-      - proveedores/views.py (orden_compra_confirmar / orden_compra_rechazar via token)
-      - core/motor/proveedor_engine.py (_latencia_promedio_dias)
-      - automatizacion/services.py (enviar_email_orden_compra_proveedor)
-    No agregar nuevas funcionalidades aquí.
+    Este modelo simple fue el original. El modelo completo (con detalles, remitos,
+    estados FK, pagos, historial de precios) vive en `compras.models.OrdenCompra`.
+
+    Se mantiene únicamente por compatibilidad con:
+      - automatizacion/models.py  → CompraPropuesta.borrador_oc (FK a este modelo)
+      - automatizacion/tasks.py   → crea instancias de este modelo al disparar compras automáticas
+      - automatizacion/services.py → enviar_email_orden_compra_proveedor
+      - proveedores/views.py      → confirmar/rechazar orden por token (flujo automático)
+      - core/motor/proveedor_engine.py → _latencia_promedio_dias
+
+    PLAN DE MIGRACIÓN:
+      1. Migrar CompraPropuesta.borrador_oc → FK a compras.OrdenCompra
+      2. Refactorizar automatizacion/tasks.py para crear compras.OrdenCompra con detalles
+      3. Migrar automatizacion/services.py para usar compras.OrdenCompra
+      4. Actualizar proveedores/views.py para usar compras.OrdenCompra (ya tiene token_proveedor)
+      5. Una vez sin referencias, eliminar este modelo con una migración
     """
     insumo = models.ForeignKey('insumos.Insumo', on_delete=models.CASCADE, to_field='idInsumo')
     cantidad = models.PositiveIntegerField()
