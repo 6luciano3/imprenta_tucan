@@ -83,6 +83,16 @@ class Proveedor(models.Model):
                   'Dejar en blanco si coincide con Teléfono (E.164).',
     )
     direccion = models.TextField(blank=True)
+    # FK normalizado a geo.Ciudad (nullable para no romper registros existentes)
+    ciudad_fk = models.ForeignKey(
+        'geo.Ciudad',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='proveedores',
+        verbose_name='Ciudad (normalizado)',
+        help_text='Referencia a la tabla de ciudades. Cuando está completo, tiene prioridad sobre el campo texto.',
+    )
     # Campo nuevo para normalizar rubro como catálogo
     rubro_fk = models.ForeignKey('proveedores.Rubro', on_delete=models.PROTECT, null=True, blank=True, related_name='proveedores')
     # Campo textual legado; se sincroniza automáticamente desde rubro_fk en el formulario

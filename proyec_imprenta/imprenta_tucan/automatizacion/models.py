@@ -274,7 +274,7 @@ class CompraPropuesta(models.Model):
     pesos_usados = models.JSONField(default=dict, blank=True)  # {'precio':0.4,'cumplimiento':0.3,...}
     motivo_trigger = models.CharField(max_length=30, choices=TRIGGER)
     estado = models.CharField(max_length=30, choices=ESTADOS, default='pendiente', db_index=True)
-    borrador_oc = models.ForeignKey('pedidos.OrdenCompra', on_delete=models.SET_NULL, null=True, blank=True)
+    borrador_oc = models.ForeignKey('compras.OrdenCompra', on_delete=models.SET_NULL, null=True, blank=True)
     consulta_stock = models.ForeignKey(ConsultaStockProveedor, on_delete=models.SET_NULL, null=True, blank=True)
     administrador = models.ForeignKey(get_user_model(), on_delete=models.SET_NULL, null=True, blank=True)
     decision = models.CharField(max_length=20, blank=True)  # 'aceptar'|'rechazar'|'modificar'

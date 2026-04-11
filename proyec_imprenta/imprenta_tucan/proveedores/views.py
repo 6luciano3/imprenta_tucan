@@ -304,15 +304,17 @@ def buscar_proveedor(request):
 
 def orden_compra_confirmar(request, token):
     """El proveedor confirma la orden haciendo clic en el link del email."""
-    from pedidos.models import OrdenCompra
-    orden = get_object_or_404(OrdenCompra, token_proveedor=token)
+    from compras.models import OrdenCompra, EstadoCompra
+    orden = get_object_or_404(OrdenCompra.objects.select_related('estado', 'proveedor'), token_proveedor=token)
 
-    ya_respondida = orden.estado in ('confirmada', 'rechazada')
+    ya_respondida = orden.estado and orden.estado.nombre.lower() in ('confirmada', 'recibida', 'rechazada', 'cancelada')
 
     if request.method == 'POST' and not ya_respondida:
-        orden.estado = 'confirmada'
-        orden.comentario = (orden.comentario + '\n' if orden.comentario else '') + 'Confirmada por el proveedor vía email.'
-        orden.save()
+        estado_confirmada, _ = EstadoCompra.objects.get_or_create(nombre='Confirmada')
+        obs_anterior = orden.observaciones or ''
+        orden.estado = estado_confirmada
+        orden.observaciones = (obs_anterior + '\n' if obs_anterior else '') + 'Confirmada por el proveedor vía email.'
+        orden.save(update_fields=['estado', 'observaciones'])
         return render(request, 'proveedores/orden_accion_realizada.html', {
             'orden': orden,
             'accion': 'confirmada',
@@ -328,16 +330,18 @@ def orden_compra_confirmar(request, token):
 
 def orden_compra_rechazar(request, token):
     """El proveedor rechaza la orden haciendo clic en el link del email."""
-    from pedidos.models import OrdenCompra
-    orden = get_object_or_404(OrdenCompra, token_proveedor=token)
+    from compras.models import OrdenCompra, EstadoCompra
+    orden = get_object_or_404(OrdenCompra.objects.select_related('estado', 'proveedor'), token_proveedor=token)
 
-    ya_respondida = orden.estado in ('confirmada', 'rechazada')
+    ya_respondida = orden.estado and orden.estado.nombre.lower() in ('confirmada', 'recibida', 'rechazada', 'cancelada')
 
     if request.method == 'POST' and not ya_respondida:
         motivo = request.POST.get('motivo', '').strip()
-        orden.estado = 'rechazada'
-        orden.comentario = (orden.comentario + '\n' if orden.comentario else '') + f'Rechazada por el proveedor vía email. Motivo: {motivo or "Sin motivo"}'
-        orden.save()
+        estado_rechazada, _ = EstadoCompra.objects.get_or_create(nombre='Rechazada')
+        obs_anterior = orden.observaciones or ''
+        orden.estado = estado_rechazada
+        orden.observaciones = (obs_anterior + '\n' if obs_anterior else '') + f'Rechazada por el proveedor vía email. Motivo: {motivo or "Sin motivo"}'
+        orden.save(update_fields=['estado', 'observaciones'])
         return render(request, 'proveedores/orden_accion_realizada.html', {
             'orden': orden,
             'accion': 'rechazada',

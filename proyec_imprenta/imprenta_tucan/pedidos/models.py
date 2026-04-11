@@ -1,4 +1,8 @@
+import logging
+
 from django.db import models
+
+logger = logging.getLogger(__name__)
 
 
 class EstadoPedido(models.Model):
@@ -190,8 +194,24 @@ def registrar_consumo_real_al_completar(sender, instance, **kwargs):
                     obj.cantidad_consumida = cantidad
                     obj.save(update_fields=["cantidad_consumida"])
 
-    except Exception as e:
-        import logging
-        logging.getLogger(__name__).warning(
-            f"registrar_consumo_real_al_completar: error en pedido #{instance.pk}: {e}"
+    except Exception:
+        logger.exception(
+            "registrar_consumo_real_al_completar: error inesperado en pedido #%s — "
+            "el historial de consumo puede estar incompleto.",
+            instance.pk,
         )
+        # Notificar al administrador si hay email configurado
+        try:
+            from django.core.mail import mail_admins
+            mail_admins(
+                subject=f"[Imprenta Tucán] Error en consumo real — Pedido #{instance.pk}",
+                message=(
+                    f"El signal registrar_consumo_real_al_completar falló para el "
+                    f"Pedido #{instance.pk}.\n\n"
+                    f"El historial de consumo de insumos puede estar incompleto.\n"
+                    f"Revisá los logs del servidor para más detalles."
+                ),
+                fail_silently=True,
+            )
+        except Exception:
+            pass  # mail_admins es best-effort, no debe romper nada

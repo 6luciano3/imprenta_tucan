@@ -51,6 +51,16 @@ class Cliente(models.Model):
     ciudad = models.CharField(max_length=100, default='Posadas')
     provincia = models.CharField(max_length=100, default='Misiones')
     pais = models.CharField(max_length=100, default='Argentina')
+    # FK normalizado a geo.Ciudad (nullable para no romper registros existentes)
+    ciudad_fk = models.ForeignKey(
+        'geo.Ciudad',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='clientes',
+        verbose_name='Ciudad (normalizado)',
+        help_text='Referencia a la tabla de ciudades. Cuando está completo, tiene prioridad sobre el campo texto.',
+    )
     telefono = models.CharField(max_length=20, blank=True, null=True)
     celular = models.CharField(max_length=20, blank=True, null=True)
     telefono_e164 = models.CharField(

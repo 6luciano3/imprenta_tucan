@@ -207,7 +207,6 @@ def enviar_email_orden_compra_proveedor(orden_compra):
         orden_compra.token_proveedor = uuid.uuid4().hex
         orden_compra.save(update_fields=['token_proveedor'])
 
-    insumo = orden_compra.insumo
     from_email = getattr(settings, 'EMAIL_HOST_USER', getattr(settings, 'DEFAULT_FROM_EMAIL', 'no-reply@imprenta.local'))
     from configuracion.models import Parametro
     url_base = Parametro.get('SITE_URL', 'http://localhost:8000').rstrip('/')
@@ -216,20 +215,18 @@ def enviar_email_orden_compra_proveedor(orden_compra):
     link_confirmar = f'{url_base}/proveedores/orden/{token}/confirmar/'
     link_rechazar  = f'{url_base}/proveedores/orden/{token}/rechazar/'
 
-    nombre_insumo = getattr(insumo, 'nombreInsumo', None) or getattr(insumo, 'nombre', str(insumo))
-    cantidad      = orden_compra.cantidad
-    estado        = orden_compra.get_estado_display() if hasattr(orden_compra, 'get_estado_display') else orden_compra.estado
-    comentario    = orden_compra.comentario or '—'
-    fecha         = orden_compra.fecha_creacion.strftime('%d/%m/%Y %H:%M') if orden_compra.fecha_creacion else '—'
+    # compras.OrdenCompra usa detalles (M:N con insumos) en lugar de un campo insumo directo
+    detalles = list(orden_compra.detalles.select_related('insumo').all())
 
-    codigo_insumo_str = getattr(insumo, 'codigo', '') or ''
-    unidad_raw = getattr(insumo, 'unidad_medida', None) or getattr(insumo, 'unidadMedida', None)
-    if unidad_raw and hasattr(unidad_raw, 'abreviatura'):
-        unidad_str = unidad_raw.abreviatura or 'unidad'
-    elif unidad_raw:
-        unidad_str = str(unidad_raw)
-    else:
-        unidad_str = 'unidad'
+    estado = orden_compra.estado.nombre if hasattr(orden_compra.estado, 'nombre') else str(orden_compra.estado)
+    comentario = getattr(orden_compra, 'observaciones', None) or getattr(orden_compra, 'comentario', None) or '—'
+    fecha = orden_compra.fecha_creacion.strftime('%d/%m/%Y %H:%M') if orden_compra.fecha_creacion else '—'
+
+    def _unidad_str(insumo):
+        unidad_raw = getattr(insumo, 'unidad_medida', None)
+        if unidad_raw and hasattr(unidad_raw, 'abreviatura'):
+            return unidad_raw.abreviatura or 'unidad'
+        return str(unidad_raw) if unidad_raw else 'unidad'
 
     html_body = (
         '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">'
@@ -273,12 +270,16 @@ def enviar_email_orden_compra_proveedor(orden_compra):
         '<th style="padding:8px 10px;text-align:center;border-right:1px solid #475569;">Cantidad solicitada</th>'
         '<th style="padding:8px 10px;text-align:center;">Unidad</th>'
         '</tr></thead><tbody>'
-        f'<tr style="background:#f0f9ff;">'
-        f'<td style="border:1px solid #e2e8f0;padding:8px 10px;">{codigo_insumo_str}</td>'
-        f'<td style="border:1px solid #e2e8f0;padding:8px 10px;">{nombre_insumo}</td>'
-        f'<td style="border:1px solid #e2e8f0;padding:8px 10px;text-align:center;">{cantidad}</td>'
-        f'<td style="border:1px solid #e2e8f0;padding:8px 10px;text-align:center;">{unidad_str}</td>'
-        '</tr></tbody></table>'
+        + ''.join(
+            f'<tr style="background:{"#f0f9ff" if i % 2 == 0 else "#fff"};">'
+            f'<td style="border:1px solid #e2e8f0;padding:8px 10px;">{getattr(d.insumo, "codigo", "") or ""}</td>'
+            f'<td style="border:1px solid #e2e8f0;padding:8px 10px;">{getattr(d.insumo, "nombre", str(d.insumo))}</td>'
+            f'<td style="border:1px solid #e2e8f0;padding:8px 10px;text-align:center;">{d.cantidad}</td>'
+            f'<td style="border:1px solid #e2e8f0;padding:8px 10px;text-align:center;">{_unidad_str(d.insumo)}</td>'
+            '</tr>'
+            for i, d in enumerate(detalles)
+        )
+        + '</tbody></table>'
         '</td></tr>'
         '<tr><td style="padding:16px 28px;border-top:1px solid #e2e8f0;">'
         '<table width="100%" cellpadding="0" cellspacing="0"><tr>'
@@ -314,12 +315,15 @@ def enviar_email_orden_compra_proveedor(orden_compra):
         '</table></td></tr></table></body></html>'
     )
 
+    lineas_insumos = '\n'.join(
+        f"  - {getattr(d.insumo, 'nombre', str(d.insumo))} (x{d.cantidad} {_unidad_str(d.insumo)})"
+        for d in detalles
+    ) or '  (sin insumos)'
     texto_plano = (
         f"Nueva Orden de Compra - Imprenta Tucan\n\n"
         f"Estimado/a {proveedor.nombre},\n\n"
         f"Orden N°: #{orden_compra.id}\n"
-        f"Insumo: {nombre_insumo}\n"
-        f"Cantidad: {cantidad} unidades\n"
+        f"Insumos:\n{lineas_insumos}\n"
         f"Estado: {estado}\n"
         f"Fecha: {fecha}\n"
         f"Observaciones: {comentario}\n\n"

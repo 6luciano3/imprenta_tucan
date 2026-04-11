@@ -10,15 +10,17 @@ from proveedores.models import Proveedor
 
 logger = logging.getLogger(__name__)
 
-# Integraciones AI/Rules (placeholders con llamadas reales si se completan módulos)
+# Integraciones AI/Rules — degradan gracefully si el módulo no está disponible
 try:
     from core.ai_ml.demand_prediction import predecir_demanda
-except Exception:
+except ImportError as _e:
+    logger.warning("core.ai_ml.demand_prediction no disponible: %s — predicción de demanda desactivada.", _e)
     predecir_demanda = None
 
 try:
     from core.ai_rules.rules_engine import evaluar_reglas
-except Exception:
+except ImportError as _e:
+    logger.warning("core.ai_rules.rules_engine no disponible: %s — motor de reglas desactivado.", _e)
     evaluar_reglas = None
 
 
@@ -215,16 +217,18 @@ def tarea_ranking_clientes():
         from core.ai_ml.ranking import calcular_ranking_clientes
         resultado = calcular_ranking_clientes()
         msg = f"ranking_clientes: {resultado['actualizados']} clientes actualizados ({resultado['periodo']})"
-    except Exception as e:
-        return f"ranking_clientes: error {e}"
+    except Exception:
+        logger.exception("tarea_ranking_clientes: error al calcular ranking")
+        return "ranking_clientes: error — ver logs"
 
     # Tras recalcular el ranking, detectar ascensos de tier y activar campañas
     try:
         from core.automation.campanas import detectar_y_activar_campanas_tier
         res_camp = detectar_y_activar_campanas_tier()
         msg += f" | campañas activadas: {res_camp.get('campanas_activadas', 0)}"
-    except Exception as e:
-        msg += f" | campañas: error {e}"
+    except Exception:
+        logger.exception("tarea_ranking_clientes: error al activar campañas de tier")
+        msg += " | campañas: error — ver logs"
 
     return msg
 
@@ -534,17 +538,22 @@ def _crear_propuesta_compra(insumo, cantidad_req, comentario_oc, motivo_trigger,
     """
     from django.db import transaction
     from automatizacion.models import CompraPropuesta, ConsultaStockProveedor
-    from pedidos.models import OrdenCompra
+    from compras.models import OrdenCompra as OrdenCompraCompras, DetalleOrdenCompra, EstadoCompra
     from automatizacion.api.services import ProveedorInteligenteService
 
     proveedor = ProveedorInteligenteService.recomendar_proveedor(insumo)
     with transaction.atomic():
-        oc = OrdenCompra.objects.create(
+        estado_pendiente, _ = EstadoCompra.objects.get_or_create(nombre='Pendiente')
+        oc = OrdenCompraCompras.objects.create(
+            proveedor=proveedor,
+            estado=estado_pendiente,
+            observaciones=comentario_oc,
+        )
+        DetalleOrdenCompra.objects.create(
+            orden=oc,
             insumo=insumo,
             cantidad=cantidad_req,
-            proveedor=proveedor,
-            estado='sugerida',
-            comentario=comentario_oc,
+            precio_unitario=0,
         )
         consulta = ConsultaStockProveedor.objects.create(
             proveedor=proveedor,
@@ -596,7 +605,7 @@ def _enviar_cotizacion_multiples_proveedores(insumo, cantidad_req, comentario, m
     if auto_aprobar is None:
         auto_aprobar = bool(Parametro.get('AUTO_APROBAR_PROPUESTAS', False))
     from automatizacion.models import CompraPropuesta, ConsultaStockProveedor, ScoreProveedor
-    from pedidos.models import OrdenCompra
+    from compras.models import OrdenCompra as OrdenCompraCompras, DetalleOrdenCompra, EstadoCompra
     from automatizacion.services import enviar_email_orden_compra_proveedor
     from proveedores.models import Proveedor
     from django.conf import settings as dj_settings
@@ -638,13 +647,18 @@ def _enviar_cotizacion_multiples_proveedores(insumo, cantidad_req, comentario, m
             from django.utils import timezone
             with transaction.atomic():
                 # PROCESO INTELIGENTE: Aprobar automáticamente si está habilitado
-                estado_inicial = 'confirmada' if auto_aprobar else 'sugerida'
-                oc = OrdenCompra.objects.create(
+                nombre_estado = 'Confirmada' if auto_aprobar else 'Pendiente'
+                estado_oc, _ = EstadoCompra.objects.get_or_create(nombre=nombre_estado)
+                oc = OrdenCompraCompras.objects.create(
+                    proveedor=proveedor,
+                    estado=estado_oc,
+                    observaciones=comentario + (' [AUTO-APROBADO]' if auto_aprobar else ''),
+                )
+                DetalleOrdenCompra.objects.create(
+                    orden=oc,
                     insumo=insumo,
                     cantidad=cantidad_req,
-                    proveedor=proveedor,
-                    estado=estado_inicial,
-                    comentario=comentario + (' [AUTO-APROBADO]' if auto_aprobar else ''),
+                    precio_unitario=0,
                 )
                 consulta = ConsultaStockProveedor.objects.create(
                     proveedor=proveedor,
@@ -850,8 +864,10 @@ def tarea_automatizacion_presupuestos_ponderada():
                     if consulta_ok and score_ok:
                         oc = p.borrador_oc
                         if oc:
-                            oc.estado = 'confirmada'
-                            oc.save()
+                            from compras.models import EstadoCompra as EstadoCompraCompras
+                            estado_confirmada, _ = EstadoCompraCompras.objects.get_or_create(nombre='Confirmada')
+                            oc.estado = estado_confirmada
+                            oc.save(update_fields=['estado'])
                         insumo = p.insumo
                         if proveedor:
                             insumo.proveedor = proveedor

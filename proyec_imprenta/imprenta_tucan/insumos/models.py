@@ -68,6 +68,10 @@ class Insumo(models.Model):
         null=True, blank=True,
         help_text='Cantidad estándar a reponer cuando se detecta necesidad de compra. Reemplaza el dict hardcodeado en tasks.',
     )
+    stock_minimo_calculado = models.PositiveIntegerField(
+        null=True, blank=True,
+        help_text='Stock mínimo pre-calculado automáticamente (tarea programada). Evita queries N+1 en listados.',
+    )
     activo = models.BooleanField(default=True)
     unidad_medida = models.CharField(max_length=20, default='unidad', blank=True)
     tipo = models.CharField(
@@ -91,7 +95,10 @@ class Insumo(models.Model):
 
     @property
     def stock_minimo_sugerido(self):
-        # Si hay historial de consumo, calcularlo dinámicamente
+        # Fuente primaria: valor pre-calculado por tarea programada (evita N+1)
+        if self.stock_minimo_calculado is not None:
+            return self.stock_minimo_calculado
+        # Fallback: calcular en tiempo real si no hay cache
         consumo_mensual = self.consumo_promedio_mensual
         if consumo_mensual > 0:
             try:
