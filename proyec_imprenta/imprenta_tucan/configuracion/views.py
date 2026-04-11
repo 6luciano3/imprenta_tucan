@@ -320,7 +320,8 @@ def lista_formulas(request):
         order_field = '-' + order_field
     formulas_qs = formulas_qs.order_by(order_field, 'codigo')
 
-    paginator = Paginator(formulas_qs, 10)
+    from configuracion.services import get_page_size
+    paginator = Paginator(formulas_qs, get_page_size())
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
     context = {

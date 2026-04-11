@@ -78,10 +78,12 @@
             <div class="flex-grow-1">
               <label class="form-label" for="id_descuento">Descuento</label>
               <select name="descuento" class="form-select" id="id_descuento" {% if pedido.estado.nombre|lower == 'entregado' %}disabled{% endif %}>
-                <option value="0" {% if descuento_actual == 0 %}selected{% endif %}>Sin descuento</option>
-                <option value="20" {% if descuento_actual == 20 %}selected{% endif %}>Descuento 20%</option>
-                <option value="15" {% if descuento_actual == 15 %}selected{% endif %}>Descuento 15%</option>
-                <option value="10" {% if descuento_actual == 10 %}selected{% endif %}>Descuento 10%</option>
+                <option value="0"  {% if descuento_actual == 0  %}selected{% endif %}>Sin descuento</option>
+                <option value="5"  {% if descuento_actual == 5  %}selected{% endif %}>Descuento 5% — Nuevo</option>
+                <option value="7"  {% if descuento_actual == 7  %}selected{% endif %}>Descuento 7% — Estándar</option>
+                <option value="10" {% if descuento_actual == 10 %}selected{% endif %}>Descuento 10% — Estratégico</option>
+                <option value="15" {% if descuento_actual == 15 %}selected{% endif %}>Descuento 15% — Premium</option>
+                <option value="20" {% if descuento_actual == 20 %}selected{% endif %}>Descuento 20% (manual)</option>
               </select>
             </div>
           </div>
@@ -202,6 +204,8 @@ window._validarCantidades = function() {
   const stockAlert = document.getElementById('stockAlert');
   const btnSubmit = document.getElementById('btnSubmit');
   const estadoSelect = document.getElementById('id_estado');
+  const pedidoId = {{ pedido.id }};
+  const verificarStockUrl = '{% url "verificar_stock_diferencial" idPedido=0 %}'.replace('/0/', '/' + pedidoId + '/');
   let debounceTimer;
 
   function format(n) { return (Math.round(n * 100) / 100).toFixed(2); }
@@ -399,10 +403,11 @@ window._validarCantidades = function() {
     if (lineas.length === 0) { clearStockAlert(); return; }
 
     try {
-      const resp = await fetch('{% url "verificar_stock" %}', {
+      const nuevoEstadoId = estadoSelect ? parseInt(estadoSelect.value || '0', 10) : null;
+      const resp = await fetch(verificarStockUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
-        body: JSON.stringify({ lineas })
+        body: JSON.stringify({ lineas, nuevo_estado_id: nuevoEstadoId || null })
       });
       console.log('[Stock] status:', resp.status);
       if (!resp.ok) throw new Error('HTTP ' + resp.status);

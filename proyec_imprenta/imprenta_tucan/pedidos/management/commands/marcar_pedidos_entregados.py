@@ -51,8 +51,22 @@ class Command(BaseCommand):
                 self.stdout.write(f'  - Pedido #{p.id} | {p.cliente} | Entrega: {p.fecha_entrega} | Estado actual: {p.estado}')
             return
 
-        # Actualización masiva sin disparar Model.save() ni signals
-        actualizados = qs.update(estado=estado_entregado)
+        # Llamar .save() individualmente para que Pedido.save() dispare
+        # las señales de notificación de entrega al cliente.
+        actualizados = 0
+        errores = 0
+        for pedido in qs.select_related('estado').order_by('fecha_entrega'):
+            try:
+                pedido.estado = estado_entregado
+                pedido.save()
+                actualizados += 1
+            except Exception as exc:
+                self.stderr.write(
+                    self.style.ERROR(f'  Error en Pedido #{pedido.id}: {exc}')
+                )
+                errores += 1
+
         self.stdout.write(self.style.SUCCESS(
             f'{actualizados} pedido(s) marcados como "{estado_entregado.nombre}".'
+            + (f' ({errores} errores — revisar logs)' if errores else '')
         ))

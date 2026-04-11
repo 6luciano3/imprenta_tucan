@@ -96,8 +96,8 @@ def lista_auditoria(request):
         deletes=Count('id', filter=Q(action='delete')),
     )
 
-    page_size = 20
-    paginator = Paginator(qs, page_size)
+    from configuracion.services import get_page_size
+    paginator = Paginator(qs, get_page_size())
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
 

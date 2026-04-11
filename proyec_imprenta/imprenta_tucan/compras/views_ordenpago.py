@@ -76,7 +76,8 @@ def lista_ordenes_pago(request):
     if proveedor_id:
         qs = qs.filter(proveedor_id=proveedor_id)
 
-    paginator = Paginator(qs, 15)
+    from configuracion.services import get_page_size
+    paginator = Paginator(qs, get_page_size())
     page_obj  = paginator.get_page(request.GET.get('page'))
 
     return render(request, 'compras/lista_ordenes_pago.html', {

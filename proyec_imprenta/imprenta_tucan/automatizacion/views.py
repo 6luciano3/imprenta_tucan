@@ -22,8 +22,18 @@ from clientes.models import Cliente
 from .models import OrdenSugerida, OfertaAutomatica, RankingCliente, RankingHistorico, OfertaPropuesta, AccionCliente
 from .services import enviar_oferta_email
 from configuracion.models import Parametro
+from decimal import Decimal
 
 logger = logging.getLogger(__name__)
+
+
+def _get_iva_rate() -> Decimal:
+    """Retorna la tasa de IVA configurada en Parametro (default: 0.21 = 21%)."""
+    try:
+        return Decimal(str(Parametro.get('IVA_PORCENTAJE', '0.21')))
+    except Exception:
+        return Decimal('0.21')
+
 
 # --- Helper: retroalimentación del ranking — delega a ClienteInteligenteEngine.retroalimentar() ---
 def _ajustar_score_por_feedback(cliente, accion):
@@ -1291,8 +1301,8 @@ def aceptar_compra_propuesta(request, propuesta_id):
                     'condicion_iva': 'Responsable Inscripto',
                 },
                 'subtotal': '{:.2f}'.format(float(oc.insumo.precio_unitario) * oc.cantidad),
-                'iva': '{:.2f}'.format(float(oc.insumo.precio_unitario) * oc.cantidad * 0.21),
-                'total': '{:.2f}'.format(float(oc.insumo.precio_unitario) * oc.cantidad * 1.21),
+                'iva': '{:.2f}'.format(float(oc.insumo.precio_unitario) * oc.cantidad * _get_iva_rate()),
+                'total': '{:.2f}'.format(float(oc.insumo.precio_unitario) * oc.cantidad * (1 + _get_iva_rate())),
             }
             html_message = render_to_string('pedidos/orden_compra_detalle.html', context)
             from core.notifications.engine import enviar_notificacion

@@ -96,9 +96,11 @@
               <a href="{% url 'modificar_pedido' pedido.id %}" class="inline-flex items-center text-amber-600 hover:text-amber-800" title="Modificar">
                 <span class="material-symbols-outlined text-base">edit</span>
               </a>
-              <a href="{% url 'clonar_pedido' pedido.id %}" class="inline-flex items-center text-purple-600 hover:text-purple-800" title="Clonar pedido">
-                <span class="material-symbols-outlined text-base">content_copy</span>
-              </a>
+              <button onclick="enviarPedidoCliente({{ pedido.id }}, '{{ pedido.cliente.email|default:''|escapejs }}')"
+                class="inline-flex items-center {% if pedido.cliente.email %}text-blue-600 hover:text-blue-800{% else %}text-gray-300 cursor-not-allowed{% endif %}"
+                title="{% if pedido.cliente.email %}Enviar al cliente ({{ pedido.cliente.email }}){% else %}Sin email — no se puede enviar{% endif %}">
+                <span class="material-symbols-outlined text-base">send</span>
+              </button>
               <!-- Cambiar Estado dropdown -->
               <div class="relative">
                 <button onclick="toggleEstadoMenu({{ pedido.id }})" class="inline-flex items-center text-green-600 hover:text-green-800" title="Cambiar Estado">
@@ -184,6 +186,28 @@
             menu.classList.add('hidden');
           }
         });
+      }
+
+      const _enviarUrl = "{% url 'enviar_pedido_cliente' idPedido=0 %}";
+      const _csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]')?.value || '';
+
+      function enviarPedidoCliente(pedidoId, email) {
+        if (!email) {
+          alert('El cliente no tiene email registrado.');
+          return;
+        }
+        if (!confirm('¿Enviar la confirmación del pedido #' + pedidoId + ' al cliente (' + email + ')?')) return;
+
+        fetch(_enviarUrl.replace('/0/', '/' + pedidoId + '/'), {
+          method: 'POST',
+          headers: { 'X-CSRFToken': _csrfToken }
+        })
+        .then(r => r.json())
+        .then(data => {
+          if (data.ok) alert('✅ Email enviado correctamente a ' + email);
+          else alert('❌ No se pudo enviar: ' + (data.error || 'error desconocido'));
+        })
+        .catch(() => alert('❌ Error de red al enviar el email.'));
       }
     </script>
     </div>

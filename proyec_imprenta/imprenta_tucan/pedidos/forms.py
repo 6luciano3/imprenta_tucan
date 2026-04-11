@@ -99,10 +99,12 @@ class ModificarPedidoForm(forms.Form):
         widget=forms.CheckboxInput(attrs={"class": "form-check-input"}),
     )
     DESCUENTO_CHOICES = [
-        ("0", "Sin descuento"),
-        ("20", "Descuento 20%"),
-        ("15", "Descuento 15%"),
-        ("10", "Descuento 10%"),
+        ("0",  "Sin descuento"),
+        ("5",  "Descuento 5% — Nuevo"),
+        ("7",  "Descuento 7% — Estándar"),
+        ("10", "Descuento 10% — Estratégico"),
+        ("15", "Descuento 15% — Premium"),
+        ("20", "Descuento 20% (manual)"),
     ]
     descuento = forms.ChoiceField(
         label="Descuento",

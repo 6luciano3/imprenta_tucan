@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Confirmación de pedido — Imprenta Tucán</title>
+  <style>
+    body { margin: 0; padding: 0; background: #f1f5f9; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #1e293b; }
+    .wrapper { max-width: 600px; margin: 32px auto; background: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.08); }
+    .header { background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%); padding: 40px 40px 32px; text-align: center; }
+    .header-icon { display: inline-block; background: rgba(255,255,255,0.2); border-radius: 50%; width: 64px; height: 64px; line-height: 64px; font-size: 32px; margin-bottom: 16px; }
+    .header h1 { margin: 0; color: #ffffff; font-size: 24px; font-weight: 800; letter-spacing: -0.5px; }
+    .header p { margin: 6px 0 0; color: #bfdbfe; font-size: 14px; }
+    .body { padding: 36px 40px; }
+    .greeting { font-size: 18px; font-weight: 700; margin-bottom: 8px; }
+    .intro { color: #475569; font-size: 15px; line-height: 1.6; margin-bottom: 28px; }
+    .badge { display: inline-block; background: #dbeafe; color: #1e40af; font-size: 12px; font-weight: 700; padding: 4px 12px; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 24px; }
+    .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 28px; }
+    .info-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px 16px; }
+    .info-card .label { font-size: 11px; color: #94a3b8; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px; margin-bottom: 4px; }
+    .info-card .value { font-size: 15px; font-weight: 700; color: #1e293b; }
+    .section-title { font-size: 13px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #e2e8f0; }
+    table.productos { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
+    table.productos th { text-align: left; font-size: 12px; color: #94a3b8; font-weight: 600; text-transform: uppercase; padding: 8px 12px; background: #f8fafc; }
+    table.productos th:last-child { text-align: right; }
+    table.productos td { padding: 10px 12px; font-size: 14px; border-top: 1px solid #f1f5f9; color: #334155; }
+    table.productos td:last-child { text-align: right; font-weight: 600; font-family: monospace; }
+    .subtotal-row td { color: #64748b; font-size: 13px; }
+    .descuento-row td { color: #dc2626; }
+    .iva-row td { color: #2563eb; }
+    .total-row { background: #eff6ff; }
+    .total-row td { font-weight: 800; color: #1e40af; font-size: 15px; padding: 12px; border-top: 2px solid #bfdbfe; }
+    .footer { background: #f8fafc; border-top: 1px solid #e2e8f0; padding: 24px 40px; text-align: center; }
+    .footer p { margin: 4px 0; color: #94a3b8; font-size: 12px; }
+    .footer strong { color: #475569; }
+    @media (max-width: 480px) {
+      .body { padding: 24px 20px; }
+      .info-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+<div class="wrapper">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header-icon">📋</div>
+    <h1>Confirmación de Pedido</h1>
+    <p>Imprenta Tucán — Recibimos tu pedido</p>
+  </div>
+
+  <!-- Body -->
+  <div class="body">
+    <p class="greeting">Hola, {{ cliente.nombre }} {{ cliente.apellido }}.</p>
+    <p class="intro">
+      Te confirmamos que recibimos tu pedido <strong>N° {{ pedido.pk }}</strong>.
+      A continuación encontrás el detalle completo.
+    </p>
+
+    <span class="badge">{{ pedido.estado.nombre }}</span>
+
+    <!-- Info cards -->
+    <div class="info-grid">
+      <div class="info-card">
+        <div class="label">N° de Pedido</div>
+        <div class="value">#{{ pedido.pk }}</div>
+      </div>
+      <div class="info-card">
+        <div class="label">Fecha del Pedido</div>
+        <div class="value">{{ pedido.fecha_pedido|date:"d/m/Y" }}</div>
+      </div>
+      <div class="info-card">
+        <div class="label">Fecha de Entrega estimada</div>
+        <div class="value">{{ pedido.fecha_entrega|date:"d/m/Y" }}</div>
+      </div>
+      <div class="info-card">
+        <div class="label">Total</div>
+        <div class="value" style="color:#1e40af;">${{ pedido.monto_total|floatformat:2 }}</div>
+      </div>
+    </div>
+
+    <!-- Detalle de productos -->
+    {% if lineas %}
+    <p class="section-title">Detalle del pedido</p>
+    <table class="productos">
+      <thead>
+        <tr>
+          <th>Producto</th>
+          <th style="text-align:center;">Cant.</th>
+          <th>Especificaciones</th>
+          <th>Importe</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for linea in lineas %}
+        <tr>
+          <td>{{ linea.producto.nombreProducto }}</td>
+          <td style="text-align:center;">{{ linea.cantidad }}</td>
+          <td style="color:#64748b;font-size:13px;">{{ linea.especificaciones|default:"—" }}</td>
+          <td>${{ linea.subtotal|floatformat:2 }}</td>
+        </tr>
+        {% endfor %}
+        <tr class="subtotal-row">
+          <td colspan="3" style="text-align:right;padding:8px 12px;">Subtotal</td>
+          <td style="padding:8px 12px;">${{ subtotal|floatformat:2 }}</td>
+        </tr>
+        {% if pedido.descuento %}
+        <tr class="descuento-row">
+          <td colspan="3" style="text-align:right;padding:8px 12px;">Descuento ({{ pedido.descuento }}%)</td>
+          <td style="padding:8px 12px;">- ${{ monto_descuento|floatformat:2 }}</td>
+        </tr>
+        {% endif %}
+        {% if pedido.aplicar_iva %}
+        <tr class="iva-row">
+          <td colspan="3" style="text-align:right;padding:8px 12px;">IVA (21%)</td>
+          <td style="padding:8px 12px;">+ ${{ monto_iva|floatformat:2 }}</td>
+        </tr>
+        {% endif %}
+        <tr class="total-row">
+          <td colspan="3" style="text-align:right;">Total del pedido</td>
+          <td>${{ pedido.monto_total|floatformat:2 }}</td>
+        </tr>
+      </tbody>
+    </table>
+    {% endif %}
+
+    <p style="font-size:14px;color:#64748b;line-height:1.6;">
+      Ante cualquier consulta sobre tu pedido, no dudes en contactarnos.
+      Podés responder este email o comunicarte directamente con nosotros.
+    </p>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <p><strong>Imprenta Tucán S.A.</strong></p>
+    <p>Este email fue generado automáticamente como confirmación de tu pedido.</p>
+    <p style="margin-top:12px;font-size:11px;color:#cbd5e1;">
+      Si recibiste este email por error, podés ignorarlo sin problema.
+    </p>
+  </div>
+
+</div>
+</body>
+</html>

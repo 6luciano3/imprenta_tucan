@@ -54,8 +54,11 @@ class Pedido(models.Model):
                 reservar_insumos_para_pedido(self)
             if "cancelad" in new_estado and "cancelad" not in old_estado:
                 ajustar_score_cancelacion(self)
-                # Si venía de "En Proceso", devolver el stock consumido
-                if "proceso" in old_estado:
+                # Devolver stock si el pedido ya había consumido insumos.
+                # Ocurre cuando venía de En Proceso, Completado o Entregado
+                # (en todos esos estados el stock fue reservado al pasar por "proceso").
+                _estados_con_stock_reservado = ("proceso", "complet", "entreg")
+                if any(s in old_estado for s in _estados_con_stock_reservado):
                     devolver_insumos_para_pedido(self)
             if "entreg" in new_estado and "entreg" not in old_estado:
                 self._notificar_entrega = True   # se dispara en post_save para tener pk seguro

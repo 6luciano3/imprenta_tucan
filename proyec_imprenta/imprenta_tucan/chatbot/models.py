@@ -3,14 +3,22 @@ from clientes.models import Cliente
 
 
 class ConversacionChatbot(models.Model):
-    """Guarda las conversaciones del chatbot con los clientes."""
-    
+    """Guarda las conversaciones del chatbot con los clientes y el personal interno."""
+
     cliente = models.ForeignKey(
-        Cliente, 
-        on_delete=models.SET_NULL, 
-        null=True, 
+        Cliente,
+        on_delete=models.SET_NULL,
+        null=True,
         blank=True,
         related_name='conversaciones_chatbot'
+    )
+    usuario = models.ForeignKey(
+        'usuarios.Usuario',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='conversaciones_chatbot',
+        help_text='Usuario interno (staff) que inició la conversación.',
     )
     session_id = models.CharField(max_length=100, blank=True, help_text="ID de sesión para usuarios sin login")
     mensaje = models.TextField()

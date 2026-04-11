@@ -34,6 +34,15 @@ from .models import OrdenCompra
 from configuracion.permissions import require_perm
 
 
+def _get_iva_rate() -> Decimal:
+    """Retorna la tasa de IVA configurada en Parametro (default: 0.21 = 21%)."""
+    try:
+        from configuracion.models import Parametro
+        return Decimal(str(Parametro.get('IVA_PORCENTAJE', '0.21')))
+    except Exception:
+        return Decimal('0.21')
+
+
 def _audit_pedido(request, pedido, accion, extra=None):
     """Registra un AuditEntry para un Pedido. Silencia errores."""
     try:
@@ -138,7 +147,8 @@ def alta_pedido(request):
             cliente = header_form.cleaned_data["cliente"]
             fecha_entrega = header_form.cleaned_data["fecha_entrega"]
             aplicar_iva = header_form.cleaned_data.get("aplicar_iva", False)
-            iva_multiplier = Decimal("1.21") if aplicar_iva else Decimal("1")
+            iva_rate = _get_iva_rate()
+            iva_multiplier = (Decimal("1") + iva_rate) if aplicar_iva else Decimal("1")
 
             # Estado inicial Pendiente (crear si no existe)
             estado_pendiente, _ = EstadoPedido.objects.get_or_create(nombre="Pendiente")
@@ -462,6 +472,161 @@ def verificar_stock_modificar(request, idPedido: int):
     return JsonResponse({"ok": False, "faltantes": detalle})
 
 
+@require_POST
+@login_required
+@requiere_permiso("Pedidos")
+def verificar_stock_diferencial(request, idPedido: int):
+    """Endpoint AJAX: valida el ajuste NETO de insumos para múltiples líneas nuevas.
+    Usa verificar_insumos_para_ajuste (diferencial), correcto para pedidos En Proceso.
+    Para la transición Pendiente → En Proceso usa verificar_insumos_para_lineas (absoluto).
+
+    Espera JSON:
+      { "lineas": [{"producto": <id>, "cantidad": <int>}, ...], "nuevo_estado_id": <int|null> }
+    Responde: { ok: bool, faltantes: [{id, codigo, nombre, faltan}] }
+    """
+    try:
+        body = json.loads(request.body.decode("utf-8"))
+    except Exception:
+        return JsonResponse({"ok": False, "error": "JSON inválido"}, status=400)
+
+    pedido = get_object_or_404(Pedido.objects.select_related("estado"), pk=idPedido)
+    lineas_req = body.get("lineas", []) or []
+    if not isinstance(lineas_req, list):
+        return JsonResponse({"ok": False, "error": "Formato inválido"}, status=400)
+
+    productos_by_id = {p.idProducto: p for p in Producto.objects.filter(
+        idProducto__in=[l.get("producto") for l in lineas_req if l.get("producto")])}
+    new_lineas = []
+    for l in lineas_req:
+        pid = l.get("producto")
+        cant = l.get("cantidad") or 0
+        prod = productos_by_id.get(pid)
+        if prod and int(cant) > 0:
+            new_lineas.append((prod, int(cant)))
+
+    if not new_lineas:
+        return JsonResponse({"ok": True, "faltantes": []})
+
+    old_lineas = [(lp.producto, lp.cantidad) for lp in pedido.lineas.select_related('producto').all()]
+
+    # Detectar si el nuevo estado es "En Proceso" y el actual es "Pendiente"
+    nuevo_estado_id = body.get("nuevo_estado_id")
+    estado_actual_nombre = (pedido.estado.nombre or "").lower() if pedido.estado else ""
+    es_transicion_a_proceso = False
+    if nuevo_estado_id:
+        try:
+            nuevo_estado = EstadoPedido.objects.get(pk=nuevo_estado_id)
+            nuevo_estado_nombre = (nuevo_estado.nombre or "").lower()
+            es_transicion_a_proceso = (
+                "pendiente" in estado_actual_nombre and "proceso" in nuevo_estado_nombre
+            )
+        except EstadoPedido.DoesNotExist:
+            pass
+
+    if es_transicion_a_proceso:
+        ok, faltantes = verificar_insumos_para_lineas(new_lineas)
+    else:
+        ok, faltantes = verificar_insumos_para_ajuste(old_lineas, new_lineas)
+
+    if ok:
+        return JsonResponse({"ok": True, "faltantes": []})
+
+    detalle = []
+    if faltantes:
+        try:
+            info = {i.idInsumo: (i.codigo, i.nombre) for i in Insumo.objects.filter(idInsumo__in=faltantes.keys())}
+        except Exception:
+            info = {}
+        for iid, falt in faltantes.items():
+            codigo, nombre = info.get(iid, ("-", f"Insumo {iid}"))
+            detalle.append({"id": iid, "codigo": codigo, "nombre": nombre, "faltan": float(falt)})
+    return JsonResponse({"ok": False, "faltantes": detalle})
+
+
+@require_POST
+@login_required
+@requiere_permiso("Pedidos")
+def enviar_pedido_cliente(request, idPedido: int):
+    """Envía la confirmación del pedido al email del cliente."""
+    from django.core.mail import send_mail
+    from django.conf import settings
+    from django.template.loader import render_to_string
+
+    pedido = get_object_or_404(
+        Pedido.objects.select_related("cliente", "estado").prefetch_related("lineas__producto"),
+        pk=idPedido,
+    )
+    cliente = pedido.cliente
+
+    if not cliente.email:
+        return JsonResponse({"ok": False, "error": "El cliente no tiene email registrado"}, status=400)
+
+    lineas = pedido.lineas.select_related("producto").all()
+
+    # Calcular desglose de montos
+    subtotal = sum(
+        (l.precio_unitario or Decimal("0")) * l.cantidad for l in lineas
+    )
+    monto_descuento = subtotal * (pedido.descuento / Decimal("100")) if pedido.descuento else Decimal("0")
+    subtotal_con_descuento = subtotal - monto_descuento
+    monto_iva = subtotal_con_descuento * _get_iva_rate() if pedido.aplicar_iva else Decimal("0")
+
+    # Agregar subtotal por línea al contexto
+    class LineaConSubtotal:
+        def __init__(self, linea):
+            self._linea = linea
+            self.producto = linea.producto
+            self.cantidad = linea.cantidad
+            self.especificaciones = linea.especificaciones
+            self.precio_unitario = linea.precio_unitario
+            self.subtotal = (linea.precio_unitario or Decimal("0")) * linea.cantidad
+
+    lineas_con_subtotal = [LineaConSubtotal(l) for l in lineas]
+
+    try:
+        html_body = render_to_string("pedidos/email_confirmacion_pedido.html", {
+            "pedido": pedido,
+            "cliente": cliente,
+            "lineas": lineas_con_subtotal,
+            "subtotal": subtotal,
+            "monto_descuento": monto_descuento,
+            "monto_iva": monto_iva,
+        })
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).exception("enviar_pedido_cliente: error al renderizar template: %s", exc)
+        return JsonResponse({"ok": False, "error": "Error al preparar el email"}, status=500)
+
+    productos_str = ", ".join(
+        f"{l.producto.nombreProducto} (x{l.cantidad})" for l in lineas
+    ) or "Ver detalle"
+
+    texto_plano = (
+        f"Hola {cliente.nombre},\n\n"
+        f"Te confirmamos que recibimos tu pedido N° {pedido.pk}.\n\n"
+        f"Productos: {productos_str}\n"
+        f"Fecha de entrega estimada: {pedido.fecha_entrega}\n"
+        f"Total: ${pedido.monto_total:,.2f}\n\n"
+        f"Ante cualquier consulta, estamos a tu disposición.\n"
+        f"— Imprenta Tucán"
+    )
+
+    try:
+        send_mail(
+            subject=f"Confirmación de Pedido N° {pedido.pk} — Imprenta Tucán",
+            message=texto_plano,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[cliente.email],
+            html_message=html_body,
+            fail_silently=False,
+        )
+        return JsonResponse({"ok": True, "message": f"Email enviado a {cliente.email}"})
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).exception("enviar_pedido_cliente: error al enviar email para pedido #%s: %s", pedido.pk, exc)
+        return JsonResponse({"ok": False, "error": str(exc)}, status=500)
+
+
 @require_perm('Pedidos', 'Ver')
 @login_required
 @requiere_permiso("Pedidos")
@@ -509,7 +674,7 @@ def detalle_pedido(request, pk: int):
     descuento = Decimal(str(getattr(pedido, 'descuento', 0)))
     aplicar_iva = getattr(pedido, 'aplicar_iva', False)
     subtotal_con_descuento = subtotal * (Decimal("1") - descuento / Decimal("100")) if descuento else subtotal
-    iva_monto = (subtotal_con_descuento * Decimal("0.21")) if aplicar_iva else Decimal("0")
+    iva_monto = (subtotal_con_descuento * _get_iva_rate()) if aplicar_iva else Decimal("0")
     return render(
         request,
         "pedidos/detalle_pedido.html",
@@ -560,9 +725,20 @@ def modificar_pedido(request, idPedido: int):
 
             old_lineas = [(l.producto, l.cantidad) for l in lineas_actuales]
 
-            # Bloquear si hay insumos faltantes, EXCEPTO cuando el nuevo estado es "Pendiente"
-            ok_stock, faltantes_stock = verificar_insumos_para_lineas(new_lineas)
+            estado_actual_nombre = (pedido.estado.nombre or "").lower() if pedido.estado else ""
             estado_nuevo_nombre = (estado.nombre or "").lower()
+
+            # Elegir qué tipo de validación corresponde:
+            # - Pendiente → En Proceso: el stock aún no se consumió; Pedido.save()
+            #   llamará reservar_insumos_para_pedido (descuento total). Usar check absoluto.
+            # - Cualquier otro caso (ej: En Proceso → En Proceso): el stock ya fue consumido
+            #   al reservar, solo importa el NETO del cambio. Usar check diferencial.
+            if "pendiente" in estado_actual_nombre and "proceso" in estado_nuevo_nombre:
+                ok_stock, faltantes_stock = verificar_insumos_para_lineas(new_lineas)
+            else:
+                ok_stock, faltantes_stock = verificar_insumos_para_ajuste(old_lineas, new_lineas)
+
+            # Bloquear si hay insumos faltantes, EXCEPTO cuando el nuevo estado es "Pendiente"
             if not ok_stock and estado_nuevo_nombre != "pendiente":
                 if faltantes_stock:
                     try:
@@ -596,7 +772,7 @@ def modificar_pedido(request, idPedido: int):
 
             descuento_val = Decimal(str(descuento))
             subtotal_con_descuento = subtotal * (1 - descuento_val / Decimal("100"))
-            iva_multiplier = Decimal("1.21") if aplicar_iva else Decimal("1")
+            iva_multiplier = (Decimal("1") + _get_iva_rate()) if aplicar_iva else Decimal("1")
             monto_total = subtotal_con_descuento * iva_multiplier
 
             try:
@@ -646,9 +822,14 @@ def modificar_pedido(request, idPedido: int):
             for l in lineas_actuales
         ]
         formset = LineaPedidoFormSet(initial=initial_lineas, prefix="linea")
-        # Fecha de entrega: 10 días después de fecha_pedido si no está seteada
+        # Fecha de entrega: N días después de fecha_pedido si no está seteada (configurable en Parametro)
         from datetime import timedelta
-        fecha_entrega_default = pedido.fecha_entrega or (pedido.fecha_pedido + timedelta(days=10))
+        try:
+            from configuracion.models import Parametro as _P
+            _dias_entrega = int(_P.get('PEDIDO_DIAS_ENTREGA_DEFAULT', 10))
+        except Exception:
+            _dias_entrega = 10
+        fecha_entrega_default = pedido.fecha_entrega or (pedido.fecha_pedido + timedelta(days=_dias_entrega))
         form = ModificarPedidoForm(initial={
             "estado": pedido.estado,
             "fecha_entrega": fecha_entrega_default,
@@ -658,6 +839,7 @@ def modificar_pedido(request, idPedido: int):
     precios_lineas_json = json.dumps([float(l.precio_unitario) for l in lineas_actuales])
 
     # Calcular desglose inicial para mostrarlo desde el servidor (sin JS en la carga)
+    _D = Decimal  # alias corto para legibilidad en cálculos de esta vista
     subtotal_inicial = sum(
         (l.precio_unitario if l.precio_unitario else (l.producto.precio or _D("0"))) * l.cantidad
         for l in lineas_actuales
@@ -665,14 +847,14 @@ def modificar_pedido(request, idPedido: int):
     descuento_bd = _D(str(pedido.descuento or 0))
     monto_descuento_inicial = (subtotal_inicial * descuento_bd / _D("100")).quantize(_D("0.01"))
     subtotal_con_desc = subtotal_inicial - monto_descuento_inicial
-    monto_iva_inicial = (subtotal_con_desc * _D("0.21")).quantize(_D("0.01")) if pedido.aplicar_iva else _D("0")
+    monto_iva_inicial = (subtotal_con_desc * _get_iva_rate()).quantize(_D("0.01")) if pedido.aplicar_iva else _D("0")
 
     descuento_actual = int(float(pedido.descuento)) if pedido.descuento else 0
     aplicar_iva_actual = bool(pedido.aplicar_iva)
 
     # Mostrar desglose (descuento/IVA) solo si monto_total coincide con la fórmula.
     # Para pedidos viejos (monto_total = solo la suma de líneas), ocultarlo evita confusión.
-    total_calculado = subtotal_con_desc * (_D("1.21") if aplicar_iva_actual else _D("1"))
+    total_calculado = subtotal_con_desc * (_D("1") + _get_iva_rate() if aplicar_iva_actual else _D("1"))
     mostrar_desglose = abs(total_calculado - pedido.monto_total) < _D("1")
 
     return render(request, "pedidos/modificar_pedido.html", {
@@ -760,11 +942,13 @@ def clonar_pedido(request, pk):
     """Crea un pedido nuevo con los mismos productos/cantidades, estado Pendiente."""
     original = get_object_or_404(Pedido.objects.prefetch_related('lineas__producto'), pk=pk)
     from datetime import date, timedelta
+    from configuracion.models import Parametro as _P
+    _dias_entrega = int(_P.get('PEDIDO_DIAS_ENTREGA_DEFAULT', 10))
     estado_pendiente, _ = EstadoPedido.objects.get_or_create(nombre='Pendiente')
     with transaction.atomic():
         nuevo = Pedido.objects.create(
             cliente=original.cliente,
-            fecha_entrega=date.today() + timedelta(days=10),
+            fecha_entrega=date.today() + timedelta(days=_dias_entrega),
             estado=estado_pendiente,
             monto_total=original.monto_total,
             descuento=original.descuento,
@@ -853,7 +1037,8 @@ def cambiar_estado_pedido(request, idPedido: int):
             pedido.save()
             _audit_pedido(request, pedido, 'update', {'estado': [estado_anterior.nombre, nuevo_estado.nombre]})
 
-            if "cancelad" in new_nombre and "proceso" in old_nombre:
+            _estados_con_stock = ("proceso", "complet", "entreg")
+            if "cancelad" in new_nombre and any(s in old_nombre for s in _estados_con_stock):
                 messages.success(
                     request,
                     f"Pedido #{pedido.id} cancelado. El stock consumido fue devuelto al inventario."

@@ -113,10 +113,12 @@ def crear_presupuesto(request):
         'telefono', 'celular', 'email', 'tipo_cliente',
     ))
     today = date.today()
-    validez_default = (today + timedelta(days=30)).strftime('%Y-%m-%d')
+    from configuracion.models import Parametro
+    _dias_validez = int(Parametro.get('PRESUPUESTO_DIAS_VALIDEZ', 30))
+    validez_default = (today + timedelta(days=_dias_validez)).strftime('%Y-%m-%d')
 
     # Descuentos por tipo de cliente (desde Parametro o defaults)
-    from configuracion.models import Parametro
+
     try:
         descuentos_tipos = {
             'nuevo':       int(Parametro.get('DESCUENTO_CLIENTE_NUEVO',       0)),
@@ -272,7 +274,12 @@ def editar_presupuesto(request, pk):
         form = PresupuestoForm(instance=presupuesto)
 
     today = date.today()
-    validez_default = (presupuesto.validez if presupuesto.validez and presupuesto.validez >= today else today + timedelta(days=30)).strftime('%Y-%m-%d')
+    try:
+        from configuracion.models import Parametro as _P
+        _dias_validez = int(_P.get('PRESUPUESTO_DIAS_VALIDEZ', 30))
+    except Exception:
+        _dias_validez = 30
+    validez_default = (presupuesto.validez if presupuesto.validez and presupuesto.validez >= today else today + timedelta(days=_dias_validez)).strftime('%Y-%m-%d')
 
     from clientes.models import Cliente as ClienteModel
     clientes_data = list(ClienteModel.objects.values(
@@ -372,6 +379,7 @@ def clonar_presupuesto(request, pk):
     from django.contrib import messages
     from datetime import date, timedelta
     from django.db import transaction
+    from configuracion.models import Parametro
     with transaction.atomic():
         # S-2: generar número de forma atómica igual que en crear_presupuesto
         ultimo = Presupuesto.objects.select_for_update().order_by('-id').first()
@@ -387,7 +395,7 @@ def clonar_presupuesto(request, pk):
         nuevo = Presupuesto.objects.create(
             numero=nuevo_numero,
             cliente=original.cliente,
-            validez=date.today() + timedelta(days=15),
+            validez=date.today() + timedelta(days=int(Parametro.get('PRESUPUESTO_DIAS_VALIDEZ', 30))),
             total=original.total,
             estado='Activo',
             respuesta_cliente='pendiente',

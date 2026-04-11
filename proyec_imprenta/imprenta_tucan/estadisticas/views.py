@@ -1123,15 +1123,25 @@ def informe_pdf_insumos(request):
     story.append(Paragraph("Resumen de Stock", st["seccion"]))
     total = Insumo.objects.count(); activos = Insumo.objects.filter(activo=True).count()
     sin_stock = Insumo.objects.filter(activo=True, stock__lte=0).count()
-    bajo_min = Insumo.objects.filter(activo=True, stock__gt=0, stock__lte=10).count()
+    # Usar stock_minimo_sugerido de cada insumo (campo calculado o manual) en vez de 10 hardcodeado
+    insumos_activos_qs = list(Insumo.objects.filter(activo=True, stock__gt=0).only(
+        'stock', 'stock_minimo_calculado', 'stock_minimo_manual',
+    ))
+    bajo_min = sum(1 for i in insumos_activos_qs if i.stock < i.stock_minimo_sugerido)
     rows = [[Paragraph("<b>Indicador</b>",st["bold"]),Paragraph("<b>Valor</b>",st["bold"])],
             [Paragraph("Total insumos",st["normal"]),Paragraph(f"<b>{total}</b>",st["bold"])],
             [Paragraph("Activos",st["normal"]),Paragraph(f"<b>{activos}</b>",st["bold"])],
             [Paragraph("Sin stock (=0)",st["normal"]),Paragraph(f"<b>{sin_stock}</b>",st["bold"])],
-            [Paragraph("Stock bajo (<=10)",st["normal"]),Paragraph(f"<b>{bajo_min}</b>",st["bold"])]]
+            [Paragraph("Stock bajo (< mínimo sugerido)",st["normal"]),Paragraph(f"<b>{bajo_min}</b>",st["bold"])]]
     t = Table(rows,colWidths=[cw*0.6,cw*0.4]); t.setStyle(_tbl_style(st)); story.append(t)
     story.append(Paragraph("Insumos con Stock Critico", st["seccion"]))
-    criticos = Insumo.objects.filter(activo=True, stock__lte=10).order_by("stock")[:30]
+    criticos = sorted(
+        [i for i in Insumo.objects.filter(activo=True).only(
+            'codigo', 'nombre', 'stock', 'precio_unitario',
+            'stock_minimo_calculado', 'stock_minimo_manual',
+        ) if i.stock <= i.stock_minimo_sugerido],
+        key=lambda i: i.stock
+    )[:30]
     rows2 = [[Paragraph("<b>Codigo</b>",st["bold"]),Paragraph("<b>Nombre</b>",st["bold"]),Paragraph("<b>Stock</b>",st["bold"]),Paragraph("<b>Precio</b>",st["bold"])]]
     for ins in criticos:
         rows2.append([Paragraph(str(ins.codigo),st["normal"]),Paragraph(str(ins.nombre)[:35],st["normal"]),Paragraph(str(ins.stock),st["normal"]),Paragraph(f"${float(ins.precio_unitario):,.2f}",st["normal"])])

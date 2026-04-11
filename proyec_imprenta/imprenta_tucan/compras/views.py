@@ -129,7 +129,8 @@ def lista_ordenes(request):
             })
     
     # Paginación
-    paginator = Paginator(ordenes, 15)
+    from configuracion.services import get_page_size
+    paginator = Paginator(ordenes, get_page_size())
     page = request.GET.get('page', 1)
     try:
         ordenes_page = paginator.page(page)
@@ -766,7 +767,8 @@ def lista_remitos(request):
     elif anulado_q == 'false':
         remitos = remitos.filter(anulado=False)
 
-    paginator = Paginator(remitos, 30)
+    from configuracion.services import get_page_size
+    paginator = Paginator(remitos, get_page_size())
     page_obj  = paginator.get_page(request.GET.get('page'))
 
     proveedores = Proveedor.objects.filter(activo=True).order_by('nombre')
@@ -1258,7 +1260,8 @@ def lista_precios_insumos(request):
         qs = qs.filter(precio_unitario=0)
 
     proveedores = Proveedor.objects.filter(activo=True).order_by("nombre")
-    paginator = Paginator(qs, 30)
+    from configuracion.services import get_page_size
+    paginator = Paginator(qs, get_page_size())
     page = paginator.get_page(request.GET.get("page"))
 
     return render(request, "compras/lista_precios.html", {
@@ -1286,7 +1289,8 @@ def historial_precios_insumo(request, insumo_pk):
         .select_related('usuario', 'remito')
         .order_by('-fecha')
     )
-    paginator = Paginator(historial_qs, 20)
+    from configuracion.services import get_page_size
+    paginator = Paginator(historial_qs, get_page_size())
     page = paginator.get_page(request.GET.get('page'))
     return render(request, "compras/historial_precios.html", {
         "insumo": insumo,
