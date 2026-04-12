@@ -17,6 +17,7 @@ urlpatterns = [
     # Módulos del sistema
     path('clientes/', include('clientes.urls')),
     path('pedidos/', include('pedidos.urls')),
+    path('facturas/', include('pedidos.urls_facturas')),
     path('productos/', include('productos.urls')),
     path('proveedores/', include('proveedores.urls')),
     path('insumos/', include('insumos.urls')),

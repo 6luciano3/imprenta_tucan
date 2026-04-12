@@ -116,6 +116,9 @@
       <a href="{% url 'lista_pedidos' %}" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100 {% if request.resolver_match.url_name == 'lista_pedidos' %}bg-blue-100 text-blue-700{% endif %}">
         <span class="material-symbols-outlined">receipt_long</span> Pedidos
       </a>
+      <a href="{% url 'lista_facturas' %}" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100 {% if request.resolver_match.url_name == 'lista_facturas' or request.resolver_match.url_name == 'detalle_factura' %}bg-blue-100 text-blue-700{% endif %}">
+        <span class="material-symbols-outlined">receipt</span> Facturas
+      </a>
       {% endif %}
       {% if show_productos %}
       <a href="{% url 'lista_productos' %}" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100 {% if request.resolver_match.url_name == 'lista_productos' %}bg-blue-100 text-blue-700{% endif %}">
@@ -209,6 +212,9 @@ function toggleMobileMenu() {
         {% if show_pedidos %}
         <a href="{% url 'lista_pedidos' %}" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-light {% if request.resolver_match.url_name == 'lista_pedidos' %}bg-primary text-white{% endif %}">
           <span class="material-symbols-outlined">receipt_long</span> Pedidos
+        </a>
+        <a href="{% url 'lista_facturas' %}" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-light {% if request.resolver_match.url_name == 'lista_facturas' or request.resolver_match.url_name == 'detalle_factura' %}bg-primary text-white{% endif %}">
+          <span class="material-symbols-outlined">receipt</span> Facturas
         </a>
         {% endif %}
         {% if show_productos %}

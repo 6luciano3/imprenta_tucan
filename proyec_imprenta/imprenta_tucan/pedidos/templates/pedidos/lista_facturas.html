@@ -1,0 +1,131 @@
+{% extends 'base.html' %}
+{% block title %}Lista de Facturas{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+  <div class="mx-auto" style="max-width: 1100px;">
+
+    <!-- Encabezado -->
+    <div class="flex items-center justify-between mb-6 gap-4 flex-wrap">
+      <div class="flex items-center gap-3">
+        <span class="material-symbols-outlined text-3xl text-blue-600">receipt</span>
+        <h1 class="text-2xl font-bold text-gray-800">Facturas</h1>
+      </div>
+    </div>
+
+    <!-- Filtros -->
+    <form method="get" class="bg-white rounded-xl shadow p-4 mb-5 flex flex-wrap gap-3 items-end">
+      <div class="flex flex-col gap-1">
+        <label class="text-xs text-gray-500 font-medium">Buscar</label>
+        <input type="text" name="q" value="{{ query }}" placeholder="N° factura, cliente..."
+          class="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-blue-400 focus:outline-none w-52">
+      </div>
+      <div class="flex flex-col gap-1">
+        <label class="text-xs text-gray-500 font-medium">Estado de cobro</label>
+        <select name="estado_pago"
+          class="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-blue-400 focus:outline-none">
+          <option value="">Todos</option>
+          <option value="pendiente" {% if estado_fil == 'pendiente' %}selected{% endif %}>Pendiente</option>
+          <option value="parcial"   {% if estado_fil == 'parcial'   %}selected{% endif %}>Pago parcial</option>
+          <option value="pagada"    {% if estado_fil == 'pagada'    %}selected{% endif %}>Pagada</option>
+        </select>
+      </div>
+      <div class="flex flex-col gap-1">
+        <label class="text-xs text-gray-500 font-medium">Desde</label>
+        <input type="date" name="fecha_desde" value="{{ fecha_desde }}"
+          class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white focus:ring-2 focus:ring-blue-400 focus:outline-none">
+      </div>
+      <div class="flex flex-col gap-1">
+        <label class="text-xs text-gray-500 font-medium">Hasta</label>
+        <input type="date" name="fecha_hasta" value="{{ fecha_hasta }}"
+          class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white focus:ring-2 focus:ring-blue-400 focus:outline-none">
+      </div>
+      <button type="submit"
+        class="flex items-center gap-1 bg-blue-600 text-white px-4 py-2 rounded-lg shadow hover:bg-blue-700 text-sm">
+        <span class="material-symbols-outlined text-base">search</span> Buscar
+      </button>
+      <a href="{% url 'lista_facturas' %}"
+        class="flex items-center gap-1 bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 text-sm">
+        <span class="material-symbols-outlined text-base">close</span> Limpiar
+      </a>
+    </form>
+
+    {% if total_resultados is not None %}
+    <p class="text-sm text-gray-500 mb-3">
+      Mostrando <strong>{{ facturas|length }}</strong> de <strong>{{ total_resultados }}</strong> resultado(s)
+      {% if estado_fil %}
+        · Estado: <span class="font-medium text-blue-600">
+          {% if estado_fil == 'pendiente' %}Pendiente{% elif estado_fil == 'parcial' %}Pago parcial{% else %}Pagada{% endif %}
+        </span>
+      {% endif %}
+    </p>
+    {% endif %}
+
+    <!-- Tabla -->
+    <div class="bg-white shadow rounded-xl overflow-hidden table-responsive">
+      {% if facturas %}
+      <table class="w-full min-w-[800px] text-left text-sm">
+        <thead class="bg-gray-100 text-gray-700">
+          <tr>
+            <th class="py-3 px-5">N° Factura</th>
+            <th class="py-3 px-5">Pedido</th>
+            <th class="py-3 px-5">Cliente</th>
+            <th class="py-3 px-5 hidden md:table-cell">Fecha Emisión</th>
+            <th class="py-3 px-5 text-end">Total</th>
+            <th class="py-3 px-5 text-end hidden md:table-cell">Pagado</th>
+            <th class="py-3 px-5 text-end hidden md:table-cell">Saldo</th>
+            <th class="py-3 px-5 text-center">Estado cobro</th>
+            <th class="py-3 px-5 text-center">Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for factura in facturas %}
+          <tr class="border-b hover:bg-gray-50">
+            <td class="py-3 px-5 font-medium">{{ factura.numero }}</td>
+            <td class="py-3 px-5">#{{ factura.pedido.id }}</td>
+            <td class="py-3 px-5">{{ factura.pedido.cliente.nombre }} {{ factura.pedido.cliente.apellido }}</td>
+            <td class="py-3 px-5 hidden md:table-cell">{{ factura.fecha_emision|date:"d/m/Y" }}</td>
+            <td class="py-3 px-5 text-end font-medium">${{ factura.monto_total|floatformat:2 }}</td>
+            <td class="py-3 px-5 text-end hidden md:table-cell text-green-700">${{ factura.total_pagado|floatformat:2 }}</td>
+            <td class="py-3 px-5 text-end hidden md:table-cell
+              {% if factura.saldo_pendiente > 0 %}text-red-600 font-semibold{% else %}text-gray-400{% endif %}">
+              ${{ factura.saldo_pendiente|floatformat:2 }}
+            </td>
+            <td class="py-3 px-5 text-center">
+              {% if factura.estado_pago == 'pagada' %}
+                <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">
+                  <span class="material-symbols-outlined text-xs">check_circle</span> Pagada
+                </span>
+              {% elif factura.estado_pago == 'parcial' %}
+                <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-700">
+                  <span class="material-symbols-outlined text-xs">pending</span> Parcial
+                </span>
+              {% else %}
+                <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700">
+                  <span class="material-symbols-outlined text-xs">schedule</span> Pendiente
+                </span>
+              {% endif %}
+            </td>
+            <td class="py-3 px-5 text-center flex justify-center gap-2">
+              <a href="{% url 'detalle_factura' factura.pk %}"
+                class="inline-flex items-center text-blue-600 hover:text-blue-800" title="Ver detalle y registrar pago">
+                <span class="material-symbols-outlined text-base">visibility</span>
+              </a>
+              <a href="{% url 'descargar_factura' factura.pedido.id %}" target="_blank"
+                class="inline-flex items-center text-emerald-600 hover:text-emerald-800" title="Descargar PDF">
+                <span class="material-symbols-outlined text-base">download</span>
+              </a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% include 'layouts/pagination.html' with page_obj=facturas %}
+      {% else %}
+      <div class="p-8 text-center text-gray-500">No hay facturas para mostrar.</div>
+      {% endif %}
+    </div>
+
+  </div>
+</div>
+{% endblock %}

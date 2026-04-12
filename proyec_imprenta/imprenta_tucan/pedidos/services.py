@@ -14,11 +14,10 @@ def _build_formula_variables(params, cantidad: int) -> dict:
         'cantidad':          float(cantidad),
         'ancho_cm':          float(params.ancho_pliego_cm),
         'alto_cm':           float(params.alto_pliego_cm),
-        'cobertura':         float(params.Ct),          # g/m2 por color
-        'desperdicio':       float(params.M),            # ej: 0.05
+        'cobertura':         float(params.Ct),
+        'desperdicio':       float(params.M),
         'paginas_totales':   int(params.C * params.F * params.Formas),
-        'paginas_por_plancha': int(params.C),            # 1 plancha por color
-        # Consumibles por horas: sin datos de producción, se usa 1 como default
+        'paginas_por_plancha': int(params.C),
         'horas':             1,
         'consumo_por_hora':  1,
     }
@@ -56,13 +55,11 @@ def calcular_consumo_producto(producto, cantidad: int) -> dict:
       1. RecetaDinamica (si existe y está activa)
       2. BOM estático (ProductoInsumo)
       3. Fórmula dinámica (producto.formula + ParametroProducto)
-         — complementa el BOM: solo agrega insumos que el BOM no incluye.
     """
     req = defaultdict(Decimal)
     if not producto or not cantidad:
         return dict(req)
 
-    # 1. RecetaDinamica
     try:
         receta = producto.receta_dinamica
         if receta and receta.activo:
@@ -70,7 +67,6 @@ def calcular_consumo_producto(producto, cantidad: int) -> dict:
     except Exception:
         pass
 
-    # 2. BOM estático
     from productos.models import ProductoInsumo
     for r in ProductoInsumo.objects.filter(producto=producto):
         if r.es_costo_fijo:
@@ -78,7 +74,6 @@ def calcular_consumo_producto(producto, cantidad: int) -> dict:
         else:
             req[r.insumo_id] += Decimal(r.cantidad_por_unidad) * Decimal(cantidad)
 
-    # 3. Fórmula dinámica — complementa insumos no cubiertos por el BOM
     for insumo_id, qty in calcular_con_formula(producto, cantidad).items():
         if insumo_id not in req:
             req[insumo_id] = qty
@@ -106,8 +101,6 @@ def reservar_insumos_para_pedido(pedido):
     import json
 
     consumos = calcular_consumo_pedido(pedido)
-    # C-4: toda la reserva va dentro de una transacción para garantizar consistencia.
-    # Si cualquier insumo falla, el stock de los anteriores no se modifica.
     with transaction.atomic():
         for insumo_id, cantidad in consumos.items():
             insumo = Insumo.objects.select_for_update().get(idInsumo=insumo_id)
@@ -125,10 +118,7 @@ def reservar_insumos_para_pedido(pedido):
                 object_repr=str(insumo),
                 action=AuditEntry.ACTION_UPDATE,
                 changes=json.dumps({
-                    'stock': {
-                        'before': stock_anterior,
-                        'after': int(insumo.stock),
-                    }
+                    'stock': {'before': stock_anterior, 'after': int(insumo.stock)}
                 }),
                 extra=json.dumps({
                     'category': 'stock-movement',
@@ -144,10 +134,7 @@ def reservar_insumos_para_pedido(pedido):
 
 
 def devolver_insumos_para_pedido(pedido):
-    """Revierte el descuento de stock generado por reservar_insumos_para_pedido.
-    Se llama cuando un pedido en estado 'En Proceso' es cancelado.
-    Suma de vuelta las cantidades al stock de cada insumo y registra en auditoría.
-    """
+    """Revierte el descuento de stock. Se llama cuando se cancela un pedido En Proceso."""
     from insumos.models import Insumo
     from pedidos.models import OrdenProduccion
     from auditoria.models import AuditEntry
@@ -180,7 +167,6 @@ def devolver_insumos_para_pedido(pedido):
             }),
         )
 
-    # Cancelar la OrdenProduccion asociada si existe
     try:
         op = OrdenProduccion.objects.get(pedido=pedido)
         op.estado = 'cancelada'
@@ -190,9 +176,7 @@ def devolver_insumos_para_pedido(pedido):
 
 
 def verificar_stock_consumo(consumo: dict) -> tuple[bool, dict]:
-    """Verifica stock disponible para un dict de consumo {insumo_id: requerido}.
-    Retorna (ok, faltantes: {insumo_id: faltan}).
-    """
+    """Verifica stock disponible para un dict de consumo {insumo_id: requerido}."""
     if not consumo:
         return True, {}
     from insumos.models import Insumo
@@ -209,11 +193,7 @@ def verificar_stock_consumo(consumo: dict) -> tuple[bool, dict]:
 
 
 def aplicar_descuento_oferta(pedido):
-    """
-    T-05: Si el cliente tiene una oferta de descuento aceptada, aplica el porcentaje
-    al monto_total del pedido. Retorna la oferta encontrada o None.
-    Solo debe llamarse en pedidos nuevos (sin pk).
-    """
+    """Aplica descuento de oferta al pedido nuevo si existe."""
     try:
         from automatizacion.models import OfertaPropuesta
         oferta = (
@@ -237,9 +217,7 @@ def aplicar_descuento_oferta(pedido):
 
 
 def ajustar_score_cancelacion(pedido):
-    """
-    T-05: Al cancelar un pedido, ajusta el score del cliente y registra en AutomationLog.
-    """
+    """Al cancelar un pedido, ajusta el score del cliente."""
     try:
         from automatizacion.models import OfertaPropuesta, AutomationLog
         from automatizacion.views import _ajustar_score_por_feedback
@@ -259,9 +237,7 @@ def ajustar_score_cancelacion(pedido):
 
 
 def marcar_oferta_aplicada(pedido, oferta):
-    """
-    T-05: Marca la oferta como aplicada y guarda el id del pedido en sus parametros.
-    """
+    """Marca la oferta como aplicada y guarda el id del pedido en sus parametros."""
     try:
         oferta.estado = "aplicada"
         params = oferta.parametros or {}
@@ -276,8 +252,7 @@ def marcar_oferta_aplicada(pedido, oferta):
 def notificar_entrega_pedido(pedido):
     """
     Envía notificación multicanal al cliente cuando su pedido pasa a "Entregado".
-    Canales: email (siempre) + WhatsApp (si tiene número) + portal interno.
-    Nunca lanza excepción — los errores se registran en el log y en AutomationLog.
+    Canales: email + WhatsApp (si tiene número) + portal interno.
     """
     import logging
     log = logging.getLogger(__name__)
@@ -289,7 +264,6 @@ def notificar_entrega_pedido(pedido):
         cliente = pedido.cliente
         lineas  = pedido.lineas.select_related('producto').all()
 
-        # ── Textos ────────────────────────────────────────────────────────────
         productos_str = ', '.join(
             f"{l.producto.nombreProducto} (x{l.cantidad})" for l in lineas
         ) or 'Ver detalle en nuestras oficinas'
@@ -306,33 +280,24 @@ def notificar_entrega_pedido(pedido):
             f"Ante cualquier consulta, no dudes en contactarnos."
         )
 
-        # ── HTML email ────────────────────────────────────────────────────────
         try:
             html_body = render_to_string('pedidos/email_entrega.html', {
-                'pedido':   pedido,
-                'cliente':  cliente,
-                'lineas':   lineas,
+                'pedido': pedido, 'cliente': cliente, 'lineas': lineas,
             })
         except Exception:
-            html_body = None   # fallback a texto plano si el template falla
+            html_body = None
 
         meta = {'pedido_id': pedido.pk, 'cliente_id': cliente.pk}
 
-        # ── Email ─────────────────────────────────────────────────────────────
         if cliente.email:
             resultado = enviar_notificacion(
-                destinatario=cliente.email,
-                mensaje=texto_plano,
-                canal='email',
-                asunto=asunto,
-                html=html_body,
-                metadata=meta,
+                destinatario=cliente.email, mensaje=texto_plano,
+                canal='email', asunto=asunto, html=html_body, metadata=meta,
             )
             if not resultado.get('ok'):
                 log.warning('notificar_entrega: email falló para pedido #%s: %s',
                             pedido.pk, resultado.get('error'))
 
-        # ── WhatsApp ──────────────────────────────────────────────────────────
         numero_wa = cliente.numero_whatsapp
         if numero_wa:
             texto_wa = (
@@ -342,23 +307,17 @@ def notificar_entrega_pedido(pedido):
                 f"¡Gracias por tu confianza! 🎉"
             )
             resultado_wa = enviar_notificacion(
-                destinatario=numero_wa,
-                mensaje=texto_wa,
-                canal='whatsapp',
-                asunto=asunto,
-                metadata=meta,
+                destinatario=numero_wa, mensaje=texto_wa,
+                canal='whatsapp', asunto=asunto, metadata=meta,
             )
             if not resultado_wa.get('ok'):
                 log.warning('notificar_entrega: WhatsApp falló para pedido #%s: %s',
                             pedido.pk, resultado_wa.get('error'))
 
-        # ── Portal interno ────────────────────────────────────────────────────
         enviar_notificacion(
             destinatario=str(cliente.pk),
             mensaje=f'Pedido #{pedido.pk} de {cliente.nombre} {cliente.apellido} entregado.',
-            canal='portal',
-            asunto='Entrega de pedido',
-            metadata=meta,
+            canal='portal', asunto='Entrega de pedido', metadata=meta,
         )
 
     except Exception as exc:
@@ -368,15 +327,10 @@ def notificar_entrega_pedido(pedido):
         )
 
 
-# ─── Facturación ──────────────────────────────────────────────────────────────
+# ── Facturación ───────────────────────────────────────────────────────────────
 
 def crear_factura_para_pedido(pedido) -> 'Factura':
-    """
-    Crea el registro Factura para un pedido que acaba de pasar a Entregado
-    y envía el PDF al cliente por email.
-    Si ya existe una factura para ese pedido, la devuelve sin duplicar
-    (no reenvía el email).
-    """
+    """Crea Factura C para un pedido Entregado y envía PDF al cliente."""
     import logging
     log = logging.getLogger(__name__)
     from .models import Factura
@@ -387,18 +341,15 @@ def crear_factura_para_pedido(pedido) -> 'Factura':
 
     numero = Factura.proximo_numero()
     factura = Factura.objects.create(
-        pedido=pedido,
-        numero=numero,
-        monto_total=pedido.monto_total,
+        pedido=pedido, numero=numero, monto_total=pedido.monto_total,
     )
-    log.info('Factura %s emitida para pedido #%s', numero, pedido.pk)
-
+    log.info('Factura C %s emitida para pedido #%s', numero, pedido.pk)
     _enviar_factura_por_email(factura)
     return factura
 
 
 def _enviar_factura_por_email(factura) -> None:
-    """Envía la factura como PDF adjunto al email del cliente."""
+    """Envía la Factura C como PDF adjunto al email del cliente."""
     import logging
     log = logging.getLogger(__name__)
 
@@ -412,32 +363,27 @@ def _enviar_factura_por_email(factura) -> None:
         from django.conf import settings
 
         pdf_bytes = generar_pdf_factura(factura)
-
-        asunto = f'Factura {factura.numero} — Pedido #{factura.pedido.pk} — Imprenta Tucán'
-
+        asunto = f'Factura C {factura.numero} — Pedido #{factura.pedido.pk} — Imprenta Tucán'
         cuerpo = (
             f'Hola {cliente.nombre},\n\n'
-            f'Adjuntamos la factura correspondiente a tu pedido N° {factura.pedido.pk}.\n\n'
+            f'Adjuntamos la Factura C correspondiente a tu pedido N° {factura.pedido.pk}.\n\n'
             f'Número de factura: {factura.numero}\n'
             f'Fecha de emisión: {factura.fecha_emision.strftime("%d/%m/%Y")}\n'
-            f'Total: ${factura.monto_total:,.2f}\n\n'
+            f'Importe total: ${factura.monto_total:,.2f}\n\n'
+            f'El presente comprobante no genera crédito fiscal de IVA.\n\n'
             f'Ante cualquier consulta, no dudes en contactarnos.\n'
             f'— Imprenta Tucán'
         )
-
         email = EmailMessage(
-            subject=asunto,
-            body=cuerpo,
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            to=[cliente.email],
+            subject=asunto, body=cuerpo,
+            from_email=settings.DEFAULT_FROM_EMAIL, to=[cliente.email],
         )
         email.attach(
-            filename=f'factura_{factura.numero}.pdf',
-            content=pdf_bytes,
-            mimetype='application/pdf',
+            filename=f'factura_c_{factura.numero}.pdf',
+            content=pdf_bytes, mimetype='application/pdf',
         )
         email.send(fail_silently=False)
-        log.info('Factura %s enviada por email a %s', factura.numero, cliente.email)
+        log.info('Factura C %s enviada por email a %s', factura.numero, cliente.email)
 
     except Exception:
         log.exception(
@@ -448,53 +394,115 @@ def _enviar_factura_por_email(factura) -> None:
 
 def generar_pdf_factura(factura) -> bytes:
     """
-    Genera el PDF de la factura usando reportlab y devuelve bytes.
+    Genera el PDF de Factura C siguiendo el formato estándar AFIP para monotributistas.
+
+    Layout (fiel al modelo físico de talonario):
+      - Encabezado: [datos empresa | C en recuadro | FACTURA / N° / fecha DIA|MES|AÑO]
+      - Sección receptor tipo formulario (Señor/es, Domicilio, Localidad, IVA, condición venta)
+      - Tabla detalle: CANTIDAD | DESCRIPCION | PRECIO UNITARIO | IMPORTE
+      - Pie: TOTAL $ destacado + leyenda + CAI + fecha vencimiento
     """
     import io
+    import os
     from decimal import Decimal
     from reportlab.lib.pagesizes import A4
     from reportlab.lib import colors
-    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.styles import ParagraphStyle
     from reportlab.lib.enums import TA_CENTER, TA_RIGHT, TA_LEFT
-    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
+    from reportlab.platypus import (
+        SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable, Image,
+    )
     from reportlab.lib.units import cm
 
-    pedido = factura.pedido
+    pedido  = factura.pedido
     cliente = pedido.cliente
-    lineas = pedido.lineas.select_related('producto').all()
+    lineas  = pedido.lineas.select_related('producto').all()
 
-    # Datos empresa
+    # ── Datos de la empresa ───────────────────────────────────────────────────
     try:
         from configuracion.models import Parametro
-        empresa = {
-            'nombre':    Parametro.get('EMPRESA_NOMBRE',    'Imprenta Tucán S.A.'),
-            'cuit':      Parametro.get('EMPRESA_CUIT',      ''),
-            'domicilio': Parametro.get('EMPRESA_DOMICILIO', ''),
-            'telefono':  Parametro.get('EMPRESA_TELEFONO',  ''),
-            'email':     Parametro.get('EMPRESA_EMAIL',     ''),
-            'iva':       Parametro.get('EMPRESA_CONDICION_IVA', 'Responsable Inscripto'),
+        emp = {
+            'nombre':    Parametro.get('EMPRESA_NOMBRE',             'Imprenta Tucán'),
+            'razon':     Parametro.get('EMPRESA_RAZON_SOCIAL',       ''),
+            'domicilio': Parametro.get('EMPRESA_DOMICILIO',          ''),
+            'telefono':  Parametro.get('EMPRESA_TELEFONO',           ''),
+            'cuit':      Parametro.get('EMPRESA_CUIT',               ''),
+            'ib':        Parametro.get('EMPRESA_INGRESOS_BRUTOS',    ''),
+            'inicio':    Parametro.get('EMPRESA_INICIO_ACTIVIDADES', ''),
+            'cond_iva':  Parametro.get('EMPRESA_CONDICION_IVA',      'RESPONSABLE MONOTRIBUTO'),
         }
     except Exception:
-        empresa = {'nombre': 'Imprenta Tucán S.A.', 'cuit': '', 'domicilio': '',
-                   'telefono': '', 'email': '', 'iva': 'Responsable Inscripto'}
+        emp = {
+            'nombre': 'Imprenta Tucán', 'razon': '', 'domicilio': '',
+            'telefono': '', 'cuit': '', 'ib': '', 'inicio': '',
+            'cond_iva': 'RESPONSABLE MONOTRIBUTO',
+        }
 
-    buf = io.BytesIO()
-    doc = SimpleDocTemplate(
+    # ── Número de comprobante ─────────────────────────────────────────────────
+    # Nuevo formato: XXXX-XXXXXXXX (2 partes numéricas)
+    # Viejo formato: F-YYYY-NNNN  → mostrar completo
+    partes = factura.numero.split('-')
+    if len(partes) == 2 and partes[0].isdigit() and partes[1].isdigit():
+        pv  = partes[0]
+        num = partes[1]
+    else:
+        pv  = '0001'
+        num = factura.numero
+
+    fecha_e = factura.fecha_emision
+    dia_s   = fecha_e.strftime('%d')
+    mes_s   = fecha_e.strftime('%m')
+    anio_s  = fecha_e.strftime('%Y')
+
+    # ── Condición IVA del receptor ────────────────────────────────────────────
+    _tier_iva = {
+        'nuevo':       'Consumidor Final',
+        'estandar':    'Consumidor Final',
+        'estrategico': 'Resp. Inscripto',
+        'premium':     'Resp. Inscripto',
+    }
+    tier = (getattr(cliente, 'tipo_cliente', '') or '').lower()
+    cond_iva_rec = _tier_iva.get(tier, 'Consumidor Final')
+
+    nombre_rec = f'{cliente.nombre} {cliente.apellido}'
+    if getattr(cliente, 'razon_social', None):
+        nombre_rec += f' / {cliente.razon_social}'
+    cuit_rec = getattr(cliente, 'cuit', '') or '—'
+    dom_rec  = (getattr(cliente, 'direccion', '')
+                or getattr(cliente, 'domicilio', '') or '')
+    tel_rec  = getattr(cliente, 'telefono', '') or ''
+    loc_rec  = (getattr(cliente, 'ciudad', None) and str(cliente.ciudad)) or ''
+
+    # ── Documento ─────────────────────────────────────────────────────────────
+    buf    = io.BytesIO()
+    PW, PH = A4
+    M      = 1.5 * cm                     # margen
+    W      = PW - 2 * M                   # ancho útil ≈ 17.7 cm
+    doc    = SimpleDocTemplate(
         buf, pagesize=A4,
-        leftMargin=2*cm, rightMargin=2*cm, topMargin=2*cm, bottomMargin=2*cm,
+        leftMargin=M, rightMargin=M,
+        topMargin=M, bottomMargin=M,
     )
 
-    styles = getSampleStyleSheet()
-    st_normal = styles['Normal']
-    st_normal.fontSize = 9
-    st_h1 = ParagraphStyle('H1', fontSize=16, fontName='Helvetica-Bold', alignment=TA_CENTER, spaceAfter=4)
-    st_h2 = ParagraphStyle('H2', fontSize=11, fontName='Helvetica-Bold', spaceAfter=2)
-    st_small = ParagraphStyle('Small', fontSize=8, textColor=colors.grey)
-    st_right = ParagraphStyle('Right', fontSize=9, alignment=TA_RIGHT)
-    st_bold = ParagraphStyle('Bold', fontSize=9, fontName='Helvetica-Bold')
-    st_total = ParagraphStyle('Total', fontSize=11, fontName='Helvetica-Bold', alignment=TA_RIGHT)
+    # ── Estilos ───────────────────────────────────────────────────────────────
+    BLK  = colors.black
+    GRY  = colors.HexColor('#888888')
+    LGY  = colors.HexColor('#dddddd')
+    DGRY = colors.HexColor('#333333')
 
-    # ── Utilidades ────────────────────────────────────────────────────────────
+    def st(name, size=8, bold=False, align=TA_LEFT, color=BLK, leading=None):
+        return ParagraphStyle(
+            name,
+            fontSize=size,
+            fontName='Helvetica-Bold' if bold else 'Helvetica',
+            alignment=align,
+            textColor=color,
+            leading=leading or size + 2,
+        )
+
+    def cell(text, size=8, bold=False, align=TA_LEFT, color=BLK):
+        return Paragraph(str(text), st(f's{id(text)}', size, bold, align, color))
+
     def money(val):
         try:
             return f'$ {Decimal(str(val)):,.2f}'
@@ -503,162 +511,341 @@ def generar_pdf_factura(factura) -> bytes:
 
     story = []
 
-    # ── Encabezado ────────────────────────────────────────────────────────────
-    header_data = [
-        [
-            Paragraph(f'<b>{empresa["nombre"]}</b>', st_h2),
-            Paragraph('<b>FACTURA</b>', st_h1),
-        ],
-        [
-            Paragraph(
-                f'CUIT: {empresa["cuit"]}<br/>'
-                f'{empresa["domicilio"]}<br/>'
-                f'Tel: {empresa["telefono"]}<br/>'
-                f'Email: {empresa["email"]}<br/>'
-                f'IVA: {empresa["iva"]}',
-                st_normal,
-            ),
-            Table(
-                [
-                    ['N°:', factura.numero],
-                    ['Fecha:', factura.fecha_emision.strftime('%d/%m/%Y')],
-                    ['Pedido:', f'#{pedido.pk}'],
-                    ['Estado:', pedido.estado.nombre],
-                ],
-                colWidths=[2.5*cm, 4.5*cm],
-                style=TableStyle([
-                    ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
-                    ('FONTSIZE', (0, 0), (-1, -1), 9),
-                    ('ALIGN', (1, 0), (1, -1), 'LEFT'),
-                    ('ROWBACKGROUNDS', (0, 0), (-1, -1), [colors.whitesmoke, colors.white]),
-                    ('BOX', (0, 0), (-1, -1), 0.5, colors.lightgrey),
-                    ('INNERGRID', (0, 0), (-1, -1), 0.25, colors.lightgrey),
-                    ('TOPPADDING', (0, 0), (-1, -1), 3),
-                    ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
-                    ('LEFTPADDING', (0, 0), (-1, -1), 5),
-                ]),
-            ),
-        ],
-    ]
-    header_table = Table(header_data, colWidths=[9*cm, 8*cm])
-    header_table.setStyle(TableStyle([
-        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-        ('LINEBELOW', (0, 1), (-1, 1), 0, colors.white),
-    ]))
-    story.append(header_table)
-    story.append(Spacer(1, 0.4*cm))
-    story.append(HRFlowable(width='100%', thickness=1, color=colors.HexColor('#1e40af')))
-    story.append(Spacer(1, 0.3*cm))
+    # =========================================================================
+    # 1. ENCABEZADO
+    #    Columnas: [empresa (izq) | C-box (centro) | factura+fecha (der)]
+    # =========================================================================
+    col_emp  = W * 0.50
+    col_c    = W * 0.12
+    col_fac  = W - col_emp - col_c
 
-    # ── Datos del cliente ─────────────────────────────────────────────────────
-    story.append(Paragraph('DATOS DEL CLIENTE', st_h2))
-    cliente_data = [
-        ['Nombre / Razón Social:', f'{cliente.nombre} {cliente.apellido}' +
-            (f' — {cliente.razon_social}' if getattr(cliente, 'razon_social', None) else '')],
-        ['CUIT:', getattr(cliente, 'cuit', '') or '—'],
-        ['Email:', cliente.email or '—'],
-        ['Teléfono:', getattr(cliente, 'telefono', '') or '—'],
-    ]
-    cliente_table = Table(cliente_data, colWidths=[5*cm, 12*cm])
-    cliente_table.setStyle(TableStyle([
-        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, -1), 9),
-        ('TOPPADDING', (0, 0), (-1, -1), 3),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
-        ('LEFTPADDING', (0, 0), (-1, -1), 4),
-        ('ROWBACKGROUNDS', (0, 0), (-1, -1), [colors.whitesmoke, colors.white]),
-    ]))
-    story.append(cliente_table)
-    story.append(Spacer(1, 0.4*cm))
+    # — Logo de la empresa —
+    _logo_path = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        'static', 'img', 'Logo Tucan_Mesa de trabajo 1.png',
+    )
+    if os.path.exists(_logo_path):
+        _logo_img = Image(_logo_path)
+        _max_w = 3.5 * cm
+        _max_h = 1.8 * cm
+        _iw = _logo_img.imageWidth or 1
+        _ih = _logo_img.imageHeight or 1
+        _scale = min(_max_w / _iw, _max_h / _ih)
+        _logo_img.drawWidth  = _iw * _scale
+        _logo_img.drawHeight = _ih * _scale
+        _logo_img.hAlign = 'LEFT'
+        _logo_cell = _logo_img
+    else:
+        _logo_cell = cell(emp['nombre'], size=13, bold=True)
 
-    # ── Detalle de líneas ─────────────────────────────────────────────────────
-    story.append(Paragraph('DETALLE', st_h2))
-    col_widths = [6.5*cm, 2*cm, 3*cm, 3.5*cm, 2*cm]
-    lineas_data = [['Producto', 'Cant.', 'Unitario', 'Importe', 'Espec.']]
+    # — Empresa (izquierda) —
+    _emp_rows = [
+        [_logo_cell],
+        [cell(emp['nombre'], size=10, bold=True)],
+        [cell(f"{emp['domicilio']}  {emp['telefono']}".strip(' '), size=8)],
+        [cell(emp['cond_iva'].upper(), size=7, bold=True)],
+    ]
+    if emp['razon']:
+        _emp_rows.insert(2, [cell(emp['razon'], size=8, color=DGRY)])
+
+    emp_content = Table(
+        _emp_rows,
+        colWidths=[col_emp - 0.3 * cm],
+    )
+    emp_content.setStyle(TableStyle([
+        ('TOPPADDING',    (0, 0), (-1, -1), 2),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
+        ('LEFTPADDING',   (0, 0), (-1, -1), 5),
+        ('RIGHTPADDING',  (0, 0), (-1, -1), 3),
+        ('VALIGN',        (0, 0), (-1, -1), 'MIDDLE'),
+    ]))
+
+    # — Letra C (centro): celda simple, el recuadro se dibuja en el header exterior —
+    c_cell = cell('C', size=32, bold=True, align=TA_CENTER)
+
+    # — FACTURA + número + fecha (derecha) —
+    # Fecha en 3 celdas: DIA | MES | AÑO
+    fecha_tabla = Table(
+        [
+            [cell('DIA', size=6, align=TA_CENTER, color=GRY),
+             cell('MES', size=6, align=TA_CENTER, color=GRY),
+             cell('AÑO', size=6, align=TA_CENTER, color=GRY)],
+            [cell(dia_s,  size=8, bold=True, align=TA_CENTER),
+             cell(mes_s,  size=8, bold=True, align=TA_CENTER),
+             cell(anio_s, size=8, bold=True, align=TA_CENTER)],
+        ],
+        colWidths=[1.1 * cm, 1.1 * cm, 1.6 * cm],
+    )
+    fecha_tabla.setStyle(TableStyle([
+        ('BOX',           (0, 0), (-1, -1), 0.5, BLK),
+        ('INNERGRID',     (0, 0), (-1, -1), 0.25, LGY),
+        ('ALIGN',         (0, 0), (-1, -1), 'CENTER'),
+        ('TOPPADDING',    (0, 0), (-1, -1), 1),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 1),
+    ]))
+
+    fac_right = Table(
+        [
+            [cell('FACTURA', size=14, bold=True, align=TA_CENTER)],
+            [cell(f'N° {pv}-{num}', size=9, bold=True, align=TA_CENTER)],
+            [fecha_tabla],
+            [cell(f'CUIT: {emp["cuit"]}', size=7)],
+            [cell(f'Ing. Brutos: {emp["ib"] or emp["cuit"]}', size=7)],
+            [cell(f'Inicio Act.: {emp["inicio"]}', size=7)],
+        ],
+        colWidths=[col_fac - 0.3 * cm],
+    )
+    fac_right.setStyle(TableStyle([
+        ('TOPPADDING',    (0, 0), (-1, -1), 2),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
+        ('LEFTPADDING',   (0, 0), (-1, -1), 6),
+        ('RIGHTPADDING',  (0, 0), (-1, -1), 4),
+        ('VALIGN',        (0, 0), (-1, -1), 'MIDDLE'),
+    ]))
+
+    header = Table(
+        [[emp_content, c_cell, fac_right]],
+        colWidths=[col_emp, col_c, col_fac],
+    )
+    header.setStyle(TableStyle([
+        # Borde exterior de todo el encabezado
+        ('BOX',           (0, 0), (-1, -1), 1,   BLK),
+        # Recuadro de la columna "C" (ocupa toda la altura del header automáticamente)
+        ('BOX',           (1, 0), (1, 0),   1.5, BLK),
+        ('ALIGN',         (1, 0), (1, 0),   'CENTER'),
+        ('VALIGN',        (0, 0), (-1, -1), 'MIDDLE'),
+        ('TOPPADDING',    (0, 0), (-1, -1), 5),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+    ]))
+    story.append(header)
+    story.append(Spacer(1, 0.25 * cm))
+
+    # =========================================================================
+    # 2. DATOS DEL RECEPTOR — estilo formulario con líneas punteadas
+    # =========================================================================
+    LINE = colors.HexColor('#aaaaaa')
+
+    def form_row(*pairs, col_widths=None):
+        """Genera una fila de formulario: [label | valor | label | valor ...]"""
+        cells = []
+        for label, value in pairs:
+            cells.append(cell(label, size=7, color=GRY))
+            cells.append(cell(value, size=8))
+        t = Table([cells], colWidths=col_widths or [W / (len(pairs) * 2)] * (len(pairs) * 2))
+        t.setStyle(TableStyle([
+            ('TOPPADDING',    (0, 0), (-1, -1), 3),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
+            ('LEFTPADDING',   (0, 0), (-1, -1), 4),
+            ('RIGHTPADDING',  (0, 0), (-1, -1), 4),
+            ('LINEBELOW',     (1, 0), (1, 0),   0.5, LINE),
+            ('LINEBELOW',     (3, 0), (3, 0),   0.5, LINE) if len(pairs) > 1 else ('NOP', (0,0),(0,0)),
+            ('VALIGN',        (0, 0), (-1, -1), 'BOTTOM'),
+        ]))
+        return t
+
+    story.append(form_row(
+        ('Señor/es:', nombre_rec),
+        ('Teléfono:', tel_rec),
+        col_widths=[2 * cm, 10 * cm, 2 * cm, W - 14 * cm],
+    ))
+    story.append(form_row(
+        ('Domicilio:', dom_rec),
+        ('Localidad:', loc_rec),
+        col_widths=[2 * cm, 9 * cm, 2.2 * cm, W - 13.2 * cm],
+    ))
+
+    # Fila IVA con checkboxes simulados
+    def check(label, marcado=False):
+        mark = '[X]' if marcado else '[ ]'
+        return cell(f'{mark} {label}', size=7)
+
+    iva_ri  = cond_iva_rec == 'Resp. Inscripto'
+    iva_cf  = cond_iva_rec == 'Consumidor Final'
+    iva_mon = cond_iva_rec == 'Resp. Monotributo'
+
+    iva_row = Table(
+        [[
+            cell('I.V.A.:', size=7, color=GRY),
+            check('Resp. Inscripto',   iva_ri),
+            check('Resp. Monotributo', iva_mon),
+            check('Consumidor Final',  iva_cf),
+            check('No Responsable',    False),
+            check('Exento',            False),
+            cell('C.U.I.T. N°:', size=7, color=GRY),
+            cell(cuit_rec, size=8),
+        ]],
+        colWidths=[1.2*cm, 2.5*cm, 2.9*cm, 2.5*cm, 2.2*cm, 1.3*cm, 1.8*cm, W-14.4*cm],
+    )
+    iva_row.setStyle(TableStyle([
+        ('TOPPADDING',    (0, 0), (-1, -1), 3),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
+        ('LEFTPADDING',   (0, 0), (-1, -1), 4),
+        ('RIGHTPADDING',  (0, 0), (-1, -1), 2),
+        ('LINEBELOW',     (7, 0), (7, 0),   0.5, LINE),
+        ('VALIGN',        (0, 0), (-1, -1), 'BOTTOM'),
+        ('BOX',           (0, 0), (-1, -1), 0.5, LINE),
+    ]))
+    story.append(iva_row)
+
+    # Condiciones de venta
+    venta_row = Table(
+        [[
+            cell('Condiciones de venta:', size=7, color=GRY),
+            check('Contado',          True),
+            check('Cuenta Corriente', False),
+            cell('Remito N°:', size=7, color=GRY),
+            cell('', size=8),
+        ]],
+        colWidths=[3.8*cm, 1.9*cm, 3.5*cm, 2.2*cm, W-11.4*cm],
+    )
+    venta_row.setStyle(TableStyle([
+        ('TOPPADDING',    (0, 0), (-1, -1), 3),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
+        ('LEFTPADDING',   (0, 0), (-1, -1), 4),
+        ('RIGHTPADDING',  (0, 0), (-1, -1), 2),
+        ('LINEBELOW',     (4, 0), (4, 0),   0.5, LINE),
+        ('VALIGN',        (0, 0), (-1, -1), 'BOTTOM'),
+        ('BOX',           (0, 0), (-1, -1), 0.5, LINE),
+    ]))
+    story.append(venta_row)
+    story.append(Spacer(1, 0.2 * cm))
+
+    # =========================================================================
+    # 3. TABLA DETALLE — CANTIDAD | DESCRIPCION | PRECIO UNITARIO | IMPORTE
+    # =========================================================================
+    cw_det = [2.5 * cm, W - 8.5 * cm, 3 * cm, 3 * cm]
+
+    th_style = dict(size=8, bold=True, align=TA_CENTER, color=colors.white)
+    det_data = [[
+        cell('CANTIDAD',       **th_style),
+        cell('DESCRIPCION',    **th_style),
+        cell('PRECIO UNITARIO',**th_style),
+        cell('IMPORTE',        **th_style),
+    ]]
+
     subtotal = Decimal('0')
     for l in lineas:
-        precio = l.precio_unitario or Decimal('0')
+        precio  = l.precio_unitario or Decimal('0')
         importe = precio * l.cantidad
         subtotal += importe
-        lineas_data.append([
-            l.producto.nombreProducto,
-            str(l.cantidad),
-            money(precio),
-            money(importe),
-            l.especificaciones or '—',
+        desc = l.producto.nombreProducto
+        if l.especificaciones:
+            desc += f' ({l.especificaciones})'
+        det_data.append([
+            cell(str(l.cantidad), align=TA_CENTER),
+            cell(desc),
+            cell(money(precio),   align=TA_RIGHT),
+            cell(money(importe),  align=TA_RIGHT),
         ])
 
-    lineas_table = Table(lineas_data, colWidths=col_widths, repeatRows=1)
-    lineas_table.setStyle(TableStyle([
-        # Encabezado
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1e40af')),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, -1), 9),
-        ('ALIGN', (1, 0), (-1, -1), 'RIGHT'),
-        ('ALIGN', (0, 0), (0, -1), 'LEFT'),
-        ('ALIGN', (4, 0), (4, -1), 'LEFT'),
-        ('TOPPADDING', (0, 0), (-1, -1), 4),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
-        ('LEFTPADDING', (0, 0), (-1, -1), 5),
-        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f8fafc')]),
-        ('GRID', (0, 0), (-1, -1), 0.25, colors.HexColor('#e2e8f0')),
-        ('LINEBELOW', (0, 0), (-1, 0), 1, colors.HexColor('#1e40af')),
+    # Rellenar con filas vacías para llegar a mínimo 8 líneas (aspecto de talonario)
+    MIN_ROWS = 8
+    while len(det_data) < MIN_ROWS + 1:
+        det_data.append([cell(''), cell(''), cell(''), cell('')])
+
+    n = len(det_data)
+    row_bgs = [colors.HexColor('#1e3a5f')] + [
+        colors.white if i % 2 == 1 else colors.HexColor('#f9f9f9')
+        for i in range(1, n)
+    ]
+
+    det_table = Table(det_data, colWidths=cw_det, repeatRows=1)
+    det_table.setStyle(TableStyle([
+        ('ROWBACKGROUNDS',  (0, 0), (-1, -1), row_bgs),
+        ('TEXTCOLOR',       (0, 0), (-1, 0),  colors.white),
+        ('FONTSIZE',        (0, 0), (-1, -1), 8),
+        ('TOPPADDING',      (0, 0), (-1, -1), 4),
+        ('BOTTOMPADDING',   (0, 0), (-1, -1), 4),
+        ('LEFTPADDING',     (0, 0), (-1, -1), 5),
+        ('RIGHTPADDING',    (0, 0), (-1, -1), 5),
+        ('GRID',            (0, 0), (-1, -1), 0.3, LGY),
+        ('LINEBELOW',       (0, 0), (-1, 0),  1,   colors.HexColor('#1e3a5f')),
+        ('VALIGN',          (0, 0), (-1, -1), 'MIDDLE'),
+        ('ALIGN',           (0, 0), (0, -1),  'CENTER'),
+        ('ALIGN',           (2, 0), (3, -1),  'RIGHT'),
     ]))
-    story.append(lineas_table)
-    story.append(Spacer(1, 0.3*cm))
+    story.append(det_table)
+    story.append(Spacer(1, 0.15 * cm))
 
-    # ── Totales ───────────────────────────────────────────────────────────────
+    # =========================================================================
+    # 4. TOTALES + LEYENDA + CAI
+    # =========================================================================
     descuento = Decimal(str(pedido.descuento or 0))
-    monto_descuento = subtotal * descuento / Decimal('100')
-    subtotal_con_dto = subtotal - monto_descuento
+    monto_dto = subtotal * descuento / Decimal('100')
 
-    try:
-        from configuracion.models import Parametro as _P
-        iva_rate = Decimal(str(_P.get('IVA_PORCENTAJE', '0.21')))
-    except Exception:
-        iva_rate = Decimal('0.21')
-
-    monto_iva = subtotal_con_dto * iva_rate if pedido.aplicar_iva else Decimal('0')
-
-    totales_rows = []
-    totales_rows.append(['Subtotal', money(subtotal)])
+    # Fila de descuento (si aplica)
+    subtotales_rows = []
+    subtotales_rows.append([cell('Subtotal', size=8, align=TA_RIGHT),
+                             cell(money(subtotal), size=8, align=TA_RIGHT)])
     if descuento:
-        totales_rows.append([f'Descuento ({descuento:.0f}%)', f'— {money(monto_descuento)}'])
-    if pedido.aplicar_iva:
-        totales_rows.append([f'IVA ({iva_rate*100:.0f}%)', money(monto_iva)])
-    totales_rows.append(['TOTAL', money(pedido.monto_total)])
+        subtotales_rows.append([
+            cell(f'Descuento ({descuento:.0f}%)', size=8, align=TA_RIGHT),
+            cell(f'- {money(monto_dto)}', size=8, align=TA_RIGHT),
+        ])
 
-    totales_table = Table(totales_rows, colWidths=[4*cm, 3.5*cm], hAlign='RIGHT')
-    totales_style = [
-        ('FONTSIZE', (0, 0), (-1, -1), 9),
-        ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
-        ('ALIGN', (0, 0), (0, -1), 'RIGHT'),
-        ('TOPPADDING', (0, 0), (-1, -1), 3),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
-        ('LEFTPADDING', (0, 0), (-1, -1), 5),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 5),
-        ('GRID', (0, 0), (-1, -1), 0.25, colors.lightgrey),
-    ]
-    last = len(totales_rows) - 1
-    totales_style += [
-        ('BACKGROUND', (0, last), (-1, last), colors.HexColor('#eff6ff')),
-        ('FONTNAME', (0, last), (-1, last), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, last), (-1, last), 11),
-        ('LINEABOVE', (0, last), (-1, last), 1, colors.HexColor('#1e40af')),
-        ('TEXTCOLOR', (0, last), (-1, last), colors.HexColor('#1e40af')),
-    ]
-    totales_table.setStyle(TableStyle(totales_style))
-    story.append(totales_table)
+    sub_table = Table(subtotales_rows, colWidths=[4 * cm, 3.5 * cm], hAlign='RIGHT')
+    sub_table.setStyle(TableStyle([
+        ('TOPPADDING',    (0, 0), (-1, -1), 2),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
+        ('LEFTPADDING',   (0, 0), (-1, -1), 6),
+        ('RIGHTPADDING',  (0, 0), (-1, -1), 6),
+        ('LINEBELOW',     (0, -1), (-1, -1), 0.5, LGY),
+    ]))
+    story.append(sub_table)
 
-    # ── Pie ───────────────────────────────────────────────────────────────────
-    story.append(Spacer(1, 0.8*cm))
-    story.append(HRFlowable(width='100%', thickness=0.5, color=colors.lightgrey))
-    story.append(Spacer(1, 0.2*cm))
+    # TOTAL $ box destacado (igual que el modelo físico)
+    total_table = Table(
+        [[
+            cell('TOTAL $', size=11, bold=True, align=TA_RIGHT, color=colors.white),
+            cell(money(pedido.monto_total), size=11, bold=True, align=TA_RIGHT, color=colors.white),
+        ]],
+        colWidths=[4 * cm, 3.5 * cm],
+        hAlign='RIGHT',
+    )
+    total_table.setStyle(TableStyle([
+        ('BACKGROUND',    (0, 0), (-1, -1), colors.HexColor('#1e3a5f')),
+        ('TOPPADDING',    (0, 0), (-1, -1), 5),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+        ('LEFTPADDING',   (0, 0), (-1, -1), 8),
+        ('RIGHTPADDING',  (0, 0), (-1, -1), 8),
+        ('BOX',           (0, 0), (-1, -1), 1, colors.HexColor('#1e3a5f')),
+    ]))
+    story.append(total_table)
+
+    # Leyenda + separador
+    story.append(Spacer(1, 0.4 * cm))
+    story.append(HRFlowable(width='100%', thickness=0.5, color=LGY))
+    story.append(Spacer(1, 0.15 * cm))
+
+    st_ly = ParagraphStyle('LY', fontSize=7, textColor=GRY,
+                            alignment=TA_CENTER, leading=9)
     story.append(Paragraph(
-        f'Documento generado automáticamente el {factura.fecha_emision.strftime("%d/%m/%Y %H:%M")}. '
-        f'Pedido #{pedido.pk} — Fecha de entrega: {pedido.fecha_entrega.strftime("%d/%m/%Y") if pedido.fecha_entrega else "—"}.',
-        st_small,
+        'El presente comprobante no genera crédito fiscal de IVA.  '
+        'ORIGINAL BLANCO / DUPLICADO COLOR',
+        st_ly,
+    ))
+    story.append(Spacer(1, 0.15 * cm))
+
+    # CAI y fecha vencimiento (pie)
+    cai_row = Table(
+        [[
+            cell(f'CUIT: {emp["cuit"]}', size=7, color=GRY),
+            cell('C.A.I.: ___________________________', size=7, color=GRY, align=TA_CENTER),
+            cell('Fecha vencimiento: ___/___/______', size=7, color=GRY, align=TA_RIGHT),
+        ]],
+        colWidths=[4 * cm, W - 8 * cm, 4 * cm],
+    )
+    cai_row.setStyle(TableStyle([
+        ('TOPPADDING',    (0, 0), (-1, -1), 2),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
+        ('LEFTPADDING',   (0, 0), (-1, -1), 0),
+        ('RIGHTPADDING',  (0, 0), (-1, -1), 0),
+    ]))
+    story.append(cai_row)
+    story.append(Spacer(1, 0.1 * cm))
+    story.append(Paragraph(
+        f'Generado el {fecha_e.strftime("%d/%m/%Y %H:%M")}  ·  Pedido #{pedido.pk}',
+        st_ly,
     ))
 
     doc.build(story)

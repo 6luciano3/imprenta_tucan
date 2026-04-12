@@ -2,7 +2,7 @@ from django import forms
 from django.forms import formset_factory
 from clientes.models import Cliente
 from productos.models import Producto
-from .models import EstadoPedido
+from .models import EstadoPedido, PagoFactura
 
 
 class AltaPedidoHeaderForm(forms.Form):
@@ -113,3 +113,23 @@ class ModificarPedidoForm(forms.Form):
         widget=forms.Select(attrs={"class": "form-select"}),
         initial="0"
     )
+
+
+class PagoFacturaForm(forms.ModelForm):
+    class Meta:
+        model = PagoFactura
+        fields = ['fecha_pago', 'monto', 'metodo_pago', 'referencia', 'notas']
+        widgets = {
+            'fecha_pago': forms.DateInput(attrs={"type": "date", "class": "form-control"}),
+            'monto': forms.NumberInput(attrs={"class": "form-control", "step": "0.01", "min": "0.01"}),
+            'metodo_pago': forms.Select(attrs={"class": "form-select"}),
+            'referencia': forms.TextInput(attrs={"class": "form-control", "placeholder": "Ej: CBU, N° cheque (opcional)"}),
+            'notas': forms.Textarea(attrs={"class": "form-control", "rows": 2, "placeholder": "Observaciones (opcional)"}),
+        }
+        labels = {
+            'fecha_pago': 'Fecha de pago',
+            'monto': 'Monto',
+            'metodo_pago': 'Método de pago',
+            'referencia': 'Referencia',
+            'notas': 'Notas',
+        }

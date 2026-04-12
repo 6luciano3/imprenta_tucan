@@ -104,11 +104,14 @@ class Factura(models.Model):
         return f'Factura {self.numero} — Pedido #{self.pedido_id}'
 
     @classmethod
-    def proximo_numero(cls):
-        """Genera el siguiente número correlativo para el año actual."""
-        anio = timezone.now().year
+    def proximo_numero(cls, punto_venta: int = 1):
+        """
+        Genera el siguiente número correlativo en formato AFIP: XXXX-XXXXXXXX
+        Ejemplo: 0001-00000001
+        """
+        pv = f'{punto_venta:04d}'
         ultimo = (
-            cls.objects.filter(numero__startswith=f'F-{anio}-')
+            cls.objects.filter(numero__startswith=f'{pv}-')
             .order_by('-numero')
             .first()
         )
@@ -119,7 +122,71 @@ class Factura(models.Model):
                 secuencia = 1
         else:
             secuencia = 1
-        return f'F-{anio}-{secuencia:04d}'
+        return f'{pv}-{secuencia:08d}'
+
+    @property
+    def total_pagado(self):
+        from django.db.models import Sum
+        resultado = self.pagos.aggregate(total=Sum('monto'))['total']
+        return resultado or 0
+
+    @property
+    def saldo_pendiente(self):
+        return self.monto_total - self.total_pagado
+
+    @property
+    def estado_pago(self):
+        """Retorna: 'pagada', 'parcial' o 'pendiente'."""
+        pagado = self.total_pagado
+        if pagado <= 0:
+            return 'pendiente'
+        if pagado >= self.monto_total:
+            return 'pagada'
+        return 'parcial'
+
+    @property
+    def estado_pago_display(self):
+        return {
+            'pagada': 'Pagada',
+            'parcial': 'Pago parcial',
+            'pendiente': 'Pendiente',
+        }.get(self.estado_pago, 'Pendiente')
+
+
+class PagoFactura(models.Model):
+    """Registro de un pago (total o parcial) sobre una Factura."""
+
+    METODO_CHOICES = [
+        ('efectivo',        'Efectivo'),
+        ('transferencia',   'Transferencia bancaria'),
+        ('cheque',          'Cheque'),
+        ('tarjeta_debito',  'Tarjeta de débito'),
+        ('tarjeta_credito', 'Tarjeta de crédito'),
+        ('otro',            'Otro'),
+    ]
+
+    factura = models.ForeignKey(
+        Factura, on_delete=models.CASCADE, related_name='pagos'
+    )
+    fecha_pago = models.DateField(default=timezone.now)
+    monto = models.DecimalField(max_digits=10, decimal_places=2)
+    metodo_pago = models.CharField(
+        max_length=20, choices=METODO_CHOICES, default='efectivo'
+    )
+    referencia = models.CharField(
+        max_length=100, blank=True,
+        help_text='Nro. de transferencia, cheque, etc. (opcional)',
+    )
+    notas = models.TextField(blank=True)
+    registrado_en = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['fecha_pago', 'registrado_en']
+        verbose_name = 'Pago de Factura'
+        verbose_name_plural = 'Pagos de Facturas'
+
+    def __str__(self):
+        return f'Pago ${self.monto} — {self.factura.numero} ({self.get_metodo_pago_display()})'
 
 
 # NUEVO: Soporte para múltiples productos por pedido

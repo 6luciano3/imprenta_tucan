@@ -18,8 +18,9 @@ from .forms import (
     LineaPedidoFormSet,
     SeleccionarClienteForm,
     ModificarPedidoForm,
+    PagoFacturaForm,
 )
-from .models import Pedido, EstadoPedido, LineaPedido, Factura
+from .models import Pedido, EstadoPedido, LineaPedido, Factura, PagoFactura
 from .utils import (
     verificar_insumos_disponibles,
     verificar_insumos_para_lineas,
@@ -1123,3 +1124,132 @@ def cambiar_estado_pedido(request, idPedido: int):
         messages.error(request, f"Error al cambiar estado: {str(e)}")
 
     return redirect('lista_pedidos')
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# FACTURAS Y REGISTRO DE PAGOS
+# ─────────────────────────────────────────────────────────────────────────────
+
+@require_perm('Pedidos', 'Ver')
+@login_required
+@requiere_permiso("Pedidos")
+def lista_facturas(request):
+    """Lista todas las facturas con su estado de cobro."""
+    from django.db.models import Sum, Value, DecimalField
+    from django.db.models.functions import Coalesce
+
+    qs = (
+        Factura.objects
+        .select_related('pedido__cliente', 'pedido__estado')
+        .prefetch_related('pagos')
+        .order_by('-fecha_emision')
+    )
+
+    # Filtros
+    q = request.GET.get('q', '').strip()
+    estado_fil = request.GET.get('estado_pago', '')
+    fecha_desde = request.GET.get('fecha_desde', '')
+    fecha_hasta = request.GET.get('fecha_hasta', '')
+
+    if q:
+        qs = qs.filter(
+            Q(numero__icontains=q)
+            | Q(pedido__cliente__nombre__icontains=q)
+            | Q(pedido__cliente__apellido__icontains=q)
+        )
+    if fecha_desde:
+        qs = qs.filter(fecha_emision__date__gte=fecha_desde)
+    if fecha_hasta:
+        qs = qs.filter(fecha_emision__date__lte=fecha_hasta)
+
+    # Anotar total pagado para filtrar por estado
+    qs = qs.annotate(
+        total_pagado_sum=Coalesce(
+            Sum('pagos__monto'), Value(0, output_field=DecimalField())
+        )
+    )
+
+    # Filtrar por estado_pago en Python (más simple que SQL complejo)
+    facturas_all = list(qs)
+    if estado_fil:
+        facturas_all = [f for f in facturas_all if f.estado_pago == estado_fil]
+
+    total_resultados = len(facturas_all)
+
+    # Paginación
+    paginator = Paginator(facturas_all, 20)
+    page_num = request.GET.get('page', 1)
+    page_obj = paginator.get_page(page_num)
+
+    return render(request, 'pedidos/lista_facturas.html', {
+        'facturas': page_obj,
+        'total_resultados': total_resultados,
+        'query': q,
+        'estado_fil': estado_fil,
+        'fecha_desde': fecha_desde,
+        'fecha_hasta': fecha_hasta,
+    })
+
+
+@require_perm('Pedidos', 'Ver')
+@login_required
+@requiere_permiso("Pedidos")
+def detalle_factura(request, pk: int):
+    """Detalle de una factura con historial de pagos y formulario para registrar uno nuevo."""
+    factura = get_object_or_404(
+        Factura.objects.select_related('pedido__cliente', 'pedido__estado')
+                       .prefetch_related('pagos', 'pedido__lineas__producto'),
+        pk=pk,
+    )
+
+    if request.method == 'POST':
+        form = PagoFacturaForm(request.POST)
+        if form.is_valid():
+            pago = form.save(commit=False)
+            pago.factura = factura
+            # Validar que no supere el saldo pendiente
+            if pago.monto > factura.saldo_pendiente:
+                messages.error(
+                    request,
+                    f'El monto ${pago.monto:,.2f} supera el saldo pendiente '
+                    f'${factura.saldo_pendiente:,.2f}.'
+                )
+                return redirect('detalle_factura', pk=pk)
+            pago.save()
+            messages.success(
+                request,
+                f'Pago de ${pago.monto:,.2f} registrado correctamente. '
+                f'Saldo restante: ${factura.saldo_pendiente:,.2f}'
+            )
+            return redirect('detalle_factura', pk=pk)
+        else:
+            messages.error(request, 'Revisá los datos del formulario.')
+    else:
+        # Pre-completar con el saldo pendiente como monto sugerido
+        form = PagoFacturaForm(initial={
+            'fecha_pago': timezone.now().date(),
+            'monto': factura.saldo_pendiente,
+        })
+
+    pagos = factura.pagos.order_by('fecha_pago', 'registrado_en')
+
+    return render(request, 'pedidos/detalle_factura.html', {
+        'factura': factura,
+        'pedido': factura.pedido,
+        'pagos': pagos,
+        'form': form,
+    })
+
+
+@require_POST
+@require_perm('Pedidos', 'Editar')
+@login_required
+@requiere_permiso("Pedidos", "Editar")
+def eliminar_pago(request, pk: int):
+    """Elimina un pago registrado (corrección de error)."""
+    pago = get_object_or_404(PagoFactura, pk=pk)
+    factura_pk = pago.factura_id
+    monto = pago.monto
+    pago.delete()
+    messages.success(request, f'Pago de ${monto:,.2f} eliminado.')
+    return redirect('detalle_factura', pk=factura_pk)
