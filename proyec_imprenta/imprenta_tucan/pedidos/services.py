@@ -366,3 +366,300 @@ def notificar_entrega_pedido(pedido):
         logging.getLogger(__name__).exception(
             'notificar_entrega_pedido: error inesperado en pedido #%s: %s', pedido.pk, exc
         )
+
+
+# ─── Facturación ──────────────────────────────────────────────────────────────
+
+def crear_factura_para_pedido(pedido) -> 'Factura':
+    """
+    Crea el registro Factura para un pedido que acaba de pasar a Entregado
+    y envía el PDF al cliente por email.
+    Si ya existe una factura para ese pedido, la devuelve sin duplicar
+    (no reenvía el email).
+    """
+    import logging
+    log = logging.getLogger(__name__)
+    from .models import Factura
+
+    existing = Factura.objects.filter(pedido=pedido).first()
+    if existing:
+        return existing
+
+    numero = Factura.proximo_numero()
+    factura = Factura.objects.create(
+        pedido=pedido,
+        numero=numero,
+        monto_total=pedido.monto_total,
+    )
+    log.info('Factura %s emitida para pedido #%s', numero, pedido.pk)
+
+    _enviar_factura_por_email(factura)
+    return factura
+
+
+def _enviar_factura_por_email(factura) -> None:
+    """Envía la factura como PDF adjunto al email del cliente."""
+    import logging
+    log = logging.getLogger(__name__)
+
+    cliente = factura.pedido.cliente
+    if not cliente.email:
+        log.info('_enviar_factura_por_email: cliente #%s sin email, se omite envío', cliente.pk)
+        return
+
+    try:
+        from django.core.mail import EmailMessage
+        from django.conf import settings
+
+        pdf_bytes = generar_pdf_factura(factura)
+
+        asunto = f'Factura {factura.numero} — Pedido #{factura.pedido.pk} — Imprenta Tucán'
+
+        cuerpo = (
+            f'Hola {cliente.nombre},\n\n'
+            f'Adjuntamos la factura correspondiente a tu pedido N° {factura.pedido.pk}.\n\n'
+            f'Número de factura: {factura.numero}\n'
+            f'Fecha de emisión: {factura.fecha_emision.strftime("%d/%m/%Y")}\n'
+            f'Total: ${factura.monto_total:,.2f}\n\n'
+            f'Ante cualquier consulta, no dudes en contactarnos.\n'
+            f'— Imprenta Tucán'
+        )
+
+        email = EmailMessage(
+            subject=asunto,
+            body=cuerpo,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            to=[cliente.email],
+        )
+        email.attach(
+            filename=f'factura_{factura.numero}.pdf',
+            content=pdf_bytes,
+            mimetype='application/pdf',
+        )
+        email.send(fail_silently=False)
+        log.info('Factura %s enviada por email a %s', factura.numero, cliente.email)
+
+    except Exception:
+        log.exception(
+            '_enviar_factura_por_email: no se pudo enviar factura %s a %s',
+            factura.numero, cliente.email,
+        )
+
+
+def generar_pdf_factura(factura) -> bytes:
+    """
+    Genera el PDF de la factura usando reportlab y devuelve bytes.
+    """
+    import io
+    from decimal import Decimal
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib import colors
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.enums import TA_CENTER, TA_RIGHT, TA_LEFT
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
+    from reportlab.lib.units import cm
+
+    pedido = factura.pedido
+    cliente = pedido.cliente
+    lineas = pedido.lineas.select_related('producto').all()
+
+    # Datos empresa
+    try:
+        from configuracion.models import Parametro
+        empresa = {
+            'nombre':    Parametro.get('EMPRESA_NOMBRE',    'Imprenta Tucán S.A.'),
+            'cuit':      Parametro.get('EMPRESA_CUIT',      ''),
+            'domicilio': Parametro.get('EMPRESA_DOMICILIO', ''),
+            'telefono':  Parametro.get('EMPRESA_TELEFONO',  ''),
+            'email':     Parametro.get('EMPRESA_EMAIL',     ''),
+            'iva':       Parametro.get('EMPRESA_CONDICION_IVA', 'Responsable Inscripto'),
+        }
+    except Exception:
+        empresa = {'nombre': 'Imprenta Tucán S.A.', 'cuit': '', 'domicilio': '',
+                   'telefono': '', 'email': '', 'iva': 'Responsable Inscripto'}
+
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buf, pagesize=A4,
+        leftMargin=2*cm, rightMargin=2*cm, topMargin=2*cm, bottomMargin=2*cm,
+    )
+
+    styles = getSampleStyleSheet()
+    st_normal = styles['Normal']
+    st_normal.fontSize = 9
+    st_h1 = ParagraphStyle('H1', fontSize=16, fontName='Helvetica-Bold', alignment=TA_CENTER, spaceAfter=4)
+    st_h2 = ParagraphStyle('H2', fontSize=11, fontName='Helvetica-Bold', spaceAfter=2)
+    st_small = ParagraphStyle('Small', fontSize=8, textColor=colors.grey)
+    st_right = ParagraphStyle('Right', fontSize=9, alignment=TA_RIGHT)
+    st_bold = ParagraphStyle('Bold', fontSize=9, fontName='Helvetica-Bold')
+    st_total = ParagraphStyle('Total', fontSize=11, fontName='Helvetica-Bold', alignment=TA_RIGHT)
+
+    # ── Utilidades ────────────────────────────────────────────────────────────
+    def money(val):
+        try:
+            return f'$ {Decimal(str(val)):,.2f}'
+        except Exception:
+            return str(val)
+
+    story = []
+
+    # ── Encabezado ────────────────────────────────────────────────────────────
+    header_data = [
+        [
+            Paragraph(f'<b>{empresa["nombre"]}</b>', st_h2),
+            Paragraph('<b>FACTURA</b>', st_h1),
+        ],
+        [
+            Paragraph(
+                f'CUIT: {empresa["cuit"]}<br/>'
+                f'{empresa["domicilio"]}<br/>'
+                f'Tel: {empresa["telefono"]}<br/>'
+                f'Email: {empresa["email"]}<br/>'
+                f'IVA: {empresa["iva"]}',
+                st_normal,
+            ),
+            Table(
+                [
+                    ['N°:', factura.numero],
+                    ['Fecha:', factura.fecha_emision.strftime('%d/%m/%Y')],
+                    ['Pedido:', f'#{pedido.pk}'],
+                    ['Estado:', pedido.estado.nombre],
+                ],
+                colWidths=[2.5*cm, 4.5*cm],
+                style=TableStyle([
+                    ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+                    ('FONTSIZE', (0, 0), (-1, -1), 9),
+                    ('ALIGN', (1, 0), (1, -1), 'LEFT'),
+                    ('ROWBACKGROUNDS', (0, 0), (-1, -1), [colors.whitesmoke, colors.white]),
+                    ('BOX', (0, 0), (-1, -1), 0.5, colors.lightgrey),
+                    ('INNERGRID', (0, 0), (-1, -1), 0.25, colors.lightgrey),
+                    ('TOPPADDING', (0, 0), (-1, -1), 3),
+                    ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+                    ('LEFTPADDING', (0, 0), (-1, -1), 5),
+                ]),
+            ),
+        ],
+    ]
+    header_table = Table(header_data, colWidths=[9*cm, 8*cm])
+    header_table.setStyle(TableStyle([
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('LINEBELOW', (0, 1), (-1, 1), 0, colors.white),
+    ]))
+    story.append(header_table)
+    story.append(Spacer(1, 0.4*cm))
+    story.append(HRFlowable(width='100%', thickness=1, color=colors.HexColor('#1e40af')))
+    story.append(Spacer(1, 0.3*cm))
+
+    # ── Datos del cliente ─────────────────────────────────────────────────────
+    story.append(Paragraph('DATOS DEL CLIENTE', st_h2))
+    cliente_data = [
+        ['Nombre / Razón Social:', f'{cliente.nombre} {cliente.apellido}' +
+            (f' — {cliente.razon_social}' if getattr(cliente, 'razon_social', None) else '')],
+        ['CUIT:', getattr(cliente, 'cuit', '') or '—'],
+        ['Email:', cliente.email or '—'],
+        ['Teléfono:', getattr(cliente, 'telefono', '') or '—'],
+    ]
+    cliente_table = Table(cliente_data, colWidths=[5*cm, 12*cm])
+    cliente_table.setStyle(TableStyle([
+        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 9),
+        ('TOPPADDING', (0, 0), (-1, -1), 3),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+        ('LEFTPADDING', (0, 0), (-1, -1), 4),
+        ('ROWBACKGROUNDS', (0, 0), (-1, -1), [colors.whitesmoke, colors.white]),
+    ]))
+    story.append(cliente_table)
+    story.append(Spacer(1, 0.4*cm))
+
+    # ── Detalle de líneas ─────────────────────────────────────────────────────
+    story.append(Paragraph('DETALLE', st_h2))
+    col_widths = [6.5*cm, 2*cm, 3*cm, 3.5*cm, 2*cm]
+    lineas_data = [['Producto', 'Cant.', 'Unitario', 'Importe', 'Espec.']]
+    subtotal = Decimal('0')
+    for l in lineas:
+        precio = l.precio_unitario or Decimal('0')
+        importe = precio * l.cantidad
+        subtotal += importe
+        lineas_data.append([
+            l.producto.nombreProducto,
+            str(l.cantidad),
+            money(precio),
+            money(importe),
+            l.especificaciones or '—',
+        ])
+
+    lineas_table = Table(lineas_data, colWidths=col_widths, repeatRows=1)
+    lineas_table.setStyle(TableStyle([
+        # Encabezado
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1e40af')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 9),
+        ('ALIGN', (1, 0), (-1, -1), 'RIGHT'),
+        ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+        ('ALIGN', (4, 0), (4, -1), 'LEFT'),
+        ('TOPPADDING', (0, 0), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ('LEFTPADDING', (0, 0), (-1, -1), 5),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f8fafc')]),
+        ('GRID', (0, 0), (-1, -1), 0.25, colors.HexColor('#e2e8f0')),
+        ('LINEBELOW', (0, 0), (-1, 0), 1, colors.HexColor('#1e40af')),
+    ]))
+    story.append(lineas_table)
+    story.append(Spacer(1, 0.3*cm))
+
+    # ── Totales ───────────────────────────────────────────────────────────────
+    descuento = Decimal(str(pedido.descuento or 0))
+    monto_descuento = subtotal * descuento / Decimal('100')
+    subtotal_con_dto = subtotal - monto_descuento
+
+    try:
+        from configuracion.models import Parametro as _P
+        iva_rate = Decimal(str(_P.get('IVA_PORCENTAJE', '0.21')))
+    except Exception:
+        iva_rate = Decimal('0.21')
+
+    monto_iva = subtotal_con_dto * iva_rate if pedido.aplicar_iva else Decimal('0')
+
+    totales_rows = []
+    totales_rows.append(['Subtotal', money(subtotal)])
+    if descuento:
+        totales_rows.append([f'Descuento ({descuento:.0f}%)', f'— {money(monto_descuento)}'])
+    if pedido.aplicar_iva:
+        totales_rows.append([f'IVA ({iva_rate*100:.0f}%)', money(monto_iva)])
+    totales_rows.append(['TOTAL', money(pedido.monto_total)])
+
+    totales_table = Table(totales_rows, colWidths=[4*cm, 3.5*cm], hAlign='RIGHT')
+    totales_style = [
+        ('FONTSIZE', (0, 0), (-1, -1), 9),
+        ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
+        ('ALIGN', (0, 0), (0, -1), 'RIGHT'),
+        ('TOPPADDING', (0, 0), (-1, -1), 3),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+        ('LEFTPADDING', (0, 0), (-1, -1), 5),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 5),
+        ('GRID', (0, 0), (-1, -1), 0.25, colors.lightgrey),
+    ]
+    last = len(totales_rows) - 1
+    totales_style += [
+        ('BACKGROUND', (0, last), (-1, last), colors.HexColor('#eff6ff')),
+        ('FONTNAME', (0, last), (-1, last), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, last), (-1, last), 11),
+        ('LINEABOVE', (0, last), (-1, last), 1, colors.HexColor('#1e40af')),
+        ('TEXTCOLOR', (0, last), (-1, last), colors.HexColor('#1e40af')),
+    ]
+    totales_table.setStyle(TableStyle(totales_style))
+    story.append(totales_table)
+
+    # ── Pie ───────────────────────────────────────────────────────────────────
+    story.append(Spacer(1, 0.8*cm))
+    story.append(HRFlowable(width='100%', thickness=0.5, color=colors.lightgrey))
+    story.append(Spacer(1, 0.2*cm))
+    story.append(Paragraph(
+        f'Documento generado automáticamente el {factura.fecha_emision.strftime("%d/%m/%Y %H:%M")}. '
+        f'Pedido #{pedido.pk} — Fecha de entrega: {pedido.fecha_entrega.strftime("%d/%m/%Y") if pedido.fecha_entrega else "—"}.',
+        st_small,
+    ))
+
+    doc.build(story)
+    return buf.getvalue()

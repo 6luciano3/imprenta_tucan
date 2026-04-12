@@ -101,6 +101,11 @@
                 title="{% if pedido.cliente.email %}Enviar al cliente ({{ pedido.cliente.email }}){% else %}Sin email — no se puede enviar{% endif %}">
                 <span class="material-symbols-outlined text-base">send</span>
               </button>
+              <a href="{% url 'descargar_factura' pedido.id %}" target="_blank"
+                class="inline-flex items-center {% if pedido.estado.nombre|lower == 'entregado' %}text-emerald-600 hover:text-emerald-800{% else %}text-gray-400 hover:text-gray-600{% endif %}"
+                title="{% if pedido.estado.nombre|lower == 'entregado' %}Descargar factura{% else %}Vista previa de factura (pedido no entregado){% endif %}">
+                <span class="material-symbols-outlined text-base">receipt</span>
+              </a>
               <!-- Cambiar Estado dropdown -->
               <div class="relative">
                 <button onclick="toggleEstadoMenu({{ pedido.id }})" class="inline-flex items-center text-green-600 hover:text-green-800" title="Cambiar Estado">

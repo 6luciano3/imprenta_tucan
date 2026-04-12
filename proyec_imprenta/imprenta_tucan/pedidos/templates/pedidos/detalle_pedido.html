@@ -52,7 +52,14 @@
           <span>(con IVA 21%)</span>
         {% endif %}
       </div>
-      <div class="flex justify-end mt-6">
+      <div class="flex justify-end gap-3 mt-6">
+        {% if pedido.estado.nombre|lower == 'entregado' %}
+        <a href="{% url 'descargar_factura' pedido.id %}" target="_blank"
+           class="btn btn-success d-flex align-items-center gap-1">
+          <span class="material-symbols-outlined" style="font-size:1.1rem;">receipt</span>
+          Descargar Factura
+        </a>
+        {% endif %}
         <a href="{% url 'lista_pedidos' %}" class="btn btn-secondary">Cerrar</a>
       </div>
     </div>

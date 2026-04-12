@@ -8,6 +8,7 @@ urlpatterns = [
     path('verificar-stock-modificar/<int:idPedido>/', views.verificar_stock_modificar, name='verificar_stock_modificar'),
     path('verificar-stock-diferencial/<int:idPedido>/', views.verificar_stock_diferencial, name='verificar_stock_diferencial'),
     path('enviar-cliente/<int:idPedido>/', views.enviar_pedido_cliente, name='enviar_pedido_cliente'),
+    path('factura/<int:idPedido>/pdf/', views.descargar_factura, name='descargar_factura'),
     path('buscar/', views.buscar_pedido, name='buscar_pedido'),
     path('detalle/<int:pk>/', views.detalle_pedido, name='detalle_pedido'),
     path('modificar/<int:idPedido>/', views.modificar_pedido, name='modificar_pedido'),

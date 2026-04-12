@@ -1,6 +1,7 @@
 import logging
 
 from django.db import models
+from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +63,7 @@ class Pedido(models.Model):
                     devolver_insumos_para_pedido(self)
             if "entreg" in new_estado and "entreg" not in old_estado:
                 self._notificar_entrega = True   # se dispara en post_save para tener pk seguro
+                self._emitir_factura = True
 
         super().save(*args, **kwargs)
 
@@ -72,6 +74,52 @@ class Pedido(models.Model):
         if getattr(self, '_notificar_entrega', False):
             self._notificar_entrega = False
             notificar_entrega_pedido(self)
+        if getattr(self, '_emitir_factura', False):
+            self._emitir_factura = False
+            try:
+                from .services import crear_factura_para_pedido
+                crear_factura_para_pedido(self)
+            except Exception:
+                logger.exception('Error al emitir factura para pedido #%s', self.pk)
+
+
+class Factura(models.Model):
+    """Factura emitida automáticamente cuando un Pedido pasa a estado Entregado."""
+    pedido = models.OneToOneField(
+        Pedido, on_delete=models.CASCADE, related_name='factura'
+    )
+    numero = models.CharField(
+        max_length=20, unique=True,
+        help_text='Número correlativo. Formato: F-YYYY-NNNN',
+    )
+    fecha_emision = models.DateTimeField(default=timezone.now)
+    monto_total = models.DecimalField(max_digits=10, decimal_places=2)
+
+    class Meta:
+        ordering = ['-fecha_emision']
+        verbose_name = 'Factura'
+        verbose_name_plural = 'Facturas'
+
+    def __str__(self):
+        return f'Factura {self.numero} — Pedido #{self.pedido_id}'
+
+    @classmethod
+    def proximo_numero(cls):
+        """Genera el siguiente número correlativo para el año actual."""
+        anio = timezone.now().year
+        ultimo = (
+            cls.objects.filter(numero__startswith=f'F-{anio}-')
+            .order_by('-numero')
+            .first()
+        )
+        if ultimo:
+            try:
+                secuencia = int(ultimo.numero.split('-')[-1]) + 1
+            except (ValueError, IndexError):
+                secuencia = 1
+        else:
+            secuencia = 1
+        return f'F-{anio}-{secuencia:04d}'
 
 
 # NUEVO: Soporte para múltiples productos por pedido

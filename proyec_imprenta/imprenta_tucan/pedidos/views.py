@@ -7,7 +7,7 @@ from django.core.paginator import Paginator
 from django.db.models import Q
 from django.db import transaction
 from decimal import Decimal
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from django.views.decorators.http import require_POST
 from django.forms import formset_factory
 import json
@@ -19,7 +19,7 @@ from .forms import (
     SeleccionarClienteForm,
     ModificarPedidoForm,
 )
-from .models import Pedido, EstadoPedido, LineaPedido
+from .models import Pedido, EstadoPedido, LineaPedido, Factura
 from .utils import (
     verificar_insumos_disponibles,
     verificar_insumos_para_lineas,
@@ -728,6 +728,16 @@ def modificar_pedido(request, idPedido: int):
             estado_actual_nombre = (pedido.estado.nombre or "").lower() if pedido.estado else ""
             estado_nuevo_nombre = (estado.nombre or "").lower()
 
+            # Completado y Entregado solo se pueden alcanzar desde En Proceso
+            _estados_terminacion = ("complet", "entreg")
+            if any(s in estado_nuevo_nombre for s in _estados_terminacion) and "proceso" not in estado_actual_nombre:
+                messages.error(
+                    request,
+                    f"No se puede pasar a '{estado.nombre}' desde '{pedido.estado.nombre}'. "
+                    f"El pedido debe estar en 'En Proceso' primero."
+                )
+                return redirect(request.path)
+
             # Elegir qué tipo de validación corresponde:
             # - Pendiente → En Proceso: el stock aún no se consumió; Pedido.save()
             #   llamará reservar_insumos_para_pedido (descuento total). Usar check absoluto.
@@ -969,6 +979,52 @@ def clonar_pedido(request, pk):
 
 @login_required
 @requiere_permiso("Pedidos")
+def descargar_factura(request, idPedido: int):
+    """Descarga el PDF de la factura asociada al pedido.
+    Si el pedido aún no tiene factura (p. ej. estado no es Entregado),
+    genera una al vuelo sin persistirla.
+    """
+    from .services import generar_pdf_factura, crear_factura_para_pedido
+
+    pedido = get_object_or_404(
+        Pedido.objects.select_related('cliente', 'estado').prefetch_related('lineas__producto'),
+        pk=idPedido,
+    )
+
+    factura = getattr(pedido, 'factura', None)
+    if factura is None:
+        # Generar y persistir si el pedido está Entregado; de lo contrario solo generar en memoria
+        estado_nombre = (pedido.estado.nombre or '').lower() if pedido.estado else ''
+        if 'entreg' in estado_nombre:
+            factura = crear_factura_para_pedido(pedido)
+        else:
+            # Vista previa sin persistir
+            from .models import Factura as _F
+            from django.utils import timezone as _tz
+            factura = _F(
+                pedido=pedido,
+                numero=_F.proximo_numero(),
+                fecha_emision=_tz.now(),
+                monto_total=pedido.monto_total,
+            )
+
+    try:
+        pdf_bytes = generar_pdf_factura(factura)
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).exception('descargar_factura: error generando PDF para pedido #%s', idPedido)
+        messages.error(request, f'No se pudo generar el PDF de la factura: {exc}')
+        return redirect('detalle_pedido', pk=idPedido)
+
+    response = HttpResponse(pdf_bytes, content_type='application/pdf')
+    response['Content-Disposition'] = (
+        f'inline; filename="factura_{factura.numero}.pdf"'
+    )
+    return response
+
+
+@login_required
+@requiere_permiso("Pedidos")
 def exportar_pedidos_csv(request):
     """Exporta la lista de pedidos a CSV respetando los filtros activos."""
     import csv
@@ -1032,6 +1088,16 @@ def cambiar_estado_pedido(request, idPedido: int):
             estado_anterior = pedido.estado
             old_nombre = estado_anterior.nombre.lower() if estado_anterior else ""
             new_nombre = nuevo_estado.nombre.lower()
+
+            # Completado y Entregado solo se pueden alcanzar desde En Proceso
+            _estados_terminacion = ("complet", "entreg")
+            if any(s in new_nombre for s in _estados_terminacion) and "proceso" not in old_nombre:
+                messages.error(
+                    request,
+                    f"No se puede pasar a '{nuevo_estado.nombre}' desde '{estado_anterior.nombre}'. "
+                    f"El pedido debe estar en 'En Proceso' primero."
+                )
+                return redirect('lista_pedidos')
 
             pedido.estado = nuevo_estado
             pedido.save()
