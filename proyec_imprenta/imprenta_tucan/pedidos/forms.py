@@ -118,17 +118,15 @@ class ModificarPedidoForm(forms.Form):
 class PagoFacturaForm(forms.ModelForm):
     class Meta:
         model = PagoFactura
-        fields = ['fecha_pago', 'monto', 'metodo_pago', 'referencia', 'notas']
+        fields = ['fecha_pago', 'metodo_pago', 'referencia', 'notas']
         widgets = {
             'fecha_pago': forms.DateInput(attrs={"type": "date", "class": "form-control"}),
-            'monto': forms.NumberInput(attrs={"class": "form-control", "step": "0.01", "min": "0.01"}),
             'metodo_pago': forms.Select(attrs={"class": "form-select"}),
             'referencia': forms.TextInput(attrs={"class": "form-control", "placeholder": "Ej: CBU, N° cheque (opcional)"}),
             'notas': forms.Textarea(attrs={"class": "form-control", "rows": 2, "placeholder": "Observaciones (opcional)"}),
         }
         labels = {
             'fecha_pago': 'Fecha de pago',
-            'monto': 'Monto',
             'metodo_pago': 'Método de pago',
             'referencia': 'Referencia',
             'notas': 'Notas',

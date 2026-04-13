@@ -93,6 +93,20 @@
                     </div>
                 </div>
             </a>
+            <a href="{% url 'lista_facturas' %}" class="group bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition">
+                <div class="flex items-center gap-4">
+                    <div class="h-12 w-12 rounded-full bg-teal-50 text-teal-700 grid place-items-center">
+                        <span class="material-symbols-outlined">receipt_long</span>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-500">Facturas</p>
+                        <p class="text-lg font-bold group-hover:text-teal-700">Ver facturas</p>
+                        {% if facturas_pendientes %}
+                        <p class="text-xs text-teal-600 font-semibold">{{ facturas_pendientes }} pendiente{{ facturas_pendientes|pluralize:",s" }} de cobro</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </a>
             <a href="{% url 'lista_clientes' %}" class="group bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition">
                 <div class="flex items-center gap-4">
                     <div class="h-12 w-12 rounded-full bg-pink-50 text-pink-700 grid place-items-center">

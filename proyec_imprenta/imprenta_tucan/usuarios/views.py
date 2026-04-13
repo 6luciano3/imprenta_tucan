@@ -168,9 +168,22 @@ def dashboard(request):
             puede_configurar_ofertas = request.user.is_staff or request.user.groups.filter(name='Comercial').exists()
         except Exception:
             puede_configurar_ofertas = request.user.is_staff
+    facturas_pendientes = 0
+    try:
+        from pedidos.models import Factura
+        from django.db.models import Sum as _Sum
+        _ids_pagadas = [
+            f.pk for f in Factura.objects.prefetch_related('pagos').annotate(
+                _pagado=_Sum('pagos__monto')
+            ) if (f._pagado or 0) >= f.monto_total
+        ]
+        facturas_pendientes = Factura.objects.exclude(pk__in=_ids_pagadas).count()
+    except Exception:
+        pass
+
     context = {
         'notificaciones': notificaciones,
         'puede_configurar_ofertas': puede_configurar_ofertas,
-        # ...otros context...
+        'facturas_pendientes': facturas_pendientes,
     }
     return render(request, 'usuarios/dashboard_paneles.html', context)

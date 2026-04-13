@@ -94,6 +94,9 @@ class Factura(models.Model):
     )
     fecha_emision = models.DateTimeField(default=timezone.now)
     monto_total = models.DecimalField(max_digits=10, decimal_places=2)
+    anulada = models.BooleanField(default=False)
+    fecha_anulacion = models.DateTimeField(null=True, blank=True)
+    motivo_anulacion = models.TextField(blank=True)
 
     class Meta:
         ordering = ['-fecha_emision']
@@ -146,6 +149,8 @@ class Factura(models.Model):
 
     @property
     def estado_pago_display(self):
+        if self.anulada:
+            return 'Anulada'
         return {
             'pagada': 'Pagada',
             'parcial': 'Pago parcial',

@@ -1207,29 +1207,17 @@ def detalle_factura(request, pk: int):
         if form.is_valid():
             pago = form.save(commit=False)
             pago.factura = factura
-            # Validar que no supere el saldo pendiente
-            if pago.monto > factura.saldo_pendiente:
-                messages.error(
-                    request,
-                    f'El monto ${pago.monto:,.2f} supera el saldo pendiente '
-                    f'${factura.saldo_pendiente:,.2f}.'
-                )
-                return redirect('detalle_factura', pk=pk)
+            pago.monto = factura.saldo_pendiente
             pago.save()
             messages.success(
                 request,
-                f'Pago de ${pago.monto:,.2f} registrado correctamente. '
-                f'Saldo restante: ${factura.saldo_pendiente:,.2f}'
+                f'Pago de ${pago.monto:,.2f} registrado correctamente.'
             )
             return redirect('detalle_factura', pk=pk)
         else:
             messages.error(request, 'Revisá los datos del formulario.')
     else:
-        # Pre-completar con el saldo pendiente como monto sugerido
-        form = PagoFacturaForm(initial={
-            'fecha_pago': timezone.now().date(),
-            'monto': factura.saldo_pendiente,
-        })
+        form = PagoFacturaForm(initial={'fecha_pago': timezone.now().date()})
 
     pagos = factura.pagos.order_by('fecha_pago', 'registrado_en')
 
@@ -1253,3 +1241,31 @@ def eliminar_pago(request, pk: int):
     pago.delete()
     messages.success(request, f'Pago de ${monto:,.2f} eliminado.')
     return redirect('detalle_factura', pk=factura_pk)
+
+
+@require_POST
+@login_required
+@requiere_permiso("Pedidos", "Editar")
+def anular_factura(request, pk: int):
+    """Anula una factura. Operación irreversible desde la interfaz."""
+    factura = get_object_or_404(Factura, pk=pk)
+
+    if factura.anulada:
+        messages.warning(request, 'La factura ya está anulada.')
+        return redirect('detalle_factura', pk=pk)
+
+    motivo = request.POST.get('motivo_anulacion', '').strip()
+    if not motivo:
+        messages.error(request, 'Debe indicar el motivo de anulación.')
+        return redirect('detalle_factura', pk=pk)
+
+    factura.anulada = True
+    factura.fecha_anulacion = timezone.now()
+    factura.motivo_anulacion = motivo
+    factura.save(update_fields=['anulada', 'fecha_anulacion', 'motivo_anulacion'])
+
+    messages.success(
+        request,
+        f'Factura {factura.numero} anulada correctamente.'
+    )
+    return redirect('detalle_factura', pk=pk)

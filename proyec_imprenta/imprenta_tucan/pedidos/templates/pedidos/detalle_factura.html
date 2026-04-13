@@ -24,8 +24,12 @@
         <h1 class="text-2xl font-bold text-gray-800">{{ factura.numero }}</h1>
         <p class="text-sm text-gray-500">Emitida el {{ factura.fecha_emision|date:"d/m/Y" }} · Pedido #{{ pedido.id }}</p>
       </div>
-      <div class="ml-auto flex gap-2">
-        {% if factura.estado_pago == 'pagada' %}
+      <div class="ml-auto flex flex-wrap gap-2 items-center">
+        {% if factura.anulada %}
+          <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-semibold bg-gray-200 text-gray-600">
+            <span class="material-symbols-outlined text-sm">block</span> Anulada
+          </span>
+        {% elif factura.estado_pago == 'pagada' %}
           <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-semibold bg-green-100 text-green-700">
             <span class="material-symbols-outlined text-sm">check_circle</span> Pagada
           </span>
@@ -42,8 +46,28 @@
           class="flex items-center gap-1 bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-sm hover:bg-emerald-700">
           <span class="material-symbols-outlined text-sm">download</span> Descargar PDF
         </a>
+        {% if not factura.anulada %}
+        <button type="button" onclick="document.getElementById('modal-anular').classList.remove('hidden')"
+          class="flex items-center gap-1 bg-red-600 text-white px-3 py-1.5 rounded-lg text-sm hover:bg-red-700">
+          <span class="material-symbols-outlined text-sm">block</span> Anular factura
+        </button>
+        {% endif %}
       </div>
     </div>
+
+    <!-- Aviso de anulación -->
+    {% if factura.anulada %}
+    <div class="bg-gray-100 border border-gray-300 rounded-xl p-4 mb-5 flex items-start gap-3">
+      <span class="material-symbols-outlined text-gray-500 text-2xl mt-0.5">block</span>
+      <div>
+        <p class="font-semibold text-gray-700">Esta factura ha sido anulada</p>
+        <p class="text-sm text-gray-500">Fecha: {{ factura.fecha_anulacion|date:"d/m/Y H:i" }}</p>
+        {% if factura.motivo_anulacion %}
+        <p class="text-sm text-gray-600 mt-1"><strong>Motivo:</strong> {{ factura.motivo_anulacion }}</p>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
 
     <div class="grid grid-cols-1 md:grid-cols-2 gap-5 mb-6">
 
@@ -131,7 +155,18 @@
     </div>
 
     <!-- Formulario para nuevo pago -->
-    {% if factura.saldo_pendiente > 0 %}
+    {% if factura.anulada %}
+    <div class="bg-gray-50 border border-gray-200 rounded-xl p-5 mb-6 flex items-center gap-3">
+      <span class="material-symbols-outlined text-gray-400 text-2xl">block</span>
+      <p class="text-sm text-gray-500">No se pueden registrar pagos en una factura anulada.</p>
+    </div>
+    <div class="flex gap-3">
+      <a href="{% url 'lista_facturas' %}"
+        class="flex items-center gap-1 bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 text-sm">
+        Volver a Facturas
+      </a>
+    </div>
+    {% elif factura.saldo_pendiente > 0 %}
     <div class="bg-white rounded-xl shadow p-5 mb-6">
       <h2 class="font-semibold text-gray-700 mb-4 flex items-center gap-2">
         <span class="material-symbols-outlined text-base">add_card</span> Registrar pago
@@ -144,9 +179,11 @@
             {{ form.fecha_pago }}
           </div>
           <div>
-            <label class="form-label text-sm fw-semibold">{{ form.monto.label }}</label>
-            {{ form.monto }}
-            <small class="text-gray-400">Saldo pendiente: ${{ factura.saldo_pendiente|floatformat:2 }}</small>
+            <label class="block text-sm font-semibold text-gray-700 mb-1">Monto a registrar</label>
+            <div class="form-control bg-gray-50 text-gray-700 font-semibold px-3 py-2 rounded border border-gray-300">
+              ${{ factura.saldo_pendiente|floatformat:2 }}
+            </div>
+            <small class="text-gray-400">Corresponde al saldo pendiente total</small>
           </div>
           <div>
             <label class="form-label text-sm fw-semibold">{{ form.metodo_pago.label }}</label>
@@ -190,6 +227,39 @@
     </div>
     {% endif %}
 
+  </div>
+</div>
+
+<!-- Modal: Anular Factura -->
+<div id="modal-anular" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+  <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md mx-4">
+    <div class="flex items-center gap-3 mb-4">
+      <span class="material-symbols-outlined text-red-600 text-2xl">warning</span>
+      <h2 class="text-lg font-bold text-gray-800">Anular factura {{ factura.numero }}</h2>
+    </div>
+    <p class="text-sm text-gray-600 mb-4">
+      Esta acción es <strong>irreversible</strong>. La factura quedará marcada como anulada
+      y no podrán registrarse más pagos sobre ella.
+    </p>
+    <form method="post" action="{% url 'anular_factura' factura.pk %}">
+      {% csrf_token %}
+      <div class="mb-4">
+        <label class="block text-sm font-semibold text-gray-700 mb-1">Motivo de anulación <span class="text-red-500">*</span></label>
+        <textarea name="motivo_anulacion" rows="3" required
+          class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400"
+          placeholder="Ej: Error en los datos del cliente, duplicado, etc."></textarea>
+      </div>
+      <div class="flex gap-3 justify-end">
+        <button type="button" onclick="document.getElementById('modal-anular').classList.add('hidden')"
+          class="px-4 py-2 rounded-lg bg-gray-200 text-gray-700 text-sm hover:bg-gray-300">
+          Cancelar
+        </button>
+        <button type="submit"
+          class="px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-semibold hover:bg-red-700">
+          Confirmar anulación
+        </button>
+      </div>
+    </form>
   </div>
 </div>
 {% endblock %}

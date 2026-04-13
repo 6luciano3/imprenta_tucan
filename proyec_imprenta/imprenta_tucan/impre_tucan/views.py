@@ -94,6 +94,20 @@ def dashboard(request):
         Pedido.objects.order_by('-fecha_pedido').first().fecha_pedido if Pedido.objects.exists() else None
     )
 
+    # Facturas pendientes de cobro
+    facturas_pendientes = 0
+    try:
+        from pedidos.models import Factura
+        from django.db.models import Sum as _Sum
+        _ids_pagadas = [
+            f.pk for f in Factura.objects.prefetch_related('pagos').annotate(
+                _pagado=_Sum('pagos__monto')
+            ) if (f._pagado or 0) >= f.monto_total
+        ]
+        facturas_pendientes = Factura.objects.exclude(pk__in=_ids_pagadas).count()
+    except Exception:
+        pass
+
     context = {
         'total_usuarios': total_usuarios,
         'total_roles': total_roles,
@@ -120,6 +134,7 @@ def dashboard(request):
         'oc_sin_respuesta':       oc_sin_respuesta,
         'pagos_por_vencer_7d':    pagos_por_vencer_7d,
         'pagos_vencidos':         pagos_vencidos,
+        'facturas_pendientes':    facturas_pendientes,
     }
     # Usar el dashboard con paneles inteligentes y logs
     return render(request, 'usuarios/dashboard_paneles.html', context)

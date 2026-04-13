@@ -76,6 +76,7 @@ def dashboard_estadisticas(request):
     modulos = [
         {"key": "clientes",     "label": "Clientes"},
         {"key": "pedidos",      "label": "Pedidos"},
+        {"key": "facturas",     "label": "Facturas"},
         {"key": "productos",    "label": "Productos"},
         {"key": "insumos",      "label": "Insumos"},
         {"key": "presupuestos", "label": "Presupuestos"},
@@ -382,6 +383,72 @@ def api_estadistica_compras(request):
             "por_proveedor": {"labels": [d["proveedor__nombre"] or "Sin proveedor" for d in por_prov], "values": [d["n"] for d in por_prov]},
             "ordenes_por_mes": {"labels": [d["mes"].strftime("%Y-%m") if d["mes"] else "N/A" for d in por_mes], "values": [d["n"] for d in por_mes]},
         }
+    })
+
+
+def api_estadistica_facturas(request):
+    desde, hasta = _get_date_range(request)
+    from pedidos.models import Factura
+    from django.db.models import Sum as _Sum
+
+    qs = Factura.objects.all()
+    if desde: qs = qs.filter(fecha_emision__date__gte=desde)
+    if hasta: qs = qs.filter(fecha_emision__date__lte=hasta)
+
+    montos = [float(v) for v in qs.values_list("monto_total", flat=True) if v is not None]
+
+    # Estado de cobro: calculado en Python porque es una propiedad
+    estado_counts = {"Pagada": 0, "Pago parcial": 0, "Pendiente": 0, "Anulada": 0}
+    for f in qs.prefetch_related("pagos"):
+        if f.anulada:
+            estado_counts["Anulada"] += 1
+        else:
+            pagado = f.total_pagado
+            if pagado >= f.monto_total:
+                estado_counts["Pagada"] += 1
+            elif pagado > 0:
+                estado_counts["Pago parcial"] += 1
+            else:
+                estado_counts["Pendiente"] += 1
+
+    por_mes = list(
+        qs.annotate(mes=TruncMonth("fecha_emision"))
+          .values("mes")
+          .annotate(n=Count("id"), total=_Sum("monto_total"))
+          .order_by("mes")
+    )
+
+    total_cobrado = float(
+        qs.filter(anulada=False)
+          .prefetch_related("pagos")
+          .aggregate(t=_Sum("pagos__monto"))["t"] or 0
+    )
+    total_facturado = float(qs.filter(anulada=False).aggregate(t=_Sum("monto_total"))["t"] or 0)
+
+    return JsonResponse({
+        "variables": {
+            "monto_total": {"label": "Monto Total Facturado ($)", "stats": _calc_stats(montos)},
+        },
+        "categoricas": {
+            "por_estado_cobro": {
+                "labels": list(estado_counts.keys()),
+                "values": list(estado_counts.values()),
+            },
+            "facturas_por_mes": {
+                "labels": [d["mes"].strftime("%Y-%m") if d["mes"] else "N/A" for d in por_mes],
+                "values": [d["n"] for d in por_mes],
+            },
+            "monto_por_mes": {
+                "labels": [d["mes"].strftime("%Y-%m") if d["mes"] else "N/A" for d in por_mes],
+                "values": [float(d["total"] or 0) for d in por_mes],
+            },
+        },
+        "resumen": {
+            "total_facturado": total_facturado,
+            "total_cobrado": total_cobrado,
+            "saldo_pendiente": round(total_facturado - total_cobrado, 2),
+            "anuladas": estado_counts["Anulada"],
+        },
     })
 
 
