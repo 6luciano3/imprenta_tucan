@@ -1078,10 +1078,10 @@ def informe_pdf_productos(request):
     qs_lp = LineaPedido.objects.all()
     if desde: qs_lp = qs_lp.filter(pedido__fecha_pedido__gte=desde)
     if hasta: qs_lp = qs_lp.filter(pedido__fecha_pedido__lte=hasta)
-    top = qs_lp.values("producto__nombreProducto","producto__categoria").annotate(veces=Count("id"),ingresos=Sum("precio_unitario")).order_by("-ingresos")[:20]
+    top = qs_lp.values("producto__nombreProducto","producto__categoriaProducto__nombreCategoria").annotate(veces=Count("id"),ingresos=Sum("precio_unitario")).order_by("-ingresos")[:20]
     rows2 = [[Paragraph("<b>#</b>",st["bold"]),Paragraph("<b>Producto</b>",st["bold"]),Paragraph("<b>Categoria</b>",st["bold"]),Paragraph("<b>Ventas</b>",st["bold"]),Paragraph("<b>Ingresos</b>",st["bold"])]]
     for i,r in enumerate(top,1):
-        rows2.append([Paragraph(str(i),st["normal"]),Paragraph(str(r["producto__nombreProducto"] or "-")[:30],st["normal"]),Paragraph(str(r["producto__categoria"] or "-"),st["normal"]),Paragraph(str(r["veces"]),st["normal"]),Paragraph(f"${float(r['ingresos'] or 0):,.2f}",st["normal"])])
+        rows2.append([Paragraph(str(i),st["normal"]),Paragraph(str(r["producto__nombreProducto"] or "-")[:30],st["normal"]),Paragraph(str(r["producto__categoriaProducto__nombreCategoria"] or "-"),st["normal"]),Paragraph(str(r["veces"]),st["normal"]),Paragraph(f"${float(r['ingresos'] or 0):,.2f}",st["normal"])])
     t2 = Table(rows2,colWidths=[cw*0.06,cw*0.36,cw*0.2,cw*0.12,cw*0.26]); t2.setStyle(_tbl_style(st)); story.append(t2)
     _data_api = _get_api_data(api_estadistica_productos, desde, hasta)
     _agregar_graficos_api(story, _data_api, st, request=request)
@@ -1418,3 +1418,117 @@ def informe_pdf_presupuestos(request):
     # Segunda pasada: PDF final con total conocido
     doc.build(story)
     return _pdf_response(buffer, "informe_presupuestos", request)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# INFORME 8: FACTURAS
+# ═══════════════════════════════════════════════════════════════════════════════
+@login_required
+def informe_pdf_facturas(request):
+    from pedidos.models import Factura, PagoFactura
+    from reportlab.platypus import Paragraph, Table
+    from django.db.models import Count, Sum
+    from django.utils.dateparse import parse_date
+
+    desde = parse_date(request.GET.get("desde", "") or "")
+    hasta = parse_date(request.GET.get("hasta", "") or "")
+    usuario = str(request.user) if request.user.is_authenticated else "Sistema"
+
+    buffer, doc, st, cw, _total_pages = _pdf_setup("Informe de Facturas", request)
+    story = []
+    hdr, hr = _pdf_header(st, "Informe de Facturas", _periodo_str(desde, hasta), usuario)
+    story += [hdr, hr]
+
+    qs = Factura.objects.all()
+    if desde: qs = qs.filter(fecha_emision__date__gte=desde)
+    if hasta: qs = qs.filter(fecha_emision__date__lte=hasta)
+
+    total = qs.count()
+    anuladas = qs.filter(anulada=True).count()
+    total_facturado = float(qs.filter(anulada=False).aggregate(t=Sum("monto_total"))["t"] or 0)
+    total_cobrado = float(
+        PagoFactura.objects.filter(factura__in=qs.filter(anulada=False))
+        .aggregate(t=Sum("monto"))["t"] or 0
+    )
+    saldo_pendiente = total_facturado - total_cobrado
+
+    story.append(Paragraph("Resumen de Facturas", st["seccion"]))
+    rows = [
+        [Paragraph("<b>Indicador</b>", st["bold"]),    Paragraph("<b>Valor</b>", st["bold"])],
+        [Paragraph("Total facturas",   st["normal"]),   Paragraph(f"<b>{total}</b>", st["bold"])],
+        [Paragraph("Anuladas",         st["normal"]),   Paragraph(f"<b>{anuladas}</b>", st["bold"])],
+        [Paragraph("Total facturado",  st["normal"]),   Paragraph(f"<b>${total_facturado:,.2f}</b>", st["bold"])],
+        [Paragraph("Total cobrado",    st["normal"]),   Paragraph(f"<b>${total_cobrado:,.2f}</b>", st["bold"])],
+        [Paragraph("Saldo pendiente",  st["normal"]),   Paragraph(f"<b>${saldo_pendiente:,.2f}</b>", st["bold"])],
+    ]
+    t = Table(rows, colWidths=[cw * 0.6, cw * 0.4])
+    t.setStyle(_tbl_style(st))
+    story.append(t)
+
+    story.append(Paragraph("Detalle de Facturas", st["seccion"]))
+    rows2 = [[
+        Paragraph("<b>N° Factura</b>", st["bold"]),
+        Paragraph("<b>Pedido</b>",     st["bold"]),
+        Paragraph("<b>Cliente</b>",    st["bold"]),
+        Paragraph("<b>Fecha</b>",      st["bold"]),
+        Paragraph("<b>Total</b>",      st["bold"]),
+        Paragraph("<b>Estado</b>",     st["bold"]),
+    ]]
+    for f in qs.select_related("pedido__cliente").prefetch_related("pagos").order_by("-fecha_emision")[:30]:
+        if f.anulada:
+            estado_label = "Anulada"
+        else:
+            pagado = float(f.total_pagado)
+            monto  = float(f.monto_total)
+            if pagado >= monto:
+                estado_label = "Pagada"
+            elif pagado > 0:
+                estado_label = "Parcial"
+            else:
+                estado_label = "Pendiente"
+        rows2.append([
+            Paragraph(str(f.numero),                        st["normal"]),
+            Paragraph(f"#{f.pedido_id}",                    st["normal"]),
+            Paragraph(str(f.pedido.cliente)[:28],           st["normal"]),
+            Paragraph(f.fecha_emision.strftime("%d/%m/%y"), st["normal"]),
+            Paragraph(f"${float(f.monto_total):,.2f}",      st["normal"]),
+            Paragraph(estado_label,                         st["normal"]),
+        ])
+    if len(rows2) == 1:
+        rows2.append([Paragraph("Sin facturas en el período", st["normal"])] + [Paragraph("-", st["normal"])] * 5)
+    t2 = Table(rows2, colWidths=[cw*0.20, cw*0.09, cw*0.29, cw*0.12, cw*0.16, cw*0.14])
+    t2.setStyle(_tbl_style(st))
+    story.append(t2)
+
+    _data_api = _get_api_data(api_estadistica_facturas, desde, hasta)
+    _agregar_graficos_api(story, _data_api, st, request=request)
+
+    hr2, firma_items = _pdf_firma(st, usuario)
+    story.append(hr2)
+    story.extend(firma_items)
+
+    import copy as _copy
+    from io import BytesIO as _BytesIO8
+    _buf_count = _BytesIO8()
+    _doc_count = __import__('reportlab.platypus', fromlist=['BaseDocTemplate']).BaseDocTemplate(
+        _buf_count, pagesize=__import__('reportlab.lib.pagesizes', fromlist=['A4']).A4,
+        pageTemplates=[__import__('reportlab.platypus', fromlist=['PageTemplate']).PageTemplate(
+            id='cnt',
+            frames=[__import__('reportlab.platypus', fromlist=['Frame']).Frame(
+                2 * st['cm'], 1.5 * st['cm'],
+                st['cw'], 25 * st['cm'],
+                leftPadding=0, rightPadding=0, topPadding=0, bottomPadding=0
+            )],
+            onPage=lambda c, d: None
+        )]
+    )
+    try:
+        _doc_count.build(_copy.deepcopy(story))
+        _buf_count.seek(0)
+        from pypdf import PdfReader as _PRI
+        _total_pages[0] = len(_PRI(_buf_count).pages)
+    except Exception:
+        _total_pages[0] = 1
+
+    doc.build(story)
+    return _pdf_response(buffer, "informe_facturas", request)

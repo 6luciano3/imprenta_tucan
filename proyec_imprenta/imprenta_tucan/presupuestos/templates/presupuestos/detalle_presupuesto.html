@@ -16,10 +16,6 @@
        class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-sm font-medium">
       <span class="material-symbols-outlined text-base">edit</span> Editar
     </a>
-    <a href="{% url 'presupuestos:clonar' presupuesto.pk %}"
-       class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium">
-      <span class="material-symbols-outlined text-base">content_copy</span> Clonar
-    </a>
   </div>
 </div>
 
@@ -182,11 +178,6 @@
            class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-sm font-medium">
           <span class="material-symbols-outlined text-base">edit</span>
           Editar presupuesto
-        </a>
-        <a href="{% url 'presupuestos:clonar' presupuesto.pk %}"
-           class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium">
-          <span class="material-symbols-outlined text-base">content_copy</span>
-          Clonar como nuevo
         </a>
         <a href="{% url 'presupuestos:eliminar' presupuesto.pk %}"
            class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 text-sm font-medium border border-red-200">

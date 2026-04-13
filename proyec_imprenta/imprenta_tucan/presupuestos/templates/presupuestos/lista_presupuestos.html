@@ -68,25 +68,28 @@
           {% endif %}
         </td>
         <td class="py-2 px-4 whitespace-nowrap">
-          <a href="{% url 'presupuestos:detalle' p.pk %}" class="text-gray-600 hover:underline">Ver</a>
-          <span class="text-gray-300 mx-1">|</span>
-          <a href="{% url 'presupuestos:editar' p.pk %}" class="text-blue-600 hover:underline">Editar</a>
-          <span class="text-gray-300 mx-1">|</span>
-          <a href="{% url 'presupuestos:clonar' p.pk %}" class="text-purple-600 hover:underline">Clonar</a>
-          <span class="text-gray-300 mx-1">|</span>
-          <a href="{% url 'presupuestos:eliminar' p.pk %}" class="text-red-600 hover:underline">Eliminar</a>
-          <span class="text-gray-300 mx-1">|</span>
-          <button type="button"
-            class="btn-enviar-presupuesto text-purple-600 hover:underline text-sm font-medium"
-            data-pk="{{ p.pk }}"
-            data-token="{{ p.token }}"
-            data-numero="{{ p.numero }}"
-            data-cliente="{{ p.cliente }}"
-            data-total="{{ p.total }}"
-            data-email="{{ p.cliente.email|default:'' }}"
-            data-celular="{{ p.cliente.celular|default:'' }}"
-            data-telefono="{{ p.cliente.telefono|default:'' }}"
-          >Enviar</button>
+          <div class="flex items-center gap-1">
+            <a href="{% url 'presupuestos:detalle' p.pk %}" title="Ver" class="p-1.5 rounded hover:bg-gray-100 text-gray-500 hover:text-gray-700">
+              <span class="material-symbols-outlined text-base">visibility</span>
+            </a>
+            <a href="{% url 'presupuestos:editar' p.pk %}" title="Editar" class="p-1.5 rounded hover:bg-blue-50 text-blue-500 hover:text-blue-700">
+              <span class="material-symbols-outlined text-base">edit</span>
+            </a>
+<a href="{% url 'presupuestos:eliminar' p.pk %}" title="Eliminar" class="p-1.5 rounded hover:bg-red-50 text-red-500 hover:text-red-700">
+              <span class="material-symbols-outlined text-base">delete</span>
+            </a>
+            <button type="button" title="Enviar"
+              class="btn-enviar-presupuesto p-1.5 rounded hover:bg-purple-50 text-purple-500 hover:text-purple-700"
+              data-pk="{{ p.pk }}"
+              data-token="{{ p.token }}"
+              data-numero="{{ p.numero }}"
+              data-cliente="{{ p.cliente }}"
+              data-total="{{ p.total }}"
+              data-email="{{ p.cliente.email|default:'' }}"
+              data-celular="{{ p.cliente.celular|default:'' }}"
+              data-telefono="{{ p.cliente.telefono|default:'' }}"
+            ><span class="material-symbols-outlined text-base">send</span></button>
+          </div>
         </td>
       </tr>
       {% empty %}

@@ -26,4 +26,5 @@ urlpatterns = [
     path('informe-pdf/insumos/', views.informe_pdf_insumos, name='informe_pdf_insumos'),
     path('informe-pdf/compras/', views.informe_pdf_compras, name='informe_pdf_compras'),
     path('informe-pdf/presupuestos/', views.informe_pdf_presupuestos, name='informe_pdf_presupuestos'),
+    path('informe-pdf/facturas/',     views.informe_pdf_facturas,     name='informe_pdf_facturas'),
 ]
