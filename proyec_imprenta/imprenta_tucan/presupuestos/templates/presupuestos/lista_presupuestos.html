@@ -19,6 +19,14 @@
   <option value="estado" {% if order_by == 'estado' %}selected{% endif %}>Estado</option>
 {% endblock %}
 
+{% block extra_head %}
+{{ block.super }}
+<style>
+  /* Ocultar el panel de búsqueda del list_base y reemplazar con el custom */
+  .list-controls { display: none !important; }
+</style>
+{% endblock %}
+
 {% block list_actions_right %}
 <a href="{% url 'presupuestos:exportar' %}?q={{ query }}&estado={{ estado_fil }}&fecha_desde={{ fecha_desde }}&fecha_hasta={{ fecha_hasta }}"
    class="flex items-center gap-2 bg-gray-600 text-white px-4 py-2 rounded-lg shadow hover:bg-gray-700 text-sm">
@@ -28,6 +36,90 @@
 {% endblock %}
 
 {% block list_content %}
+<!-- Panel de búsqueda custom (una sola línea) -->
+<div class="bg-white rounded-xl shadow p-3 mb-5">
+  <form method="GET" class="flex flex-wrap lg:flex-nowrap items-center gap-2">
+
+    <!-- Búsqueda de texto -->
+    <div class="relative flex-1 min-w-48">
+      <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-lg pointer-events-none">search</span>
+      <input type="text" name="q" value="{{ query }}"
+        placeholder="N° presupuesto, cliente, estado..."
+        class="w-full pl-10 pr-8 py-2 rounded-full border border-gray-200 bg-white text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+      {% if query %}
+      <a href="{% url 'presupuestos:lista' %}?order_by={{ order_by }}&direction={{ direction }}"
+         class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+        <span class="material-symbols-outlined text-base">close</span>
+      </a>
+      {% endif %}
+    </div>
+
+    <!-- Estado -->
+    <div class="relative">
+      <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-base pointer-events-none">filter_list</span>
+      <select name="estado"
+        class="pl-9 pr-7 py-2 rounded-full border border-gray-200 bg-white text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 appearance-none"
+        style="background-image:url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%23888%22><path d=%22M7 10l5 5 5-5z%22/></svg>');background-repeat:no-repeat;background-position:right 0.5rem center;background-size:1rem">
+        <option value="">Todos los estados</option>
+        {% for est in estados_choices %}
+        <option value="{{ est }}" {% if estado_fil == est %}selected{% endif %}>{{ est }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <!-- Rango de fechas -->
+    <div class="flex items-center gap-1 bg-white border border-gray-200 rounded-full px-3 py-2 shadow-sm text-sm">
+      <span class="material-symbols-outlined text-gray-400 text-base">calendar_month</span>
+      <input type="date" name="fecha_desde" value="{{ fecha_desde }}" title="Desde"
+        class="border-0 bg-transparent text-gray-700 focus:outline-none w-[6.5rem]">
+      <span class="text-gray-300">—</span>
+      <input type="date" name="fecha_hasta" value="{{ fecha_hasta }}" title="Hasta"
+        class="border-0 bg-transparent text-gray-700 focus:outline-none w-[6.5rem]">
+    </div>
+
+    <!-- Ordenar por -->
+    <div class="relative">
+      <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-base pointer-events-none">sort</span>
+      <select name="order_by"
+        class="pl-9 pr-7 py-2 rounded-full border border-gray-200 bg-white text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 appearance-none"
+        style="background-image:url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%23888%22><path d=%22M7 10l5 5 5-5z%22/></svg>');background-repeat:no-repeat;background-position:right 0.5rem center;background-size:1rem">
+        <option value="id"              {% if order_by == 'id' %}selected{% endif %}>ID</option>
+        <option value="numero"          {% if order_by == 'numero' %}selected{% endif %}>N°</option>
+        <option value="cliente__apellido" {% if order_by == 'cliente__apellido' %}selected{% endif %}>Apellido</option>
+        <option value="fecha"           {% if order_by == 'fecha' %}selected{% endif %}>Fecha</option>
+        <option value="total"           {% if order_by == 'total' %}selected{% endif %}>Total</option>
+        <option value="estado"          {% if order_by == 'estado' %}selected{% endif %}>Estado</option>
+      </select>
+    </div>
+
+    <!-- Dirección -->
+    <div class="relative">
+      <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-base pointer-events-none">swap_vert</span>
+      <select name="direction"
+        class="pl-9 pr-7 py-2 rounded-full border border-gray-200 bg-white text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 appearance-none"
+        style="background-image:url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%23888%22><path d=%22M7 10l5 5 5-5z%22/></svg>');background-repeat:no-repeat;background-position:right 0.5rem center;background-size:1rem">
+        <option value="asc"  {% if direction == 'asc' %}selected{% endif %}>A → Z</option>
+        <option value="desc" {% if direction == 'desc' %}selected{% endif %}>Z → A</option>
+      </select>
+    </div>
+
+    <!-- Botones -->
+    <button type="submit"
+      class="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold shadow-sm whitespace-nowrap">
+      <span class="material-symbols-outlined text-base">search</span> Buscar
+    </button>
+    {% if query or estado_fil or fecha_desde or fecha_hasta %}
+    <a href="{% url 'presupuestos:lista' %}"
+      class="inline-flex items-center gap-1 px-3 py-2 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 text-sm whitespace-nowrap">
+      <span class="material-symbols-outlined text-base">close</span> Limpiar
+    </a>
+    {% endif %}
+
+    <input type="hidden" name="next"  value="{{ request.GET.next }}">
+    <input type="hidden" name="popup" value="{{ request.GET.popup }}">
+  </form>
+</div>
+
 {% if total_resultados is not None %}
 <p class="text-sm text-gray-500 mb-3">
   Mostrando <strong>{{ presupuestos|length }}</strong> de <strong>{{ total_resultados }}</strong> resultado(s)
@@ -184,25 +276,6 @@
       </button>
     </div>
   </div>
-</div>
-{% endblock %}
-
-{% block extra_filters %}
-<div class="flex items-center gap-2">
-  <select name="estado" aria-label="Filtrar por estado"
-    class="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-blue-400 focus:outline-none">
-    <option value="">Todos los estados</option>
-    {% for est in estados_choices %}
-    <option value="{{ est }}" {% if estado_fil == est %}selected{% endif %}>{{ est }}</option>
-    {% endfor %}
-  </select>
-</div>
-<div class="flex items-center gap-1 date-modern">
-  <input type="date" name="fecha_desde" value="{{ fecha_desde }}" title="Fecha desde"
-    class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white focus:ring-2 focus:ring-blue-400 focus:outline-none">
-  <span class="text-gray-400 text-xs">—</span>
-  <input type="date" name="fecha_hasta" value="{{ fecha_hasta }}" title="Fecha hasta"
-    class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white focus:ring-2 focus:ring-blue-400 focus:outline-none">
 </div>
 {% endblock %}
 
