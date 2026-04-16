@@ -131,6 +131,21 @@ class ProyeccionInsumo(models.Model):
         ('modificada', 'Modificada'),
         ('rechazada', 'Rechazada'),
     ], default='pendiente')
+    FUENTE_MEDIA_MOVIL = 'media_movil'
+    FUENTE_ETS = 'ets'
+    FUENTE_STOCK_MINIMO = 'stock_minimo'
+    FUENTE_FALLBACK = 'fallback'
+    FUENTE_CHOICES = [
+        (FUENTE_MEDIA_MOVIL, 'Media Móvil Ponderada'),
+        (FUENTE_ETS, 'Suavizado Exponencial (ETS)'),
+        (FUENTE_STOCK_MINIMO, 'Stock Mínimo Sugerido'),
+        (FUENTE_FALLBACK, 'Valor por defecto'),
+    ]
+    fuente = models.CharField(
+        max_length=20, choices=FUENTE_CHOICES,
+        default=FUENTE_MEDIA_MOVIL, blank=True,
+        help_text='Origen del valor proyectado: algoritmo usado o fallback aplicado.',
+    )
     cantidad_validada = models.PositiveIntegerField(null=True, blank=True)
     proveedor_validado = models.ForeignKey(Proveedor, on_delete=models.SET_NULL, null=True, blank=True,
                                            related_name='proyecciones_validadas')

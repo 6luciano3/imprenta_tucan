@@ -93,12 +93,33 @@
   <form method="POST" class="bg-white rounded-xl shadow p-6 space-y-6">
     {% csrf_token %}
 
-    
+    <!-- Selector de algoritmo -->
+    <div class="border-2 border-blue-200 rounded-xl p-5 bg-blue-50">
+      <label class="block text-sm font-bold text-blue-800 mb-1 flex items-center gap-2">
+        <span class="material-symbols-outlined text-base">psychology</span>
+        Algoritmo de predicción
+      </label>
+      <p class="text-sm text-blue-700 mb-4">Elegí el método matemático que se usará para proyectar la demanda de cada insumo en la próxima ejecución.</p>
+      <div class="grid grid-cols-1 gap-3">
+        {% for valor, nombre, descripcion in algoritmo_opciones %}
+        <label class="flex items-start gap-3 p-4 bg-white rounded-lg border-2 cursor-pointer transition
+          {% if algoritmo_actual == valor %}border-blue-500 shadow-sm{% else %}border-gray-200 hover:border-blue-300{% endif %}">
+          <input type="radio" name="ALGORITMO_PROYECCION" value="{{ valor }}"
+                 {% if algoritmo_actual == valor %}checked{% endif %}
+                 class="mt-0.5 accent-blue-600">
+          <div>
+            <span class="block text-sm font-semibold text-gray-800">{{ nombre }}</span>
+            <span class="block text-xs text-gray-500 mt-0.5">{{ descripcion }}</span>
+          </div>
+        </label>
+        {% endfor %}
+      </div>
+      <p class="text-xs text-blue-600 mt-3">Clave interna: <code>ALGORITMO_PROYECCION</code></p>
+    </div>
+
     {% for p in params %}
     <div class="border border-gray-200 rounded-lg p-4">
-      <label class="block text-sm font-semibold text-gray-700 mb-1">
-        {{ p.nombre }}
-      </label>
+      <label class="block text-sm font-semibold text-gray-700 mb-1">{{ p.nombre }}</label>
       <p class="text-sm text-gray-500 mb-3">{{ p.descripcion }}</p>
       <input
         type="text"
@@ -119,7 +140,7 @@
       />
       <p class="text-xs text-gray-400 mt-1">
         Rango permitido: <span class="font-medium text-blue-600">{{ p.min|default:0 }} - {{ p.max|default:50 }}</span>
-        · Clave interna: <code>{{ p.clave }}</code>
+        · Clave: <code>{{ p.clave }}</code>
       </p>
     </div>
     {% endfor %}

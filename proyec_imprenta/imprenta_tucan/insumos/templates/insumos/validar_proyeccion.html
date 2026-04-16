@@ -1,40 +1,181 @@
 {% extends 'base.html' %}
-{% block title %}Validar Proyección de Insumo{% endblock %}
+{% block title %}Validar Proyección — {{ proyeccion.insumo.nombre }}{% endblock %}
 {% block content %}
-<h1 class="text-2xl font-bold mb-4">Validar Proyección de Insumo</h1>
-<div class="mb-6">
-    <p><strong>Insumo:</strong> {{ proyeccion.insumo.nombre }}</p>
-    <p><strong>Periodo:</strong> {{ proyeccion.periodo }}</p>
-    <p><strong>Cantidad proyectada:</strong> {{ proyeccion.cantidad_proyectada }}</p>
-    <p><strong>Proveedor sugerido:</strong> {% if proyeccion.proveedor_sugerido %}{{ proyeccion.proveedor_sugerido.nombre }}{% else %}-{% endif %}</p>
+
+<div class="mb-6 flex items-center justify-between">
+  <h1 class="text-2xl font-bold text-gray-800 flex items-center gap-2">
+    <span class="material-symbols-outlined text-blue-600">check_circle</span>
+    Validar Proyección
+  </h1>
+  <a href="{% url 'lista_proyecciones' %}" class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm">
+    <span class="material-symbols-outlined text-base">arrow_back</span> Volver
+  </a>
 </div>
-<form method="post">
-    {% csrf_token %}
-    <div class="mb-4">
-        <label for="cantidad_validada" class="block font-semibold mb-1">Cantidad validada</label>
-        <input type="number" name="cantidad_validada" id="cantidad_validada" value="{{ proyeccion.cantidad_validada|default:proyeccion.cantidad_proyectada }}" class="border rounded px-2 py-1 w-32">
+
+{% if messages %}
+{% for msg in messages %}
+<div class="mb-4 px-4 py-3 rounded-lg {% if msg.tags == 'error' %}bg-red-50 text-red-700 border border-red-200{% elif msg.tags == 'warning' %}bg-yellow-50 text-yellow-700 border border-yellow-200{% else %}bg-green-50 text-green-700 border border-green-200{% endif %}">
+  {{ msg }}
+</div>
+{% endfor %}
+{% endif %}
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+  <!-- Panel info de la proyección -->
+  <div class="lg:col-span-1 space-y-4">
+
+    <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+      <h2 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Datos de la proyección</h2>
+      <dl class="space-y-2 text-sm">
+        <div>
+          <dt class="text-gray-400 text-xs">Insumo</dt>
+          <dd class="font-semibold text-gray-800">{{ proyeccion.insumo.nombre }}</dd>
+        </div>
+        <div>
+          <dt class="text-gray-400 text-xs">Código</dt>
+          <dd class="text-gray-600 font-mono text-xs">{{ proyeccion.insumo.codigo }}</dd>
+        </div>
+        <div>
+          <dt class="text-gray-400 text-xs">Período</dt>
+          <dd class="font-medium">{{ proyeccion.periodo }}</dd>
+        </div>
+        <div>
+          <dt class="text-gray-400 text-xs">Cantidad proyectada</dt>
+          <dd class="font-bold text-lg text-blue-700">{{ proyeccion.cantidad_proyectada }}</dd>
+        </div>
+        <div>
+          <dt class="text-gray-400 text-xs mb-1">Fuente del valor</dt>
+          <dd>
+            {% if proyeccion.fuente == 'media_movil' %}
+              <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full text-xs border border-blue-200">
+                <span class="material-symbols-outlined" style="font-size:13px">show_chart</span> Media Móvil Ponderada
+              </span>
+              <p class="text-xs text-gray-400 mt-1">Calculado con historial real de consumo de los últimos meses.</p>
+            {% elif proyeccion.fuente == 'ets' %}
+              <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-purple-50 text-purple-700 rounded-full text-xs border border-purple-200">
+                <span class="material-symbols-outlined" style="font-size:13px">auto_graph</span> Suavizado Exponencial (ETS)
+              </span>
+              <p class="text-xs text-gray-400 mt-1">Calculado con el modelo ETS sobre historial extendido.</p>
+            {% elif proyeccion.fuente == 'stock_minimo' %}
+              <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-50 text-amber-700 rounded-full text-xs border border-amber-200">
+                <span class="material-symbols-outlined" style="font-size:13px">inventory</span> Stock Mínimo Sugerido
+              </span>
+              <p class="text-xs text-amber-600 mt-1">Sin historial de consumo suficiente. Se usó el stock mínimo como referencia. Revisá si el valor es adecuado.</p>
+            {% else %}
+              <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-gray-100 text-gray-500 rounded-full text-xs">
+                <span class="material-symbols-outlined" style="font-size:13px">help_outline</span> Valor por defecto
+              </span>
+              <p class="text-xs text-gray-400 mt-1">Sin historial ni stock mínimo. Se usó el valor por defecto del sistema. Revisá el dato antes de aceptar.</p>
+            {% endif %}
+          </dd>
+        </div>
+      </dl>
     </div>
-    <div class="mb-4">
-        <label for="proveedor_validado" class="block font-semibold mb-1">Proveedor validado</label>
-        <select name="proveedor_validado" id="proveedor_validado" class="border rounded px-2 py-1 w-64">
-            {% for proveedor in proveedores %}
-            <option value="{{ proveedor.id }}" {% if proyeccion.proveedor_validado and proyeccion.proveedor_validado.id == proveedor.id %}selected{% elif proyeccion.proveedor_sugerido and proyeccion.proveedor_sugerido.id == proveedor.id %}selected{% endif %}>{{ proveedor.nombre }}</option>
-            {% endfor %}
-        </select>
+
+    <!-- Info del insumo -->
+    <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+      <h2 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Stock actual</h2>
+      <dl class="space-y-2 text-sm">
+        <div class="flex justify-between">
+          <dt class="text-gray-500">Stock actual</dt>
+          <dd class="font-semibold {% if proyeccion.insumo.stock <= 0 %}text-red-600{% elif proyeccion.insumo.stock <= 50 %}text-amber-600{% else %}text-green-700{% endif %}">
+            {{ proyeccion.insumo.stock }}
+          </dd>
+        </div>
+        <div class="flex justify-between">
+          <dt class="text-gray-500">Stock mínimo sugerido</dt>
+          <dd class="font-medium text-gray-700">{{ proyeccion.insumo.stock_minimo_sugerido }}</dd>
+        </div>
+        <div class="flex justify-between">
+          <dt class="text-gray-500">Precio unitario</dt>
+          <dd class="font-medium {% if not proyeccion.insumo.precio_unitario or proyeccion.insumo.precio_unitario == 0 %}text-red-500{% else %}text-gray-700{% endif %}">
+            ${{ proyeccion.insumo.precio_unitario|floatformat:2 }}
+            {% if not proyeccion.insumo.precio_unitario or proyeccion.insumo.precio_unitario == 0 %}
+              <span class="block text-xs text-red-500">Sin precio — la OC se creará con monto $0</span>
+            {% endif %}
+          </dd>
+        </div>
+      </dl>
     </div>
-    <div class="mb-4">
-        <label for="estado" class="block font-semibold mb-1">Estado</label>
-        <select name="estado" id="estado" class="border rounded px-2 py-1 w-64">
-            <option value="aceptada" {% if proyeccion.estado == 'aceptada' %}selected{% endif %}>Aceptar</option>
-            <option value="modificada" {% if proyeccion.estado == 'modificada' %}selected{% endif %}>Modificar</option>
+
+  </div>
+
+  <!-- Formulario de validación -->
+  <div class="lg:col-span-2">
+    <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+      <h2 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-4">Decisión de validación</h2>
+
+      <form method="post" class="space-y-5">
+        {% csrf_token %}
+
+        <div>
+          <label for="estado" class="block text-sm font-semibold text-gray-700 mb-1">Decisión</label>
+          <select name="estado" id="estado" onchange="toggleCantidad(this.value)"
+                  class="border border-gray-300 rounded-lg px-3 py-2 text-sm w-full focus:ring-2 focus:ring-blue-400">
+            <option value="aceptada" {% if proyeccion.estado == 'aceptada' %}selected{% endif %}>Aceptar (crear Orden de Compra sugerida)</option>
+            <option value="modificada" {% if proyeccion.estado == 'modificada' %}selected{% endif %}>Modificar cantidad y aceptar</option>
             <option value="rechazada" {% if proyeccion.estado == 'rechazada' %}selected{% endif %}>Rechazar</option>
-        </select>
+          </select>
+        </div>
+
+        <div id="seccion-cantidad">
+          <label for="cantidad_validada" class="block text-sm font-semibold text-gray-700 mb-1">Cantidad a ordenar</label>
+          <input type="number" name="cantidad_validada" id="cantidad_validada" min="1"
+                 value="{{ proyeccion.cantidad_validada|default:proyeccion.cantidad_proyectada }}"
+                 class="border border-gray-300 rounded-lg px-3 py-2 text-sm w-40 focus:ring-2 focus:ring-blue-400">
+          <p class="text-xs text-gray-400 mt-1">Proyectada: <strong>{{ proyeccion.cantidad_proyectada }}</strong></p>
+        </div>
+
+        <div>
+          <label for="proveedor_validado" class="block text-sm font-semibold text-gray-700 mb-1">Proveedor</label>
+          <select name="proveedor_validado" id="proveedor_validado"
+                  class="border border-gray-300 rounded-lg px-3 py-2 text-sm w-full focus:ring-2 focus:ring-blue-400">
+            <option value="">— Sin asignar —</option>
+            {% for proveedor in proveedores %}
+            <option value="{{ proveedor.id }}"
+              {% if proyeccion.proveedor_validado and proyeccion.proveedor_validado.id == proveedor.id %}selected
+              {% elif not proyeccion.proveedor_validado and proyeccion.proveedor_sugerido and proyeccion.proveedor_sugerido.id == proveedor.id %}selected
+              {% endif %}>
+              {{ proveedor.nombre }}
+              {% if scores_map %}
+                {% with score=scores_map|default:"{}" %}
+                  {% if proveedor.id in scores_map %}(score: {{ scores_map|dictsort:"0" }}){% endif %}
+                {% endwith %}
+              {% endif %}
+            </option>
+            {% endfor %}
+          </select>
+          {% if proyeccion.proveedor_sugerido %}
+          <p class="text-xs text-gray-400 mt-1">Sugerido por el motor: <strong>{{ proyeccion.proveedor_sugerido.nombre }}</strong></p>
+          {% endif %}
+        </div>
+
+        <div>
+          <label for="comentario_admin" class="block text-sm font-semibold text-gray-700 mb-1">Comentario <span class="font-normal text-gray-400">(opcional)</span></label>
+          <textarea name="comentario_admin" id="comentario_admin" rows="3"
+                    class="border border-gray-300 rounded-lg px-3 py-2 text-sm w-full focus:ring-2 focus:ring-blue-400">{{ proyeccion.comentario_admin }}</textarea>
+        </div>
+
+        <div class="flex items-center gap-3 pt-2">
+          <button type="submit"
+                  class="inline-flex items-center gap-2 px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg">
+            <span class="material-symbols-outlined text-base">save</span>
+            Guardar validación
+          </button>
+          <a href="{% url 'lista_proyecciones' %}" class="text-gray-500 hover:underline text-sm">Cancelar</a>
+        </div>
+      </form>
     </div>
-    <div class="mb-4">
-        <label for="comentario_admin" class="block font-semibold mb-1">Comentario</label>
-        <textarea name="comentario_admin" id="comentario_admin" rows="3" class="border rounded px-2 py-1 w-full">{{ proyeccion.comentario_admin }}</textarea>
-    </div>
-    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 rounded">Guardar validación</button>
-    <a href="{% url 'lista_proyecciones' %}" class="ml-4 text-gray-600 hover:underline">Volver a la lista</a>
-</form>
+  </div>
+</div>
+
+<script>
+function toggleCantidad(estado) {
+  const sec = document.getElementById('seccion-cantidad');
+  sec.style.display = (estado === 'rechazada') ? 'none' : 'block';
+}
+// Inicializar
+toggleCantidad(document.getElementById('estado').value);
+</script>
 {% endblock %}

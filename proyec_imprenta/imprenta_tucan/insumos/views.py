@@ -347,18 +347,21 @@ def lista_proyecciones(request):
     # T-06: la generacion de proyecciones fue movida a insumos.tasks.generar_proyecciones_insumos
     # que Celery ejecuta diariamente. Esta vista es solo lectura.
     from configuracion.services import get_page_size
-    
+    from insumos.models import predecir_demanda_media_movil
+
     # Obtener el último período con proyecciones
     ultimo_periodo = ProyeccionInsumo.objects.order_by('-periodo').values_list('periodo', flat=True).first()
     periodo_actual = ultimo_periodo or timezone.now().strftime('%Y-%m')
-    proyecciones_qs = ProyeccionInsumo.objects.filter(periodo=periodo_actual)
+    proyecciones_qs = ProyeccionInsumo.objects.filter(periodo=periodo_actual).select_related(
+        'insumo', 'proveedor_sugerido', 'proveedor_validado'
+    )
 
-    # Obtener prediccion para cada proyeccion (solo lectura, sin escribir en BD)
-    from insumos.models import predecir_demanda_media_movil
     proyecciones = []
     for p in proyecciones_qs.order_by('insumo__nombre'):
-        prediccion = predecir_demanda_media_movil(p.insumo, p.periodo, meses=3)
-        p.prediccion_media_movil = prediccion
+        # Predicción calculada en tiempo real (para el modal de detalle)
+        p.prediccion_media_movil = predecir_demanda_media_movil(p.insumo, p.periodo, meses=3)
+        # Comparativa proyectado vs consumo real (solo si el período ya pasó)
+        p.comparacion = p.comparar_consumo_real()
         proyecciones.append(p)
 
     paginator = Paginator(proyecciones, get_page_size())
@@ -368,6 +371,7 @@ def lista_proyecciones(request):
     return render(request, 'insumos/lista_proyecciones.html', {
         'proyecciones': page_obj,
         'sin_proyecciones': sin_proyecciones,
+        'periodo_actual': periodo_actual,
     })
 
 
@@ -376,48 +380,79 @@ def lista_proyecciones(request):
 def validar_proyeccion(request, pk):
     proyeccion = get_object_or_404(ProyeccionInsumo, pk=pk)
     if request.method == 'POST':
-        cantidad = request.POST.get('cantidad_validada')
+        cantidad = request.POST.get('cantidad_validada', '').strip()
         proveedor_id = request.POST.get('proveedor_validado')
         estado = request.POST.get('estado')
-        comentario = request.POST.get('comentario_admin')
-        proyeccion.cantidad_validada = cantidad
-        proyeccion.proveedor_validado_id = proveedor_id
-        proyeccion.estado = estado
-        proyeccion.comentario_admin = comentario
-        proyeccion.administrador = request.user
-        proyeccion.fecha_validacion = timezone.now()
-        proyeccion.save()
-        # Generar Orden de Compra sugerida (sin remito ni stock — se actualizan al recibir físicamente)
-        if estado in ['aceptada', 'modificada'] and cantidad:
-            insumo = proyeccion.insumo
+        comentario = request.POST.get('comentario_admin', '').strip()
+
+        # Validar cantidad > 0 si se acepta o modifica
+        if estado in ['aceptada', 'modificada']:
             try:
-                from django.db import transaction
-                from compras.models import EstadoCompra, DetalleOrdenCompra
-                with transaction.atomic():
+                cantidad_int = int(cantidad)
+                if cantidad_int <= 0:
+                    messages.error(request, 'La cantidad debe ser mayor a 0.')
+                    return redirect('validar_proyeccion', pk=pk)
+            except (ValueError, TypeError):
+                messages.error(request, 'La cantidad ingresada no es válida.')
+                return redirect('validar_proyeccion', pk=pk)
+        else:
+            cantidad_int = None
+
+        from django.db import transaction
+        from compras.models import EstadoCompra, DetalleOrdenCompra
+
+        try:
+            with transaction.atomic():
+                proyeccion.cantidad_validada = cantidad_int
+                proyeccion.proveedor_validado_id = proveedor_id
+                proyeccion.estado = estado
+                proyeccion.comentario_admin = comentario
+                proyeccion.administrador = request.user
+                proyeccion.fecha_validacion = timezone.now()
+                proyeccion.save()
+
+                # Generar Orden de Compra sugerida solo si se acepta o modifica
+                if estado in ['aceptada', 'modificada'] and cantidad_int:
+                    insumo = proyeccion.insumo
+                    precio = insumo.precio_unitario or 0
                     estado_oc, _ = EstadoCompra.objects.get_or_create(nombre='Sugerida')
                     oc = OrdenCompra.objects.create(
                         proveedor_id=proveedor_id or (insumo.proveedor.pk if insumo.proveedor else None),
                         estado=estado_oc,
-                        observaciones=f"Generada por proyección #{proyeccion.pk}. {comentario or ''}".strip(),
+                        observaciones=f"Generada por proyección #{proyeccion.pk}. {comentario}".strip('. '),
                         usuario=request.user,
                     )
-                    precio = insumo.precio_unitario or 0
                     DetalleOrdenCompra.objects.create(
                         orden=oc,
                         insumo=insumo,
-                        cantidad=int(cantidad),
+                        cantidad=cantidad_int,
                         precio_unitario=precio,
                     )
                     oc.calcular_total()
-            except Exception as e_oc:
-                import logging
-                logging.getLogger(__name__).warning(
-                    f'Error creando OrdenCompra para proyeccion #{proyeccion.pk}: {e_oc}'
-                )
+                    if float(precio) == 0:
+                        messages.warning(
+                            request,
+                            f'La orden de compra fue creada, pero {insumo.nombre} no tiene precio unitario cargado (monto $0). '
+                            'Actualizá el precio del insumo para que el monto sea correcto.'
+                        )
+        except Exception as e_oc:
+            import logging
+            logging.getLogger(__name__).warning(f'Error en validar_proyeccion #{pk}: {e_oc}')
+            messages.error(request, f'Error al guardar la validación: {e_oc}')
+            return redirect('validar_proyeccion', pk=pk)
+
         messages.success(request, 'Proyección validada correctamente.')
         return redirect('lista_proyecciones')
-    proveedores = Proveedor.objects.all()
-    return render(request, 'insumos/validar_proyeccion.html', {'proyeccion': proyeccion, 'proveedores': proveedores})
+
+    proveedores = Proveedor.objects.filter(activo=True).order_by('nombre')
+    # Puntajes de proveedores para mostrar en el formulario
+    from automatizacion.models import ScoreProveedor
+    scores_map = dict(ScoreProveedor.objects.values_list('proveedor_id', 'score'))
+    return render(request, 'insumos/validar_proyeccion.html', {
+        'proyeccion': proyeccion,
+        'proveedores': proveedores,
+        'scores_map': scores_map,
+    })
 
 
 @login_required
@@ -425,7 +460,11 @@ def validar_proyeccion(request, pk):
 def rechazar_proyeccion(request, pk):
     proyeccion = get_object_or_404(ProyeccionInsumo, pk=pk)
     proyeccion.estado = 'rechazada'
-    proyeccion.save(update_fields=['estado'])
+    proyeccion.administrador = request.user
+    proyeccion.fecha_validacion = timezone.now()
+    proyeccion.save(update_fields=['estado', 'administrador', 'fecha_validacion'])
+    # Cancelar OrdenCompra sugerida asociada a esta proyección
+    _cancelar_oc_de_proyeccion(pk)
     messages.success(request, 'Proyección rechazada correctamente.')
     return redirect('lista_proyecciones')
 
@@ -434,6 +473,21 @@ def rechazar_proyeccion(request, pk):
 @requiere_permiso("Insumos")
 def eliminar_proyeccion(request, pk):
     proyeccion = get_object_or_404(ProyeccionInsumo, pk=pk)
+    # Cancelar OrdenCompra sugerida antes de eliminar
+    _cancelar_oc_de_proyeccion(pk)
     proyeccion.delete()
     messages.success(request, 'Proyección eliminada correctamente.')
     return redirect('lista_proyecciones')
+
+
+def _cancelar_oc_de_proyeccion(proyeccion_pk):
+    """Cancela las OrdenCompra en estado 'Sugerida' generadas por una proyección."""
+    try:
+        from compras.models import EstadoCompra
+        estado_cancelada, _ = EstadoCompra.objects.get_or_create(nombre='Cancelada')
+        OrdenCompra.objects.filter(
+            observaciones__startswith=f"Generada por proyección #{proyeccion_pk}",
+            estado__nombre='Sugerida',
+        ).update(estado=estado_cancelada)
+    except Exception:
+        pass

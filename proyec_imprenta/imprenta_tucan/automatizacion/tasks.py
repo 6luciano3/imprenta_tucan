@@ -32,7 +32,7 @@ def tarea_prediccion_demanda():
     Solo procesa insumos de tipo directo.
     """
     try:
-        from insumos.models import Insumo, ProyeccionInsumo, predecir_demanda_media_movil
+        from insumos.models import Insumo, ProyeccionInsumo, predecir_demanda_media_movil, predecir_demanda_ets
         from automatizacion.models import ScoreProveedor
         from django.utils import timezone
         from datetime import timedelta
@@ -46,6 +46,7 @@ def tarea_prediccion_demanda():
 
         from core.motor.config import MotorConfig
         meses = MotorConfig.get('PROYECCION_MESES', cast=int) or 3
+        algoritmo = str(MotorConfig.get('ALGORITMO_PROYECCION') or 'media_movil').strip()
 
         insumos = Insumo.objects.filter(activo=True, tipo='directo')
         procesados = 0
@@ -53,11 +54,21 @@ def tarea_prediccion_demanda():
 
         for insumo in insumos:
             try:
-                cantidad_proyectada = predecir_demanda_media_movil(insumo, periodo_siguiente, meses=meses) or 0
+                fuente = algoritmo
+                if algoritmo == 'ets':
+                    cantidad_proyectada = predecir_demanda_ets(insumo, periodo_siguiente) or 0
+                else:
+                    cantidad_proyectada = predecir_demanda_media_movil(insumo, periodo_siguiente, meses=meses) or 0
+
                 if cantidad_proyectada <= 0:
                     # B6: sin historial, usar el stock_minimo_sugerido como fallback neutro.
-                    # Multiplicar por 2 inflaba proyecciones artificialmente cuando no hay datos reales.
-                    cantidad_proyectada = int(insumo.stock_minimo_sugerido or 0) or int(Parametro.get('PROYECCION_FALLBACK_CANTIDAD', 5))
+                    fallback_min = int(insumo.stock_minimo_sugerido or 0)
+                    if fallback_min > 0:
+                        cantidad_proyectada = fallback_min
+                        fuente = ProyeccionInsumo.FUENTE_STOCK_MINIMO
+                    else:
+                        cantidad_proyectada = int(Parametro.get('PROYECCION_FALLBACK_CANTIDAD', 5))
+                        fuente = ProyeccionInsumo.FUENTE_FALLBACK
 
                 # Proveedor sugerido: el de mayor score
                 score = ScoreProveedor.objects.filter(
@@ -80,8 +91,9 @@ def tarea_prediccion_demanda():
                     existente.cantidad_proyectada = int(cantidad_proyectada)
                     existente.proveedor_sugerido = proveedor_sugerido
                     existente.fecha_generacion = now
+                    existente.fuente = fuente
                     existente.save(update_fields=[
-                        'cantidad_proyectada', 'proveedor_sugerido', 'fecha_generacion'
+                        'cantidad_proyectada', 'proveedor_sugerido', 'fecha_generacion', 'fuente'
                     ])
                     proj = existente
                     created = False
@@ -94,6 +106,7 @@ def tarea_prediccion_demanda():
                             'proveedor_sugerido': proveedor_sugerido,
                             'fecha_generacion': now,
                             'estado': 'pendiente',
+                            'fuente': fuente,
                         }
                     )
                 procesados += 1
@@ -871,24 +884,7 @@ def tarea_automatizacion_presupuestos_ponderada():
                         insumo = p.insumo
                         if proveedor:
                             insumo.proveedor = proveedor
-                        # Remito automatico generado por App Compras
-                        try:
-                            from compras.models import Remito, DetalleRemito, EstadoCompra, OrdenCompra
-                            from django.utils import timezone
-                            estado_recibida, _ = EstadoCompra.objects.get_or_create(nombre='Recibida')
-                            remito = Remito.objects.create(
-                                proveedor=insumo.proveedor,
-                                numero=f'AUTO-{p.pk:06d}',
-                                fecha=timezone.now().date(),
-                                observaciones=f'Automatico CompraPropuesta #{p.pk}',
-                            )
-                            cantidad = int(p.cantidad_requerida or 0)
-                            DetalleRemito.objects.create(remito=remito, insumo=insumo, cantidad=cantidad)
-                            insumo.stock = (insumo.stock or 0) + cantidad
-                            insumo.save(update_fields=['stock', 'updated_at'])
-                        except Exception as e_r:
-                            insumo.stock = (insumo.stock or 0) + int(p.cantidad_requerida or 0)
-                            insumo.save(update_fields=['stock'])
+                            insumo.save(update_fields=['proveedor'])
                         p.estado = 'aceptada'
                         p.decision = 'aceptar'
                         p.comentario_admin = 'Aceptada automáticamente por umbrales'

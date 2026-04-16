@@ -118,7 +118,7 @@ def proyeccion_demanda_config(request):
         {
             'clave': 'PROYECCION_MESES',
             'nombre': 'Ventana de meses (media móvil)',
-            'descripcion': 'Cantidad de meses hacia atrás usados para calcular el promedio de consumo real cuando no hay proyección oficial. Aplica tanto al dashboard como a la tarea automática.',
+            'descripcion': 'Cantidad de meses hacia atrás usados para la Media Móvil Ponderada. Aplica tanto al dashboard como a la tarea automática.',
             'tipo': Parametro.TIPO_INT,
             'step': '1',
             'min': '1',
@@ -141,6 +141,11 @@ def proyeccion_demanda_config(request):
             'min': '3',
             'max': '24',
         },
+    ]
+
+    ALGORITMO_OPCIONES = [
+        ('media_movil', 'Media Móvil Ponderada', 'Promedio de los últimos N meses con mayor peso en meses recientes. Reacciona rápido a cambios.'),
+        ('ets', 'Suavizado Exponencial (ETS)', 'Suaviza el historial dando mayor peso a observaciones recientes con un factor alpha configurable. Más estable ante fluctuaciones.'),
     ]
 
     # Parámetros informativos (no se pueden cambiar desde aquí — el crontab es fijo en settings)
@@ -169,6 +174,13 @@ def proyeccion_demanda_config(request):
             codigo='PROYECCION_DEMANDA',
             defaults={'nombre': 'Proyección Demanda'},
         )
+
+        # Guardar algoritmo seleccionado
+        algoritmo_elegido = request.POST.get('ALGORITMO_PROYECCION', 'media_movil')
+        if algoritmo_elegido in ('media_movil', 'ets'):
+            Parametro.set('ALGORITMO_PROYECCION', algoritmo_elegido, tipo=Parametro.TIPO_CADENA,
+                          grupo=grupo, nombre='Algoritmo de proyección')
+
         errores = []
         for p in PARAMS:
             raw = request.POST.get(p['clave'], '').strip()
@@ -219,6 +231,9 @@ def proyeccion_demanda_config(request):
         for p in PARAMS
     ]
 
+    # Algoritmo actualmente seleccionado
+    algoritmo_actual = str(MotorConfig.get('ALGORITMO_PROYECCION') or 'media_movil').strip()
+
     # Resumen del estado actual de proyecciones
     from insumos.models import ProyeccionInsumo
     from django.utils import timezone
@@ -231,6 +246,8 @@ def proyeccion_demanda_config(request):
         'params': params,
         'saved': saved,
         'info_schedule': INFO_SCHEDULE,
+        'algoritmo_actual': algoritmo_actual,
+        'algoritmo_opciones': ALGORITMO_OPCIONES,
         'estado_proyecciones': {
             'periodo': periodo_actual,
             'total': total_proyecciones,
