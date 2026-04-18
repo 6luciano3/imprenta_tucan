@@ -18,7 +18,7 @@ class StockPedidoTests(TestCase):
     def setUp(self):
         self.insumo = Insumo.objects.create(
             nombre="Tinta Negra", codigo="INK-001",
-            stock=100, precio_unitario=10, precio=10, activo=True,
+            stock=100, precio_unitario=10, activo=True,
         )
         formula = Formula.objects.create(
             insumo=self.insumo, codigo="F001", nombre="Formula Test",

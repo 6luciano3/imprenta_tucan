@@ -21,7 +21,7 @@ _formula_counter = 0
 def _make_insumo(nombre, codigo, stock=100, tipo='directo'):
     return Insumo.objects.create(
         nombre=nombre, codigo=codigo,
-        stock=stock, precio_unitario=1, precio=1, activo=True, tipo=tipo,
+        stock=stock, precio_unitario=1, activo=True, tipo=tipo,
     )
 
 

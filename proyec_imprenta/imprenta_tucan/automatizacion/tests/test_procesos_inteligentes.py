@@ -84,11 +84,9 @@ def make_insumo(codigo=None, stock=100):
     return Insumo.objects.create(
         nombre=f"Insumo {n}",
         codigo=codigo,
-        cantidad=stock,
         precio_unitario=Decimal("10.00"),
         categoria="Papel",
         stock=stock,
-        precio=Decimal("10.00"),
         activo=True,
     )
 

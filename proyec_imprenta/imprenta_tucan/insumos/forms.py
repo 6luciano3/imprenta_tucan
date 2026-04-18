@@ -26,19 +26,17 @@ class InsumoForm(forms.ModelForm):
 class AltaInsumoForm(forms.ModelForm):
     class Meta:
         model = Insumo
-        fields = ["nombre", "codigo", "tipo", "proveedor", "cantidad", "precio_unitario"]
+        fields = ["nombre", "codigo", "tipo", "proveedor", "precio_unitario"]
         widgets = {
             "nombre": forms.TextInput(attrs={"class": "form-control", "required": True, "maxlength": 100}),
             "codigo": forms.TextInput(attrs={"class": "form-control", "required": True, "maxlength": 20}),
             "tipo": forms.Select(attrs={"class": "form-select", "required": True}),
             "proveedor": forms.Select(attrs={"class": "form-select", "required": True}),
-            # cantidad excluida del form - solo desde App Compras
             "precio_unitario": forms.NumberInput(attrs={"class": "form-control", "required": True, "min": 0.01, "max": 1000000, "step": "0.01"}),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Filtrar proveedores activos de la industria gráfica (papel, tintas, químicos, repuestos, etc.)
         terms = ["papel", "tinta", "quím", "quim", "repuesto", "placa", "barniz"]
         q = Q()
         for t in terms:
@@ -48,12 +46,6 @@ class AltaInsumoForm(forms.ModelForm):
             qs = qs.filter(q)
         self.fields["proveedor"].queryset = qs.order_by("nombre")
         self.fields["proveedor"].label_from_instance = lambda obj: obj.nombre
-
-    def clean_cantidad(self):
-        cantidad = self.cleaned_data.get("cantidad")
-        if cantidad is None or cantidad <= 0:
-            raise forms.ValidationError("La cantidad debe ser un número positivo.")
-        return cantidad
 
     def clean_precio_unitario(self):
         precio = self.cleaned_data.get("precio_unitario")

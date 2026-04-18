@@ -54,11 +54,9 @@ class AltaPedidoTests(TestCase):
         self.insumo = Insumo.objects.create(
             nombre="Papel A4",
             codigo="PAP-A4",
-            cantidad=1000,
             precio_unitario=Decimal("10.00"),
             categoria="Papel",
             stock=50,
-            precio=Decimal("10.00"),
             activo=True,
         )
         self.formula = Formula.objects.create(
@@ -174,7 +172,7 @@ class CambioEstadoStockTests(TestCase):
     def setUp(self):
         self.insumo = Insumo.objects.create(
             nombre="Tinta Negra", codigo="INK-001",
-            stock=100, precio_unitario=10, precio=10, activo=True,
+            stock=100, precio_unitario=10, activo=True,
         )
         formula = Formula.objects.create(
             insumo=self.insumo, codigo="F-ST", nombre="Formula Stock",
