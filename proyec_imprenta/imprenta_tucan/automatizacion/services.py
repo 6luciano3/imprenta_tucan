@@ -13,7 +13,7 @@ def _html_tabla_combo(combo):
     descuento_valor = subtotal * descuento / 100
     return filas, subtotal, descuento, descuento_valor, subtotal - descuento_valor
 
-def enviar_oferta_email(oferta, request=None, force=False):
+def enviar_oferta_email(oferta, request=None, force=False, destinatario_override=None):
     """
     Envía email de oferta al cliente.
     
@@ -121,18 +121,17 @@ def enviar_oferta_email(oferta, request=None, force=False):
         from automatizacion.models import MensajeOferta
         import time
 
-        # Canal principal: email - enviar solo a correos reales si score >= 96
-        SCORE_MINIMO = 96
+        # Canal principal: email
+        SCORE_MINIMO = 25
         EMAILS_DEMOSTRACION = ['bookdesignpdas@yahoo.com.ar', '6luciano10@gmail.com']
-        
+
         score = getattr(oferta, 'score_al_generar', 0) or 0
-        if score >= SCORE_MINIMO:
-            # Alternar entre los dos emails de demostración
+        if destinatario_override:
+            canales: list[tuple[str, str]] = [('email', destinatario_override)]
+        elif score >= SCORE_MINIMO:
             indice = int(oferta.id) % len(EMAILS_DEMOSTRACION)
-            canal_email = EMAILS_DEMOSTRACION[indice]
-            canales: list[tuple[str, str]] = [('email', canal_email)]
+            canales = [('email', EMAILS_DEMOSTRACION[indice])]
         else:
-            # Score bajo: no enviar (para demos rápidas)
             canales = []
 
         # Solo agregar canales adicionales si hay email configurado

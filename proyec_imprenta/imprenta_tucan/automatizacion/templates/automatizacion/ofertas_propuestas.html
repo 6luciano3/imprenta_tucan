@@ -2,12 +2,7 @@
 {% block title %}Validación de Ofertas{% endblock %}
 
 {% block content %}
-    <!-- Encabezado unificado -->
-    <h1 class="text-3xl font-black mb-2 flex items-center gap-2">
-        <span class="material-symbols-outlined text-3xl">loyalty</span>
-        Validación de Ofertas
-    </h1>
-    <p class="text-gray-600 mb-4">Aprueba, ajusta o rechaza propuestas antes de enviarlas al cliente.</p>
+<div class="px-4 sm:px-6 py-4">
 
     {% if email_modo == 'local' %}
     <div class="mb-4 px-4 py-3 rounded-lg border border-yellow-300 bg-yellow-50 text-yellow-900 text-sm flex items-start gap-2">
@@ -28,123 +23,140 @@
     </div>
     {% endif %}
 
-    <div class="mb-4 flex justify-end gap-2">
+    <!-- Encabezado -->
+    <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <div class="flex items-center gap-3">
+            <span class="material-symbols-outlined text-3xl text-sky-600">loyalty</span>
+            <h1 class="text-lg sm:text-xl font-semibold">Validación de Ofertas</h1>
+        </div>
         <form method="post" action="/automatizacion/generar-ofertas-ahora/">
             {% csrf_token %}
-            <button type="submit" class="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-5 rounded-lg shadow">
-                <span class="material-symbols-outlined text-sm">auto_awesome</span>
+            <button type="submit" class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium">
+                <span class="material-symbols-outlined text-base">auto_awesome</span>
                 Ejecutar Proceso Inteligente
             </button>
         </form>
     </div>
-    <div class="bg-white shadow rounded-xl overflow-hidden table-responsive">
-        <table class="w-full min-w-[980px] text-left text-sm">
-            <thead class="bg-gray-100 text-gray-700">
+
+    <!-- Tabla — desktop -->
+    <div class="hidden md:block bg-white shadow rounded-xl overflow-x-auto">
+        <table class="text-sm text-left" style="table-layout:fixed; width:100%;">
+            <colgroup>
+                <col style="width:96px">
+                <col style="width:96px">
+                <col style="width:64px">
+                <col style="width:64px">
+                <col style="width:64px">
+                <col style="width:64px">
+                <col style="width:96px">
+                <col style="width:64px">
+                <col style="width:64px">
+                <col style="width:80px">
+            </colgroup>
+            <thead class="bg-slate-50 border-b text-xs text-slate-500 uppercase tracking-wide">
             <tr>
-                <th class="py-3 px-5">Cliente</th>
-                <th class="py-3 px-5">Título</th>
-                <th class="py-3 px-5">Descripción</th>
-                <th class="py-3 px-5">Tipo</th>
-                <th class="py-3 px-5">Estado</th>
-                <th class="py-3 px-5">Estado Mensaje</th>
-                <th class="py-3 px-5">Acciones Cliente</th>
-                <th class="py-3 px-5">Score</th>
-                <th class="py-3 px-5">Validación</th>
-                <th class="py-3 px-5 text-center">Acciones</th>
+                <th class="py-3 px-4 truncate">Cliente</th>
+                <th class="py-3 px-4 truncate">Título</th>
+                <th class="py-3 px-4 truncate">Descripción</th>
+                <th class="py-3 px-4 truncate">Tipo</th>
+                <th class="py-3 px-4 truncate">Estado</th>
+                <th class="py-3 px-4 truncate">Msg</th>
+                <th class="py-3 px-4 truncate">Acc. Cliente</th>
+                <th class="py-3 px-4 text-center">Score</th>
+                <th class="py-3 px-4 truncate">Validación</th>
+                <th class="py-3 px-4 text-center">Acciones</th>
             </tr>
             </thead>
-            <tbody>
+            <tbody class="divide-y divide-slate-100">
             {% for o in ofertas %}
-                <tr class="border-b hover:bg-gray-50" data-oferta-id="{{ o.id }}">
-                    <td class="py-3 px-5 font-medium">{{ o.cliente.nombre }} {{ o.cliente.apellido }}</td>
-                    <td class="py-3 px-5" data-titulo>{{ o.titulo }}</td>
-                    <td class="py-3 px-5 text-gray-600">{{ o.descripcion }}</td>
-                    <td class="py-3 px-5">{{ o.get_tipo_display }}</td>
-                    <td class="py-3 px-5">{{ o.get_estado_display }}</td>
-                    <td class="py-3 px-5">
+                <tr class="hover:bg-slate-50" data-oferta-id="{{ o.id }}">
+                    <td class="py-3 px-4 font-medium overflow-hidden truncate">{{ o.cliente.nombre }} {{ o.cliente.apellido }}</td>
+                    <td class="py-3 px-4 overflow-hidden truncate" data-titulo>{{ o.titulo }}</td>
+                    <td class="py-3 px-4 text-slate-500 overflow-hidden truncate">{{ o.descripcion }}</td>
+                    <td class="py-3 px-4 overflow-hidden truncate">{{ o.get_tipo_display }}</td>
+                    <td class="py-3 px-4 overflow-hidden truncate">{{ o.get_estado_display }}</td>
+                    <td class="py-3 px-4">
                         {% if o.estado_mensaje %}
                             {% if o.estado_mensaje == 'enviado' %}
-                                <span class="inline-flex items-center gap-1 px-2 py-1 rounded bg-blue-100 text-blue-700">
+                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-blue-100 text-blue-700 text-xs">
                                     <span class="material-symbols-outlined text-sm">outgoing_mail</span> Enviado
                                 </span>
                             {% elif o.estado_mensaje == 'entregado' %}
-                                <span class="inline-flex items-center gap-1 px-2 py-1 rounded bg-green-100 text-green-700">
+                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-green-100 text-green-700 text-xs">
                                     <span class="material-symbols-outlined text-sm">mail</span> Entregado
                                 </span>
                             {% elif o.estado_mensaje == 'leido' %}
-                                <span class="inline-flex items-center gap-1 px-2 py-1 rounded bg-indigo-100 text-indigo-700">
+                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-indigo-100 text-indigo-700 text-xs">
                                     <span class="material-symbols-outlined text-sm">mark_email_read</span> Leído
                                 </span>
                             {% elif o.estado_mensaje == 'fallido' %}
-                                <span class="inline-flex items-center gap-1 px-2 py-1 rounded bg-red-100 text-red-700">
+                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-red-100 text-red-700 text-xs">
                                     <span class="material-symbols-outlined text-sm">error</span> Fallido
                                 </span>
                             {% else %}
-                                <span class="text-gray-500">{{ o.estado_mensaje }}</span>
+                                <span class="text-slate-500 text-xs">{{ o.estado_mensaje }}</span>
                             {% endif %}
                             {% if o.mensaje_actualizado %}
-                                <div class="text-xs text-gray-500">{{ o.mensaje_actualizado|date:"d/m H:i" }}</div>
+                                <div class="text-xs text-slate-400">{{ o.mensaje_actualizado|date:"d/m H:i" }}</div>
                             {% endif %}
                         {% else %}
-                            <span class="text-gray-400">—</span>
+                            <span class="text-slate-300">—</span>
                         {% endif %}
                     </td>
-                    <td class="py-3 px-5">
+                    <td class="py-3 px-4">
                         {% if o.ultima_accion %}
                             {% if o.ultima_accion == 'aceptar' %}
-                                <span class="inline-flex items-center gap-1 px-2 py-1 rounded bg-green-100 text-green-700">
+                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-green-100 text-green-700 text-xs">
                                     <span class="material-symbols-outlined text-sm">thumb_up</span> Aceptó
                                 </span>
                             {% elif o.ultima_accion == 'rechazar' %}
-                                <span class="inline-flex items-center gap-1 px-2 py-1 rounded bg-red-100 text-red-700">
+                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-red-100 text-red-700 text-xs">
                                     <span class="material-symbols-outlined text-sm">thumb_down</span> Rechazó
                                 </span>
                             {% elif o.ultima_accion == 'click' %}
-                                <span class="inline-flex items-center gap-1 px-2 py-1 rounded bg-orange-100 text-orange-700">
+                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-orange-100 text-orange-700 text-xs">
                                     <span class="material-symbols-outlined text-sm">mouse</span> Click
                                 </span>
                             {% elif o.ultima_accion == 'vista' %}
-                                <span class="inline-flex items-center gap-1 px-2 py-1 rounded bg-gray-100 text-gray-700">
+                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-100 text-slate-700 text-xs">
                                     <span class="material-symbols-outlined text-sm">visibility</span> Vista
                                 </span>
                             {% elif o.ultima_accion == 'leido' %}
-                                <span class="inline-flex items-center gap-1 px-2 py-1 rounded bg-indigo-100 text-indigo-700">
+                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-indigo-100 text-indigo-700 text-xs">
                                     <span class="material-symbols-outlined text-sm">mark_email_read</span> Leído
                                 </span>
                             {% else %}
-                                <span class="text-gray-500">{{ o.ultima_accion }}</span>
+                                <span class="text-slate-500 text-xs">{{ o.ultima_accion }}</span>
                             {% endif %}
                             {% if o.accion_actualizada %}
-                                <div class="text-xs text-gray-500">{{ o.accion_actualizada|date:"d/m H:i" }}</div>
+                                <div class="text-xs text-slate-400">{{ o.accion_actualizada|date:"d/m H:i" }}</div>
                             {% endif %}
                             {% if o.acciones_count %}
-                                <div class="text-xs text-gray-500">Total: {{ o.acciones_count }}</div>
+                                <div class="text-xs text-slate-400">Total: {{ o.acciones_count }}</div>
                             {% endif %}
                         {% else %}
-                            <span class="text-gray-400">—</span>
+                            <span class="text-slate-300">—</span>
                         {% endif %}
                     </td>
-                    <td class="py-3 px-5">{{ o.score_al_generar|floatformat:2 }}</td>
-                    
-                    <td class="py-3 px-5">
+                    <td class="py-3 px-4 text-center">{{ o.score_al_generar|floatformat:2 }}</td>
+                    <td class="py-3 px-4">
                         {% if o.fecha_validacion %}
-                            <div class="text-gray-700">{{ o.fecha_validacion|date:"d/m/Y" }}</div>
+                            <div class="text-slate-700 text-xs whitespace-nowrap">{{ o.fecha_validacion|date:"d/m/Y" }}</div>
                             {% if o.administrador %}
-                            <div class="text-xs text-gray-500">por {{ o.administrador.email|default:o.administrador }}</div>
+                            <div class="text-xs text-slate-400">por {{ o.administrador.email|default:o.administrador }}</div>
                             {% endif %}
                         {% else %}
-                            <span class="text-gray-400">Pendiente</span>
+                            <span class="text-slate-400 text-xs">Pendiente</span>
                         {% endif %}
                     </td>
-                    <td class="py-3 px-5">
+                    <td class="py-3 px-4">
                         <div class="flex justify-center gap-3">
-
                             <button type="button"
-                                class="text-gray-600 hover:text-gray-800 flex items-center gap-1 delete-offer-btn"
+                                class="text-slate-500 hover:text-red-600 delete-offer-btn"
                                 data-oferta-id="{{ o.id }}" data-oferta-title="{{ o.titulo }}" data-oferta-cliente="{{ o.cliente.nombre }} {{ o.cliente.apellido }}" title="Eliminar">
                                 <span class="material-symbols-outlined text-sm">delete</span>
                             </button>
-                            <button type="button" class="text-blue-600 hover:text-blue-800 flex items-center gap-1 ver-combos-btn" title="Ver combos de oferta" onclick="openCombosModal('{{ o.cliente.id }}')">
+                            <button type="button" class="text-sky-600 hover:text-sky-800 ver-combos-btn" title="Ver combos" onclick="openCombosModal('{{ o.cliente.id }}')">
                                 <span class="material-symbols-outlined text-sm">visibility</span>
                             </button>
                         </div>
@@ -152,75 +164,172 @@
                 </tr>
             {% empty %}
                 <tr>
-                    <td colspan="10" class="py-6 px-5 text-center text-gray-500">No hay ofertas propuestas.</td>
+                    <td colspan="10" class="py-8 px-5 text-center text-slate-400">No hay ofertas propuestas.</td>
                 </tr>
             {% endfor %}
             </tbody>
         </table>
     </div>
-        <!-- Paginación similar a listas -->
-        <div class="px-5 py-4 border-t border-gray-200 mt-2">
-            <div class="flex justify-end items-center gap-2">
-                {% if ofertas.has_previous %}
-                    <a href="?page=1" class="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm">
-                        <span class="material-symbols-outlined text-sm">first_page</span>
-                    </a>
-                    <a href="?page={{ ofertas.previous_page_number }}" class="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm">
-                        <span class="material-symbols-outlined text-sm">chevron_left</span>
-                    </a>
-                {% endif %}
 
-                <span class="text-sm text-gray-700">
-                    Página {{ ofertas.number }} de {{ ofertas.paginator.num_pages }}
-                </span>
-
-                {% if ofertas.has_next %}
-                    <a href="?page={{ ofertas.next_page_number }}" class="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm">
-                        <span class="material-symbols-outlined text-sm">chevron_right</span>
-                    </a>
-                    <a href="?page={{ ofertas.paginator.num_pages }}" class="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm">
-                        <span class="material-symbols-outlined text-sm">last_page</span>
-                    </a>
-                {% endif %}
+    <!-- Tarjetas — mobile -->
+    <div class="md:hidden space-y-3">
+        {% for o in ofertas %}
+        <div class="bg-white shadow rounded-xl p-4 space-y-3" data-oferta-id="{{ o.id }}">
+            <div class="flex items-start justify-between gap-2">
+                <div>
+                    <p class="font-semibold text-slate-800">{{ o.cliente.nombre }} {{ o.cliente.apellido }}</p>
+                    <p class="text-sm text-slate-600 mt-0.5" data-titulo>{{ o.titulo }}</p>
+                </div>
+                <span class="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 whitespace-nowrap">Score: {{ o.score_al_generar|floatformat:1 }}</span>
+            </div>
+            {% if o.descripcion %}
+            <p class="text-xs text-slate-500">{{ o.descripcion }}</p>
+            {% endif %}
+            <dl class="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+                <div>
+                    <dt class="text-slate-400 uppercase tracking-wide">Tipo</dt>
+                    <dd class="text-slate-700 mt-0.5">{{ o.get_tipo_display }}</dd>
+                </div>
+                <div>
+                    <dt class="text-slate-400 uppercase tracking-wide">Estado</dt>
+                    <dd class="text-slate-700 mt-0.5">{{ o.get_estado_display }}</dd>
+                </div>
+                <div>
+                    <dt class="text-slate-400 uppercase tracking-wide">Mensaje</dt>
+                    <dd class="mt-0.5">
+                        {% if o.estado_mensaje == 'enviado' %}
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-blue-100 text-blue-700">
+                                <span class="material-symbols-outlined text-xs">outgoing_mail</span> Enviado
+                            </span>
+                        {% elif o.estado_mensaje == 'entregado' %}
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-green-100 text-green-700">
+                                <span class="material-symbols-outlined text-xs">mail</span> Entregado
+                            </span>
+                        {% elif o.estado_mensaje == 'leido' %}
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-indigo-100 text-indigo-700">
+                                <span class="material-symbols-outlined text-xs">mark_email_read</span> Leído
+                            </span>
+                        {% elif o.estado_mensaje == 'fallido' %}
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-red-100 text-red-700">
+                                <span class="material-symbols-outlined text-xs">error</span> Fallido
+                            </span>
+                        {% elif o.estado_mensaje %}
+                            <span class="text-slate-600">{{ o.estado_mensaje }}</span>
+                        {% else %}
+                            <span class="text-slate-300">—</span>
+                        {% endif %}
+                    </dd>
+                </div>
+                <div>
+                    <dt class="text-slate-400 uppercase tracking-wide">Acc. Cliente</dt>
+                    <dd class="mt-0.5">
+                        {% if o.ultima_accion == 'aceptar' %}
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-green-100 text-green-700">
+                                <span class="material-symbols-outlined text-xs">thumb_up</span> Aceptó
+                            </span>
+                        {% elif o.ultima_accion == 'rechazar' %}
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-red-100 text-red-700">
+                                <span class="material-symbols-outlined text-xs">thumb_down</span> Rechazó
+                            </span>
+                        {% elif o.ultima_accion %}
+                            <span class="text-slate-600">{{ o.ultima_accion }}</span>
+                        {% else %}
+                            <span class="text-slate-300">—</span>
+                        {% endif %}
+                    </dd>
+                </div>
+                <div class="col-span-2">
+                    <dt class="text-slate-400 uppercase tracking-wide">Validación</dt>
+                    <dd class="text-slate-700 mt-0.5">
+                        {% if o.fecha_validacion %}
+                            {{ o.fecha_validacion|date:"d/m/Y" }}{% if o.administrador %} — {{ o.administrador.email|default:o.administrador }}{% endif %}
+                        {% else %}
+                            <span class="text-slate-400">Pendiente</span>
+                        {% endif %}
+                    </dd>
+                </div>
+            </dl>
+            <div class="flex gap-2 pt-1">
+                <button type="button"
+                    class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 hover:bg-red-50 hover:text-red-600 text-xs font-medium delete-offer-btn"
+                    data-oferta-id="{{ o.id }}" data-oferta-title="{{ o.titulo }}" data-oferta-cliente="{{ o.cliente.nombre }} {{ o.cliente.apellido }}">
+                    <span class="material-symbols-outlined text-sm">delete</span> Eliminar
+                </button>
+                <button type="button"
+                    class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-sky-50 border border-sky-200 text-sky-700 hover:bg-sky-100 text-xs font-medium ver-combos-btn"
+                    onclick="openCombosModal('{{ o.cliente.id }}')">
+                    <span class="material-symbols-outlined text-sm">visibility</span> Ver combos
+                </button>
             </div>
         </div>
-                <!-- Modal de confirmación de eliminación -->
-                <div id="deleteModal" class="fixed inset-0 bg-black/40 hidden items-center justify-center z-50">
-                        <div class="bg-white rounded-xl shadow-lg w-full max-w-md">
-                                <div class="p-5 border-b border-gray-200">
-                                        <h3 class="text-lg font-semibold flex items-center gap-2">
-                                                <span class="material-symbols-outlined text-red-600">delete</span>
-                                                Confirmar eliminación
-                                        </h3>
-                                </div>
-                                <div class="p-5 text-sm text-gray-700 space-y-1">
-                                    <p>¿Seguro que deseas eliminar esta oferta? Esta acción no se puede deshacer.</p>
-                                    <p><span class="font-semibold">Cliente:</span> <span id="modalCliente" class="text-gray-900"></span></p>
-                                    <p><span class="font-semibold">Oferta:</span> <span id="modalTitulo" class="text-gray-900"></span></p>
-                                </div>
-                                <div class="p-5 flex justify-end gap-3 border-t border-gray-200">
-                                        <button type="button" id="cancelDeleteBtn" class="px-4 py-2 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200">Cancelar</button>
-                                        <form id="deleteForm" method="post" action="#">
-                                                {% csrf_token %}
-                                                <button type="submit" class="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700">Eliminar</button>
-                                        </form>
-                                </div>
-                        </div>
-                </div>
-                <!-- Modal combos-oferta -->
-                <div id="combosModal" class="fixed inset-0 bg-black/40 hidden items-center justify-center z-50">
-    <div class="bg-white rounded-xl shadow-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-        <div class="p-5 border-b border-gray-200 flex justify-between items-center">
+        {% empty %}
+        <div class="bg-white shadow rounded-xl p-8 text-center text-slate-400">No hay ofertas propuestas.</div>
+        {% endfor %}
+    </div>
+
+    <!-- Paginación -->
+    <div class="px-2 py-4 mt-2">
+        <div class="flex flex-wrap justify-end items-center gap-2">
+            {% if ofertas.has_previous %}
+                <a href="?page=1" class="px-3 py-1 bg-slate-100 text-slate-700 rounded-md hover:bg-slate-200 text-sm">
+                    <span class="material-symbols-outlined text-sm">first_page</span>
+                </a>
+                <a href="?page={{ ofertas.previous_page_number }}" class="px-3 py-1 bg-slate-100 text-slate-700 rounded-md hover:bg-slate-200 text-sm">
+                    <span class="material-symbols-outlined text-sm">chevron_left</span>
+                </a>
+            {% endif %}
+            <span class="text-sm text-slate-600">Página {{ ofertas.number }} de {{ ofertas.paginator.num_pages }}</span>
+            {% if ofertas.has_next %}
+                <a href="?page={{ ofertas.next_page_number }}" class="px-3 py-1 bg-slate-100 text-slate-700 rounded-md hover:bg-slate-200 text-sm">
+                    <span class="material-symbols-outlined text-sm">chevron_right</span>
+                </a>
+                <a href="?page={{ ofertas.paginator.num_pages }}" class="px-3 py-1 bg-slate-100 text-slate-700 rounded-md hover:bg-slate-200 text-sm">
+                    <span class="material-symbols-outlined text-sm">last_page</span>
+                </a>
+            {% endif %}
+        </div>
+    </div>
+
+</div><!-- fin px-4 container -->
+
+<!-- Modal eliminación -->
+<div id="deleteModal" class="fixed inset-0 bg-black/40 hidden items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-xl shadow-lg w-full max-w-md max-h-[90vh] overflow-y-auto">
+        <div class="p-5 border-b border-slate-200">
             <h3 class="text-lg font-semibold flex items-center gap-2">
-                <span class="material-symbols-outlined text-blue-600">loyalty</span>
+                <span class="material-symbols-outlined text-red-600">delete</span>
+                Confirmar eliminación
+            </h3>
+        </div>
+        <div class="p-5 text-sm text-slate-700 space-y-1">
+            <p>¿Seguro que deseas eliminar esta oferta? Esta acción no se puede deshacer.</p>
+            <p><span class="font-semibold">Cliente:</span> <span id="modalCliente" class="text-slate-900"></span></p>
+            <p><span class="font-semibold">Oferta:</span> <span id="modalTitulo" class="text-slate-900"></span></p>
+        </div>
+        <div class="p-5 flex justify-end gap-3 border-t border-slate-200">
+            <button type="button" id="cancelDeleteBtn" class="px-4 py-2 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200">Cancelar</button>
+            <form id="deleteForm" method="post" action="#">
+                {% csrf_token %}
+                <button type="submit" class="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700">Eliminar</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal combos-oferta -->
+<div id="combosModal" class="fixed inset-0 bg-black/40 hidden items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-xl shadow-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div class="p-5 border-b border-slate-200 flex justify-between items-center">
+            <h3 class="text-lg font-semibold flex items-center gap-2">
+                <span class="material-symbols-outlined text-sky-600">loyalty</span>
                 Combos de Oferta
             </h3>
-            <button type="button" class="text-gray-500 hover:text-gray-700" onclick="closeCombosModal()">
+            <button type="button" class="text-slate-500 hover:text-slate-700" onclick="closeCombosModal()">
                 <span class="material-symbols-outlined">close</span>
             </button>
         </div>
         <div class="p-5" id="combosModalContent">
-            <div class="text-center text-gray-500 py-10">Cargando combos de oferta...</div>
+            <div class="text-center text-slate-400 py-10">Cargando combos de oferta...</div>
         </div>
     </div>
 </div>

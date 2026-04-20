@@ -2,264 +2,406 @@
 {% load static %}
 
 {% block content %}
-<div class="px-6 py-4">
+<div class="px-4 sm:px-6 py-4">
+
   {% if messages %}
-  <div class="mb-3">
+  <div class="mb-3 space-y-2">
     {% for message in messages %}
-      <div class="px-3 py-2 rounded text-sm {% if message.tags == 'success' %}bg-emerald-50 text-emerald-700 border border-emerald-200{% elif message.tags == 'warning' %}bg-amber-50 text-amber-700 border border-amber-200{% elif message.tags == 'error' %}bg-rose-50 text-rose-700 border border-rose-200{% else %}bg-slate-50 text-slate-700 border border-slate-200{% endif %}">
-        {{ message }}
-      </div>
+    <div class="px-3 py-2 rounded text-sm
+      {% if message.tags == 'success' %}bg-emerald-50 text-emerald-700 border border-emerald-200
+      {% elif message.tags == 'warning' %}bg-amber-50 text-amber-700 border border-amber-200
+      {% elif message.tags == 'error' %}bg-rose-50 text-rose-700 border border-rose-200
+      {% else %}bg-slate-50 text-slate-700 border border-slate-200{% endif %}">
+      {{ message }}
+    </div>
     {% endfor %}
   </div>
   {% endif %}
-  <div class="flex items-center gap-3 mb-4">
-    <span class="material-symbols-outlined text-3xl text-sky-600">shopping_cart_checkout</span>
-    <h1 class="text-xl font-semibold">Automatización de presupuestos con criterios ponderados</h1>
-  </div>
 
-  <div class="flex items-center justify-between mb-3">
-    <div></div>
+  <!-- Encabezado -->
+  <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+    <div class="flex items-center gap-3">
+      <span class="material-symbols-outlined text-3xl text-sky-600">shopping_cart_checkout</span>
+      <h1 class="text-lg sm:text-xl font-semibold">Automatización de presupuestos</h1>
+    </div>
     <form method="post" action="{% url 'generar_compras_propuestas' %}">
       {% csrf_token %}
-      <button type="submit" class="px-3 py-2 rounded bg-emerald-600 text-white text-sm">Generar propuestas</button>
+      <button type="submit"
+        class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium">
+        <span class="material-symbols-outlined text-base">auto_awesome</span>
+        Generar propuestas
+      </button>
     </form>
   </div>
-  <div class="bg-white shadow rounded-xl overflow-x-auto">
+
+  <!-- Tabla — desktop -->
+  <div class="hidden md:block bg-white shadow rounded-xl overflow-x-auto">
     <table class="min-w-full text-sm">
-      <thead class="bg-slate-50 border-b">
+      <thead class="bg-slate-50 border-b text-xs text-slate-500 uppercase tracking-wide">
         <tr>
-          <th class="px-4 py-2 text-left">Fecha</th>
-          <th class="px-4 py-2 text-left">Insumo</th>
-          <th class="px-4 py-2 text-left">Cantidad</th>
-          <th class="px-4 py-2 text-left">Proveedor recomendado</th>
-          <th class="px-4 py-2 text-left">Estado</th>
-          <th class="px-4 py-2 text-left">Orden de Cotización</th>
-          <th class="px-4 py-2 text-left">Consulta Stock</th>
-          <th class="px-4 py-2 text-left">Respuesta SC</th>
-          <th class="px-4 py-2 text-center w-40">Acciones</th>
+          <th class="px-4 py-3 text-left">Fecha</th>
+          <th class="px-4 py-3 text-left">Insumo</th>
+          <th class="px-4 py-3 text-center">Cantidad</th>
+          <th class="px-4 py-3 text-left">Proveedor sugerido</th>
+          <th class="px-4 py-3 text-center">Estado</th>
+          <th class="px-4 py-3 text-center">Cotización</th>
+          <th class="px-4 py-3 text-center">Stock</th>
+          <th class="px-4 py-3 text-center">Resp. SC</th>
+          <th class="px-4 py-3 text-center">Acciones</th>
         </tr>
       </thead>
-      <tbody>
+      <tbody class="divide-y divide-slate-100">
         {% for p in propuestas %}
-        <tr class="border-t hover:bg-slate-50">
-          <td class="px-4 py-2">{% if p.creada %}{{ p.creada|date:'d/m/Y' }}{% else %}<span class="text-slate-400">—</span>{% endif %}</td>
-          <td class="px-4 py-2">{{ p.insumo }}</td>
-          <td class="px-4 py-2">{% if p.cantidad_requerida %}{{ p.cantidad_requerida }}{% else %}<span class="text-slate-400">—</span>{% endif %}</td>
-          <td class="px-4 py-2">{% if p.proveedor_recomendado %}{{ p.proveedor_recomendado }}{% else %}<span class="text-slate-400">—</span>{% endif %}</td>
-          <td class="px-4 py-2">
-            <span class="inline-flex items-center gap-1">
-              <span class="material-symbols-outlined text-sky-600 text-base">flag</span>
-              {{ p.estado|default:'sin propuesta' }}
-            </span>
+        <tr class="hover:bg-slate-50">
+          <td class="px-4 py-2 text-slate-500 text-xs whitespace-nowrap">
+            {% if p.creada %}{{ p.creada|date:'d/m/Y' }}{% else %}<span class="text-slate-300">—</span>{% endif %}
+          </td>
+          <td class="px-4 py-2 font-medium text-slate-800">{{ p.insumo }}</td>
+          <td class="px-4 py-2 text-center">
+            {% if p.cantidad_requerida %}{{ p.cantidad_requerida }}{% else %}<span class="text-slate-300">—</span>{% endif %}
           </td>
           <td class="px-4 py-2">
+            {% if p.proveedor_recomendado %}{{ p.proveedor_recomendado }}{% else %}<span class="text-slate-300">—</span>{% endif %}
+          </td>
+          <td class="px-4 py-2 text-center">
+            {% include "automatizacion/_badge_estado_propuesta.html" with estado=p.estado only %}
+          </td>
+          <td class="px-4 py-2 text-center">
             {% if p.borrador_oc and p.proveedor_recomendado %}
-              <button type="button"
-                onclick="openCotizacionModal('{{ p.proveedor_recomendado.id }}')"
-                class="inline-flex items-center gap-1 px-2 py-1 rounded bg-sky-50 border border-sky-200 text-sky-700 hover:bg-sky-100 text-xs">
-                <span class="material-symbols-outlined text-sm">request_quote</span>
-                Ver cotización
-              </button>
-            {% else %}
-              <span class="text-slate-400">—</span>
-            {% endif %}
+            <button type="button" onclick="openCotizacionModal('{{ p.proveedor_recomendado.id }}')"
+              class="inline-flex items-center gap-1 px-2 py-1 rounded bg-sky-50 border border-sky-200 text-sky-700 hover:bg-sky-100 text-xs">
+              <span class="material-symbols-outlined text-sm">request_quote</span> Ver
+            </button>
+            {% else %}<span class="text-slate-300">—</span>{% endif %}
           </td>
-          <td class="px-4 py-2">
+          <td class="px-4 py-2 text-center text-xs">
             {% if p.consulta_stock %}
-              {{ p.consulta_stock.estado }}
-            {% else %}
-              <span class="text-slate-400">—</span>
-            {% endif %}
+              <span class="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">{{ p.consulta_stock.estado }}</span>
+            {% else %}<span class="text-slate-300">—</span>{% endif %}
           </td>
-          <td class="px-4 py-2">
+          <td class="px-4 py-2 text-center">
             {% if p.proveedor_recomendado and sc_por_proveedor %}
               {% for sc_id, sc_obj in sc_por_proveedor.items %}
                 {% if sc_id == p.proveedor_recomendado.id %}
                   {% if sc_obj.estado == "confirmada" %}
-                    <span class="inline-flex items-center gap-1 px-2 py-1 rounded bg-green-100 text-green-700 text-xs font-medium"><span class="material-symbols-outlined text-sm">thumb_up</span> Confirmada</span>
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-100 text-green-700 text-xs font-medium">
+                      <span class="material-symbols-outlined text-sm">thumb_up</span> Confirmada
+                    </span>
                   {% elif sc_obj.estado == "rechazada" %}
-                    <span class="inline-flex items-center gap-1 px-2 py-1 rounded bg-red-100 text-red-700 text-xs font-medium"><span class="material-symbols-outlined text-sm">thumb_down</span> Rechazada</span>
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-100 text-red-700 text-xs font-medium">
+                      <span class="material-symbols-outlined text-sm">thumb_down</span> Rechazada
+                    </span>
                   {% else %}
-                    <span class="inline-flex items-center gap-1 px-2 py-1 rounded bg-amber-100 text-amber-700 text-xs font-medium"><span class="material-symbols-outlined text-sm">hourglass_empty</span> Pendiente</span>
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-xs font-medium">
+                      <span class="material-symbols-outlined text-sm">hourglass_empty</span> Pendiente
+                    </span>
                   {% endif %}
                 {% endif %}
               {% endfor %}
-            {% else %}
-              <span class="text-slate-400">-</span>
-            {% endif %}
+            {% else %}<span class="text-slate-300">—</span>{% endif %}
           </td>
-          <td class="px-4 py-2 w-40 text-center">
-            <div class="flex flex-nowrap gap-1 items-center justify-center">
+          <td class="px-4 py-2 text-center">
+            <div class="flex items-center justify-center gap-1">
               {% if p.creada %}
-                <button type="button" class="p-0.5 rounded hover:bg-slate-100 text-sky-600" title="Ver detalles" onclick="openPropuestaModal('{{ p.id }}')">
+                <button type="button" onclick="openPropuestaModal('{{ p.id }}')"
+                  class="p-1 rounded hover:bg-slate-100 text-sky-600" title="Ver detalles">
                   <span class="material-symbols-outlined text-sm">info</span>
                 </button>
-                <!-- Aceptar propuesta -->
                 <form method="post" action="{% url 'aceptar_compra_propuesta' p.id %}">
                   {% csrf_token %}
-                  <button type="submit" class="p-0.5 rounded hover:bg-slate-100 text-emerald-600" title="Aceptar propuesta">
+                  <button type="submit" class="p-1 rounded hover:bg-slate-100 text-emerald-600" title="Aceptar">
                     <span class="material-symbols-outlined text-sm">check_circle</span>
                   </button>
                 </form>
-                <!-- Rechazar propuesta -->
                 <form method="post" action="{% url 'rechazar_compra_propuesta' p.id %}">
                   {% csrf_token %}
-                  <button type="submit" class="p-0.5 rounded hover:bg-slate-100 text-rose-600" title="Rechazar propuesta">
-                    <span class="material-symbols-outlined text-sm">close</span>
+                  <button type="submit" class="p-1 rounded hover:bg-slate-100 text-rose-600" title="Rechazar">
+                    <span class="material-symbols-outlined text-sm">cancel</span>
                   </button>
                 </form>
-                <!-- Proveedor alternativo -->
-                <a href="{% url 'recalcular_alternativo_propuesta' p.id %}" class="p-0.5 rounded hover:bg-slate-100 text-amber-600" title="Proveedor alternativo">
-                  <span class="material-symbols-outlined text-sm">swap_horizontal_circle</span>
+                <a href="{% url 'recalcular_alternativo_propuesta' p.id %}"
+                  class="p-1 rounded hover:bg-slate-100 text-amber-600" title="Proveedor alternativo">
+                  <span class="material-symbols-outlined text-sm">swap_horiz</span>
                 </a>
               {% else %}
-                <form method="post" action="{% url 'crear_propuesta_para_insumo' %}" style="display:inline;">
+                <form method="post" action="{% url 'crear_propuesta_para_insumo' %}">
                   {% csrf_token %}
                   <input type="hidden" name="insumo_id" value="{{ p.insumo.pk }}">
-                  <button type="submit" class="p-0.5 rounded hover:bg-slate-100 text-emerald-600" title="Crear propuesta">
-                    <span class="material-symbols-outlined text-sm">add_circle</span> Crear propuesta
+                  <button type="submit"
+                    class="inline-flex items-center gap-1 px-2 py-1 rounded bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100 text-xs">
+                    <span class="material-symbols-outlined text-sm">add_circle</span> Crear
                   </button>
                 </form>
               {% endif %}
             </div>
           </td>
         </tr>
-        {% if p.creada %}
-        <div id="modal-propuesta-{{ p.id }}" class="fixed inset-0 bg-black/40 z-50 hidden">
-          <div class="bg-white rounded-xl shadow-xl w-full max-w-lg mx-auto mt-24 p-4">
-            <div class="flex items-center justify-between">
-              <h2 class="text-lg font-semibold">Detalle propuesta #{{ p.id }}</h2>
-              <button type="button" class="p-1 rounded hover:bg-slate-100" onclick="closePropuestaModal('{{ p.id }}')">
-                <span class="material-symbols-outlined">close</span>
-              </button>
-            </div>
-            <div class="mt-3">
-              <div class="text-sm text-slate-600">Orden de Compra</div>
-              {% if p.borrador_oc %}
-              <div class="mt-1 text-sm">
-                <div>ID: #{{ p.borrador_oc.id }}</div>
-                <div>Estado: {{ p.borrador_oc.estado }}</div>
-                <div>Proveedor: {{ p.borrador_oc.proveedor }}</div>
-              </div>
-              {% else %}
-              <div class="mt-1 text-sm text-slate-500">Sin orden de compra</div>
-              {% endif %}
-              <div class="mt-4 text-sm text-slate-600">Consulta de Stock</div>
-              {% if p.consulta_stock %}
-              <div class="mt-1 text-sm">
-                <div>Proveedor: {{ p.consulta_stock.proveedor }}</div>
-                <div>Insumo: {{ p.consulta_stock.insumo }}</div>
-                <div>Cantidad: {{ p.consulta_stock.cantidad }}</div>
-                <div>Estado: {{ p.consulta_stock.estado }}</div>
-                <div>Respuesta: {{ p.consulta_stock.respuesta }}</div>
-              </div>
-              {% else %}
-              <div class="mt-1 text-sm text-slate-500">Sin consulta registrada</div>
-              {% endif %}
-            </div>
-            <div class="mt-4 text-right">
-              <button type="button" class="px-3 py-2 rounded bg-slate-700 text-white text-sm" onclick="closePropuestaModal('{{ p.id }}')">Cerrar</button>
-            </div>
-          </div>
-        </div>
-        {% endif %}
         {% empty %}
         <tr>
-          <td colspan="8" class="px-4 py-6 text-center text-slate-500">No hay propuestas generadas aún.</td>
+          <td colspan="9" class="px-4 py-10 text-center text-slate-400">
+            <span class="material-symbols-outlined text-4xl block mb-2">inbox</span>
+            No hay propuestas generadas aún.
+          </td>
         </tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
 
-  <div class="mt-4 flex items-center justify-between">
-    <div class="text-sm text-slate-600">Página {{ propuestas.number }} de {{ propuestas.paginator.num_pages }}</div>
+  <!-- Cards — mobile -->
+  <div class="md:hidden space-y-3">
+    {% for p in propuestas %}
+    <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+      <div class="flex items-start justify-between gap-2 mb-3">
+        <div>
+          <p class="font-semibold text-slate-800 text-sm">{{ p.insumo }}</p>
+          <p class="text-xs text-slate-400 mt-0.5">
+            {% if p.creada %}{{ p.creada|date:'d/m/Y' }}{% else %}Sin fecha{% endif %}
+          </p>
+        </div>
+        {% if p.estado %}
+        <span class="px-2 py-0.5 rounded-full text-xs font-medium
+          {% if p.estado == 'pendiente' %}bg-yellow-100 text-yellow-700
+          {% elif p.estado == 'aceptada' %}bg-green-100 text-green-700
+          {% elif p.estado == 'rechazada' %}bg-red-100 text-red-700
+          {% else %}bg-slate-100 text-slate-600{% endif %}">
+          {{ p.estado|capfirst }}
+        </span>
+        {% endif %}
+      </div>
+
+      <dl class="grid grid-cols-2 gap-x-4 gap-y-1 text-xs mb-3">
+        <div>
+          <dt class="text-slate-400">Cantidad</dt>
+          <dd class="font-medium">{{ p.cantidad_requerida|default:"—" }}</dd>
+        </div>
+        <div>
+          <dt class="text-slate-400">Proveedor sugerido</dt>
+          <dd class="font-medium">{{ p.proveedor_recomendado|default:"—" }}</dd>
+        </div>
+        <div>
+          <dt class="text-slate-400">Consulta stock</dt>
+          <dd>{% if p.consulta_stock %}{{ p.consulta_stock.estado }}{% else %}—{% endif %}</dd>
+        </div>
+        <div>
+          <dt class="text-slate-400">Resp. SC</dt>
+          <dd>
+            {% if p.proveedor_recomendado and sc_por_proveedor %}
+              {% for sc_id, sc_obj in sc_por_proveedor.items %}
+                {% if sc_id == p.proveedor_recomendado.id %}{{ sc_obj.estado|capfirst }}{% endif %}
+              {% endfor %}
+            {% else %}—{% endif %}
+          </dd>
+        </div>
+      </dl>
+
+      <div class="flex flex-wrap gap-2 pt-2 border-t border-slate-100">
+        {% if p.creada %}
+          <button type="button" onclick="openPropuestaModal('{{ p.id }}')"
+            class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-sky-50 text-sky-700 text-xs font-medium">
+            <span class="material-symbols-outlined text-sm">info</span> Detalles
+          </button>
+          {% if p.borrador_oc and p.proveedor_recomendado %}
+          <button type="button" onclick="openCotizacionModal('{{ p.proveedor_recomendado.id }}')"
+            class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-sky-50 text-sky-700 text-xs font-medium">
+            <span class="material-symbols-outlined text-sm">request_quote</span> Cotización
+          </button>
+          {% endif %}
+          <form method="post" action="{% url 'aceptar_compra_propuesta' p.id %}">
+            {% csrf_token %}
+            <button type="submit"
+              class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 text-xs font-medium">
+              <span class="material-symbols-outlined text-sm">check_circle</span> Aceptar
+            </button>
+          </form>
+          <form method="post" action="{% url 'rechazar_compra_propuesta' p.id %}">
+            {% csrf_token %}
+            <button type="submit"
+              class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-rose-50 text-rose-700 text-xs font-medium">
+              <span class="material-symbols-outlined text-sm">cancel</span> Rechazar
+            </button>
+          </form>
+          <a href="{% url 'recalcular_alternativo_propuesta' p.id %}"
+            class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-amber-50 text-amber-700 text-xs font-medium">
+            <span class="material-symbols-outlined text-sm">swap_horiz</span> Alternativo
+          </a>
+        {% else %}
+          <form method="post" action="{% url 'crear_propuesta_para_insumo' %}">
+            {% csrf_token %}
+            <input type="hidden" name="insumo_id" value="{{ p.insumo.pk }}">
+            <button type="submit"
+              class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 text-xs font-medium">
+              <span class="material-symbols-outlined text-sm">add_circle</span> Crear propuesta
+            </button>
+          </form>
+        {% endif %}
+      </div>
+    </div>
+    {% empty %}
+    <div class="bg-white rounded-xl border border-slate-200 p-8 text-center text-slate-400">
+      <span class="material-symbols-outlined text-4xl block mb-2">inbox</span>
+      No hay propuestas generadas aún.
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- Paginación -->
+  {% if propuestas.paginator.num_pages > 1 %}
+  <div class="mt-4 flex flex-wrap items-center justify-between gap-3">
+    <p class="text-sm text-slate-500">Página {{ propuestas.number }} de {{ propuestas.paginator.num_pages }}</p>
     <div class="flex gap-2">
       {% if propuestas.has_previous %}
-      <a href="?page={{ propuestas.previous_page_number }}" class="px-3 py-1 border rounded">Anterior</a>
+      <a href="?page={{ propuestas.previous_page_number }}"
+        class="px-3 py-1.5 border border-slate-200 rounded-lg text-sm hover:bg-slate-50">
+        <span class="material-symbols-outlined text-sm align-middle">chevron_left</span> Anterior
+      </a>
       {% endif %}
       {% if propuestas.has_next %}
-      <a href="?page={{ propuestas.next_page_number }}" class="px-3 py-1 border rounded">Siguiente</a>
+      <a href="?page={{ propuestas.next_page_number }}"
+        class="px-3 py-1.5 border border-slate-200 rounded-lg text-sm hover:bg-slate-50">
+        Siguiente <span class="material-symbols-outlined text-sm align-middle">chevron_right</span>
+      </a>
       {% endif %}
     </div>
   </div>
+  {% endif %}
 </div>
+
+<!-- ── Modales de detalle de propuesta ─────────────────────────────────────── -->
+{% for p in propuestas %}
+{% if p.creada %}
+<div id="modal-propuesta-{{ p.id }}"
+  class="fixed inset-0 bg-black/40 z-50 hidden flex items-center justify-center p-4">
+  <div class="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+    <div class="flex items-center justify-between px-5 py-4 border-b">
+      <h2 class="text-base font-semibold text-slate-800">Detalle propuesta #{{ p.id }}</h2>
+      <button type="button" onclick="closePropuestaModal('{{ p.id }}')"
+        class="p-1 rounded hover:bg-slate-100 text-slate-400">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+    <div class="px-5 py-4 space-y-4 text-sm">
+      <div>
+        <p class="text-xs font-semibold text-slate-500 uppercase mb-2">Orden de Compra</p>
+        {% if p.borrador_oc %}
+        <dl class="grid grid-cols-2 gap-2">
+          <div><dt class="text-xs text-slate-400">ID</dt><dd class="font-medium">#{{ p.borrador_oc.id }}</dd></div>
+          <div><dt class="text-xs text-slate-400">Estado</dt><dd>{{ p.borrador_oc.estado }}</dd></div>
+          <div class="col-span-2"><dt class="text-xs text-slate-400">Proveedor</dt><dd class="font-medium">{{ p.borrador_oc.proveedor }}</dd></div>
+        </dl>
+        {% else %}
+        <p class="text-slate-400">Sin orden de compra asociada.</p>
+        {% endif %}
+      </div>
+      <div>
+        <p class="text-xs font-semibold text-slate-500 uppercase mb-2">Consulta de Stock</p>
+        {% if p.consulta_stock %}
+        <dl class="grid grid-cols-2 gap-2">
+          <div><dt class="text-xs text-slate-400">Proveedor</dt><dd>{{ p.consulta_stock.proveedor }}</dd></div>
+          <div><dt class="text-xs text-slate-400">Estado</dt><dd>{{ p.consulta_stock.estado }}</dd></div>
+          <div><dt class="text-xs text-slate-400">Cantidad</dt><dd>{{ p.consulta_stock.cantidad }}</dd></div>
+          <div><dt class="text-xs text-slate-400">Respuesta</dt><dd>{{ p.consulta_stock.respuesta }}</dd></div>
+        </dl>
+        {% else %}
+        <p class="text-slate-400">Sin consulta registrada.</p>
+        {% endif %}
+      </div>
+    </div>
+    <div class="px-5 py-3 border-t text-right">
+      <button type="button" onclick="closePropuestaModal('{{ p.id }}')"
+        class="px-4 py-2 rounded-lg bg-slate-700 text-white text-sm hover:bg-slate-800">Cerrar</button>
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endfor %}
+
+<!-- ── Modales de cotización ────────────────────────────────────────────────── -->
 {% for prov_id, items in cotizaciones.items %}
 {% with prov=items.0.proveedor_recomendado %}
-<div id="modal-cotizacion-{{ prov_id }}" class="fixed inset-0 bg-black/40 z-50 hidden">
-  <div class="bg-white rounded-xl shadow-xl w-full max-w-2xl mx-auto mt-16 p-0 overflow-hidden">
+<div id="modal-cotizacion-{{ prov_id }}"
+  class="fixed inset-0 bg-black/40 z-50 hidden flex items-center justify-center p-4">
+  <div class="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
     <!-- Header -->
-    <div class="bg-slate-700 text-white px-6 py-4 flex justify-between items-center">
+    <div class="bg-slate-700 text-white px-5 py-4 flex justify-between items-start rounded-t-xl">
       <div>
-        <div class="text-xs text-slate-300 uppercase tracking-wide">Solicitud de Cotización de Insumos</div>
-        <div class="font-bold text-lg">Nº {{ items.0.borrador_oc.id|stringformat:"06d" }}</div>
+        <p class="text-xs text-slate-300 uppercase tracking-wide">Solicitud de Cotización</p>
+        <p class="font-bold text-lg">Nº {{ items.0.borrador_oc.id|stringformat:"06d" }}</p>
       </div>
-      <button type="button" class="p-1 rounded hover:bg-slate-600" onclick="closeCotizacionModal('{{ prov_id }}')">
+      <button type="button" onclick="closeCotizacionModal('{{ prov_id }}')"
+        class="p-1 rounded hover:bg-slate-600 text-white">
         <span class="material-symbols-outlined">close</span>
       </button>
     </div>
     <!-- Empresa + Proveedor -->
-    <div class="flex justify-between px-6 pt-4 pb-2 border-b">
-      <div class="text-sm">
-        <div class="font-bold text-base">{{ empresa_razon_social }}</div>
-        <div class="text-slate-500">{{ empresa_domicilio }}</div>
-        <div class="text-slate-500">IVA: {{ empresa_condicion_iva }}</div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 px-5 pt-4 pb-3 border-b text-sm">
+      <div>
+        <p class="font-bold text-base">{{ empresa_razon_social }}</p>
+        <p class="text-slate-500">{{ empresa_domicilio }}</p>
+        <p class="text-slate-500">IVA: {{ empresa_condicion_iva }}</p>
       </div>
-      <div class="text-sm text-right">
-        <div class="text-slate-500">Proveedor:</div>
-        <div class="font-bold">{{ prov.nombre }}</div>
-        <div class="text-slate-500">CUIT: {{ prov.cuit }}</div>
-        <div class="text-slate-500">{{ prov.direccion }}</div>
-        <div class="text-slate-500">{{ prov.email }}</div>
+      <div class="sm:text-right">
+        <p class="text-slate-500 text-xs">Proveedor:</p>
+        <p class="font-bold">{{ prov.nombre }}</p>
+        <p class="text-slate-500">CUIT: {{ prov.cuit }}</p>
+        <p class="text-slate-500">{{ prov.direccion }}</p>
+        <p class="text-slate-500">{{ prov.email }}</p>
       </div>
     </div>
-    <!-- Fecha Moneda -->
-    <div class="flex gap-8 px-6 py-2 border-b text-sm text-slate-600">
+    <!-- Fecha / Moneda -->
+    <div class="flex flex-wrap gap-6 px-5 py-2 border-b text-sm text-slate-600">
       <div><span class="font-semibold">Fecha:</span> {% now "d/m/Y" %}</div>
       <div><span class="font-semibold">Moneda:</span> ARS</div>
-      <div><span class="font-semibold">Proveedor:</span> {{ prov.nombre }}</div>
     </div>
     <!-- Tabla insumos -->
-    <div class="px-6 py-3">
-      <div class="font-semibold text-sm mb-2">Detalle de Productos</div>
-      <table class="min-w-full text-xs border">
-        <thead class="bg-slate-700 text-white">
-          <tr>
-            <th class="px-2 py-1 text-left border-r border-slate-600">Código</th>
-            <th class="px-2 py-1 text-left border-r border-slate-600">Descripción</th>
-            <th class="px-2 py-1 text-center border-r border-slate-600">Cantidad solicitada</th>
-            <th class="px-2 py-1 text-center">Unidad</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for item in items %}
-          <tr class="{% cycle 'bg-white' 'bg-sky-50' %}">
-            <td class="border px-2 py-1">{{ item.insumo.codigo }}</td>
-            <td class="border px-2 py-1">{{ item.insumo.nombre }}</td>
-            <td class="border px-2 py-1 text-center">{{ item.cantidad_requerida }}</td>
-            <td class="border px-2 py-1 text-center">{{ item.insumo.unidad_medida|default:"unidad" }}</td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-    <!-- Entrega + Generado -->
-    <div class="flex gap-4 px-6 py-3 border-t text-sm">
-      <div class="flex-1">
-        <div class="font-semibold mb-1">Entrega a:</div>
-        <div>{{ empresa_razon_social }}</div>
-        <div class="text-slate-500">{{ empresa_domicilio }}</div>
-        <div class="text-slate-500">Tel: {{ empresa_telefono }}</div>
+    <div class="px-5 py-3">
+      <p class="font-semibold text-sm mb-2">Detalle de Productos</p>
+      <div class="overflow-x-auto">
+        <table class="min-w-full text-xs border border-slate-200 rounded-lg overflow-hidden">
+          <thead class="bg-slate-700 text-white">
+            <tr>
+              <th class="px-3 py-2 text-left">Código</th>
+              <th class="px-3 py-2 text-left">Descripción</th>
+              <th class="px-3 py-2 text-center">Cantidad</th>
+              <th class="px-3 py-2 text-center">Unidad</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100">
+            {% for item in items %}
+            <tr class="{% cycle 'bg-white' 'bg-sky-50' %}">
+              <td class="px-3 py-2">{{ item.insumo.codigo }}</td>
+              <td class="px-3 py-2">{{ item.insumo.nombre }}</td>
+              <td class="px-3 py-2 text-center">{{ item.cantidad_requerida }}</td>
+              <td class="px-3 py-2 text-center">{{ item.insumo.unidad_medida|default:"unidad" }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
       </div>
-      <div class="flex-1 text-right text-slate-600">
-        <div><span class="font-semibold">Generado por:</span> {{ request.user.get_full_name|default:request.user.username }}</div>
-        <div><span class="font-semibold">Fecha:</span> {% now "d/m/Y" %}</div>
+    </div>
+    <!-- Entrega -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 px-5 py-3 border-t text-sm">
+      <div>
+        <p class="font-semibold mb-1">Entrega a:</p>
+        <p>{{ empresa_razon_social }}</p>
+        <p class="text-slate-500">{{ empresa_domicilio }}</p>
+        <p class="text-slate-500">Tel: {{ empresa_telefono }}</p>
+      </div>
+      <div class="sm:text-right text-slate-600">
+        <p><span class="font-semibold">Generado por:</span> {{ request.user.get_full_name|default:request.user.username }}</p>
+        <p><span class="font-semibold">Fecha:</span> {% now "d/m/Y" %}</p>
       </div>
     </div>
     <!-- Firma -->
-    <div class="px-6 pb-4 pt-2 border-t flex gap-8">
-      <div><div class="h-8 border-b border-slate-400 w-28"></div><div class="text-xs text-slate-500 mt-1">Firma autorizada</div></div>
-      <div><div class="h-8 border-b border-slate-400 w-28"></div><div class="text-xs text-slate-500 mt-1">Cargo</div></div>
+    <div class="flex flex-wrap gap-8 px-5 pb-5 pt-3 border-t">
+      <div>
+        <div class="h-8 border-b border-slate-400 w-32"></div>
+        <p class="text-xs text-slate-400 mt-1">Firma autorizada</p>
+      </div>
+      <div>
+        <div class="h-8 border-b border-slate-400 w-32"></div>
+        <p class="text-xs text-slate-400 mt-1">Cargo</p>
+      </div>
     </div>
   </div>
 </div>
@@ -267,21 +409,23 @@
 {% endfor %}
 
 <script>
-  function openCotizacionModal(id) {
-    var m = document.getElementById('modal-cotizacion-' + id);
-    if (m) { m.classList.remove('hidden'); }
+function openCotizacionModal(id) {
+  document.getElementById('modal-cotizacion-' + id)?.classList.remove('hidden');
+}
+function closeCotizacionModal(id) {
+  document.getElementById('modal-cotizacion-' + id)?.classList.add('hidden');
+}
+function openPropuestaModal(id) {
+  document.getElementById('modal-propuesta-' + id)?.classList.remove('hidden');
+}
+function closePropuestaModal(id) {
+  document.getElementById('modal-propuesta-' + id)?.classList.add('hidden');
+}
+// Cerrar modal clickeando el backdrop
+document.addEventListener('click', function(e) {
+  if (e.target.classList.contains('bg-black\\/40')) {
+    e.target.classList.add('hidden');
   }
-  function closeCotizacionModal(id) {
-    var m = document.getElementById('modal-cotizacion-' + id);
-    if (m) { m.classList.add('hidden'); }
-  }
-  function openPropuestaModal(id) {
-    var m = document.getElementById('modal-propuesta-' + id);
-    if (m) { m.classList.remove('hidden'); }
-  }
-  function closePropuestaModal(id) {
-    var m = document.getElementById('modal-propuesta-' + id);
-    if (m) { m.classList.add('hidden'); }
-  }
+});
 </script>
 {% endblock %}

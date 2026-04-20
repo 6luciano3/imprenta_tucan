@@ -53,6 +53,7 @@ class Pedido(models.Model):
             new_estado = self.estado.nombre.lower() if self.estado else ""
             if "proceso" not in old_estado and "proceso" in new_estado:
                 reservar_insumos_para_pedido(self)
+                self._emitir_factura = True  # factura al confirmar producción
             if "cancelad" in new_estado and "cancelad" not in old_estado:
                 ajustar_score_cancelacion(self)
                 # Devolver stock si el pedido ya había consumido insumos.
@@ -63,7 +64,6 @@ class Pedido(models.Model):
                     devolver_insumos_para_pedido(self)
             if "entreg" in new_estado and "entreg" not in old_estado:
                 self._notificar_entrega = True   # se dispara en post_save para tener pk seguro
-                self._emitir_factura = True
 
         super().save(*args, **kwargs)
 

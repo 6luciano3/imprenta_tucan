@@ -458,7 +458,7 @@ def _enviar_whatsapp(destinatario, mensaje, *, asunto=None, html=None, metadata=
 
 # ── Canal: Portal (notificación interna) ─────────────────────────────────────
 
-def _enviar_portal(destinatario, mensaje, *, asunto=None, html=None, metadata=None, attachments=None):
+def _enviar_portal(destinatario, mensaje, *, asunto=None, html=None, metadata=None, attachments=None, reply_to=None):
     """
     Registra la notificación en AutomationLog (visible en el panel interno).
     'destinatario' puede ser un user_id, username o cualquier identificador.

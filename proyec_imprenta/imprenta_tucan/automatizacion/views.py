@@ -84,18 +84,21 @@ def _crear_pedido_desde_oferta(oferta):
         except Exception as e:
             logger.warning(f"_crear_pedido_desde_oferta: no se pudo obtener combo para cliente {cliente.pk}: {e}")
 
-        # Validar stock antes de comprometer el pedido
+        # Advertir si hay stock insuficiente, pero crear el pedido igual en estado pendiente.
+        # El bloqueo por stock ocurre al pasar a "En Proceso", no al crear.
         if lineas_data:
-            from pedidos.utils import verificar_insumos_para_lineas
-            lineas_para_verificar = [(cop.producto, cop.cantidad) for cop in lineas_data]
-            stock_ok, faltantes = verificar_insumos_para_lineas(lineas_para_verificar)
-            if not stock_ok:
-                nombres_faltantes = ', '.join(str(k) for k in faltantes.keys()) if faltantes else 'insumos desconocidos'
-                logger.warning(
-                    f"_crear_pedido_desde_oferta: stock insuficiente para oferta {oferta.id} "
-                    f"(cliente {cliente.pk}). Faltantes: {nombres_faltantes}"
-                )
-                return None
+            try:
+                from pedidos.utils import verificar_insumos_para_lineas
+                lineas_para_verificar = [(cop.producto, cop.cantidad) for cop in lineas_data]
+                stock_ok, faltantes = verificar_insumos_para_lineas(lineas_para_verificar)
+                if not stock_ok:
+                    nombres_faltantes = ', '.join(str(k) for k in faltantes.keys()) if faltantes else 'insumos desconocidos'
+                    logger.warning(
+                        f"_crear_pedido_desde_oferta: stock insuficiente para oferta {oferta.id} "
+                        f"(cliente {cliente.pk}). Faltantes: {nombres_faltantes}. Se crea el pedido igual."
+                    )
+            except Exception:
+                pass
 
         # Marcar oferta como 'aplicada' y crear el Pedido en una sola transacción.
         # Si cualquier paso falla, ambos cambios se revierten automáticamente.
@@ -1441,55 +1444,65 @@ def webhook_consulta_stock(request, propuesta_id):
 def generar_ofertas_ahora(request):
     """
     PROCESO INTELIGENTE AUTOMÁTICO COMPLETO:
-    1. Envía ofertas pendientes que no han sido enviadas aún
-    2. Aprueba automáticamente las ofertas (cambia estado: pendiente → enviada)
-    3. Envía emails automáticamente a los correos reales configurados
+    1. Genera nuevas OfertaPropuesta para el período actual (clientes sin oferta este mes)
+    2. Aprueba automáticamente (pendiente → enviada)
+    3. Envía emails a los clientes
     """
     try:
         from automatizacion.models import OfertaPropuesta, MensajeOferta
         from automatizacion.services import enviar_oferta_email
-        from django.utils import timezone
-        
-        # Obtener ofertas pendientes que no han sido enviadas aún
-        ofertas_nuevas = OfertaPropuesta.objects.filter(
-            estado='pendiente',
-            cliente__isnull=False,
-            cliente__email__isnull=False,
-        ).exclude(cliente__email='').exclude(
-            id__in=MensajeOferta.objects.values_list('oferta_id', flat=True)
-        )[:50]
-        
-        generadas = ofertas_nuevas.count()
+        from core.ai_ml.ofertas import generar_ofertas_segmentadas
+
+        # Paso 1: generar ofertas para el período actual
+        resultado = generar_ofertas_segmentadas()
+        nuevas_generadas = resultado.get('generadas', 0)
+
+        # Paso 2: tomar las 2 mejores ofertas pendientes y enviar una a cada email demo
+        EMAILS_DEMO = ['bookdesignpdas@yahoo.com.ar', '6luciano10@gmail.com']
+        ofertas_top = list(
+            OfertaPropuesta.objects.filter(
+                estado='pendiente',
+                cliente__isnull=False,
+                cliente__email__isnull=False,
+            ).exclude(cliente__email='').exclude(
+                id__in=MensajeOferta.objects.values_list('oferta_id', flat=True)
+            ).order_by('-score_al_generar')[:2]
+        )
+
         enviados = 0
         errores = 0
         destinatarios = []
-        
-        for oferta in ofertas_nuevas:
+
+        for i, oferta in enumerate(ofertas_top):
+            dest = EMAILS_DEMO[i % len(EMAILS_DEMO)]
             try:
-                # AUTOAPROBAR: Cambiar estado a enviada
                 oferta.estado = 'enviada'
                 oferta.fecha_validacion = timezone.now()
                 oferta.accion_aprobacion = 'aprobar'
                 oferta.fecha_aprobacion = timezone.now()
                 oferta.save()
-                
-                # AUTOENVIAR: Enviar email
-                ok, err = enviar_oferta_email(oferta, force=True)
+
+                ok, err = enviar_oferta_email(oferta, force=True, destinatario_override=dest)
                 if ok:
                     MensajeOferta.objects.create(
                         oferta=oferta,
                         cliente=oferta.cliente,
                         estado='enviado',
-                        detalle='Enviada automáticamente por Proceso Inteligente',
+                        detalle=f'Enviada por Proceso Inteligente a {dest}',
                     )
-                    destinatarios.append(f"{oferta.cliente.nombre}")
+                    destinatarios.append(f"{oferta.cliente.nombre} → {dest}")
                     enviados += 1
                 else:
                     errores += 1
-            except Exception as e:
+            except Exception:
                 errores += 1
-        
-        msg = f"Proceso Inteligente: {generadas} pendientes, {enviados} enviadas a {', '.join(destinatarios) or 'emails reales'}, {errores} errores"
+
+        msg = (
+            f"Proceso Inteligente: {nuevas_generadas} generadas, "
+            f"{enviados} enviadas"
+            + (f" a {', '.join(destinatarios)}" if destinatarios else "")
+            + (f", {errores} errores" if errores else "")
+        )
         from urllib.parse import urlencode
         params = urlencode({'ok': '1', 'msg': msg})
     except Exception as e:
